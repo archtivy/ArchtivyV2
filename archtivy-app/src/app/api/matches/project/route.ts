@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getProjectMatches } from "@/lib/matches/queries";
+import type { MatchTier } from "@/lib/matches/types";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getFirstImageUrlPerListingIds, sanitizeListingImageUrl } from "@/lib/db/listingImages";
 
@@ -11,7 +12,7 @@ export interface MatchItem {
   slug: string;
   primary_image: string | null;
   score: number;
-  tier: "verified" | "possible";
+  tier: MatchTier;
   author?: string;
 }
 

@@ -88,7 +88,7 @@ export async function rebuildMatchesFromEmbeddings(): Promise<RebuildResult> {
 
   try {
     const rows = await getImageAiForRebuild();
-    const byKey = new Map<string, { embeddings: number[]; imageIds: string[]; byImage: Map<string, number[]> }>();
+    const byKey = new Map<string, { embeddings: number[][]; imageIds: string[]; byImage: Map<string, number[]> }>();
     for (const r of rows) {
       const key = `${r.listing_type}:${r.listing_id}`;
       let group = byKey.get(key);
