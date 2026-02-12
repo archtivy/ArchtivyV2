@@ -1,0 +1,349 @@
+{
+  "projects": [
+    {
+      "id": "project-1",
+      "title": "Riverside Pavilion",
+      "city": "Berlin",
+      "country": "Germany",
+      "year": 2022,
+      "type": "Pavilion / Cultural",
+      "areaSqft": 2400,
+      "materials": ["Concrete", "Glass", "Steel", "Timber"],
+      "coverImage": "assets/images/placeholder.svg",
+      "galleryImages": ["assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg"],
+      "usedProductIds": ["product-1", "product-2", "product-3", "product-4"],
+      "brandIds": ["brand-1", "brand-2", "brand-3", "brand-4"],
+      "team": [
+        { "role": "Lead Architect", "name": "Anna Müller", "memberProfileUrl": "profile.html" },
+        { "role": "Project Architect", "name": "Jan Weber" },
+        { "role": "Structural", "name": "Lisa Klein" }
+      ],
+      "studioName": "Müller & Associates",
+      "studioProfileUrl": "profile.html",
+      "description": [
+        "Riverside Pavilion reinterprets the relationship between built form and landscape. The structure sits lightly on the riverbank, with cantilevered volumes that frame views toward the water and the city beyond. Materials were selected for durability and low maintenance in a flood-prone zone.",
+        "The project was completed in 2022 and has since been used for public events and temporary exhibitions. Interior and exterior finishes are unified to blur the boundary between inside and out."
+      ]
+    },
+    {
+      "id": "project-2",
+      "title": "Harbor Gallery",
+      "city": "Berlin",
+      "country": "Germany",
+      "year": 2021,
+      "type": "Gallery / Cultural",
+      "areaSqft": 3200,
+      "materials": ["Concrete", "Steel", "Glass"],
+      "coverImage": "assets/images/placeholder.svg",
+      "galleryImages": ["assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg"],
+      "usedProductIds": ["product-3", "product-5", "product-2"],
+      "brandIds": ["brand-3", "brand-2", "brand-1"],
+      "team": [
+        { "role": "Lead Architect", "name": "Anna Müller", "memberProfileUrl": "profile.html" },
+        { "role": "Interior", "name": "Jan Weber" }
+      ],
+      "studioName": "Müller & Associates",
+      "studioProfileUrl": "profile.html",
+      "description": [
+        "Harbor Gallery connects the waterfront with the city through a series of layered volumes and framed views.",
+        "The building houses temporary exhibitions and a permanent collection, with flexible spaces that adapt to different curatorial needs."
+      ]
+    },
+    {
+      "id": "project-3",
+      "title": "Urban Loft Complex",
+      "city": "Berlin",
+      "country": "Germany",
+      "year": 2023,
+      "type": "Residential",
+      "areaSqft": 18000,
+      "materials": ["Concrete", "Brick", "Steel", "Timber"],
+      "coverImage": "assets/images/placeholder.svg",
+      "galleryImages": ["assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg"],
+      "usedProductIds": ["product-1", "product-4", "product-5", "product-6"],
+      "brandIds": ["brand-1", "brand-3", "brand-4"],
+      "team": [
+        { "role": "Lead Architect", "name": "Anna Müller", "memberProfileUrl": "profile.html" },
+        { "role": "Project Architect", "name": "Lisa Klein" }
+      ],
+      "studioName": "Müller & Associates",
+      "studioProfileUrl": "profile.html",
+      "description": [
+        "Urban Loft Complex redefines inner-city living with a mix of residential units and shared amenity spaces.",
+        "The massing responds to the historic context while introducing contemporary materiality and passive strategies."
+      ]
+    },
+    {
+      "id": "project-4",
+      "title": "Library West",
+      "city": "Munich",
+      "country": "Germany",
+      "year": 2020,
+      "type": "Civic / Library",
+      "areaSqft": 45000,
+      "materials": ["Concrete", "Glass", "Wood"],
+      "coverImage": "assets/images/placeholder.svg",
+      "galleryImages": ["assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg"],
+      "usedProductIds": ["product-1", "product-3", "product-4"],
+      "brandIds": ["brand-1", "brand-3", "brand-4"],
+      "team": [
+        { "role": "Lead Architect", "name": "Anna Müller", "memberProfileUrl": "profile.html" },
+        { "role": "Structural", "name": "Jan Weber" },
+        { "role": "MEP", "name": "Tom Schmidt" }
+      ],
+      "studioName": "Müller & Associates",
+      "studioProfileUrl": "profile.html",
+      "description": [
+        "Library West serves as a civic anchor and community resource with open reading rooms and archive facilities.",
+        "Daylight and acoustic design were prioritized to support long-term use and accessibility."
+      ]
+    },
+    {
+      "id": "project-5",
+      "title": "Market Hall",
+      "city": "Hamburg",
+      "country": "Germany",
+      "year": 2022,
+      "type": "Commercial / Market",
+      "areaSqft": 12000,
+      "materials": ["Steel", "Glass", "Timber"],
+      "coverImage": "assets/images/placeholder.svg",
+      "galleryImages": ["assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg"],
+      "usedProductIds": ["product-2", "product-3", "product-5"],
+      "brandIds": ["brand-2", "brand-3", "brand-4"],
+      "team": [
+        { "role": "Lead Architect", "name": "Jan Weber" },
+        { "role": "Interior", "name": "Lisa Klein" }
+      ],
+      "studioName": "Studio North",
+      "studioProfileUrl": "profile.html",
+      "description": [
+        "Market Hall revitalizes a historic market site with a new roof structure and vendor stalls.",
+        "The design preserves the existing footprint while improving circulation and environmental performance."
+      ]
+    },
+    {
+      "id": "project-6",
+      "title": "Campus Hub",
+      "city": "Berlin",
+      "country": "Germany",
+      "year": 2023,
+      "type": "Education",
+      "areaSqft": 28000,
+      "materials": ["Concrete", "Glass", "Steel"],
+      "coverImage": "assets/images/placeholder.svg",
+      "galleryImages": ["assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg"],
+      "usedProductIds": ["product-1", "product-3", "product-5", "product-6"],
+      "brandIds": ["brand-1", "brand-3", "brand-4"],
+      "team": [
+        { "role": "Lead Architect", "name": "Anna Müller", "memberProfileUrl": "profile.html" }
+      ],
+      "studioName": "Müller & Associates",
+      "studioProfileUrl": "profile.html",
+      "description": [
+        "Campus Hub consolidates student services and social spaces into a single landmark building.",
+        "The facade and interior use a consistent material palette to reinforce wayfinding and identity."
+      ]
+    },
+    {
+      "id": "project-7",
+      "title": "Waterfront Offices",
+      "city": "Berlin",
+      "country": "Germany",
+      "year": 2021,
+      "type": "Office",
+      "areaSqft": 35000,
+      "materials": ["Glass", "Steel", "Concrete"],
+      "coverImage": "assets/images/placeholder.svg",
+      "galleryImages": ["assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg"],
+      "usedProductIds": ["product-3", "product-4", "product-5"],
+      "brandIds": ["brand-3", "brand-4"],
+      "team": [
+        { "role": "Lead Architect", "name": "Lisa Klein" },
+        { "role": "Facade", "name": "Tom Schmidt" }
+      ],
+      "studioName": "Studio North",
+      "studioProfileUrl": "profile.html",
+      "description": [
+        "Waterfront Offices provide flexible floor plates and strong connectivity to the river and public transport.",
+        "The building targets high environmental standards and has achieved certification for both energy and wellbeing."
+      ]
+    }
+  ],
+  "products": [
+    {
+      "id": "product-1",
+      "name": "Concrete Panel A2",
+      "brandName": "MaterialBrand",
+      "brandProfileUrl": "profile.html",
+      "productType": "Cladding / Panel",
+      "materials": ["Aluminum", "Concrete composite"],
+      "colorOptions": ["Grey", "White", "Graphite", "Custom"],
+      "year": 2020,
+      "customOrder": true,
+      "heroImage": "assets/images/placeholder.svg",
+      "galleryImages": ["assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg"],
+      "usedInProjectIds": ["project-1", "project-3", "project-4", "project-6"],
+      "files": [
+        { "type": "MAX", "filename": "panel_a2_model.max", "size": "24 MB", "category": "3d" },
+        { "type": "FBX", "filename": "panel_a2_model.fbx", "size": "18 MB", "category": "3d" },
+        { "type": "DWG", "filename": "panel_a2_detail.dwg", "size": "2.1 MB", "category": "cad" },
+        { "type": "RFA", "filename": "panel_a2_revit.rfa", "size": "1.8 MB", "category": "cad" },
+        { "type": "PDF", "filename": "catalog_2026.pdf", "size": "12 MB", "category": "catalog" },
+        { "type": "PDF", "filename": "spec_sheet.pdf", "size": "340 KB", "category": "catalog" },
+        { "type": "PDF", "filename": "care_instructions.pdf", "size": "156 KB", "category": "care" }
+      ],
+      "team": [
+        { "role": "Lead Designer", "name": "Anna Müller", "memberProfileUrl": "profile.html" },
+        { "role": "Product Designer", "name": "Jan Weber" },
+        { "role": "Engineer", "name": "Lisa Klein" },
+        { "role": "Lighting Consultant", "name": "Tom Schmidt" }
+      ],
+      "description": [
+        "Concrete Panel A2 is a precast cladding system for facades and interior feature walls.",
+        "Available in multiple finishes and dimensions, with options for integrated insulation and fixings."
+      ]
+    },
+    {
+      "id": "product-2",
+      "name": "Floor Tile River",
+      "brandName": "TileCo",
+      "brandProfileUrl": "profile.html",
+      "productType": "Tile / Flooring",
+      "materials": ["Ceramic", "Glaze"],
+      "colorOptions": ["Grey", "White", "Terrazzo", "Blue", "Green", "Custom"],
+      "year": 2019,
+      "customOrder": true,
+      "heroImage": "assets/images/placeholder.svg",
+      "galleryImages": ["assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg"],
+      "usedInProjectIds": ["project-1", "project-2", "project-5"],
+      "files": [
+        { "type": "FBX", "filename": "tile_river.fbx", "size": "8 MB", "category": "3d" },
+        { "type": "PDF", "filename": "tile_river_spec.pdf", "size": "420 KB", "category": "catalog" },
+        { "type": "PDF", "filename": "installation.pdf", "size": "200 KB", "category": "care" }
+      ],
+      "team": [
+        { "role": "Product Designer", "name": "Jan Weber" },
+        { "role": "Engineer", "name": "Lisa Klein" }
+      ],
+      "description": [
+        "Floor Tile River is a large-format ceramic tile with a fluid, stone-like appearance.",
+        "Suitable for interior floors and walls in commercial and residential applications."
+      ]
+    },
+    {
+      "id": "product-3",
+      "name": "Linear Pendant L1",
+      "brandName": "LightStudio",
+      "brandProfileUrl": "profile.html",
+      "productType": "Pendant / Linear fixture",
+      "materials": ["Aluminum", "Opal glass"],
+      "colorOptions": ["White", "Black", "Graphite", "Brushed"],
+      "year": 2021,
+      "customOrder": true,
+      "heroImage": "assets/images/placeholder.svg",
+      "galleryImages": ["assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg"],
+      "usedInProjectIds": ["project-1", "project-2", "project-3", "project-4", "project-5", "project-6", "project-7"],
+      "files": [
+        { "type": "MAX", "filename": "chair_model_v1.max", "size": "24 MB", "category": "3d" },
+        { "type": "FBX", "filename": "chair_model_v1.fbx", "size": "18 MB", "category": "3d" },
+        { "type": "DWG", "filename": "chair_detail.dwg", "size": "2.1 MB", "category": "cad" },
+        { "type": "RFA", "filename": "chair_revit.rfa", "size": "1.8 MB", "category": "cad" },
+        { "type": "PDF", "filename": "catalog_2026.pdf", "size": "12 MB", "category": "catalog" },
+        { "type": "PDF", "filename": "spec_sheet.pdf", "size": "340 KB", "category": "catalog" },
+        { "type": "PDF", "filename": "care_instructions.pdf", "size": "156 KB", "category": "care" }
+      ],
+      "team": [
+        { "role": "Lead Designer", "name": "Anna Müller", "memberProfileUrl": "profile.html" },
+        { "role": "Product Designer", "name": "Jan Weber" },
+        { "role": "Engineer", "name": "Lisa Klein" }
+      ],
+      "description": [
+        "Linear Pendant L1 is a minimal suspension fixture designed for architectural and commercial interiors. The extruded aluminum body and opal glass diffuser provide even, glare-free illumination suitable for workspaces, corridors, and retail environments.",
+        "Available in multiple lengths and finishes, the system can be specified as single units or continuous runs. Mounting and wiring options support surface, pendant, and cable installations. All components are replaceable to extend product life."
+      ]
+    },
+    {
+      "id": "product-4",
+      "name": "Glazing System G4",
+      "brandName": "GlassWorks",
+      "brandProfileUrl": "profile.html",
+      "productType": "Glazing / Facade",
+      "materials": ["Glass", "Aluminum", "Sealant"],
+      "colorOptions": ["Clear", "Grey", "Bronze", "Green"],
+      "year": 2020,
+      "customOrder": true,
+      "heroImage": "assets/images/placeholder.svg",
+      "galleryImages": ["assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg"],
+      "usedInProjectIds": ["project-1", "project-3", "project-4", "project-7"],
+      "files": [
+        { "type": "DWG", "filename": "g4_detail.dwg", "size": "3 MB", "category": "cad" },
+        { "type": "PDF", "filename": "g4_spec.pdf", "size": "1.2 MB", "category": "catalog" }
+      ],
+      "team": [
+        { "role": "Lead Engineer", "name": "Lisa Klein" },
+        { "role": "Facade", "name": "Tom Schmidt" }
+      ],
+      "description": [
+        "Glazing System G4 is a unitized curtain wall and window system for commercial and high-rise applications.",
+        "Configurable for different spans and loads, with options for double skin and integrated shading."
+      ]
+    },
+    {
+      "id": "product-5",
+      "name": "Linear Pendant L2",
+      "brandName": "LightStudio",
+      "brandProfileUrl": "profile.html",
+      "productType": "Pendant / Linear fixture",
+      "materials": ["Aluminum", "Polycarbonate"],
+      "colorOptions": ["White", "Black", "Silver"],
+      "year": 2022,
+      "customOrder": false,
+      "heroImage": "assets/images/placeholder.svg",
+      "galleryImages": ["assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg"],
+      "usedInProjectIds": ["project-2", "project-3", "project-5", "project-6", "project-7"],
+      "files": [
+        { "type": "FBX", "filename": "l2_model.fbx", "size": "14 MB", "category": "3d" },
+        { "type": "PDF", "filename": "l2_spec.pdf", "size": "280 KB", "category": "catalog" }
+      ],
+      "team": [
+        { "role": "Lead Designer", "name": "Anna Müller", "memberProfileUrl": "profile.html" }
+      ],
+      "description": [
+        "Linear Pendant L2 is a compact linear fixture for corridors and task areas.",
+        "Designed for quick installation and compatibility with standard suspension systems."
+      ]
+    },
+    {
+      "id": "product-6",
+      "name": "Wall Sconce S1",
+      "brandName": "LightStudio",
+      "brandProfileUrl": "profile.html",
+      "productType": "Wall / Sconce",
+      "materials": ["Aluminum", "Glass"],
+      "colorOptions": ["White", "Black", "Brushed"],
+      "year": 2021,
+      "customOrder": true,
+      "heroImage": "assets/images/placeholder.svg",
+      "galleryImages": ["assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg", "assets/images/placeholder.svg"],
+      "usedInProjectIds": ["project-3", "project-6"],
+      "files": [
+        { "type": "RFA", "filename": "s1_revit.rfa", "size": "1.2 MB", "category": "cad" },
+        { "type": "PDF", "filename": "s1_spec.pdf", "size": "180 KB", "category": "catalog" }
+      ],
+      "team": [
+        { "role": "Product Designer", "name": "Jan Weber" }
+      ],
+      "description": [
+        "Wall Sconce S1 provides indirect wall wash and accent lighting for lobbies and corridors.",
+        "Available in single and twin configurations with optional sensors."
+      ]
+    }
+  ],
+  "brands": [
+    { "id": "brand-1", "name": "MaterialBrand", "logoPlaceholder": true, "profileUrl": "profile.html" },
+    { "id": "brand-2", "name": "TileCo", "logoPlaceholder": true, "profileUrl": "profile.html" },
+    { "id": "brand-3", "name": "LightStudio", "logoPlaceholder": true, "profileUrl": "profile.html" },
+    { "id": "brand-4", "name": "GlassWorks", "logoPlaceholder": true, "profileUrl": "profile.html" }
+  ]
+}

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team profile · Archtivy v2</title>
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a href="index.html" class="logo">Archtivy v2</a>
+      <nav class="nav">
+        <a href="index.html">Home</a>
+        <a href="projects.html">Projects</a>
+        <a href="products.html">Products</a>
+        <a href="profile.html">Profile</a>
+      </nav>
+      <div class="header-actions" id="header-actions">
+        <span class="header-guest">
+          <a href="profile.html?edit=1" class="btn btn-header">Create profile</a>
+          <button type="button" class="btn btn-secondary btn-header" id="header-sign-in">Sign in</button>
+        </span>
+        <span class="header-user">
+          <span class="user-chip">Mustafa</span>
+          <a href="#" id="header-sign-out">Sign out</a>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="claim-hero" aria-labelledby="claim-name">
+      <h1 class="claim-name" id="team-name">—</h1>
+      <p class="claim-role" id="team-role">—</p>
+      <span class="claim-badge">Credited on Archtivy</span>
+    </section>
+
+    <section class="project-section" aria-labelledby="tagged-heading">
+      <h2 id="tagged-heading" class="section-title">Tagged projects</h2>
+      <ul class="card tagged-list">
+        <li><a href="project.html?id=project-1">Riverside Pavilion</a></li>
+        <li><a href="project.html?id=project-2">Harbor Gallery</a></li>
+        <li><a href="project.html?id=project-3">Urban Loft Complex</a></li>
+      </ul>
+    </section>
+
+    <div class="claim-cta-card">
+      <h2>Claim this profile</h2>
+      <p>Verify your email to manage this profile and add your work.</p>
+      <button type="button" class="btn" id="claim-profile-btn">Claim this profile</button>
+      <p class="claim-note">This profile was created from project credits.</p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    Archtivy v2 · Minimal starter
+  </footer>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var name = params.get('name') || '—';
+      var role = params.get('role') || '—';
+      var nameEl = document.getElementById('team-name');
+      var roleEl = document.getElementById('team-role');
+      if (nameEl) nameEl.textContent = name;
+      if (roleEl) roleEl.textContent = role;
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Archtivy palette: accent-only (buttons, links, active states, focus rings). Backgrounds/surfaces/text use default theme. */

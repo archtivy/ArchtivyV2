@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project · Archtivy v2</title>
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a href="index.html" class="logo">Archtivy v2</a>
+      <nav class="nav">
+        <a href="index.html">Home</a>
+        <a href="projects.html">Projects</a>
+        <a href="products.html">Products</a>
+        <a href="profile.html">Profile</a>
+      </nav>
+      <div class="header-actions" id="header-actions">
+        <span class="header-guest">
+          <a href="profile.html?edit=1" class="btn btn-header">Create profile</a>
+          <button type="button" class="btn btn-secondary btn-header" id="header-sign-in">Sign in</button>
+        </span>
+        <span class="header-user">
+          <span class="user-chip">Mustafa</span>
+          <a href="#" id="header-sign-out">Sign out</a>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="project-main">
+    <!-- Hero -->
+    <section class="project-hero" aria-labelledby="project-title">
+      <div class="project-cover" id="project-cover" aria-hidden="true">
+        <span>Cover image</span>
+      </div>
+      <div class="project-hero-body">
+        <h1 id="project-title">—</h1>
+        <div class="project-meta" id="project-meta">—</div>
+        <div class="project-badges" id="project-badges">
+          <span>—</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Intro -->
+    <section class="project-intro" id="project-intro">
+      <p>—</p>
+    </section>
+
+    <!-- Gallery -->
+    <section class="project-section" aria-labelledby="gallery-heading">
+      <h2 id="gallery-heading" class="section-title">Gallery</h2>
+      <div class="project-gallery" id="project-gallery" role="list">
+        <div class="project-gallery-item" role="listitem" data-lightbox-src="assets/images/placeholder.svg" tabindex="0"><span>1</span></div>
+      </div>
+    </section>
+
+    <!-- Lightbox -->
+    <div class="lightbox" id="gallery-lightbox" role="dialog" aria-modal="true" aria-label="Image lightbox" hidden>
+      <div class="lightbox-inner">
+        <div class="lightbox-image-wrap">
+          <img id="lightbox-image" src="" alt="Project image" />
+        </div>
+        <aside class="lightbox-sidebar">
+          <div class="lightbox-actions">
+            <button type="button" class="btn btn-secondary">Save</button>
+            <button type="button" class="btn btn-secondary">Share</button>
+          </div>
+          <h3>Used Products</h3>
+          <div class="lightbox-products" id="lightbox-products"></div>
+        </aside>
+      </div>
+      <button type="button" class="lightbox-close" id="lightbox-close" aria-label="Close lightbox">&times;</button>
+    </div>
+
+    <!-- Spec block -->
+    <section class="project-section" aria-labelledby="spec-heading">
+      <h2 id="spec-heading" class="section-title">Details</h2>
+      <dl class="project-spec" id="project-spec"></dl>
+    </section>
+
+    <!-- Used in this project -->
+    <section class="project-section" aria-labelledby="used-products-heading">
+      <h2 id="used-products-heading" class="section-title">Used in this project</h2>
+      <div class="products-grid" id="project-used-products"></div>
+    </section>
+
+    <!-- Brands used -->
+    <section class="project-section brands-strip" aria-labelledby="brands-heading">
+      <h2 id="brands-heading" class="section-title">Brands used</h2>
+      <div class="brands-logos" id="project-brands-logos"></div>
+    </section>
+
+    <!-- Nearby projects -->
+    <section class="project-section" aria-labelledby="nearby-heading">
+      <h2 id="nearby-heading" class="section-title">Nearby projects</h2>
+      <div class="nearby-grid" id="project-nearby"></div>
+    </section>
+
+    <!-- More from this studio -->
+    <section class="project-section" aria-labelledby="studio-heading">
+      <h2 id="studio-heading" class="section-title">More from this studio</h2>
+      <div class="studio-grid" id="project-more-studio"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    Archtivy v2 · Minimal starter
+  </footer>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

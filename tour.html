@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demo tour · Archtivy v2</title>
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a href="index.html" class="logo">Archtivy v2</a>
+      <nav class="nav">
+        <a href="index.html">Home</a>
+        <a href="projects.html">Projects</a>
+        <a href="products.html">Products</a>
+        <a href="profile.html">Profile</a>
+      </nav>
+      <div class="header-actions" id="header-actions">
+        <span class="header-guest">
+          <a href="profile.html?edit=1" class="btn btn-header">Create profile</a>
+          <button type="button" class="btn btn-secondary btn-header" id="header-sign-in">Sign in</button>
+        </span>
+        <span class="header-user">
+          <span class="user-chip">Mustafa</span>
+          <a href="#" id="header-sign-out">Sign out</a>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="tour-main">
+    <header class="tour-header">
+      <h1 class="page-title">Demo tour</h1>
+      <p class="page-intro">Click each step to open the screen in a new tab. Follow in order to see the full flow.</p>
+    </header>
+
+    <div class="tour-toggle-wrap" role="group" aria-label="Demo member mode">
+      <button type="button" class="tour-toggle" id="tour-member-toggle" aria-pressed="false" aria-label="Toggle demo member mode">Toggle</button>
+      <span id="tour-toggle-label">Demo member mode off — links open as guest</span>
+    </div>
+
+    <div class="tour-steps">
+      <a href="project.html?id=project-1" class="tour-step-card" target="_blank" rel="noopener noreferrer" id="tour-step-1" data-href="project.html?id=project-1" data-href-member="project.html?id=project-1&user=member">
+        <span class="tour-step-num">Step 1</span>
+        <h2 class="tour-step-title">Project page</h2>
+        <p class="tour-step-desc">See a full project: hero, gallery with lightbox, used products, specs, team credits, and nearby projects.</p>
+      </a>
+      <a href="product.html?id=product-1" class="tour-step-card" target="_blank" rel="noopener noreferrer" id="tour-step-2" data-href="product.html?id=product-1" data-href-member="product.html?id=product-1&user=member">
+        <span class="tour-step-num">Step 2</span>
+        <h2 class="tour-step-title">Product page (guest)</h2>
+        <p class="tour-step-desc">Product detail with gallery, specs, and files. Download buttons are locked until you sign in.</p>
+      </a>
+      <a href="product.html?id=product-1&user=member" class="tour-step-card" target="_blank" rel="noopener noreferrer" id="tour-step-3" data-href="product.html?id=product-1" data-href-member="product.html?id=product-1&user=member">
+        <span class="tour-step-num">Step 3</span>
+        <h2 class="tour-step-title">Product page (member)</h2>
+        <p class="tour-step-desc">Same product in member mode: download buttons are unlocked so you can access files.</p>
+      </a>
+      <a href="team-profile.html?name=Alex%20Morgan&role=Architect" class="tour-step-card" target="_blank" rel="noopener noreferrer" id="tour-step-4" data-href="team-profile.html?name=Alex%20Morgan&role=Architect" data-href-member="team-profile.html?name=Alex%20Morgan&role=Architect&user=member">
+        <span class="tour-step-num">Step 4</span>
+        <h2 class="tour-step-title">Claim profile</h2>
+        <p class="tour-step-desc">Credited team members who aren’t yet on the platform see this page; they can claim the profile and verify their email.</p>
+      </a>
+      <a href="projects.html" class="tour-step-card" target="_blank" rel="noopener noreferrer" id="tour-step-5" data-href="projects.html" data-href-member="projects.html?user=member">
+        <span class="tour-step-num">Step 5</span>
+        <h2 class="tour-step-title">Explore projects</h2>
+        <p class="tour-step-desc">Browse all projects with search and type filters; click any card to open the project detail.</p>
+      </a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    Archtivy v2 · Minimal starter
+  </footer>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (function () {
+      var toggle = document.getElementById('tour-member-toggle');
+      var label = document.getElementById('tour-toggle-label');
+      var cards = document.querySelectorAll('.tour-step-card[data-href]');
+
+      function updateLinks() {
+        var isOn = toggle && toggle.getAttribute('aria-pressed') === 'true';
+        cards.forEach(function (card) {
+          var href = isOn ? (card.getAttribute('data-href-member') || card.getAttribute('data-href')) : card.getAttribute('data-href');
+          if (href) card.setAttribute('href', href);
+        });
+        if (label) label.textContent = isOn ? 'Demo member mode on — links include &user=member' : 'Demo member mode off — links open as guest';
+      }
+
+      if (toggle) {
+        toggle.addEventListener('click', function () {
+          var pressed = toggle.getAttribute('aria-pressed') === 'true';
+          toggle.setAttribute('aria-pressed', !pressed);
+          toggle.classList.toggle('is-on', !pressed);
+          updateLinks();
+        });
+      }
+      updateLinks();
+    })();
+  </script>
+</body>
+</html>

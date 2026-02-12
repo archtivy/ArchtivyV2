@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product · Archtivy v2</title>
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a href="index.html" class="logo">Archtivy v2</a>
+      <nav class="nav">
+        <a href="index.html">Home</a>
+        <a href="projects.html">Projects</a>
+        <a href="products.html">Products</a>
+        <a href="profile.html">Profile</a>
+      </nav>
+      <div class="header-actions" id="header-actions">
+        <span class="header-guest">
+          <a href="profile.html?edit=1" class="btn btn-header">Create profile</a>
+          <button type="button" class="btn btn-secondary btn-header" id="header-sign-in">Sign in</button>
+        </span>
+        <span class="header-user">
+          <span class="user-chip">Mustafa</span>
+          <a href="#" id="header-sign-out">Sign out</a>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="product-main">
+    <!-- Product hero -->
+    <section class="product-hero" aria-labelledby="product-title">
+      <div class="product-image-wrap" id="product-hero-image" aria-hidden="true">
+        <span>Product image</span>
+      </div>
+      <div class="product-hero-body">
+        <h1 id="product-title">—</h1>
+        <a href="profile.html" class="brand-link" id="product-brand-link">—</a>
+        <div class="product-badges" id="product-badges">
+          <span>—</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Product description -->
+    <section class="product-description" id="product-description">
+      <p>—</p>
+    </section>
+
+    <!-- Product gallery -->
+    <section class="product-section" aria-labelledby="product-gallery-heading">
+      <h2 id="product-gallery-heading" class="section-title">Gallery</h2>
+      <div class="product-gallery" id="product-gallery" role="list">
+        <div class="product-gallery-item" role="listitem" data-lightbox-src="assets/images/placeholder.svg" data-index="0" tabindex="0"><span>1</span></div>
+      </div>
+    </section>
+
+    <!-- Product lightbox -->
+    <div class="lightbox" id="product-lightbox" role="dialog" aria-modal="true" aria-label="Product image lightbox" hidden>
+      <div class="lightbox-top-bar">
+        <button type="button" class="lightbox-close" id="product-lightbox-close" aria-label="Close lightbox">&times;</button>
+        <div class="lightbox-actions">
+          <button type="button" class="btn btn-secondary">Save</button>
+          <button type="button" class="btn btn-secondary">Share</button>
+        </div>
+      </div>
+      <div class="lightbox-inner">
+        <div class="lightbox-image-wrap">
+          <img id="product-lightbox-image" src="" alt="Product image" />
+          <div class="lightbox-nav" aria-hidden="true">
+            <button type="button" class="lightbox-prev" id="product-lightbox-prev" aria-label="Previous image">&larr;</button>
+            <span class="lightbox-counter" id="product-lightbox-counter">1 / 10</span>
+            <button type="button" class="lightbox-next" id="product-lightbox-next" aria-label="Next image">&rarr;</button>
+          </div>
+        </div>
+        <aside class="lightbox-sidebar">
+          <p class="lightbox-product-title" id="product-lightbox-title">—</p>
+          <a href="profile.html" class="lightbox-product-brand" id="product-lightbox-brand">—</a>
+          <div class="lightbox-sidebar-section">
+            <h3 class="section-label">Designed &amp; developed by</h3>
+            <ul class="lightbox-team-list" id="product-lightbox-team"></ul>
+          </div>
+          <div class="lightbox-sidebar-section">
+            <h3 class="section-label">Quick files</h3>
+            <ul class="lightbox-quick-files" id="product-lightbox-quick-files"></ul>
+          </div>
+          <div class="lightbox-sidebar-section">
+            <h3 class="section-label">Used in projects</h3>
+            <ul class="lightbox-mini-projects" id="product-lightbox-projects"></ul>
+          </div>
+          <p class="lightbox-view-all">
+            <a href="#files-heading" class="lightbox-scroll-files">View all files</a><br />
+            <a href="#used-projects-heading" class="lightbox-scroll-projects">View all projects</a>
+          </p>
+        </aside>
+      </div>
+    </div>
+
+    <!-- Product team -->
+    <section class="product-section product-team" aria-labelledby="product-team-heading">
+      <h2 id="product-team-heading" class="section-title">Designed &amp; developed by</h2>
+      <ul class="product-team-list" id="product-team-list"></ul>
+    </section>
+
+    <!-- Used in projects -->
+    <section class="product-section" aria-labelledby="used-projects-heading">
+      <h2 id="used-projects-heading" class="section-title">Used in projects</h2>
+      <div class="used-in-projects-grid" id="product-used-projects"></div>
+    </section>
+
+    <!-- Product specs -->
+    <section class="product-section" aria-labelledby="spec-heading">
+      <h2 id="spec-heading" class="section-title">Specs</h2>
+      <dl class="product-spec" id="product-spec"></dl>
+    </section>
+
+    <!-- Product files -->
+    <section class="product-section files-section" aria-labelledby="files-heading">
+      <h2 id="files-heading" class="section-title">Files</h2>
+      <div id="product-files"></div>
+      <p class="files-note">Files are provided by the brand/designer. Some files may require membership to download.</p>
+    </section>
+
+    <!-- More from this brand -->
+    <section class="product-section" aria-labelledby="more-brand-heading">
+      <h2 id="more-brand-heading" class="section-title">More from this brand</h2>
+      <div class="products-grid-3" id="product-more-brand"></div>
+    </section>
+
+    <!-- Related products -->
+    <section class="product-section" aria-labelledby="related-heading">
+      <h2 id="related-heading" class="section-title">Related products</h2>
+      <div class="products-grid-6" id="product-related"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    Archtivy v2 · Minimal starter
+  </footer>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

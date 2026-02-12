@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile · Archtivy v2</title>
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a href="index.html" class="logo">Archtivy v2</a>
+      <nav class="nav">
+        <a href="index.html">Home</a>
+        <a href="projects.html">Projects</a>
+        <a href="products.html">Products</a>
+        <a href="profile.html" aria-current="page">Profile</a>
+      </nav>
+      <div class="header-actions" id="header-actions">
+        <span class="header-guest">
+          <a href="profile.html?edit=1" class="btn btn-header">Create profile</a>
+          <button type="button" class="btn btn-secondary btn-header" id="header-sign-in">Sign in</button>
+        </span>
+        <span class="header-user">
+          <span class="user-chip">Mustafa</span>
+          <a href="#" id="header-sign-out">Sign out</a>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Edit mode: visible when ?edit=1 -->
+    <div id="profile-edit-view" class="profile-edit-view" hidden>
+      <h1 class="page-title">Edit profile</h1>
+      <p class="page-intro">Update your public profile.</p>
+      <div class="profile-stats" id="profile-stats">
+        <div class="profile-stats-item">
+          <span class="value" id="profile-stat-projects">—</span>
+          <span class="label">Projects</span>
+        </div>
+        <div class="profile-stats-item">
+          <span class="value" id="profile-stat-products">—</span>
+          <span class="label">Products</span>
+        </div>
+        <div class="profile-stats-item">
+          <span class="value" id="profile-stat-tagged">—</span>
+          <span class="label">Tagged</span>
+        </div>
+      </div>
+      <form class="profile-edit-form" id="profile-edit-form">
+        <div class="form-group">
+          <label for="profile-bio">Bio</label>
+          <textarea id="profile-bio" placeholder="Short bio…"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="profile-location">Location</label>
+          <input type="text" id="profile-location" placeholder="City, Country" />
+        </div>
+        <button type="submit" class="btn">Save</button>
+      </form>
+    </div>
+
+    <!-- Public view: visible when not edit mode -->
+    <div id="profile-public-view" class="profile-public-view">
+      <p id="profile-edit-link-wrap" class="profile-edit-link" hidden>
+        <a href="profile.html?edit=1&user=member" id="profile-edit-link">Edit profile</a>
+      </p>
+      <h1 class="page-title">Profile</h1>
+      <p class="page-intro">User or account profile placeholder.</p>
+      <div class="card">
+        <h2>Profile details</h2>
+        <p id="profile-public-bio">Add profile content, settings, or account info here.</p>
+        <p id="profile-public-location" class="profile-meta"></p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    Archtivy v2 · Minimal starter
+  </footer>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search || '');
+      var isEdit = params.get('edit') === '1';
+      var isMember = params.get('user') === 'member';
+
+      var editView = document.getElementById('profile-edit-view');
+      var publicView = document.getElementById('profile-public-view');
+      var editLinkWrap = document.getElementById('profile-edit-link-wrap');
+
+      if (isEdit) {
+        if (editView) { editView.hidden = false; editView.removeAttribute('hidden'); }
+        if (publicView) publicView.setAttribute('hidden', '');
+        if (document.getElementById('profile-stat-projects')) document.getElementById('profile-stat-projects').textContent = '0';
+        if (document.getElementById('profile-stat-products')) document.getElementById('profile-stat-products').textContent = '0';
+        if (document.getElementById('profile-stat-tagged')) document.getElementById('profile-stat-tagged').textContent = '0';
+        var bioInput = document.getElementById('profile-bio');
+        var locInput = document.getElementById('profile-location');
+        if (bioInput && localStorage.getItem('profile-bio')) bioInput.value = localStorage.getItem('profile-bio');
+        if (locInput && localStorage.getItem('profile-location')) locInput.value = localStorage.getItem('profile-location');
+        var form = document.getElementById('profile-edit-form');
+        if (form) {
+          form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var bio = document.getElementById('profile-bio');
+            var loc = document.getElementById('profile-location');
+            if (bio) localStorage.setItem('profile-bio', bio.value);
+            if (loc) localStorage.setItem('profile-location', loc.value);
+            window.location.href = 'profile.html' + (isMember ? '?user=member' : '');
+          });
+        }
+      } else {
+        if (editView) editView.setAttribute('hidden', '');
+        if (publicView) publicView.removeAttribute('hidden');
+        if (isMember && editLinkWrap) { editLinkWrap.hidden = false; editLinkWrap.removeAttribute('hidden'); }
+        var publicBio = document.getElementById('profile-public-bio');
+        var publicLoc = document.getElementById('profile-public-location');
+        if (publicBio && localStorage.getItem('profile-bio')) publicBio.textContent = localStorage.getItem('profile-bio');
+        if (publicLoc && localStorage.getItem('profile-location')) publicLoc.textContent = localStorage.getItem('profile-location');
+      }
+    })();
+  </script>
+</body>
+</html>
