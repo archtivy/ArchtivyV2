@@ -1,15 +1,13 @@
-import { getProjectsCanonicalFiltered, getExploreStats } from "@/lib/db/explore";
+import { getProjectsCanonicalFiltered, getExploreNetworkCounts } from "@/lib/db/explore";
 import { EXPLORE_PAGE_SIZE } from "@/lib/db/explore";
 import { parseExploreFilters } from "@/lib/explore/filters/parse";
 import { exploreFiltersToProjectFilters } from "@/lib/explore/filters/query";
 import { getExploreFilterOptions } from "@/lib/explore/filters/options";
 import { ExploreFilterBar } from "@/components/explore/ExploreFilterBar";
-import { ExploreStatsStrip } from "@/components/explore/ExploreStatsStrip";
+import { ExploreCountsHero } from "@/components/explore/ExploreCountsHero";
 import { ExploreProjectsContent } from "@/components/explore/ExploreProjectsContent";
 import { ExploreSearchBar } from "@/components/search/ExploreSearchBar";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Button } from "@/components/ui/Button";
-import { ExploreClearSearchLinks } from "@/components/explore/ExploreClearSearchLinks";
+import { ExploreEmptyState } from "@/components/explore/ExploreEmptyState";
 
 export default async function ExploreProjectsPage({
   searchParams,
@@ -20,7 +18,7 @@ export default async function ExploreProjectsPage({
   const filters = parseExploreFilters(params, "projects");
   const projectFilters = exploreFiltersToProjectFilters(filters);
 
-  const [result, options, stats] = await Promise.all([
+  const [result, options, networkCounts] = await Promise.all([
     getProjectsCanonicalFiltered({
       filters: projectFilters,
       limit: EXPLORE_PAGE_SIZE,
@@ -28,70 +26,53 @@ export default async function ExploreProjectsPage({
       sort: filters.sort as "newest" | "year_desc" | "area_desc",
     }),
     getExploreFilterOptions("projects"),
-    getExploreStats("projects"),
+    getExploreNetworkCounts(),
   ]);
 
   const { data: initialData, total } = result;
   const isEmpty = initialData.length === 0;
   const filterSortKey = JSON.stringify({ filters, sort: filters.sort });
 
+  const cityDisplay = filters.city?.trim()
+    ? filters.city.trim().replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    : null;
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-            Explore projects
-          </h1>
-          {stats != null && (
-            <ExploreStatsStrip
+    <div className="min-h-screen bg-white dark:bg-zinc-950">
+      <ExploreCountsHero counts={networkCounts} />
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="space-y-4 pt-4">
+          <ExploreSearchBar type="projects" currentFilters={filters} />
+
+          {filters.q?.trim() && (
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Search results for: <span className="font-medium">&quot;{filters.q.trim()}&quot;</span>
+            </p>
+          )}
+
+          <ExploreFilterBar
+            type="projects"
+            currentFilters={filters}
+            options={options}
+            sort={filters.sort}
+          />
+
+          {isEmpty ? (
+            <ExploreEmptyState
               type="projects"
-              totalListings={stats.totalListings}
-              totalConnections={stats.totalConnections}
+              cityName={cityDisplay}
+              showResetAndFirst={!cityDisplay}
+            />
+          ) : (
+            <ExploreProjectsContent
+              key={filterSortKey}
+              initialData={initialData}
+              initialTotal={total}
+              filters={projectFilters}
+              sort={filters.sort as "newest" | "year_desc" | "area_desc"}
             />
           )}
-        </div>
-        <Button as="link" href="/add/project" variant="primary">
-          Add project
-        </Button>
       </div>
-
-      <ExploreSearchBar type="projects" currentFilters={filters} className="mb-2" />
-
-      {filters.q?.trim() && (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Search results for: <span className="font-medium">&quot;{filters.q.trim()}&quot;</span>
-        </p>
-      )}
-
-      <ExploreFilterBar
-        type="projects"
-        currentFilters={filters}
-        options={options}
-        sort={filters.sort}
-      />
-
-      {isEmpty ? (
-        <EmptyState
-          title="No projects match"
-          description="Try changing filters or add a new project."
-          action={
-            <div className="flex flex-wrap items-center gap-3">
-              <ExploreClearSearchLinks type="projects" currentFilters={filters} />
-              <Button as="link" href="/add/project" variant="primary">
-                Add project
-              </Button>
-            </div>
-          }
-        />
-      ) : (
-        <ExploreProjectsContent
-          key={filterSortKey}
-          initialData={initialData}
-          initialTotal={total}
-          filters={projectFilters}
-          sort={filters.sort as "newest" | "year_desc" | "area_desc"}
-        />
-      )}
     </div>
   );
 }

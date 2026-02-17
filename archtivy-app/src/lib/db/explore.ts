@@ -7,7 +7,7 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { projectListingSelect, productListingSelect } from "@/lib/db/selects";
 import { getImagesByListingIds, type ListingImageRow } from "@/lib/db/listingImages";
 import type { ProductImageRow } from "@/lib/db/gallery";
-import { getProfilesByClerkIds } from "@/lib/db/profiles";
+import { getProfilesByClerkIds, getProfilesByIds } from "@/lib/db/profiles";
 import {
   isProjectListing,
   normalizeProject,
@@ -501,13 +501,12 @@ export async function getProjectsCanonical(
   const rows = await getProjectListingRows(limit);
   if (rows.length === 0) return [];
   const ids = rows.map((r) => String(r.id));
-  const [imageResult, profilesResult, materialsMap] = await Promise.all([
+  const clerkIds = Array.from(new Set(rows.map((r) => r.owner_clerk_user_id as string | null).filter(Boolean) as string[]));
+  const ownerProfileIds = Array.from(new Set(rows.map((r) => (r as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id).filter(Boolean) as string[]));
+  const [imageResult, profilesByClerk, profilesById, materialsMap] = await Promise.all([
     getImagesByListingIds(ids),
-    getProfilesByClerkIds(
-      rows
-        .map((r) => r.owner_clerk_user_id as string | null)
-        .filter(Boolean) as string[]
-    ),
+    clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
+    ownerProfileIds.length > 0 ? getProfilesByIds(ownerProfileIds) : Promise.resolve({ data: [] }),
     getMaterialsByProjectIds(ids),
   ]);
   const { data: imageRows, error: imgError } = imageResult;
@@ -519,18 +518,21 @@ export async function getProjectsCanonical(
     if (!byListingId[img.listing_id]) byListingId[img.listing_id] = [];
     byListingId[img.listing_id].push(img);
   }
-  const profiles = profilesResult.data ?? [];
   const ownerByClerkId: Record<string, ProjectOwner> = {};
-  for (const p of profiles) {
-    const displayName =
-      (p.display_name && p.display_name.trim()) ||
-      (p.username && p.username.trim()) ||
-      "";
+  for (const p of profilesByClerk.data ?? []) {
+    const displayName = (p.display_name && p.display_name.trim()) || (p.username && p.username.trim()) || "";
+    if (!displayName) continue;
     ownerByClerkId[p.clerk_user_id] = {
       displayName,
       avatarUrl: p.avatar_url ?? null,
       profileId: p.id,
+      username: (p as { username?: string | null }).username ?? null,
     };
+  }
+  const ownerByProfileId: Record<string, ProjectOwner> = {};
+  for (const p of profilesById.data ?? []) {
+    const o = toProjectOwner(p);
+    if (o.displayName) ownerByProfileId[p.id] = o;
   }
   const result: ProjectCanonical[] = [];
   for (const row of rows) {
@@ -538,8 +540,9 @@ export async function getProjectsCanonical(
     const listingImages = byListingId[String(row.id)] ?? [];
     const projectMaterials = materialsMap[String(row.id)] ?? [];
     const project = normalizeProject(row, listingImages, projectMaterials);
+    const profileId = (row as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id ?? null;
     const clerkId = (row.owner_clerk_user_id as string) ?? null;
-    project.owner = clerkId ? ownerByClerkId[clerkId] ?? null : null;
+    project.owner = profileId ? ownerByProfileId[profileId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
     result.push(project);
   }
   return result;
@@ -555,42 +558,40 @@ export async function getProductsCanonical(
   const rows = await getProductRows(limit);
   if (rows.length === 0) return [];
   const ids = rows.map((r) => String(r.id));
-  const clerkIds = Array.from(
-    new Set(
-      rows
-        .map((r) => (r as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id)
-        .filter(Boolean) as string[]
-    )
-  );
-  const [imageResult, usedCounts, materialMap, profilesResult] = await Promise.all([
+  const clerkIds = Array.from(new Set(rows.map((r) => (r as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id).filter(Boolean) as string[]));
+  const brandProfileIds = Array.from(new Set(rows.map((r) => (r as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id).filter(Boolean) as string[]));
+  const [imageResult, usedCounts, materialMap, profilesByClerk, profilesById] = await Promise.all([
     getImagesByListingIds(ids),
     getUsedInProjectsCountByProductIds(ids),
     getMaterialsByProductIds(ids),
     clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
+    brandProfileIds.length > 0 ? getProfilesByIds(brandProfileIds) : Promise.resolve({ data: [] }),
   ]);
   const imageRows = imageResult.data ?? [];
-  const profiles = profilesResult.data ?? [];
   const ownerByClerkId: Record<string, ProjectOwner> = {};
-  for (const p of profiles) {
-    const displayName =
-      (p.display_name && p.display_name.trim()) ||
-      (p.username && p.username.trim()) ||
-      "";
-    if (displayName) {
-      ownerByClerkId[p.clerk_user_id] = {
-        displayName,
-        avatarUrl: p.avatar_url ?? null,
-        profileId: p.id,
-      };
-    }
+  for (const p of profilesByClerk.data ?? []) {
+    const displayName = (p.display_name && p.display_name.trim()) || (p.username && p.username.trim()) || "";
+    if (!displayName) continue;
+    ownerByClerkId[p.clerk_user_id] = {
+      displayName,
+      avatarUrl: p.avatar_url ?? null,
+      profileId: p.id,
+      username: (p as { username?: string | null }).username ?? null,
+    };
+  }
+  const ownerByProfileId: Record<string, ProjectOwner> = {};
+  for (const p of profilesById.data ?? []) {
+    const o = toProjectOwner(p);
+    if (o.displayName) ownerByProfileId[p.id] = o;
   }
   return rows.map((row) => {
     const productImages = listingImagesToProductImageRows(String(row.id), imageRows);
     const productMaterials = materialMap[String(row.id)] ?? [];
     const product = normalizeProduct(row, productImages, productMaterials);
     product.connectionCount += usedCounts[String(row.id)] ?? 0;
+    const brandId = (row as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id ?? null;
     const clerkId = (row as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id ?? null;
-    product.owner = clerkId ? ownerByClerkId[clerkId] ?? null : null;
+    product.owner = brandId ? ownerByProfileId[brandId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
     return product;
   });
 }
@@ -620,13 +621,12 @@ export async function getProjectsCanonicalFiltered({
   if (rows.length === 0) return { data: [], total };
 
   const ids = rows.map((r) => String(r.id));
-  const [imageResult, profilesResult, materialsMap] = await Promise.all([
+  const clerkIds = Array.from(new Set(rows.map((r) => r.owner_clerk_user_id as string | null).filter(Boolean) as string[]));
+  const ownerProfileIds = Array.from(new Set(rows.map((r) => (r as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id).filter(Boolean) as string[]));
+  const [imageResult, profilesByClerk, profilesById, materialsMap] = await Promise.all([
     getImagesByListingIds(ids),
-    getProfilesByClerkIds(
-      rows
-        .map((r) => r.owner_clerk_user_id as string | null)
-        .filter(Boolean) as string[]
-    ),
+    clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
+    ownerProfileIds.length > 0 ? getProfilesByIds(ownerProfileIds) : Promise.resolve({ data: [] }),
     getMaterialsByProjectIds(ids),
   ]);
   const { data: imageRows } = imageResult;
@@ -635,18 +635,21 @@ export async function getProjectsCanonicalFiltered({
     if (!byListingId[img.listing_id]) byListingId[img.listing_id] = [];
     byListingId[img.listing_id].push(img);
   }
-  const profiles = profilesResult.data ?? [];
   const ownerByClerkId: Record<string, ProjectOwner> = {};
-  for (const p of profiles) {
-    const displayName =
-      (p.display_name && p.display_name.trim()) ||
-      (p.username && p.username.trim()) ||
-      "";
+  for (const p of profilesByClerk.data ?? []) {
+    const displayName = (p.display_name && p.display_name.trim()) || (p.username && p.username.trim()) || "";
+    if (!displayName) continue;
     ownerByClerkId[p.clerk_user_id] = {
       displayName,
       avatarUrl: p.avatar_url ?? null,
       profileId: p.id,
+      username: (p as { username?: string | null }).username ?? null,
     };
+  }
+  const ownerByProfileId: Record<string, ProjectOwner> = {};
+  for (const p of profilesById.data ?? []) {
+    const o = toProjectOwner(p);
+    if (o.displayName) ownerByProfileId[p.id] = o;
   }
   const data: ProjectCanonical[] = [];
   for (const row of rows) {
@@ -654,11 +657,26 @@ export async function getProjectsCanonicalFiltered({
     const listingImages = byListingId[String(row.id)] ?? [];
     const projectMaterials = materialsMap[String(row.id)] ?? [];
     const project = normalizeProject(row, listingImages, projectMaterials);
+    const profileId = (row as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id ?? null;
     const clerkId = (row.owner_clerk_user_id as string) ?? null;
-    project.owner = clerkId ? ownerByClerkId[clerkId] ?? null : null;
+    project.owner = profileId ? ownerByProfileId[profileId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
     data.push(project);
   }
   return { data, total };
+}
+
+/** Build ProjectOwner from profile row (id, display_name, username). */
+function toProjectOwner(p: { id: string; display_name: string | null; username: string | null }): ProjectOwner {
+  const displayName =
+    (p.display_name && p.display_name.trim()) ||
+    (p.username && p.username.trim()) ||
+    "";
+  return {
+    displayName,
+    avatarUrl: null,
+    profileId: p.id,
+    username: p.username?.trim() || null,
+  };
 }
 
 /**
@@ -684,17 +702,56 @@ export async function getProductsCanonicalFiltered({
   if (rows.length === 0) return { data: [], total };
 
   const ids = rows.map((r) => String(r.id));
-  const [imageResult, usedCounts, materialMap] = await Promise.all([
+  const clerkIds = Array.from(
+    new Set(
+      rows
+        .map((r) => (r as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id)
+        .filter(Boolean) as string[]
+    )
+  );
+  const brandProfileIds = Array.from(
+    new Set(
+      rows
+        .map((r) => (r as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id)
+        .filter(Boolean) as string[]
+    )
+  );
+  const [imageResult, usedCounts, materialMap, profilesByClerk, profilesById] = await Promise.all([
     getImagesByListingIds(ids),
     getUsedInProjectsCountByProductIds(ids),
     getMaterialsByProductIds(ids),
+    clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
+    brandProfileIds.length > 0 ? getProfilesByIds(brandProfileIds) : Promise.resolve({ data: [] }),
   ]);
   const imageRows = imageResult.data ?? [];
+  const ownerByClerkId: Record<string, ProjectOwner> = {};
+  for (const p of profilesByClerk.data ?? []) {
+    const displayName = (p.display_name && p.display_name.trim()) || (p.username && p.username.trim()) || "";
+    if (!displayName) continue;
+    ownerByClerkId[p.clerk_user_id] = {
+      displayName,
+      avatarUrl: (p as { avatar_url?: string | null }).avatar_url ?? null,
+      profileId: p.id,
+      username: (p as { username?: string | null }).username ?? null,
+    };
+  }
+  const ownerByProfileId: Record<string, ProjectOwner> = {};
+  for (const p of profilesById.data ?? []) {
+    const o = toProjectOwner(p);
+    if (o.displayName) ownerByProfileId[p.id] = o;
+  }
   const data = rows.map((row) => {
     const productImages = listingImagesToProductImageRows(String(row.id), imageRows);
     const productMaterials = materialMap[String(row.id)] ?? [];
     const product = normalizeProduct(row, productImages, productMaterials);
     product.connectionCount += usedCounts[String(row.id)] ?? 0;
+    const brandId = (row as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id ?? null;
+    const clerkId = (row as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id ?? null;
+    product.owner = brandId
+      ? ownerByProfileId[brandId] ?? null
+      : clerkId
+        ? ownerByClerkId[clerkId] ?? null
+        : null;
     return product;
   });
   return { data, total };
@@ -882,6 +939,33 @@ export async function getExploreStats(type: ExploreStatsType): Promise<ExploreSt
     }
     const totalConnections = teamSum + pplCount + brandCount;
     return { totalListings, totalConnections };
+  } catch {
+    return null;
+  }
+}
+
+export interface ExploreNetworkCounts {
+  projectCount: number;
+  productCount: number;
+  connectionCount: number | null;
+}
+
+/**
+ * Read-only counts for Explore header: projects, products, and total connections (project_product_links).
+ * Returns null on error; connectionCount may be null if that query fails.
+ */
+export async function getExploreNetworkCounts(): Promise<ExploreNetworkCounts | null> {
+  try {
+    const sup = supabase();
+    const [projectsRes, productsRes, pplRes] = await Promise.all([
+      sup.from("listings").select("id", { count: "exact", head: true }).eq("type", "project").eq("status", "APPROVED").is("deleted_at", null),
+      sup.from("listings").select("id", { count: "exact", head: true }).eq("type", "product").eq("status", "APPROVED").is("deleted_at", null),
+      sup.from("project_product_links").select("id", { count: "exact", head: true }),
+    ]);
+    const projectCount = projectsRes.count ?? 0;
+    const productCount = productsRes.count ?? 0;
+    const connectionCount = pplRes.error ? null : (pplRes.count ?? 0);
+    return { projectCount, productCount, connectionCount };
   } catch {
     return null;
   }

@@ -126,6 +126,23 @@ export async function getProfileById(
 }
 
 /**
+ * Get profiles by multiple ids (e.g. brand_profile_id on products). Read-only; for owner resolution.
+ * Returns id, display_name, username; order not guaranteed.
+ */
+export async function getProfilesByIds(
+  ids: string[]
+): Promise<DbResult<Pick<Profile, "id" | "display_name" | "username">[]>> {
+  if (ids.length === 0) return { data: [], error: null };
+  const unique = Array.from(new Set(ids.filter(Boolean)));
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("id, display_name, username")
+    .in("id", unique);
+  if (error) return { data: null, error: error.message };
+  return { data: (data ?? []) as Pick<Profile, "id" | "display_name" | "username">[], error: null };
+}
+
+/**
  * Get full profile by id for public profile page (/u/id/[profileId]).
  * Uses service client so unclaimed profiles (username NULL) are readable when RLS
  * would otherwise block anonymous access.

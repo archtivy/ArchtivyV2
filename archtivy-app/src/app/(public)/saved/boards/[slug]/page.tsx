@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBoardByShareSlug } from "@/app/actions/savedFolders";
+import { Container } from "@/components/layout/Container";
 import type { FolderItemWithCreated } from "@/app/actions/savedFolders";
 import { getListingsByIds } from "@/lib/db/listings";
 import { getFirstImageUrlPerListingIds } from "@/lib/db/listingImages";
@@ -31,7 +32,8 @@ export default async function PublicBoardPage({
   const data = result.data;
   if (data == null) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-12 text-center">
+      <Container className="py-12">
+        <div className="mx-auto max-w-2xl text-center">
         <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">This board is private.</h1>
         <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
           The owner has not made this board public. You need to be signed in as the owner to view it.
@@ -42,7 +44,8 @@ export default async function PublicBoardPage({
         >
           Go to home
         </Link>
-      </div>
+        </div>
+      </Container>
     );
   }
 
@@ -124,7 +127,7 @@ export default async function PublicBoardPage({
   const basePath = `/saved/boards/${slug}`;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
+    <Container className="space-y-6 py-8">
       <div>
         <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 sm:text-2xl">
           {folder.name}
@@ -189,6 +192,6 @@ export default async function PublicBoardPage({
           })}
         </ul>
       )}
-    </div>
+    </Container>
   );
 }

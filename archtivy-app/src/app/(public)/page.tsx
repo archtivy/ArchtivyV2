@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { getProjectsCanonical, getProductsCanonical } from "@/lib/db/explore";
-import { getListingUrl } from "@/lib/canonical";
-import { projectCanonicalToCardData, productCanonicalToCardData } from "@/lib/canonical-models";
-import { Button } from "@/components/ui/Button";
-import { ProjectCard } from "@/components/listing/ProjectCard";
-import { ProductCard } from "@/components/listing/ProductCard";
+import { ProjectCardPremium } from "@/components/listing/ProjectCardPremium";
+import { ProductCardPremium } from "@/components/listing/ProductCardPremium";
 import { HomeHeroSearch } from "@/components/search/HomeHeroSearch";
+import { ShareWorkTrigger } from "@/components/ShareWorkTrigger";
 
 const FEATURED_PROJECTS_LIMIT = 6;
 const FEATURED_PRODUCTS_LIMIT = 8;
@@ -20,23 +18,25 @@ export default async function Home() {
     <div className="space-y-16 pb-24 sm:space-y-20 sm:pb-28">
       {/* Hero */}
       <section className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl md:text-5xl dark:text-zinc-100">
-          Projects, products & credits for architecture
+        <h1 className="font-serif text-3xl font-normal tracking-tight text-zinc-900 sm:text-4xl md:text-5xl dark:text-zinc-100">
+          Architecture, intelligently connected.
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-zinc-500 dark:text-zinc-400">
-          Archtivy connects built projects with the products and people behind
-          them. Explore work, link products to projects, and surface what
-          matters.
+          Discover how projects, products, and professionals connect across cities.
         </p>
         <div className="mt-8 flex flex-col items-center gap-4">
           <HomeHeroSearch />
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <Button as="link" href="/explore/projects" variant="primary">
-              Explore Projects
-            </Button>
-            <Button as="link" href="/explore/products" variant="secondary">
-              Explore Products
-            </Button>
+            <Link
+              href="/explore/projects"
+              className="inline-block rounded-[20px] px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
+              style={{ backgroundColor: "#002abf" }}
+            >
+              Explore the Network
+            </Link>
+            <ShareWorkTrigger className="inline-block rounded-[20px] border border-zinc-300 bg-transparent px-5 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-archtivy-primary focus:ring-offset-2 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800 dark:focus:ring-offset-zinc-950">
+              Share your work
+            </ShareWorkTrigger>
           </div>
         </div>
       </section>
@@ -66,17 +66,10 @@ export default async function Home() {
             .
           </p>
         ) : (
-          <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3" aria-label="Featured projects">
+          <ul className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Featured projects">
             {projects.map((p) => (
-              <li key={p.id}>
-                <ProjectCard
-                  listing={projectCanonicalToCardData(p)}
-                  imageUrl={p.cover}
-                  href={getListingUrl({ id: p.id, type: "project" })}
-                  postedBy={p.owner?.displayName ?? undefined}
-                  location={p.location_text}
-                  areaSqft={p.area_sqft}
-                />
+              <li key={p.id} className="h-full">
+                <ProjectCardPremium project={p} />
               </li>
             ))}
           </ul>
@@ -108,15 +101,10 @@ export default async function Home() {
             .
           </p>
         ) : (
-          <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4" aria-label="Featured products">
+          <ul className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Featured products">
             {products.map((p) => (
-              <li key={p.id}>
-                <ProductCard
-                  listing={productCanonicalToCardData(p)}
-                  imageUrl={p.cover}
-                  href={getListingUrl({ id: p.id, type: "product" })}
-                  postedBy={p.owner?.displayName ?? undefined}
-                />
+              <li key={p.id} className="h-full">
+                <ProductCardPremium product={p} />
               </li>
             ))}
           </ul>

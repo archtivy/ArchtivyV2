@@ -37,6 +37,8 @@ export interface ProjectOwner {
   displayName: string;
   avatarUrl?: string | null;
   profileId?: string | null;
+  /** For profile link: /u/[username] when set; else /u/id/[profileId]. */
+  username?: string | null;
 }
 
 export interface ProjectCanonical {

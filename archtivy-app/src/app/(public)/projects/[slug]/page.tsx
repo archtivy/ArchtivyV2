@@ -232,7 +232,7 @@ export default async function ProjectPage({
   })));
 
   return (
-    <div className="mx-auto max-w-[1040px] px-4 pt-1 pb-6 sm:px-6 sm:pt-2 sm:pb-8">
+    <div className="pt-1 pb-6 sm:pt-2 sm:pb-8">
       <ListingViewTracker type="project" id={project.id} />
       <nav
         className="mb-4 flex flex-wrap items-center gap-2 text-sm text-[#374151] dark:text-zinc-400"

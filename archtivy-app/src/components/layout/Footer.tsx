@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCachedTotalConnections } from "@/lib/db/footer-metrics";
+import { Container } from "@/components/layout/Container";
 import { FooterNewsletter } from "@/components/layout/FooterNewsletter";
 import { ShareWorkTrigger } from "@/components/ShareWorkTrigger";
 
@@ -13,7 +14,7 @@ export async function Footer() {
       role="contentinfo"
       className="relative left-1/2 w-screen -translate-x-1/2 overflow-x-clip bg-zinc-100 dark:bg-zinc-900/50"
     >
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
+      <Container className="py-10 sm:py-12">
         <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white/95 dark:border-zinc-700/80 dark:bg-zinc-900/95">
           {/* CTA card */}
           <section className="relative border-b border-zinc-200/80 px-6 py-10 sm:px-10 sm:py-12 dark:border-zinc-700/80">
@@ -209,7 +210,7 @@ export async function Footer() {
             </a>
           </nav>
         </div>
-      </div>
+      </Container>
     </footer>
   );
 }

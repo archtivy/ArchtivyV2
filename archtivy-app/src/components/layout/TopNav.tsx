@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useUser, useClerk, SignedIn, SignedOut } from "@clerk/nextjs";
 import { useEffect, useState, useCallback } from "react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { Container } from "@/components/layout/Container";
 import { TopNavAuth } from "@/components/layout/TopNavAuth";
 import { ShareCTA } from "@/components/layout/ShareCTA";
 import { TopNavLinks } from "@/components/layout/TopNavLinks";
@@ -84,7 +85,7 @@ export function TopNav() {
         className="sticky top-0 z-50 border-b bg-[#ffffff] dark:border-zinc-800 dark:bg-zinc-950/95 dark:supports-[backdrop-filter]:bg-zinc-950/80"
         style={{ borderBottomColor: "#e5e7eb" }}
       >
-        <div className="mx-auto flex max-w-[1040px] items-center justify-between gap-2 px-4 py-4 sm:px-6 sm:py-5">
+        <Container className="flex items-center justify-between gap-2 py-4 sm:py-5">
           {/* Left: Logo only on mobile; logo + divider + nav on desktop */}
           <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
             <Link
@@ -122,7 +123,7 @@ export function TopNav() {
               </svg>
             </button>
           </div>
-        </div>
+        </Container>
       </header>
 
       {/* Mobile drawer */}

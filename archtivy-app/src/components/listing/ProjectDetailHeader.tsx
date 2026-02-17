@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { SaveToFolderModal } from "@/components/gallery/SaveToFolderModal";
+import { ContactLeadModal } from "@/components/listing/ContactLeadModal";
 import { track } from "@/lib/events";
 
 function ShareIcon({ className }: { className?: string }) {
@@ -55,19 +56,22 @@ export interface ProjectDetailHeaderProps {
   entityId: string;
   currentPath: string;
   isSaved: boolean;
+  /** For "Contact via Archtivy" lead modal. */
+  listingType?: "project" | "product";
 }
 
 export function ProjectDetailHeader({
   title,
-  metadataLine,
   entityId,
   currentPath,
   isSaved: initialSaved,
+  listingType = "project",
 }: ProjectDetailHeaderProps) {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const [saved, setSaved] = useState(initialSaved);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
   const [shareToast, setShareToast] = useState(false);
 
   const handleSave = useCallback(() => {
@@ -109,6 +113,14 @@ export function ProjectDetailHeader({
         </button>
         <button
           type="button"
+          onClick={() => setContactModalOpen(true)}
+          aria-label="Contact via Archtivy"
+          className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:ring-offset-zinc-950"
+        >
+          Contact via Archtivy
+        </button>
+        <button
+          type="button"
           onClick={handleShare}
           aria-label="Share"
           className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:ring-offset-zinc-950"
@@ -130,6 +142,13 @@ export function ProjectDetailHeader({
         open={saveModalOpen}
         onClose={() => setSaveModalOpen(false)}
         onSaved={() => setSaved(true)}
+      />
+      <ContactLeadModal
+        open={contactModalOpen}
+        onClose={() => setContactModalOpen(false)}
+        listingId={entityId}
+        listingType={listingType}
+        listingTitle={title}
       />
     </header>
   );

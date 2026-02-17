@@ -1,16 +1,14 @@
 import type { Metadata } from "next";
-import { getProductsCanonicalFiltered, getExploreStats } from "@/lib/db/explore";
+import { getProductsCanonicalFiltered, getExploreNetworkCounts } from "@/lib/db/explore";
 import { EXPLORE_PAGE_SIZE } from "@/lib/db/explore";
 import { parseExploreFilters } from "@/lib/explore/filters/parse";
 import { exploreFiltersToProductFilters, countActiveFilters } from "@/lib/explore/filters/query";
 import { getExploreFilterOptions } from "@/lib/explore/filters/options";
 import { ExploreFilterBar } from "@/components/explore/ExploreFilterBar";
-import { ExploreStatsStrip } from "@/components/explore/ExploreStatsStrip";
+import { ExploreCountsHero } from "@/components/explore/ExploreCountsHero";
 import { ExploreProductsContent } from "@/components/explore/ExploreProductsContent";
 import { ExploreSearchBar } from "@/components/search/ExploreSearchBar";
-import { ExploreClearSearchLinks } from "@/components/explore/ExploreClearSearchLinks";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Button } from "@/components/ui/Button";
+import { ExploreEmptyState } from "@/components/explore/ExploreEmptyState";
 
 /** Filtered product views: noindex,follow so taxonomy values do not create indexable pages. */
 export async function generateMetadata({
@@ -33,7 +31,7 @@ export default async function ExploreProductsPage({
   const filters = parseExploreFilters(params, "products");
   const productFilters = exploreFiltersToProductFilters(filters);
 
-  const [result, options, stats] = await Promise.all([
+  const [result, options, networkCounts] = await Promise.all([
     getProductsCanonicalFiltered({
       filters: productFilters,
       limit: EXPLORE_PAGE_SIZE,
@@ -41,70 +39,53 @@ export default async function ExploreProductsPage({
       sort: filters.sort as "newest" | "year_desc",
     }),
     getExploreFilterOptions("products"),
-    getExploreStats("products"),
+    getExploreNetworkCounts(),
   ]);
 
   const { data: initialData, total } = result;
   const isEmpty = initialData.length === 0;
   const filterSortKey = JSON.stringify({ filters, sort: filters.sort });
 
+  const cityDisplay = filters.city?.trim()
+    ? filters.city.trim().replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    : null;
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-            Explore products
-          </h1>
-          {stats != null && (
-            <ExploreStatsStrip
+    <div className="min-h-screen bg-white dark:bg-zinc-950">
+      <ExploreCountsHero counts={networkCounts} />
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="space-y-4 pt-4">
+          <ExploreSearchBar type="products" currentFilters={filters} />
+
+          {filters.q?.trim() && (
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Search results for: <span className="font-medium">&quot;{filters.q.trim()}&quot;</span>
+            </p>
+          )}
+
+          <ExploreFilterBar
+            type="products"
+            currentFilters={filters}
+            options={options}
+            sort={filters.sort}
+          />
+
+          {isEmpty ? (
+            <ExploreEmptyState
               type="products"
-              totalListings={stats.totalListings}
-              totalConnections={stats.totalConnections}
+              cityName={cityDisplay}
+              showResetAndFirst={!cityDisplay}
+            />
+          ) : (
+            <ExploreProductsContent
+              key={filterSortKey}
+              initialData={initialData}
+              initialTotal={total}
+              filters={productFilters}
+              sort={filters.sort as "newest" | "year_desc"}
             />
           )}
-        </div>
-        <Button as="link" href="/add/product" variant="primary">
-          Add product
-        </Button>
       </div>
-
-      <ExploreSearchBar type="products" currentFilters={filters} className="mb-2" />
-
-      {filters.q?.trim() && (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Search results for: <span className="font-medium">&quot;{filters.q.trim()}&quot;</span>
-        </p>
-      )}
-
-      <ExploreFilterBar
-        type="products"
-        currentFilters={filters}
-        options={options}
-        sort={filters.sort}
-      />
-
-      {isEmpty ? (
-        <EmptyState
-          title="No products match"
-          description="Try changing filters or add a new product."
-          action={
-            <div className="flex flex-wrap items-center gap-3">
-              <ExploreClearSearchLinks type="products" currentFilters={filters} />
-              <Button as="link" href="/add/product" variant="primary">
-                Add product
-              </Button>
-            </div>
-          }
-        />
-      ) : (
-        <ExploreProductsContent
-          key={filterSortKey}
-          initialData={initialData}
-          initialTotal={total}
-          filters={productFilters}
-          sort={filters.sort as "newest" | "year_desc"}
-        />
-      )}
     </div>
   );
 }

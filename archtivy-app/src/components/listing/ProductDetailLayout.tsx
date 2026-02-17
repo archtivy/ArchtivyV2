@@ -7,6 +7,7 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { SaveToFolderModal } from "@/components/gallery/SaveToFolderModal";
+import { ContactLeadModal } from "@/components/listing/ContactLeadModal";
 import { track } from "@/lib/events";
 import { ProductDetailGallery } from "./ProductDetailGallery";
 import { ProductSidebarDocuments } from "./ProductSidebarDocuments";
@@ -86,6 +87,7 @@ export function ProductDetailLayout({
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [saved, setSaved] = useState(initialSaved);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
   const [shareToast, setShareToast] = useState(false);
 
   const handleImageClick = useCallback((index: number) => {
@@ -167,6 +169,14 @@ export function ProductDetailLayout({
                   >
                     <BookmarkIcon className="h-4 w-4" />
                     {saved ? "Saved" : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setContactModalOpen(true)}
+                    aria-label="Contact via Archtivy"
+                    className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:ring-offset-zinc-950"
+                  >
+                    Contact via Archtivy
                   </button>
                   <button
                     type="button"
@@ -360,6 +370,13 @@ export function ProductDetailLayout({
         open={saveModalOpen}
         onClose={() => setSaveModalOpen(false)}
         onSaved={() => setSaved(true)}
+      />
+      <ContactLeadModal
+        open={contactModalOpen}
+        onClose={() => setContactModalOpen(false)}
+        listingId={product.id}
+        listingType="product"
+        listingTitle={product.title}
       />
     </>
   );
