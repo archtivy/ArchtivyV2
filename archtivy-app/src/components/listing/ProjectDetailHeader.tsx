@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { toggleBookmark } from "@/app/actions/galleryBookmarks";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
+import { SaveToFolderModal } from "@/components/gallery/SaveToFolderModal";
 import { track } from "@/lib/events";
 
 function ShareIcon({ className }: { className?: string }) {
@@ -62,21 +64,20 @@ export function ProjectDetailHeader({
   currentPath,
   isSaved: initialSaved,
 }: ProjectDetailHeaderProps) {
+  const { isLoaded, userId } = useAuth();
+  const router = useRouter();
   const [saved, setSaved] = useState(initialSaved);
-  const [pendingSave, setPendingSave] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [shareToast, setShareToast] = useState(false);
 
-  const handleSave = useCallback(async () => {
-    const nextSaved = !saved;
-    setSaved(nextSaved);
-    setPendingSave(true);
-    try {
-      const result = await toggleBookmark("project", entityId, currentPath);
-      if (result.error) setSaved(!nextSaved);
-    } finally {
-      setPendingSave(false);
+  const handleSave = useCallback(() => {
+    if (!isLoaded) return;
+    if (!userId) {
+      router.push(`/sign-in?redirect_url=${encodeURIComponent(currentPath)}`);
+      return;
     }
-  }, [entityId, currentPath, saved]);
+    setSaveModalOpen(true);
+  }, [isLoaded, userId, currentPath, router]);
 
   const handleShare = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -99,8 +100,8 @@ export function ProjectDetailHeader({
         <button
           type="button"
           onClick={handleSave}
-          disabled={pendingSave}
-          aria-label={saved ? "Unsave project" : "Save project"}
+          disabled={!isLoaded}
+          aria-label={saved ? "Saved" : "Save to folder"}
           className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:ring-offset-zinc-950"
         >
           <BookmarkIcon className="h-4 w-4" />
@@ -121,6 +122,15 @@ export function ProjectDetailHeader({
           </span>
         )}
       </div>
+      <SaveToFolderModal
+        entityType="project"
+        entityId={entityId}
+        entityTitle={title}
+        currentPath={currentPath}
+        open={saveModalOpen}
+        onClose={() => setSaveModalOpen(false)}
+        onSaved={() => setSaved(true)}
+      />
     </header>
   );
 }
