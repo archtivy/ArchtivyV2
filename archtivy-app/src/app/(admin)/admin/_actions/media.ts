@@ -18,3 +18,14 @@ export async function updateImageAlt(input: { imageId: string; alt: string | nul
   return { ok: true as const };
 }
 
+/** Update listing image alt and revalidate project edit page (for Editorial Image Manager). */
+export async function updateImageAltForProject(input: {
+  imageId: string;
+  alt: string | null;
+  projectId: string;
+}) {
+  const res = await updateImageAlt({ imageId: input.imageId, alt: input.alt });
+  if (!res.ok) return res;
+  revalidatePath(`/admin/projects/${input.projectId}`, "page");
+  return { ok: true as const };
+}

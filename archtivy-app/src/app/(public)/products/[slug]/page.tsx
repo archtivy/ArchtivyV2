@@ -1,27 +1,36 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { auth } from "@clerk/nextjs/server";
 import { getProductForProductPage } from "@/app/actions/listings";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { getProjectsForProduct } from "@/lib/db/projectProductLinks";
 import { getFirstImageUrlPerListingIds } from "@/lib/db/listingImages";
-import { getProfileById } from "@/lib/db/profiles";
+import { getProfileById, getProfileByClerkId } from "@/lib/db/profiles";
 import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
 import { getGalleryBookmarkState } from "@/app/actions/galleryBookmarks";
 import { getListingDocumentsServer } from "@/lib/db/listingDocuments";
-import { PageContainer } from "@/components/layout/PageContainer";
-import { DetailLayout } from "@/components/listing/DetailLayout";
-import { ProductSidebarDocuments } from "@/components/listing/ProductSidebarDocuments";
+import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
-import { DetailHeaderBar } from "@/components/listing/DetailHeaderBar";
-import { DetailSidebar, type DetailSidebarRow } from "@/components/listing/DetailSidebar";
+import { ProductDetailLayout } from "@/components/listing/ProductDetailLayout";
 import { TeamMemberLinks } from "@/components/listing/TeamMemberLinks";
-import { MatchesStrip } from "@/components/matches/MatchesStrip";
+import { type DetailSidebarRow } from "@/components/listing/DetailSidebar";
 import { productExploreUrl } from "@/lib/exploreUrls";
 import { connectionsLabelText } from "@/components/listing/connectionsLabel";
+import { getColorSwatch } from "@/lib/colors";
 import type { GalleryImage } from "@/lib/db/gallery";
 import type { ProductCanonical } from "@/lib/canonical-models";
 import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
+
+async function getProductColorOptions(productId: string): Promise<string[]> {
+  const supabase = getSupabaseServiceClient();
+  const { data } = await supabase.from("products").select("color_options").eq("id", productId).maybeSingle();
+  const arr = (data as { color_options?: string[] | null } | null)?.color_options;
+  return Array.isArray(arr) ? arr : [];
+}
 
 function canonicalGalleryToGalleryImages(
   gallery: { url: string; alt: string }[]
@@ -38,7 +47,8 @@ function buildProductSidebarRows(
   product: ProductCanonical,
   brandName: string | null,
   brandHref: string | null,
-  teamWithProfiles: ListingTeamMemberWithProfile[] | null
+  teamWithProfiles: ListingTeamMemberWithProfile[] | null,
+  colorOptions: string[] = []
 ): DetailSidebarRow[] {
   const rows: DetailSidebarRow[] = [];
 
@@ -47,6 +57,28 @@ function buildProductSidebarRows(
     rows.push({
       label: "Connections",
       value: connectionsText,
+    });
+  }
+
+  if (colorOptions.length > 0) {
+    rows.push({
+      label: "Color options",
+      value: (
+        <div className="flex flex-wrap gap-2">
+          {colorOptions.map((c) => (
+            <span
+              key={c}
+              className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            >
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: getColorSwatch(c) }}
+              />
+              {c}
+            </span>
+          ))}
+        </div>
+      ),
     });
   }
 
@@ -140,6 +172,9 @@ export async function generateMetadata({
   const { slug } = await params;
   const product = await getProductForProductPage(slug);
   if (!product) return {};
+  if (product.status === "PENDING") {
+    return { title: "Product" };
+  }
   const path = `/products/${product.slug ?? product.id}`;
   const title = product.title?.trim() || "Product";
   const description =
@@ -169,6 +204,14 @@ export default async function ProductPage({
   const { slug } = await params;
   const product = await getProductForProductPage(slug);
   if (!product) notFound();
+  if (product.status === "PENDING") {
+    const { userId } = await auth();
+    const profileRes = await getProfileByClerkId(userId ?? "");
+    const profile = profileRes.data as { is_admin?: boolean } | null;
+    const isOwner = Boolean(userId && product.owner_clerk_user_id === userId);
+    const isAdmin = Boolean(profile?.is_admin);
+    if (!isOwner && !isAdmin) notFound();
+  }
 
   const [relatedResult, isSaved, brandResult, teamResult, docsResult] = await Promise.all([
     getProjectsForProduct(product.id),
@@ -198,20 +241,32 @@ export default async function ProductPage({
 
   const brandProfile = brandResult.data;
   const brandName = brandProfile?.display_name?.trim() || brandProfile?.username?.trim() || null;
-  const brandHref = brandProfile?.username ? `/u/${brandProfile.username}` : null;
+  const brandHref =
+    brandProfile?.username
+      ? `/u/${brandProfile.username}`
+      : product.brand_profile_id
+        ? `/u/id/${product.brand_profile_id}`
+        : null;
   const teamWithProfiles = teamResult.data ?? null;
+  const colorOptions = await getProductColorOptions(product.id);
 
   const images = canonicalGalleryToGalleryImages(product.gallery);
   const currentPath = `/products/${product.slug ?? product.id}`;
-  const sidebarRows = buildProductSidebarRows(product, brandName, brandHref, teamWithProfiles);
+  const sidebarRows = buildProductSidebarRows(product, brandName, brandHref, teamWithProfiles, colorOptions);
   const listingDocuments = docsResult.data ?? [];
   const productPath = `/products/${product.slug ?? product.id}`;
 
+  const relatedListingsForLayout = relatedListings.map((p) => {
+    const row = p as { id: string; slug?: string; title: string; location?: string | null };
+    return { id: row.id, slug: row.slug, title: row.title, location: row.location ?? null };
+  });
+
   return (
-    <PageContainer>
+    <div className="min-h-screen bg-white dark:bg-zinc-950">
+      <div className="mx-auto max-w-[1040px] px-4 pt-1 pb-6 sm:px-6 sm:pt-2 sm:pb-8">
       <ListingViewTracker type="product" id={product.id} />
       <nav
-        className="mb-4 flex flex-wrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"
+        className="mb-6 flex flex-wrap items-center gap-2 text-sm text-[#374151] dark:text-zinc-400"
         aria-label="Breadcrumb"
       >
         <Link href="/" className="hover:text-zinc-900 dark:hover:text-zinc-100">
@@ -222,61 +277,26 @@ export default async function ProductPage({
           Products
         </Link>
         <span aria-hidden>/</span>
-        <span className="text-zinc-500 dark:text-zinc-400">{product.title}</span>
+        <span className="text-[#374151] dark:text-zinc-400">{product.title}</span>
       </nav>
 
-      <DetailLayout
+      <ProductDetailLayout
         images={images}
-        listingTitle={product.title}
-        context="product"
-        relatedItems={relatedItems}
-        entityType="product"
-        entityId={product.id}
-        entitySlug={product.slug ?? product.id}
+        product={product}
+        brandName={brandName}
+        brandHref={brandHref}
         isSaved={isSaved}
         currentPath={currentPath}
-        headerBar={
-          <DetailHeaderBar
-            entityType="product"
-            entityId={product.id}
-            currentPath={currentPath}
-            isSaved={isSaved}
-            brandLine={
-              brandName && brandHref ? { name: brandName, href: brandHref } : undefined
-            }
-            connectionCount={product.connectionCount}
-          />
-        }
-        belowHeader={<MatchesStrip type="product" id={product.id} title="Used in Projects" showBadge />}
-        title={
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 md:text-3xl">
-            {product.title}
-          </h1>
-        }
-        description={
-          product.description?.trim() ? (
-            <section className="prose prose-zinc dark:prose-invert max-w-none">
-              <div className="whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">
-                {product.description.trim()}
-              </div>
-            </section>
-          ) : null
-        }
-        sidebar={
-          <>
-            <DetailSidebar title="Product details" rows={sidebarRows} />
-            {listingDocuments.length > 0 && (
-              <div className="mt-5">
-                <ProductSidebarDocuments
-                  documents={listingDocuments}
-                  listingId={product.id}
-                  signInRedirectUrl={getAbsoluteUrl(productPath)}
-                />
-              </div>
-            )}
-          </>
-        }
+        relatedItems={relatedItems}
+        sidebarRows={sidebarRows}
+        listingDocuments={listingDocuments}
+        signInRedirectUrl={getAbsoluteUrl(productPath)}
+        relatedListings={relatedListingsForLayout}
+        thumbnailMap={thumbnailMap}
+        teamWithProfiles={teamWithProfiles}
+        mapHref={null}
       />
-    </PageContainer>
+      </div>
+    </div>
   );
 }

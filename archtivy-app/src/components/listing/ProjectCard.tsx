@@ -8,7 +8,6 @@ import { LogoStack, type LogoItem } from "./LogoStack";
 import { formatConnections } from "./connectionsLabel";
 
 const FALLBACK = "Not specified";
-const OWNER_FALLBACK = "by Archtivy";
 const SQM_TO_SQFT = 10.7639;
 const MAX_TEAM = 3;
 const MAX_BRANDS = 4;
@@ -18,7 +17,7 @@ export interface ProjectCardProps {
   imageUrl?: string | null;
   /** Override canonical URL. When not provided, uses getListingUrl(listing). */
   href?: string | null;
-  /** Posted-by: owner display name. Fallback "by Archtivy" when not provided. */
+  /** Owner display name. Shown only when provided. */
   postedBy?: string | null;
   /** Location text (overrides listing.location if provided) */
   location?: string | null;
@@ -63,7 +62,7 @@ export function ProjectCard({
     listing.year != null && String(listing.year).trim() !== ""
       ? String(listing.year).trim()
       : FALLBACK;
-  const postedByLabel = postedBy?.trim() || OWNER_FALLBACK;
+  const postedByLabel = postedBy?.trim() || null;
 
   const team = listing.team_members ?? [];
   const brands = listing.brands_used ?? [];
@@ -114,13 +113,15 @@ export function ProjectCard({
           </div>
         )}
       </div>
-      <div className="p-4">
-        <h3 className="truncate font-semibold text-zinc-900 group-hover:text-archtivy-primary dark:text-zinc-100 dark:group-hover:text-archtivy-primary">
+      <div className="p-5">
+        <h3 className="font-serif text-lg font-medium tracking-tight text-zinc-900 group-hover:text-archtivy-primary dark:text-zinc-100 dark:group-hover:text-archtivy-primary line-clamp-2">
           {listing.title?.trim() || FALLBACK}
         </h3>
-        <p className="mt-0.5 truncate text-sm text-zinc-500 dark:text-zinc-400">
-          {postedByLabel}
-        </p>
+        {postedByLabel && (
+          <p className="mt-1 truncate text-sm text-zinc-500 dark:text-zinc-400">
+            {postedByLabel}
+          </p>
+        )}
         <MetaRow
           items={[metaLocation, ...(hasArea ? [metaArea] : []), metaYear].filter(Boolean)}
           className="mt-1.5"

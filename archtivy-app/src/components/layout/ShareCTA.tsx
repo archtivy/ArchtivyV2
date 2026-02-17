@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { ShareWorkChooser } from "@/components/ShareWorkChooser";
 
 import type { ProfileRole } from "@/lib/auth/config";
 
@@ -13,7 +13,13 @@ interface ShareCTAProps {
 
 const READER_MESSAGE = "This account type can't share work.";
 
+const SIGN_IN_PROJECT_REDIRECT =
+  "/sign-in?redirect_url=" + encodeURIComponent("/add/project");
+const SIGN_IN_PRODUCT_REDIRECT =
+  "/sign-in?redirect_url=" + encodeURIComponent("/add/product");
+
 export function ShareCTA({ userId, role }: ShareCTAProps) {
+  const [chooserOpen, setChooserOpen] = useState(false);
   const [showReaderMessage, setShowReaderMessage] = useState(false);
 
   const handleReaderClick = useCallback(() => {
@@ -24,40 +30,6 @@ export function ShareCTA({ userId, role }: ShareCTAProps) {
 
   const shareButtonClass =
     "inline-flex items-center justify-center rounded-[20px] bg-archtivy-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-archtivy-primary focus:ring-offset-2 dark:focus:ring-offset-zinc-950";
-
-  if (!userId) {
-    return (
-      <Link href="/sign-in?from=share" className={shareButtonClass}>
-        Share your work
-      </Link>
-    );
-  }
-
-  if (role === "designer") {
-    return (
-      <Button
-        as="link"
-        href="/add/project"
-        variant="primary"
-        className="rounded-[20px]"
-      >
-        Share your work
-      </Button>
-    );
-  }
-
-  if (role === "brand") {
-    return (
-      <Button
-        as="link"
-        href="/add/product"
-        variant="primary"
-        className="rounded-[20px]"
-      >
-        Share your work
-      </Button>
-    );
-  }
 
   if (role === "reader") {
     return (
@@ -85,13 +57,20 @@ export function ShareCTA({ userId, role }: ShareCTAProps) {
   }
 
   return (
-    <Button
-      as="link"
-      href="/sign-in?from=share"
-      variant="primary"
-      className="rounded-[20px]"
-    >
-      Share your work
-    </Button>
+    <>
+      <button
+        type="button"
+        onClick={() => setChooserOpen(true)}
+        className={shareButtonClass}
+      >
+        Share your work
+      </button>
+      <ShareWorkChooser
+        open={chooserOpen}
+        onClose={() => setChooserOpen(false)}
+        projectHref={userId ? "/add/project" : SIGN_IN_PROJECT_REDIRECT}
+        productHref={userId ? "/add/product" : SIGN_IN_PRODUCT_REDIRECT}
+      />
+    </>
   );
 }

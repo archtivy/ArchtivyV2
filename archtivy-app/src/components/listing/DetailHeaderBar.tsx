@@ -97,14 +97,16 @@ export function DetailHeaderBar({
   const [shareToast, setShareToast] = useState(false);
 
   const handleSave = useCallback(async () => {
+    const nextSaved = !saved;
+    setSaved(nextSaved);
     setPendingSave(true);
     try {
       const result = await toggleBookmark(entityType, entityId, currentPath);
-      if (!result.error) setSaved(result.saved);
+      if (result.error) setSaved(!nextSaved);
     } finally {
       setPendingSave(false);
     }
-  }, [entityType, entityId, currentPath]);
+  }, [entityType, entityId, currentPath, saved]);
 
   const handleShare = useCallback(() => {
     if (typeof window === "undefined") return;

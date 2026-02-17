@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCachedTotalConnections } from "@/lib/db/footer-metrics";
 import { FooterNewsletter } from "@/components/layout/FooterNewsletter";
+import { ShareWorkTrigger } from "@/components/ShareWorkTrigger";
 
 export async function Footer() {
   const totalConnections = await getCachedTotalConnections();
@@ -13,7 +14,7 @@ export async function Footer() {
       className="relative left-1/2 w-screen -translate-x-1/2 overflow-x-clip bg-zinc-100 dark:bg-zinc-900/50"
     >
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
-        <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white/95 shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/95">
+        <div className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white/95 dark:border-zinc-700/80 dark:bg-zinc-900/95">
           {/* CTA card */}
           <section className="relative border-b border-zinc-200/80 px-6 py-10 sm:px-10 sm:py-12 dark:border-zinc-700/80">
             <div className="absolute right-0 top-0 h-full w-1/3 overflow-hidden rounded-tr-2xl">
@@ -52,12 +53,11 @@ export async function Footer() {
                 </>
               )}
               <div className="flex flex-wrap gap-3">
-                <Link
-                  href="/add/project"
+                <ShareWorkTrigger
                   className="inline-flex items-center justify-center rounded-full bg-[#002abf] px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-900"
                 >
                   Share your work
-                </Link>
+                </ShareWorkTrigger>
                 <Link
                   href="/explore/projects"
                   className="inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 dark:focus:ring-offset-zinc-900"

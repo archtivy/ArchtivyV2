@@ -53,7 +53,7 @@
     <section class="project-section" aria-labelledby="gallery-heading">
       <h2 id="gallery-heading" class="section-title">Gallery</h2>
       <div class="project-gallery" id="project-gallery" role="list">
-        <div class="project-gallery-item" role="listitem" data-lightbox-src="assets/images/placeholder.svg" tabindex="0"><span>1</span></div>
+        <div class="project-gallery-item" role="listitem" data-lightbox-src="assets/images/placeholder.svg" data-products="[]" tabindex="0"><span>1</span></div>
       </div>
     </section>
 
@@ -62,14 +62,21 @@
       <div class="lightbox-inner">
         <div class="lightbox-image-wrap">
           <img id="lightbox-image" src="" alt="Project image" />
+          <div class="lightbox-nav" aria-hidden="true">
+            <button type="button" class="lightbox-prev" id="gallery-lightbox-prev" aria-label="Previous image">&larr;</button>
+            <span class="lightbox-counter" id="gallery-lightbox-counter">1 / 1</span>
+            <button type="button" class="lightbox-next" id="gallery-lightbox-next" aria-label="Next image">&rarr;</button>
+          </div>
         </div>
-        <aside class="lightbox-sidebar">
+        <aside class="lightbox-sidebar archtivy-pswp-sidebar">
           <div class="lightbox-actions">
             <button type="button" class="btn btn-secondary">Save</button>
             <button type="button" class="btn btn-secondary">Share</button>
           </div>
           <h3>Used Products</h3>
           <div class="lightbox-products" id="lightbox-products"></div>
+          <h3 class="archtivy-pswp-sidebar-title">Products in this image</h3>
+          <div class="archtivy-pswp-sidebar-content" id="lightbox-products-in-this-image"></div>
         </aside>
       </div>
       <button type="button" class="lightbox-close" id="lightbox-close" aria-label="Close lightbox">&times;</button>

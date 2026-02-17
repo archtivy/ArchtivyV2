@@ -52,8 +52,6 @@ export function ExploreProductsContent({
               listing={productCanonicalToCardData(p)}
               imageUrl={p.cover}
               href={getListingUrl({ id: p.id, type: "product" })}
-              productType={p.material_type}
-              keyFeature={p.color}
             />
           </li>
         ))}

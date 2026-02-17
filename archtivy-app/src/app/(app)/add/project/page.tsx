@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createProject } from "@/app/actions/createProject";
 import { AddProjectForm } from "./AddProjectForm";
 import { Button } from "@/components/ui/Button";
-import { getProfileByClerkId, getProfilesByRole } from "@/lib/db/profiles";
+import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getProjectMaterialOptions } from "@/lib/db/materials";
 import { getListingsByOwner } from "@/lib/db/listings";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
@@ -37,24 +37,21 @@ export default async function AddProjectPage() {
   if (!profile?.username) {
     redirect("/onboarding");
   }
-  if (profile.role !== "designer") {
-    redirect("/me");
-  }
 
   const { data: listings } = await getListingsByOwner(userId);
   const listingsCount = listings?.length ?? 0;
   const showOnboarding = listingsCount === 0;
 
-  const [brandsResult, materialOptions, memberTitles] = await Promise.all([
-    getProfilesByRole("brand"),
+  const [materialOptions, memberTitles] = await Promise.all([
     getProjectMaterialOptions(),
     getActiveMemberTitles(),
   ]);
-  const brands = brandsResult.data ?? [];
   const materials = materialOptions ?? [];
 
   return (
-    <div className="space-y-8">
+    <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950/50">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+        <div className="space-y-8">
       {showOnboarding && (
         <OnboardingSteps />
       )}
@@ -63,7 +60,7 @@ export default async function AddProjectPage() {
           Add project
         </h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Create a new project listing. Use the checklist to track progress. Save draft anytime or publish when ready.
+          Create a new project listing. Save draft anytime or publish when ready.
         </p>
         <p className="mt-2">
           <Button as="link" href="/explore/projects" variant="link">
@@ -71,7 +68,9 @@ export default async function AddProjectPage() {
           </Button>
         </p>
       </div>
-      <AddProjectForm brands={brands} materials={materials} memberTitles={memberTitles} />
+      <AddProjectForm materials={materials} memberTitles={memberTitles} />
+        </div>
+      </div>
     </div>
   );
 }

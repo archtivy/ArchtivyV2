@@ -36,9 +36,6 @@ export default async function AddProductPage() {
   if (!profile?.username) {
     redirect("/onboarding");
   }
-  if (profile.role !== "brand") {
-    redirect("/me");
-  }
 
   const { data: listings } = await getListingsByOwner(userId);
   const listingsCount = listings?.length ?? 0;
@@ -51,7 +48,9 @@ export default async function AddProductPage() {
   const materials = materialOptions ?? [];
 
   return (
-    <div className="space-y-8">
+    <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950/50">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+        <div className="space-y-8">
       {showOnboarding && (
         <OnboardingSteps />
       )}
@@ -60,7 +59,7 @@ export default async function AddProductPage() {
           Add product
         </h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Create a new product listing. Use the checklist to track progress. Save draft anytime or publish when ready.
+          Create a new product listing. Save draft anytime or publish when ready.
         </p>
         <p className="mt-2">
           <Button as="link" href="/explore/products" variant="link">
@@ -69,6 +68,8 @@ export default async function AddProductPage() {
         </p>
       </div>
       <AddProductForm materials={materials} memberTitles={memberTitles} />
+        </div>
+      </div>
     </div>
   );
 }

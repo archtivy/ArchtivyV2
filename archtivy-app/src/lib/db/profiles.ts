@@ -269,6 +269,13 @@ export type OnboardingProfileInput = {
   designer_discipline: string | null;
   brand_type: string | null;
   reader_type: string | null;
+  location_place_name: string | null;
+  location_city: string | null;
+  location_country: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
+  location_mapbox_id: string | null;
+  location_visibility: "public" | "private";
 };
 
 export async function upsertProfileFromOnboarding(
@@ -284,6 +291,13 @@ export async function upsertProfileFromOnboarding(
     designer_discipline: input.designer_discipline ?? null,
     brand_type: input.brand_type ?? null,
     reader_type: input.reader_type ?? null,
+    location_place_name: input.location_place_name ?? null,
+    location_city: input.location_city ?? null,
+    location_country: input.location_country ?? null,
+    location_lat: input.location_lat ?? null,
+    location_lng: input.location_lng ?? null,
+    location_mapbox_id: input.location_mapbox_id ?? null,
+    location_visibility: input.location_visibility ?? "public",
     updated_at: now,
   };
 

@@ -52,7 +52,7 @@ export function ExploreProjectsContent({
               listing={projectCanonicalToCardData(p)}
               imageUrl={p.cover}
               href={getListingUrl({ id: p.id, type: "project" })}
-              postedBy={p.owner?.displayName ?? "by Archtivy"}
+              postedBy={p.owner?.displayName ?? undefined}
               location={p.location_text}
               areaSqft={p.area_sqft}
             />

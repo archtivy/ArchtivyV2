@@ -726,6 +726,43 @@ main {
   border-bottom: none;
 }
 
+/* Per-image products in lightbox sidebar */
+.archtivy-pswp-sidebar-content {
+  margin-top: 0.5rem;
+}
+.archtivy-pswp-sidebar-empty {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+.archtivy-pswp-product-card {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.archtivy-pswp-product-card:last-child {
+  border-bottom: none;
+}
+.archtivy-pswp-product-card a {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  text-decoration: none;
+  color: var(--text);
+}
+.archtivy-pswp-product-thumb-placeholder,
+.archtivy-pswp-product-thumb {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: var(--radius);
+  object-fit: cover;
+  background: var(--border);
+}
+.archtivy-pswp-product-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
 .used-product-card a {
   display: flex;
   gap: 0.75rem;

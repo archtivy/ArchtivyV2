@@ -1,7 +1,12 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { auth } from "@clerk/nextjs/server";
 import { getProjectCanonicalBySlugOrId } from "@/lib/db/explore";
+import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getAbsoluteUrl, getBaseUrl } from "@/lib/canonical";
 import { getProductsForProject } from "@/lib/db/projectProductLinks";
 import {
@@ -10,22 +15,16 @@ import {
   sanitizeListingImageUrl,
 } from "@/lib/db/listingImages";
 import { getPhotoProductTagsByImageIds } from "@/lib/db/photoProductTags";
-import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { getListingDocumentsServer } from "@/lib/db/listingDocuments";
+import { resolveMentionedProducts } from "@/lib/db/mentionedProducts";
 import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
 import { getGalleryBookmarkState } from "@/app/actions/galleryBookmarks";
-import { PageContainer } from "@/components/layout/PageContainer";
-import { DetailLayout } from "@/components/listing/DetailLayout";
-import { DetailHeaderBar } from "@/components/listing/DetailHeaderBar";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
-import { DetailSidebar, type DetailSidebarRow } from "@/components/listing/DetailSidebar";
-import { TeamMemberLinks } from "@/components/listing/TeamMemberLinks";
-import { UsedOrSuggestedProductsStrip } from "@/components/listing/UsedOrSuggestedProductsStrip";
-import { projectExploreUrl } from "@/lib/exploreUrls";
-import { areaSqftToBucket } from "@/lib/exploreFilters";
-import { connectionsLabelText } from "@/components/listing/connectionsLabel";
+import { ProjectDetailLayout } from "@/components/listing/ProjectDetailLayout";
 import type { GalleryImage } from "@/lib/db/gallery";
 import type { ProjectCanonical } from "@/lib/canonical-models";
 import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
+import type { UsedProductItem } from "@/components/listing/ProjectDetailContent";
 
 function canonicalGalleryToGalleryImages(
   gallery: { url: string; alt: string }[]
@@ -38,114 +37,6 @@ function canonicalGalleryToGalleryImages(
   }));
 }
 
-function buildProjectSidebarRows(
-  project: ProjectCanonical,
-  teamWithProfiles: ListingTeamMemberWithProfile[] | null
-): DetailSidebarRow[] {
-  const rows: DetailSidebarRow[] = [];
-
-  if (project.category?.trim()) {
-    rows.push({
-      label: "Category",
-      value: project.category.trim(),
-      href: projectExploreUrl({ category: project.category }),
-    });
-  }
-
-  const locationText = project.location_text?.trim() || (project.location?.city && project.location?.country
-    ? `${project.location.city}, ${project.location.country}`
-    : null);
-  if (locationText) {
-    rows.push({
-      label: "Location",
-      value: locationText,
-      href: projectExploreUrl({
-        city: project.location?.city ?? undefined,
-        country: project.location?.country ?? undefined,
-      }),
-    });
-  }
-
-  if (project.year != null && !Number.isNaN(project.year)) {
-    rows.push({
-      label: "Year",
-      value: String(project.year),
-      href: projectExploreUrl({ year: project.year }),
-    });
-  }
-
-  const areaSqft = project.area_sqft != null && !Number.isNaN(project.area_sqft) ? Math.round(project.area_sqft) : null;
-  const areaSqm = project.area_sqm != null && !Number.isNaN(project.area_sqm) ? Math.round(project.area_sqm) : null;
-  if (areaSqft != null || areaSqm != null) {
-    const areaValue = areaSqm != null && areaSqft != null
-      ? `${areaSqft} sqft (${areaSqm} sqm)`
-      : areaSqft != null
-        ? `${areaSqft} sqft`
-        : `${areaSqm} sqm`;
-    const areaBucket = areaSqft != null ? areaSqftToBucket(areaSqft) : undefined;
-    rows.push({
-      label: "Area",
-      value: areaValue,
-      href: projectExploreUrl({ area_bucket: areaBucket }),
-    });
-  }
-
-  const materials = project.materials ?? [];
-  if (materials.length > 0) {
-    rows.push({
-      label: "Materials",
-      value: (
-        <div className="flex flex-wrap gap-2">
-          {materials.map((m) => (
-            <Link
-              key={m.id}
-              href={projectExploreUrl({ materials: [m.slug] })}
-              className="rounded-full bg-archtivy-primary/10 px-3 py-1 text-xs font-medium text-archtivy-primary transition hover:bg-archtivy-primary/15 hover:underline dark:bg-archtivy-primary/20"
-            >
-              {m.name}
-            </Link>
-          ))}
-        </div>
-      ),
-    });
-  }
-
-  const connectionsText = connectionsLabelText(project.connectionCount);
-  if (connectionsText) {
-    rows.push({
-      label: "Connections",
-      value: connectionsText,
-    });
-  }
-
-  if (teamWithProfiles && teamWithProfiles.length > 0) {
-    rows.push({
-      label: "Team Members",
-      value: <TeamMemberLinks members={teamWithProfiles} />,
-    });
-  } else if (project.team_members?.length > 0) {
-    const names = project.team_members
-      .map((m) => (m.name?.trim() || "").replace(/\s+/g, " "))
-      .filter(Boolean);
-    if (names.length > 0) {
-      rows.push({
-        label: "Team Members",
-        value: names.join(", "),
-      });
-    }
-  }
-
-  if (Array.isArray(project.documents) && project.documents.length > 0) {
-    const count = project.documents.length;
-    rows.push({
-      label: "Documents",
-      value: count === 1 ? "1 file" : `${count} files`,
-    });
-  }
-
-  return rows;
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -154,6 +45,9 @@ export async function generateMetadata({
   const { slug } = await params;
   const project = await getProjectCanonicalBySlugOrId(slug);
   if (!project) return {};
+  if (project.status === "PENDING") {
+    return { title: "Project" };
+  }
   const path = `/projects/${project.slug ?? project.id}`;
   const title = project.title?.trim() || "Project";
   const description =
@@ -184,12 +78,23 @@ export default async function ProjectPage({
   const project = await getProjectCanonicalBySlugOrId(slug);
   if (!project) notFound();
 
-  const [usedResult, isSaved, teamResult] = await Promise.all([
+  const { userId } = await auth();
+  const profileRes = await getProfileByClerkId(userId ?? "");
+  const profile = profileRes.data as { is_admin?: boolean } | null;
+  const isAdmin = Boolean(profile?.is_admin);
+
+  if (project.status === "PENDING") {
+    const isOwner = Boolean(userId && project.owner_clerk_user_id === userId);
+    if (!isOwner && !isAdmin) notFound();
+  }
+
+  const [usedResult, isSaved, teamResult, docsResult] = await Promise.all([
     getProductsForProject(project.id, { sources: ["manual", "photo_tag"] }).catch(() =>
       getProductsForProject(project.id)
     ),
     getGalleryBookmarkState("project", project.id),
     getListingTeamMembersWithProfiles(project.id),
+    getListingDocumentsServer(project.id),
   ]);
   const usedListingsRaw = usedResult.data ?? [];
   const usedListings = Array.from(
@@ -201,19 +106,32 @@ export default async function ProjectPage({
       ? (await getFirstImageUrlPerListingIds(relatedIds)).data ?? {}
       : {};
 
-  const usedItems = usedListings.map((p) => {
-    const row = p as { id: string; slug?: string; title: string; description?: string | null };
+  const usedProducts: UsedProductItem[] = usedListings.map((p) => {
+    const row = p as {
+      id: string;
+      slug?: string;
+      title: string;
+      description?: string | null;
+      brands_used?: { name?: string }[];
+    };
+    const brand = row.brands_used?.[0]?.name?.trim() ?? null;
     return {
       id: row.id,
       slug: row.slug ?? row.id,
       title: row.title,
-      subtitle: row.description ?? null,
-      thumbnail: thumbnailMap[row.id],
+      brand: brand || null,
+      thumbnail: thumbnailMap[row.id] ?? null,
     };
   });
 
+  const documents = (docsResult.data ?? []).map((d) => ({
+    id: d.id,
+    file_url: d.file_url,
+    file_name: d.file_name,
+  }));
+
   let suggestedItems: { id: string; slug: string; title: string; thumbnail?: string | null }[] = [];
-  if (usedItems.length === 0) {
+  if (usedProducts.length === 0) {
     const baseUrl = getBaseUrl();
     const matchesUrl = `${baseUrl}/api/matches/project?projectId=${encodeURIComponent(project.id)}&tier=all&limit=8`;
     try {
@@ -231,7 +149,21 @@ export default async function ProjectPage({
     }
   }
 
-  const relatedItems = usedItems;
+  const relatedItems = usedProducts.length > 0
+    ? usedProducts.map((p) => ({
+        id: p.id,
+        slug: p.slug,
+        title: p.title,
+        subtitle: p.brand ?? null,
+        thumbnail: p.thumbnail ?? undefined,
+      }))
+    : suggestedItems.map((s) => ({
+        id: s.id,
+        slug: s.slug,
+        title: s.title,
+        subtitle: null,
+        thumbnail: s.thumbnail ?? undefined,
+      }));
 
   const teamWithProfiles = teamResult.data ?? null;
 
@@ -242,56 +174,68 @@ export default async function ProjectPage({
     const imageIds = imagesWithIds.map((i) => i.id);
     const tagsResult = await getPhotoProductTagsByImageIds(imageIds);
     const tags = tagsResult.data ?? [];
-    const productIds = Array.from(new Set(tags.map((t) => t.product_id)));
-    const productMap: Record<string, { title: string; slug: string }> = {};
-    if (productIds.length > 0) {
-      const supabase = getSupabaseServiceClient();
-      const { data: titleRows } = await supabase
-        .from("listings")
-        .select("id, title, slug")
-        .in("id", productIds);
-      for (const row of titleRows ?? []) {
-        const r = row as { id: string; title: string | null; slug: string | null };
-        productMap[r.id] = { title: r.title?.trim() ?? "", slug: r.slug ?? r.id };
-      }
-    }
-    const tagsByImageId: Record<string, { x: number; y: number; product_id: string; product_title?: string; product_slug?: string }[]> = {};
+    const tagsByImageId: Record<string, { id: string; x: number; y: number; product_id: string; product_title?: string; product_slug?: string; product_thumbnail?: string; product_owner_name?: string }[]> = {};
     for (const t of tags) {
-      if (!tagsByImageId[t.listing_image_id]) tagsByImageId[t.listing_image_id] = [];
-      const info = productMap[t.product_id];
-      tagsByImageId[t.listing_image_id].push({
+      const key =
+        typeof t.listing_image_id === "string"
+          ? t.listing_image_id
+          : (t.listing_image_id as { id?: string } | null)?.id;
+
+      if (!key) continue;
+      const product = t.product;
+      if (!t.product_id) continue;
+      (tagsByImageId[key] ||= []).push({
+        id: t.id,
         x: t.x,
         y: t.y,
         product_id: t.product_id,
-        product_title: info?.title,
-        product_slug: info?.slug,
+        product_title: product?.title ?? undefined,
+        product_slug: product?.slug ?? undefined,
+        product_thumbnail: product?.thumbnail ?? undefined,
+        product_owner_name: product?.brand ?? undefined,
       });
     }
-    images = imagesWithIds.map((img, i) => {
+    images = imagesWithIds.map((img) => {
       const src = sanitizeListingImageUrl(img.image_url);
       return {
         id: img.id,
         src: src ?? "",
         alt: img.alt ?? "Image",
         sort_order: img.sort_order,
-        photoTags: tagsByImageId[img.id],
+        photoTags: tagsByImageId[img.id] ?? [],
       };
     });
+    // Each image: id = listing_images.id, photoTags = tags for that image only (for Lightbox per-image sidebar).
   } else {
     images = canonicalGalleryToGalleryImages(project.gallery);
   }
 
+  const mentionedRaw = project.mentioned_products ?? [];
+  const mentionedResolved = mentionedRaw.length > 0 ? await resolveMentionedProducts(mentionedRaw) : [];
+
   const currentPath = `/projects/${project.slug ?? project.id}`;
-  const sidebarRows = buildProjectSidebarRows(project, teamWithProfiles);
-  const locationLine = project.location_text?.trim() || (project.location?.city && project.location?.country
-    ? `${project.location.city}, ${project.location.country}`
-    : null);
+  const productsCount = usedProducts.length;
+  const professionalsCount = teamWithProfiles?.length ?? 0;
+  const connectionLine =
+    productsCount > 0 || professionalsCount > 0
+      ? `Connected to ${productsCount} product${productsCount !== 1 ? "s" : ""} and ${professionalsCount} professional${professionalsCount !== 1 ? "s" : ""}.`
+      : null;
+  const mapHref =
+    project.location?.lat != null && project.location?.lng != null
+      ? `https://www.google.com/maps?q=${project.location.lat},${project.location.lng}`
+      : null;
+
+  console.log("[ProjectPage] gallery images debug", images.map((img) => ({
+    id: img.id,
+    photoTagsCount: img.photoTags?.length ?? 0,
+    keys: Object.keys(img),
+  })));
 
   return (
-    <PageContainer>
+    <div className="mx-auto max-w-[1040px] px-4 pt-1 pb-6 sm:px-6 sm:pt-2 sm:pb-8">
       <ListingViewTracker type="project" id={project.id} />
       <nav
-        className="mb-4 flex flex-wrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"
+        className="mb-4 flex flex-wrap items-center gap-2 text-sm text-[#374151] dark:text-zinc-400"
         aria-label="Breadcrumb"
       >
         <Link href="/" className="hover:text-zinc-900 dark:hover:text-zinc-100">
@@ -302,51 +246,22 @@ export default async function ProjectPage({
           Projects
         </Link>
         <span aria-hidden>/</span>
-        <span className="text-zinc-500 dark:text-zinc-400">{project.title}</span>
+        <span className="text-[#374151] dark:text-zinc-400">{project.title}</span>
       </nav>
 
-      <DetailLayout
+      <ProjectDetailLayout
         images={images}
-        listingTitle={project.title}
-        context="project"
+        project={project}
+        usedProducts={usedProducts}
+        mentionedResolved={mentionedResolved}
+        teamWithProfiles={teamWithProfiles}
+        documents={documents}
         relatedItems={relatedItems}
-        entityType="project"
-        entityId={project.id}
-        entitySlug={project.slug ?? project.id}
         isSaved={isSaved}
         currentPath={currentPath}
-        headerBar={
-          <DetailHeaderBar
-            entityType="project"
-            entityId={project.id}
-            currentPath={currentPath}
-            isSaved={isSaved}
-            locationLine={locationLine ?? undefined}
-            connectionCount={project.connectionCount}
-          />
-        }
-        belowHeader={
-          <UsedOrSuggestedProductsStrip
-            usedItems={usedItems.length > 0 ? usedItems : null}
-            suggestedItems={usedItems.length === 0 ? suggestedItems : null}
-          />
-        }
-        title={
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 md:text-3xl">
-            {project.title}
-          </h1>
-        }
-        description={
-          project.description?.trim() ? (
-            <section className="prose prose-zinc dark:prose-invert max-w-none">
-              <div className="whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">
-                {project.description.trim()}
-              </div>
-            </section>
-          ) : null
-        }
-        sidebar={<DetailSidebar title="Project details" rows={sidebarRows} />}
+        connectionLine={connectionLine}
+        mapHref={mapHref}
       />
-    </PageContainer>
+    </div>
   );
 }

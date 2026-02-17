@@ -4,9 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const baseClass =
-  "rounded px-2 py-1 text-zinc-500 transition hover:text-zinc-900 focus:text-zinc-900 focus:outline-none dark:text-zinc-400 dark:hover:text-zinc-100 dark:focus:text-zinc-100";
-const activeClass =
-  "border-b-2 border-archtivy-primary font-medium text-archtivy-primary";
+  "rounded px-2 py-1 text-[15px] font-medium text-[#2b2b2b] transition-colors hover:text-[#002abf] focus:outline-none focus-visible:bg-[#002abf]/10 focus-visible:ring-0 dark:text-zinc-300 dark:hover:text-[#002abf] dark:focus-visible:bg-[#002abf]/15";
+const activeClass = "text-[#002abf] dark:text-[#002abf]";
 
 export function TopNavLinks() {
   const pathname = usePathname();

@@ -58,12 +58,16 @@ export interface ProjectCanonical {
   team_members: { name: string; role: string }[];
   documents: unknown[];
   owner_clerk_user_id: string | null;
-  /** Resolved from profiles; use for card subtitle. Fallback "by Archtivy" when null. */
+  /** Resolved from profiles; use for card subtitle. */
   owner: ProjectOwner | null;
   /** team_members.length + brands_used.length. For "X connections" label. */
   connectionCount: number;
   created_at: string;
   updated_at: string | null;
+  /** PENDING until admin approves; only APPROVED in public explore. */
+  status: "PENDING" | "APPROVED";
+  /** User-provided { brand_name_text, product_name_text }[]; link if match existing product. */
+  mentioned_products: { brand_name_text: string; product_name_text: string }[];
 }
 
 export interface ProductCanonical {
@@ -74,6 +78,8 @@ export interface ProductCanonical {
   category: string | null;
   material_type: string | null;
   color: string | null;
+  /** Array of color names for filtering and tag suggestions. Default []. */
+  color_options?: string[];
   year: number | null;
   brand_profile_id: string | null;
   team_members: unknown[];
@@ -81,12 +87,16 @@ export interface ProductCanonical {
   cover: string | null;
   gallery: { url: string; alt: string }[];
   owner_clerk_user_id?: string | null;
+  /** Resolved from profiles; use for card subtitle (owner display name). */
+  owner?: ProjectOwner | null;
   /** team_members.length + usedInProjectsCount (project_product_links). For "X connections" label. */
   connectionCount: number;
   created_at: string;
   /** Hydrated via product_material_links -> materials. Use for sidebar/cards. */
   materials: { id: string; name: string; slug: string }[];
   material_tags: MaterialTag[];
+  /** PENDING until admin approves; only APPROVED in public explore. */
+  status: "PENDING" | "APPROVED";
 }
 
 /** Single source of truth: project rows are listings with type = 'project'. Tolerant: type ?? listing_type. */
@@ -279,6 +289,7 @@ export function normalizeProduct(
     created_at: String(raw.created_at ?? ""),
     materials: materialTags.map((m) => ({ id: m.id, name: m.display_name, slug: m.slug })),
     material_tags: materialTags,
+    status: (raw.status as "PENDING" | "APPROVED") ?? "APPROVED",
   };
 }
 

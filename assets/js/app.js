@@ -97,10 +97,17 @@
     var galleryEl = document.getElementById('project-gallery');
     if (galleryEl) {
       var images = project.galleryImages && project.galleryImages.length ? project.galleryImages : ['assets/images/placeholder.svg'];
+      var firstProductSample = [
+        { id: 'sample-1', title: 'Sample product (first image)', url: 'product.html?id=sample-1', thumb: '' }
+      ];
       galleryEl.innerHTML = images
         .map(function (src, i) {
+          var productsJson = (i === 0 ? firstProductSample : []).map(function (p) {
+            return { id: p.id, title: p.title, url: p.url || '', thumb: p.thumb || '' };
+          });
+          var dataProducts = JSON.stringify(productsJson).replace(/'/g, '&#39;');
           return (
-            '<div class="project-gallery-item" role="listitem" data-lightbox-src="' + escapeHtml(src) + '" tabindex="0"><span>' + (i + 1) + '</span></div>'
+            '<div class="project-gallery-item" role="listitem" data-lightbox-src="' + escapeHtml(src) + '" data-products=\'' + dataProducts + '\' tabindex="0"><span>' + (i + 1) + '</span></div>'
           );
         })
         .join('');
@@ -446,6 +453,51 @@
     }
   }
 
+  // ---------- Per-image products sidebar (project lightbox) ----------
+  function getProductsFromSlideElement(el) {
+    if (!el) return [];
+    var raw = el.getAttribute('data-products');
+    if (raw == null || raw === '') return [];
+    try {
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      if (typeof window.__ARCHTIVY_DEBUG_LIGHTBOX__ !== 'undefined' && window.__ARCHTIVY_DEBUG_LIGHTBOX__) {
+        console.log('[Archtivy lightbox] data-products parse error', e);
+      }
+      return [];
+    }
+  }
+
+  function renderProductsSidebar(products) {
+    var container = document.getElementById('lightbox-products-in-this-image');
+    if (!container) return;
+    var list = Array.isArray(products) ? products : [];
+    if (typeof window.__ARCHTIVY_DEBUG_LIGHTBOX__ !== 'undefined' && window.__ARCHTIVY_DEBUG_LIGHTBOX__) {
+      console.log('[Archtivy lightbox] renderProductsSidebar', list.length, list);
+    }
+    if (list.length === 0) {
+      container.innerHTML = '<p class="archtivy-pswp-sidebar-empty">No tagged products for this image.</p>';
+      return;
+    }
+    var html = list
+      .map(function (p) {
+        var id = escapeHtml(String(p.id || ''));
+        var title = escapeHtml(String(p.title || ''));
+        var url = (p.url && p.url.trim()) ? escapeHtml(p.url.trim()) : 'product.html?id=' + id;
+        var thumb = (p.thumb && p.thumb.trim()) ? '<img src="' + escapeHtml(p.thumb) + '" alt="" class="archtivy-pswp-product-thumb" />' : '<span class="archtivy-pswp-product-thumb-placeholder">Product</span>';
+        return (
+          '<div class="archtivy-pswp-product-card">' +
+          '<a href="' + url + '">' +
+          thumb +
+          '<span class="archtivy-pswp-product-title">' + title + '</span>' +
+          '</a></div>'
+        );
+      })
+      .join('');
+    container.innerHTML = html;
+  }
+
   // ---------- Lightbox (project page) ----------
   function initLightbox() {
     var lightbox = document.getElementById('gallery-lightbox');
@@ -453,14 +505,38 @@
 
     var lightboxImage = document.getElementById('lightbox-image');
     var closeBtn = document.getElementById('lightbox-close');
-    var galleryItems = document.querySelectorAll('.project-gallery-item[data-lightbox-src]');
+    var prevBtn = document.getElementById('gallery-lightbox-prev');
+    var nextBtn = document.getElementById('gallery-lightbox-next');
+    var counterEl = document.getElementById('gallery-lightbox-counter');
+    var currentIndex = 0;
 
-    function openLightbox(src) {
+    function getGalleryItems() {
+      return document.querySelectorAll('.project-gallery-item[data-lightbox-src]');
+    }
+
+    function updateSidebarForIndex(index) {
+      var items = getGalleryItems();
+      var item = items[index] || null;
+      var products = getProductsFromSlideElement(item);
+      renderProductsSidebar(products);
+    }
+
+    function openLightbox(index) {
+      var items = getGalleryItems();
+      var total = items.length || 1;
+      currentIndex = Math.max(0, Math.min(parseInt(index, 10) || 0, total - 1));
+      var item = items[currentIndex];
+      var src = item ? item.getAttribute('data-lightbox-src') : '';
       if (lightboxImage && src) lightboxImage.src = src;
+      if (counterEl) counterEl.textContent = (currentIndex + 1) + ' / ' + total;
+      updateSidebarForIndex(currentIndex);
       lightbox.classList.add('is-open');
       lightbox.removeAttribute('hidden');
       if (closeBtn) closeBtn.focus();
       document.body.style.overflow = 'hidden';
+      if (typeof window.__ARCHTIVY_DEBUG_LIGHTBOX__ !== 'undefined' && window.__ARCHTIVY_DEBUG_LIGHTBOX__) {
+        console.log('[Archtivy lightbox] open', currentIndex, total);
+      }
     }
 
     function closeLightbox() {
@@ -469,10 +545,22 @@
       document.body.style.overflow = '';
     }
 
+    function goPrev() {
+      var items = getGalleryItems();
+      if (currentIndex > 0) openLightbox(currentIndex - 1);
+    }
+
+    function goNext() {
+      var items = getGalleryItems();
+      if (currentIndex < getGalleryItems().length - 1) openLightbox(currentIndex + 1);
+    }
+
     function handleGalleryClick(e) {
       var item = e.currentTarget;
-      var src = item.getAttribute('data-lightbox-src');
-      if (src) openLightbox(src);
+      var items = getGalleryItems();
+      var index = Array.prototype.indexOf.call(items, item);
+      if (index === -1) index = 0;
+      openLightbox(index);
     }
 
     function handleGalleryKeydown(e) {
@@ -482,12 +570,15 @@
       }
     }
 
+    var galleryItems = getGalleryItems();
     galleryItems.forEach(function (item) {
       item.addEventListener('click', handleGalleryClick);
       item.addEventListener('keydown', handleGalleryKeydown);
     });
 
     if (closeBtn) closeBtn.addEventListener('click', closeLightbox);
+    if (prevBtn) prevBtn.addEventListener('click', goPrev);
+    if (nextBtn) nextBtn.addEventListener('click', goNext);
 
     lightbox.addEventListener('click', function (e) {
       if (e.target === lightbox) closeLightbox();
@@ -495,6 +586,10 @@
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && lightbox.classList.contains('is-open')) closeLightbox();
+      if (lightbox.classList.contains('is-open') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        if (e.key === 'ArrowLeft') goPrev();
+        else goNext();
+      }
     });
   }
 

@@ -13,12 +13,6 @@ import { Button } from "@/components/ui/Button";
 import type { ListingCardData } from "@/lib/types/listings";
 import type { Profile } from "@/lib/types/profiles";
 
-const ROLE_LABELS: Record<string, string> = {
-  designer: "Designer",
-  brand: "Brand",
-  reader: "Reader",
-};
-
 const EMPTY_LISTING_CARD: Omit<ListingCardData, "id" | "type" | "title" | "cover_image_url"> = {
   description: null,
   location: null,
@@ -140,12 +134,22 @@ export default async function ProfileByIdPage({
       : { data: {} as Record<string, string> };
   const imageMap = imageResult.data ?? {};
 
-  const location = [profile.location_city, profile.location_country]
-    .filter(Boolean)
-    .join(", ");
-  const roleLabel = ROLE_LABELS[profile.role] ?? profile.role;
+  const showLocation = profile.location_visibility !== "private";
+  const locationText =
+    [profile.location_city, profile.location_country].filter(Boolean).join(", ") ||
+    profile.location_place_name ||
+    null;
+  const location = showLocation && locationText ? locationText : null;
   const displayName = profile.display_name ?? profile.username ?? "Anonymous";
   const showClaim = canShowClaimButton(profile as ProfileRow);
+  const showDiscipline =
+    profile.role === "designer" &&
+    profile.designer_discipline &&
+    (profile as { show_designer_discipline?: boolean }).show_designer_discipline !== false;
+  const showBrandTypeLabel =
+    profile.role === "brand" &&
+    profile.brand_type &&
+    (profile as { show_brand_type?: boolean }).show_brand_type !== false;
 
   return (
     <div className="space-y-8">
@@ -153,9 +157,10 @@ export default async function ProfileByIdPage({
         profile={profile}
         profileId={profileId}
         location={location}
-        roleLabel={roleLabel}
         displayName={displayName}
         showClaimButton={showClaim}
+        showDiscipline={showDiscipline}
+        showBrandTypeLabel={showBrandTypeLabel}
       />
 
       {showClaim && (
@@ -265,112 +270,116 @@ function ProfileHeader({
   profile,
   profileId,
   location,
-  roleLabel,
   displayName,
   showClaimButton,
+  showDiscipline,
+  showBrandTypeLabel,
 }: {
   profile: Profile;
   profileId: string;
   location: string;
-  roleLabel: string;
   displayName: string;
   showClaimButton: boolean;
+  showDiscipline: boolean;
+  showBrandTypeLabel: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
-      <div className="shrink-0">
-        {profile.avatar_url ? (
-          <Image
-            src={profile.avatar_url}
-            alt={displayName}
-            width={96}
-            height={96}
-            className="rounded-full border border-zinc-200 dark:border-zinc-700"
-            unoptimized
-          />
-        ) : (
-          <div className="flex h-24 w-24 items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-700 bg-zinc-200 text-2xl font-semibold text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
-            {displayName[0].toUpperCase()}
-          </div>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+    <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-6 dark:border-zinc-800 dark:bg-zinc-900/50 sm:p-8">
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+        <div className="shrink-0">
+          {profile.avatar_url ? (
+            <Image
+              src={profile.avatar_url}
+              alt={displayName}
+              width={120}
+              height={120}
+              className="rounded-full border border-zinc-200 dark:border-zinc-700"
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-[120px] w-[120px] items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-700 bg-zinc-200 text-3xl font-semibold text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
+              {displayName[0].toUpperCase()}
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-semibold text-zinc-900 sm:text-3xl dark:text-zinc-100">
             {displayName}
           </h1>
-          <span className="rounded border border-zinc-200 dark:border-zinc-700 bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
-            {roleLabel}
-          </span>
-          {profile.designer_discipline && profile.role === "designer" && (
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
-              {profile.designer_discipline}
-            </span>
+          {(showDiscipline || showBrandTypeLabel) && (
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              {showDiscipline && profile.designer_discipline}
+              {showDiscipline && showBrandTypeLabel && " · "}
+              {showBrandTypeLabel && profile.brand_type}
+            </p>
           )}
-          {profile.brand_type && profile.role === "brand" && (
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
-              {profile.brand_type}
-            </span>
+          {location && (
+            <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+              {location}
+            </p>
           )}
-          {profile.reader_type && profile.role === "reader" && (
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
-              {profile.reader_type}
-            </span>
+          {profile.bio && (
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+              {profile.bio}
+            </p>
           )}
-        </div>
-        {location && (
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {location}
-          </p>
-        )}
-        {profile.bio && (
-          <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-500 dark:text-zinc-400">
-            {profile.bio}
-          </p>
-        )}
-        <div className="mt-3 flex flex-wrap gap-4 text-sm">
-          {profile.website && (
-            <a
-              href={profile.website.startsWith("http") ? profile.website : `https://${profile.website}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-archtivy-primary hover:underline dark:text-archtivy-primary"
-            >
-              Website
-            </a>
-          )}
-          {profile.instagram && (
-            <a
-              href={`https://instagram.com/${profile.instagram.replace(/^@/, "")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-archtivy-primary hover:underline dark:text-archtivy-primary"
-            >
-              Instagram
-            </a>
-          )}
-          {profile.linkedin && (
-            <a
-              href={profile.linkedin.startsWith("http") ? profile.linkedin : `https://linkedin.com/in/${profile.linkedin}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-archtivy-primary hover:underline dark:text-archtivy-primary"
-            >
-              LinkedIn
-            </a>
-          )}
-        </div>
-        {showClaimButton && (
-          <div className="mt-4">
-            <Button
-              as="link"
-              href={`/u/id/${profileId}/claim`}
-              variant="secondary"
-            >
-              Request claim
-            </Button>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {profile.website && (
+              <a
+                href={profile.website.startsWith("http") ? profile.website : `https://${profile.website}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-500 transition hover:bg-zinc-50 hover:text-archtivy-primary dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-archtivy-primary"
+                aria-label="Website"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                </svg>
+              </a>
+            )}
+            {profile.instagram && (
+              <a
+                href={`https://instagram.com/${profile.instagram.replace(/^@/, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-500 transition hover:bg-zinc-50 hover:text-archtivy-primary dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-archtivy-primary"
+                aria-label="Instagram"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                  <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+                </svg>
+              </a>
+            )}
+            {profile.linkedin && (
+              <a
+                href={profile.linkedin.startsWith("http") ? profile.linkedin : `https://linkedin.com/in/${profile.linkedin}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-500 transition hover:bg-zinc-50 hover:text-archtivy-primary dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-archtivy-primary"
+                aria-label="LinkedIn"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                </svg>
+              </a>
+            )}
           </div>
-        )}
+          {showClaimButton && (
+            <div className="mt-4">
+              <Button
+                as="link"
+                href={`/u/id/${profileId}/claim`}
+                variant="secondary"
+              >
+                Request claim
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

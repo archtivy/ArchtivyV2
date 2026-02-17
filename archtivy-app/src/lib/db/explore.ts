@@ -23,8 +23,6 @@ import { areaBucketToRange } from "@/lib/exploreFilters";
 import type { ProjectSortOption, ProductSortOption } from "@/lib/exploreFilters";
 import { getMaterialsByProjectIds, getMaterialsByProductIds } from "@/lib/db/materials";
 
-const OWNER_FALLBACK = "by Archtivy";
-
 const supabase = () => getSupabaseServiceClient();
 
 /** Map listing_images rows to ProductImageRow shape for normalizeProduct (listing_id = product_id, image_url = src). */
@@ -81,12 +79,13 @@ async function getUsedInProjectsCountByProductIds(
   return map;
 }
 
-/** Fetch project listings (listings.type = 'project') with canonical select. */
+/** Fetch project listings (listings.type = 'project') with canonical select. Public: only APPROVED. */
 async function getProjectListingRows(limit: number): Promise<RawListingRow[]> {
   const { data, error } = await supabase()
     .from("listings")
     .select(projectListingSelect)
     .eq("type", "project")
+    .eq("status", "APPROVED")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -123,11 +122,11 @@ async function getProjectIdsBySearch(q: string): Promise<string[]> {
   const ids = new Set<string>();
 
   const [t, d, loc, locCity, locCountry] = await Promise.all([
-    sup.from("listings").select("id").eq("type", "project").is("deleted_at", null).ilike("title", pattern).limit(300),
-    sup.from("listings").select("id").eq("type", "project").is("deleted_at", null).ilike("description", pattern).limit(300),
-    sup.from("listings").select("id").eq("type", "project").is("deleted_at", null).ilike("location", pattern).limit(300),
-    sup.from("listings").select("id").eq("type", "project").is("deleted_at", null).ilike("location_city", pattern).limit(300),
-    sup.from("listings").select("id").eq("type", "project").is("deleted_at", null).ilike("location_country", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).ilike("title", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).ilike("description", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).ilike("location", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).ilike("location_city", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).ilike("location_country", pattern).limit(300),
   ]);
   for (const res of [t, d, loc, locCity, locCountry])
     for (const r of res.data ?? []) ids.add((r as { id: string }).id);
@@ -143,6 +142,7 @@ async function getProjectIdsBySearch(q: string): Promise<string[]> {
       .from("listings")
       .select("id")
       .eq("type", "project")
+      .eq("status", "APPROVED")
       .is("deleted_at", null)
       .in("owner_clerk_user_id", clerkIds)
       .limit(500);
@@ -173,9 +173,9 @@ async function getProductIdsBySearch(q: string): Promise<string[]> {
   const ids = new Set<string>();
 
   const [t, d, cat] = await Promise.all([
-    sup.from("listings").select("id").eq("type", "product").is("deleted_at", null).ilike("title", pattern).limit(300),
-    sup.from("listings").select("id").eq("type", "product").is("deleted_at", null).ilike("description", pattern).limit(300),
-    sup.from("listings").select("id").eq("type", "product").is("deleted_at", null).ilike("category", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).ilike("title", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).ilike("description", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).ilike("category", pattern).limit(300),
   ]);
   for (const res of [t, d, cat])
     for (const r of res.data ?? []) ids.add((r as { id: string }).id);
@@ -192,6 +192,7 @@ async function getProductIdsBySearch(q: string): Promise<string[]> {
       .from("listings")
       .select("id")
       .eq("type", "product")
+      .eq("status", "APPROVED")
       .is("deleted_at", null)
       .in("owner_profile_id", brandIds)
       .limit(500);
@@ -339,6 +340,7 @@ async function getProjectListingRowsFiltered(
     .from("listings")
     .select(projectListingSelect, { count: "exact" })
     .eq("type", "project")
+    .eq("status", "APPROVED")
     .is("deleted_at", null);
 
   if (projectIdConstraint !== undefined) {
@@ -427,6 +429,7 @@ async function getProductRowsFiltered(
     .from("listings")
     .select(productListingSelect, { count: "exact" })
     .eq("type", "product")
+    .eq("status", "APPROVED")
     .is("deleted_at", null);
 
   if (productIdConstraint !== undefined) {
@@ -467,12 +470,13 @@ async function getProductRowsFiltered(
   return { rows: rows.map(listingRowToRawProductRow), total: count ?? 0 };
 }
 
-/** Fetch all product listings with canonical columns. Source: listings (type=product). */
+/** Fetch all product listings with canonical columns. Source: listings (type=product). Public: only APPROVED. */
 async function getProductRows(limit: number): Promise<RawProductRow[]> {
   const { data, error } = await supabase()
     .from("listings")
     .select(productListingSelect)
     .eq("type", "product")
+    .eq("status", "APPROVED")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -521,7 +525,7 @@ export async function getProjectsCanonical(
     const displayName =
       (p.display_name && p.display_name.trim()) ||
       (p.username && p.username.trim()) ||
-      OWNER_FALLBACK;
+      "";
     ownerByClerkId[p.clerk_user_id] = {
       displayName,
       avatarUrl: p.avatar_url ?? null,
@@ -536,9 +540,6 @@ export async function getProjectsCanonical(
     const project = normalizeProject(row, listingImages, projectMaterials);
     const clerkId = (row.owner_clerk_user_id as string) ?? null;
     project.owner = clerkId ? ownerByClerkId[clerkId] ?? null : null;
-    if (!project.owner) {
-      project.owner = { displayName: OWNER_FALLBACK };
-    }
     result.push(project);
   }
   return result;
@@ -554,17 +555,42 @@ export async function getProductsCanonical(
   const rows = await getProductRows(limit);
   if (rows.length === 0) return [];
   const ids = rows.map((r) => String(r.id));
-  const [imageResult, usedCounts, materialMap] = await Promise.all([
+  const clerkIds = Array.from(
+    new Set(
+      rows
+        .map((r) => (r as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id)
+        .filter(Boolean) as string[]
+    )
+  );
+  const [imageResult, usedCounts, materialMap, profilesResult] = await Promise.all([
     getImagesByListingIds(ids),
     getUsedInProjectsCountByProductIds(ids),
     getMaterialsByProductIds(ids),
+    clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
   ]);
   const imageRows = imageResult.data ?? [];
+  const profiles = profilesResult.data ?? [];
+  const ownerByClerkId: Record<string, ProjectOwner> = {};
+  for (const p of profiles) {
+    const displayName =
+      (p.display_name && p.display_name.trim()) ||
+      (p.username && p.username.trim()) ||
+      "";
+    if (displayName) {
+      ownerByClerkId[p.clerk_user_id] = {
+        displayName,
+        avatarUrl: p.avatar_url ?? null,
+        profileId: p.id,
+      };
+    }
+  }
   return rows.map((row) => {
     const productImages = listingImagesToProductImageRows(String(row.id), imageRows);
     const productMaterials = materialMap[String(row.id)] ?? [];
     const product = normalizeProduct(row, productImages, productMaterials);
     product.connectionCount += usedCounts[String(row.id)] ?? 0;
+    const clerkId = (row as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id ?? null;
+    product.owner = clerkId ? ownerByClerkId[clerkId] ?? null : null;
     return product;
   });
 }
@@ -615,7 +641,7 @@ export async function getProjectsCanonicalFiltered({
     const displayName =
       (p.display_name && p.display_name.trim()) ||
       (p.username && p.username.trim()) ||
-      OWNER_FALLBACK;
+      "";
     ownerByClerkId[p.clerk_user_id] = {
       displayName,
       avatarUrl: p.avatar_url ?? null,
@@ -630,7 +656,6 @@ export async function getProjectsCanonicalFiltered({
     const project = normalizeProject(row, listingImages, projectMaterials);
     const clerkId = (row.owner_clerk_user_id as string) ?? null;
     project.owner = clerkId ? ownerByClerkId[clerkId] ?? null : null;
-    if (!project.owner) project.owner = { displayName: OWNER_FALLBACK };
     data.push(project);
   }
   return { data, total };
@@ -689,12 +714,13 @@ export async function getProjectFilterOptions(): Promise<{
 }> {
   const sup = supabase();
   const [catRes, matRes, listingRes, profilesRes] = await Promise.all([
-    sup.from("listings").select("category").eq("type", "project").is("deleted_at", null).not("category", "is", null),
+    sup.from("listings").select("category").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).not("category", "is", null),
     sup.from("materials").select("name, slug").order("name", { ascending: true }),
     sup
       .from("listings")
       .select("location_city, location_country, owner_clerk_user_id, year, brands_used")
       .eq("type", "project")
+      .eq("status", "APPROVED")
       .is("deleted_at", null)
       .limit(2000),
     sup.from("profiles").select("clerk_user_id, display_name, username").eq("is_hidden", false).not("username", "is", null),
@@ -769,10 +795,10 @@ export async function getProductFilterOptions(): Promise<{
 }> {
   const sup = supabase();
   const [catRes, brandProfiles, materialRes, yearRes] = await Promise.all([
-    sup.from("listings").select("category").eq("type", "product").is("deleted_at", null).not("category", "is", null),
+    sup.from("listings").select("category").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).not("category", "is", null),
     sup.from("profiles").select("id, display_name, username").eq("role", "brand").eq("is_hidden", false).not("username", "is", null),
     sup.from("materials").select("name, slug").order("name", { ascending: true }),
-    sup.from("listings").select("year").eq("type", "product").is("deleted_at", null).not("year", "is", null),
+    sup.from("listings").select("year").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).not("year", "is", null),
   ]);
   const categories = Array.from(new Set((catRes.data ?? []).map((r) => (r as { category: string | null }).category?.trim()).filter(Boolean) as string[])).sort();
   const materialTypes: string[] = [];
@@ -824,9 +850,9 @@ export async function getExploreStats(type: ExploreStatsType): Promise<ExploreSt
 
     if (type === "projects") {
       const [listingsCountRes, pplRes, listingRowsRes] = await Promise.all([
-        sup.from("listings").select("id", { count: "exact", head: true }).eq("type", "project").is("deleted_at", null),
+        sup.from("listings").select("id", { count: "exact", head: true }).eq("type", "project").eq("status", "APPROVED").is("deleted_at", null),
         sup.from("project_product_links").select("project_id", { count: "exact", head: true }),
-        sup.from("listings").select("team_members, brands_used").eq("type", "project").is("deleted_at", null).range(0, 9999),
+        sup.from("listings").select("team_members, brands_used").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).range(0, 9999),
       ]);
       const totalListings = listingsCountRes.count ?? 0;
       const pplCount = pplRes.error ? 0 : pplRes.count ?? 0;
@@ -841,9 +867,9 @@ export async function getExploreStats(type: ExploreStatsType): Promise<ExploreSt
 
     // products (listings type=product)
     const [productsCountRes, pplRes, productRowsRes] = await Promise.all([
-      sup.from("listings").select("id", { count: "exact", head: true }).eq("type", "product").is("deleted_at", null),
+      sup.from("listings").select("id", { count: "exact", head: true }).eq("type", "product").eq("status", "APPROVED").is("deleted_at", null),
       sup.from("project_product_links").select("product_id", { count: "exact", head: true }),
-      sup.from("listings").select("team_members, owner_profile_id").eq("type", "product").is("deleted_at", null).range(0, 9999),
+      sup.from("listings").select("team_members, owner_profile_id").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).range(0, 9999),
     ]);
     const totalListings = productsCountRes.count ?? 0;
     const pplCount = pplRes.error ? 0 : pplRes.count ?? 0;
@@ -911,12 +937,12 @@ export async function getProjectCanonicalBySlugOrId(
       displayName:
         (ownerProfile.display_name && ownerProfile.display_name.trim()) ||
         (ownerProfile.username && ownerProfile.username.trim()) ||
-        OWNER_FALLBACK,
+        "",
       avatarUrl: ownerProfile.avatar_url ?? null,
       profileId: ownerProfile.id,
     };
   } else {
-    project.owner = { displayName: OWNER_FALLBACK };
+    project.owner = null;
   }
   return project;
 }
