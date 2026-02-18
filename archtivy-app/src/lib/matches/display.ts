@@ -4,9 +4,9 @@
 
 import { MATCH_MIN_SCORE } from "./constants";
 
+/** Minimum shape for match selection; items need at least a score. */
 export interface MatchDisplayItem {
   score: number;
-  [key: string]: unknown;
 }
 
 export interface SelectTopMatchesOptions {

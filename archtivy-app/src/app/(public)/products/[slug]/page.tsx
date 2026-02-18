@@ -13,24 +13,11 @@ import { getProfileById, getProfileByClerkId } from "@/lib/db/profiles";
 import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
 import { getGalleryBookmarkState } from "@/app/actions/galleryBookmarks";
 import { getListingDocumentsServer } from "@/lib/db/listingDocuments";
-import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { ProductDetailLayout } from "@/components/listing/ProductDetailLayout";
-import { TeamMemberLinks } from "@/components/listing/TeamMemberLinks";
-import { type DetailSidebarRow } from "@/components/listing/DetailSidebar";
-import { productExploreUrl } from "@/lib/exploreUrls";
-import { connectionsLabelText } from "@/components/listing/connectionsLabel";
-import { getColorSwatch } from "@/lib/colors";
+import { getProductsCanonicalFiltered } from "@/lib/db/explore";
+import { DEFAULT_PRODUCT_FILTERS } from "@/lib/exploreFilters";
 import type { GalleryImage } from "@/lib/db/gallery";
-import type { ProductCanonical } from "@/lib/canonical-models";
-import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
-
-async function getProductColorOptions(productId: string): Promise<string[]> {
-  const supabase = getSupabaseServiceClient();
-  const { data } = await supabase.from("products").select("color_options").eq("id", productId).maybeSingle();
-  const arr = (data as { color_options?: string[] | null } | null)?.color_options;
-  return Array.isArray(arr) ? arr : [];
-}
 
 function canonicalGalleryToGalleryImages(
   gallery: { url: string; alt: string }[]
@@ -41,127 +28,6 @@ function canonicalGalleryToGalleryImages(
     alt: img.alt || "Image",
     sort_order: i,
   }));
-}
-
-function buildProductSidebarRows(
-  product: ProductCanonical,
-  brandName: string | null,
-  brandHref: string | null,
-  teamWithProfiles: ListingTeamMemberWithProfile[] | null,
-  colorOptions: string[] = []
-): DetailSidebarRow[] {
-  const rows: DetailSidebarRow[] = [];
-
-  const connectionsText = connectionsLabelText(product.connectionCount);
-  if (connectionsText) {
-    rows.push({
-      label: "Connections",
-      value: connectionsText,
-    });
-  }
-
-  if (colorOptions.length > 0) {
-    rows.push({
-      label: "Color options",
-      value: (
-        <div className="flex flex-wrap gap-2">
-          {colorOptions.map((c) => (
-            <span
-              key={c}
-              className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
-            >
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: getColorSwatch(c) }}
-              />
-              {c}
-            </span>
-          ))}
-        </div>
-      ),
-    });
-  }
-
-  const materials = product.materials ?? [];
-  if (materials.length > 0) {
-    rows.push({
-      label: "Materials",
-      value: (
-        <div className="flex flex-wrap gap-2">
-          {materials.map((m) => (
-            <Link
-              key={m.id}
-              href={productExploreUrl({ materials: [m.slug] })}
-              className="rounded-full bg-archtivy-primary/10 px-3 py-1 text-xs font-medium text-archtivy-primary transition hover:bg-archtivy-primary/15 hover:underline dark:bg-archtivy-primary/20"
-            >
-              {m.name}
-            </Link>
-          ))}
-        </div>
-      ),
-    });
-  }
-
-  if (product.category?.trim()) {
-    rows.push({
-      label: "Category",
-      value: product.category.trim(),
-      href: productExploreUrl({ category: product.category }),
-    });
-  }
-
-  if (product.material_type?.trim()) {
-    rows.push({
-      label: "Material Type",
-      value: product.material_type.trim(),
-      href: productExploreUrl({ material_type: product.material_type }),
-    });
-  }
-
-  if (product.color?.trim()) {
-    rows.push({
-      label: "Color",
-      value: product.color.trim(),
-      href: productExploreUrl({ color: product.color }),
-    });
-  }
-
-  if (product.year != null && !Number.isNaN(product.year)) {
-    rows.push({
-      label: "Year",
-      value: String(product.year),
-      href: productExploreUrl({ year: product.year }),
-    });
-  }
-
-  if (brandName?.trim() || brandHref) {
-    rows.push({
-      label: "Brand",
-      value: brandName?.trim() || "View profile",
-      href: brandHref ?? undefined,
-    });
-  }
-
-  if (teamWithProfiles && teamWithProfiles.length > 0) {
-    rows.push({
-      label: "Team Members",
-      value: <TeamMemberLinks members={teamWithProfiles} />,
-    });
-  } else {
-    const teamMembers = Array.isArray(product.team_members) ? product.team_members : [];
-    const names = teamMembers
-      .filter((m) => m && typeof m === "object" && typeof (m as { name?: string }).name === "string")
-      .map((m) => ((m as { name: string }).name || "").trim())
-      .filter(Boolean);
-    if (names.length > 0) {
-      rows.push({
-        label: "Team Members",
-        value: names.join(", "),
-      });
-    }
-  }
-
-  return rows;
 }
 
 export async function generateMetadata({
@@ -228,6 +94,24 @@ export default async function ProductPage({
       ? (await getFirstImageUrlPerListingIds(projectIds)).data ?? {}
       : {};
 
+  let relatedProducts: { id: string; slug?: string; title: string; thumbnail?: string | null }[] = [];
+  if (relatedListings.length === 0 && product.category?.trim()) {
+    const { data: sameCategory } = await getProductsCanonicalFiltered({
+      filters: { ...DEFAULT_PRODUCT_FILTERS, category: [product.category.trim()] },
+      limit: 9,
+      sort: "newest",
+    });
+    relatedProducts = (sameCategory ?? [])
+      .filter((p) => p.id !== product.id)
+      .slice(0, 8)
+      .map((p) => ({
+        id: p.id,
+        slug: p.slug ?? p.id,
+        title: p.title,
+        thumbnail: p.cover ?? null,
+      }));
+  }
+
   const relatedItems = relatedListings.map((p) => {
     const row = p as { id: string; slug?: string; title: string };
     return {
@@ -239,7 +123,7 @@ export default async function ProductPage({
     };
   });
 
-  const brandProfile = brandResult.data;
+  const brandProfile = brandResult.data as { display_name?: string; username?: string; avatar_url?: string } | null;
   const brandName = brandProfile?.display_name?.trim() || brandProfile?.username?.trim() || null;
   const brandHref =
     brandProfile?.username
@@ -247,12 +131,11 @@ export default async function ProductPage({
       : product.brand_profile_id
         ? `/u/id/${product.brand_profile_id}`
         : null;
+  const brandLogoUrl = brandProfile?.avatar_url?.trim() ?? null;
   const teamWithProfiles = teamResult.data ?? null;
-  const colorOptions = await getProductColorOptions(product.id);
 
   const images = canonicalGalleryToGalleryImages(product.gallery);
   const currentPath = `/products/${product.slug ?? product.id}`;
-  const sidebarRows = buildProductSidebarRows(product, brandName, brandHref, teamWithProfiles, colorOptions);
   const listingDocuments = docsResult.data ?? [];
   const productPath = `/products/${product.slug ?? product.id}`;
 
@@ -285,15 +168,16 @@ export default async function ProductPage({
         product={product}
         brandName={brandName}
         brandHref={brandHref}
+        brandLogoUrl={brandLogoUrl}
         isSaved={isSaved}
         currentPath={currentPath}
         relatedItems={relatedItems}
-        sidebarRows={sidebarRows}
         listingDocuments={listingDocuments}
         signInRedirectUrl={getAbsoluteUrl(productPath)}
         relatedListings={relatedListingsForLayout}
         thumbnailMap={thumbnailMap}
         teamWithProfiles={teamWithProfiles}
+        relatedProducts={relatedProducts}
         mapHref={null}
       />
       </div>

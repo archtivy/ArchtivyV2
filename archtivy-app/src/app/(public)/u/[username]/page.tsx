@@ -9,12 +9,15 @@ import { getTaggedListingsForProfile } from "@/lib/db/listingTeamMembers";
 import { getProjectIdsLinkedToProducts } from "@/lib/db/projectProductLinks";
 import { getListingsByIds } from "@/lib/db/listings";
 import { getFirstImageUrlPerListingIds } from "@/lib/db/listingImages";
-import { getCanonicalUrl, getAbsoluteUrl } from "@/lib/canonical";
-import { ProjectCard } from "@/components/listing/ProjectCard";
-import { ProductCard } from "@/components/listing/ProductCard";
+import { getAbsoluteUrl } from "@/lib/canonical";
+import { ProjectCardPremium } from "@/components/listing/ProjectCardPremium";
+import { ProductCardPremium } from "@/components/listing/ProductCardPremium";
 import { Button } from "@/components/ui/Button";
 import { ProfileEditButton } from "@/components/profile/ProfileEditButton";
 import { ProfileEditForm } from "@/components/profile/ProfileEditForm";
+import { ProfileContactButton } from "@/components/profile/ProfileContactButton";
+import { listingToProjectForCard, listingToProductForCard } from "@/lib/profileCardData";
+import type { ProjectOwner } from "@/lib/canonical-models";
 import type { ListingCardData, ListingSummary } from "@/lib/types/listings";
 import type { TaggedListingRow } from "@/lib/db/listingTeamMembers";
 
@@ -106,6 +109,12 @@ export default async function PublicProfilePage({
       : { data: {} as Record<string, string> };
   const imageMap = imageResult.data ?? {};
   const postedBy = profile.display_name ?? profile.username ?? undefined;
+  const profileOwner: ProjectOwner = {
+    displayName: profile.display_name ?? profile.username ?? "",
+    username: profile.username ?? null,
+    profileId: profile.id,
+  };
+  const firstListingForContact = projects[0] ?? products[0];
 
   const showLocation = profile.location_visibility !== "private";
   const locationText =
@@ -244,6 +253,15 @@ export default async function PublicProfilePage({
                 />
               </div>
             )}
+            {!isOwner && firstListingForContact && (
+              <div className="mt-4">
+                <ProfileContactButton
+                  listingId={firstListingForContact.id}
+                  listingType={firstListingForContact.type === "product" ? "product" : "project"}
+                  listingTitle={firstListingForContact.title ?? "Listing"}
+                />
+              </div>
+            )}
             {showClaim && (
             <div className="mt-4">
               {claimPending ? (
@@ -314,13 +332,11 @@ export default async function PublicProfilePage({
               No projects yet.
             </p>
           ) : (
-            <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {projects.map((listing) => (
                 <li key={listing.id}>
-                  <ProjectCard
-                    listing={listing}
-                    imageUrl={imageMap[listing.id]}
-                    postedBy={postedBy}
+                  <ProjectCardPremium
+                    project={listingToProjectForCard(listing, imageMap[listing.id] ?? null, profileOwner)}
                   />
                 </li>
               ))}
@@ -340,13 +356,11 @@ export default async function PublicProfilePage({
                 No products yet.
               </p>
             ) : (
-              <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {products.map((listing) => (
                   <li key={listing.id}>
-                    <ProductCard
-                      listing={listing}
-                      imageUrl={imageMap[listing.id]}
-                      postedBy={postedBy}
+                    <ProductCardPremium
+                      product={listingToProductForCard(listing, imageMap[listing.id] ?? null, profileOwner)}
                     />
                   </li>
                 ))}
@@ -362,12 +376,11 @@ export default async function PublicProfilePage({
                 Not linked to any projects yet.
               </p>
             ) : (
-              <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {usedInProjects.map((listing) => (
                   <li key={listing.id}>
-                    <ProjectCard
-                      listing={listing}
-                      imageUrl={imageMap[listing.id]}
+                    <ProjectCardPremium
+                      project={listingToProjectForCard(listing, imageMap[listing.id] ?? null, null)}
                     />
                   </li>
                 ))}
@@ -386,27 +399,22 @@ export default async function PublicProfilePage({
             Listings where this profile is credited as a team member (not owner).
           </p>
           {taggedProjects.length > 0 && (
-            <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {taggedProjects.map((row) => (
                 <li key={row.id}>
-                  <ProjectCard
-                    listing={taggedToCard(row)}
-                    imageUrl={imageMap[row.id]}
-                    href={getCanonicalUrl("project", row.slug ?? row.id)}
+                  <ProjectCardPremium
+                    project={listingToProjectForCard(taggedToCard(row), imageMap[row.id] ?? null, null)}
                   />
                 </li>
               ))}
             </ul>
           )}
           {taggedProducts.length > 0 && (
-            <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {taggedProducts.map((row) => (
                 <li key={row.id}>
-                  <ProductCard
-                    listing={taggedToCard(row)}
-                    imageUrl={imageMap[row.id]}
-                    href={getCanonicalUrl("product", row.slug ?? row.id)}
-                    postedBy={postedBy}
+                  <ProductCardPremium
+                    product={listingToProductForCard(taggedToCard(row), imageMap[row.id] ?? null, null)}
                   />
                 </li>
               ))}

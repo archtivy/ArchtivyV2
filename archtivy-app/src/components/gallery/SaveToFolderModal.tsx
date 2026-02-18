@@ -88,7 +88,17 @@ export function SaveToFolderModal({
     }
     const created = result.data;
     if (created) {
-      setFolders((prev) => [...prev, { ...created, item_count: 0, cover_image_url: null }]);
+      setFolders((prev) => [
+        ...prev,
+        {
+          ...created,
+          item_count: 0,
+          cover_image_url: null,
+          updated_at: null,
+          is_public: false,
+          share_slug: null,
+        },
+      ]);
       setSelectedIds((prev) => new Set(prev).add(created.id));
     }
     setNewFolderName("");

@@ -19,7 +19,13 @@ export interface ExploreMapboxMapProps {
   className?: string;
 }
 
-type MapboxGL = typeof import("mapbox-gl");
+interface MapboxGLLike {
+  accessToken: string;
+  Map: new (options: Record<string, unknown>) => import("mapbox-gl").Map;
+  NavigationControl: new () => import("mapbox-gl").IControl;
+  Marker: new (opts?: { element?: HTMLElement }) => import("mapbox-gl").Marker;
+  LngLatBounds: new () => import("mapbox-gl").LngLatBounds;
+}
 
 /**
  * Mapbox GL map with markers for projects (solid dot + halo), designers (outline dot), brands (square).
@@ -37,7 +43,7 @@ export default function ExploreMapboxMap({
   const [mounted, setMounted] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<import("mapbox-gl").Map | null>(null);
-  const mapboxRef = React.useRef<MapboxGL | null>(null);
+  const mapboxRef = React.useRef<MapboxGLLike | null>(null);
   const markersRef = React.useRef<Map<string, { marker: import("mapbox-gl").Marker; el: HTMLDivElement }>>(new Map());
   const onBoundsChangeRef = React.useRef(onBoundsChange);
   const onMarkerHoverRef = React.useRef(onMarkerHover);
@@ -57,7 +63,7 @@ export default function ExploreMapboxMap({
     import("mapbox-gl").then((mapboxgl) => {
       if (cancelled || !containerRef.current) return;
       if (mapRef.current) return;
-      const mb = mapboxgl.default as MapboxGL;
+      const mb = mapboxgl.default as unknown as MapboxGLLike;
       mb.accessToken = accessToken;
       map = new mb.Map({
         container: containerRef.current,

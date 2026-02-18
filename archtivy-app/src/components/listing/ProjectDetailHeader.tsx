@@ -6,6 +6,7 @@ import { useAuth } from "@clerk/nextjs";
 import { SaveToFolderModal } from "@/components/gallery/SaveToFolderModal";
 import { ContactLeadModal } from "@/components/listing/ContactLeadModal";
 import { track } from "@/lib/events";
+import { MetaLine, type MetaLinePart } from "./MetaLine";
 
 function ShareIcon({ className }: { className?: string }) {
   return (
@@ -56,6 +57,8 @@ export interface ProjectDetailHeaderProps {
   entityId: string;
   currentPath: string;
   isSaved: boolean;
+  /** Meta line under title: City · Year · Category · Area (each optional, with explore links). */
+  metaLineParts?: MetaLinePart[];
   /** For "Contact via Archtivy" lead modal. */
   listingType?: "project" | "product";
 }
@@ -65,6 +68,7 @@ export function ProjectDetailHeader({
   entityId,
   currentPath,
   isSaved: initialSaved,
+  metaLineParts,
   listingType = "project",
 }: ProjectDetailHeaderProps) {
   const { isLoaded, userId } = useAuth();
@@ -93,12 +97,18 @@ export function ProjectDetailHeader({
     });
   }, [entityId]);
 
+  const ctaClass =
+    "inline-flex items-center gap-2 rounded border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:ring-offset-zinc-950";
+
   return (
     <header className="flex flex-wrap items-start justify-between gap-6 pt-4 pb-4">
       <div className="min-w-0 flex-1">
-        <h1 className="font-serif text-3xl font-normal tracking-tight text-[#111827] dark:text-zinc-100 md:text-4xl lg:text-[2.5rem]">
+        <h1 className="font-serif text-3xl font-normal tracking-tight text-zinc-900 dark:text-zinc-100 md:text-4xl lg:text-[2.5rem]">
           {title}
         </h1>
+        {metaLineParts && metaLineParts.length > 0 && (
+          <MetaLine parts={metaLineParts} className="mt-2" />
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <button
@@ -106,7 +116,7 @@ export function ProjectDetailHeader({
           onClick={handleSave}
           disabled={!isLoaded}
           aria-label={saved ? "Saved" : "Save to folder"}
-          className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:ring-offset-zinc-950"
+          className={ctaClass}
         >
           <BookmarkIcon className="h-4 w-4" />
           {saved ? "Saved" : "Save"}
@@ -115,7 +125,7 @@ export function ProjectDetailHeader({
           type="button"
           onClick={() => setContactModalOpen(true)}
           aria-label="Contact via Archtivy"
-          className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:ring-offset-zinc-950"
+          className={ctaClass}
         >
           Contact via Archtivy
         </button>
@@ -123,7 +133,7 @@ export function ProjectDetailHeader({
           type="button"
           onClick={handleShare}
           aria-label="Share"
-          className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:ring-offset-zinc-950"
+          className={ctaClass}
         >
           <ShareIcon className="h-4 w-4" />
           Share

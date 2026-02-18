@@ -63,10 +63,12 @@ export function ExploreMapView() {
   );
 
   const fetchOnBbox = React.useMemo(
-    () => debounce((bounds: { minLat: number; minLng: number; maxLat: number; maxLng: number }) => {
-      setBbox(bounds);
-      fetchExplore(bounds);
-    }, DEBOUNCE_MS),
+    () =>
+      debounce((bounds: unknown) => {
+        const b = bounds as { minLat: number; minLng: number; maxLat: number; maxLng: number };
+        setBbox(b);
+        fetchExplore(b);
+      }, DEBOUNCE_MS),
     [fetchExplore]
   );
 

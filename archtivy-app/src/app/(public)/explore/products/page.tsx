@@ -53,9 +53,8 @@ export default async function ExploreProductsPage({
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
       <ExploreCountsHero counts={networkCounts} />
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="space-y-4 pt-4">
-          <ExploreSearchBar type="products" currentFilters={filters} />
+      <div className="space-y-4 pt-4">
+        <ExploreSearchBar type="products" currentFilters={filters} />
 
           {filters.q?.trim() && (
             <p className="text-sm text-zinc-600 dark:text-zinc-400">

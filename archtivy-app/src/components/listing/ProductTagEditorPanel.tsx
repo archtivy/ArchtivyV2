@@ -63,10 +63,10 @@ export function ProductTagEditorPanel({
     }
     setLoading(true);
     searchSuggestedProducts({
-      categoryText: debouncedCategory.trim() || null,
+      categoryId: debouncedCategory.trim() || null,
       colorText: debouncedColor.trim() || null,
       materialId: materialId.trim() || null,
-      featureQuery: debouncedFeature.trim() || debouncedManual.trim() || null,
+      featureText: debouncedFeature.trim() || debouncedManual.trim() || null,
     }).then((res) => {
       setLoading(false);
       if (res.ok && res.data) setSuggestions(res.data);

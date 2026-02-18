@@ -145,7 +145,7 @@ export function TagEditorPanel({
         setResultsError(null);
       } else {
         setSuggestions([]);
-        const err = res.error ?? "Failed to load results";
+        const err = res.ok === false ? (res.error ?? "Failed to load results") : "Failed to load results";
         setResultsError(err);
         console.error("[TagEditorPanel] searchSuggestedProducts failed:", err);
       }

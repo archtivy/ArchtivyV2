@@ -6,10 +6,13 @@ import { getProfileByIdForPublicPage } from "@/lib/db/profiles";
 import { getOwnedListingsForProfile } from "@/lib/db/listings";
 import { getTaggedListingsForProfile } from "@/lib/db/listingTeamMembers";
 import { getFirstImageUrlPerListingIds } from "@/lib/db/listingImages";
-import { getCanonicalUrl, getAbsoluteUrl } from "@/lib/canonical";
-import { ProjectCard } from "@/components/listing/ProjectCard";
-import { ProductCard } from "@/components/listing/ProductCard";
+import { getAbsoluteUrl } from "@/lib/canonical";
+import { ProjectCardPremium } from "@/components/listing/ProjectCardPremium";
+import { ProductCardPremium } from "@/components/listing/ProductCardPremium";
+import { ProfileContactButton } from "@/components/profile/ProfileContactButton";
 import { Button } from "@/components/ui/Button";
+import { listingToProjectForCard, listingToProductForCard } from "@/lib/profileCardData";
+import type { ProjectOwner } from "@/lib/canonical-models";
 import type { ListingCardData } from "@/lib/types/listings";
 import type { Profile } from "@/lib/types/profiles";
 
@@ -133,6 +136,12 @@ export default async function ProfileByIdPage({
       ? await getFirstImageUrlPerListingIds(allListingIds)
       : { data: {} as Record<string, string> };
   const imageMap = imageResult.data ?? {};
+  const profileOwner: ProjectOwner = {
+    displayName: profile.display_name ?? profile.username ?? "",
+    username: profile.username ?? null,
+    profileId: profile.id,
+  };
+  const firstListingForContact = ownedProjects[0] ?? ownedProducts[0];
 
   const showLocation = profile.location_visibility !== "private";
   const locationText =
@@ -156,11 +165,12 @@ export default async function ProfileByIdPage({
       <ProfileHeader
         profile={profile}
         profileId={profileId}
-        location={location}
+        location={location ?? ""}
         displayName={displayName}
         showClaimButton={showClaim}
-        showDiscipline={showDiscipline}
-        showBrandTypeLabel={showBrandTypeLabel}
+        showDiscipline={Boolean(showDiscipline)}
+        showBrandTypeLabel={Boolean(showBrandTypeLabel)}
+        firstListingForContact={firstListingForContact}
       />
 
       {showClaim && (
@@ -178,26 +188,22 @@ export default async function ProfileByIdPage({
             Listings owned by this profile.
           </p>
           {ownedProjects.length > 0 && (
-            <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {ownedProjects.map((listing) => (
                 <li key={listing.id}>
-                  <ProjectCard
-                    listing={listing}
-                    imageUrl={imageMap[listing.id]}
-                    href={getCanonicalUrl("project", (listing as { slug?: string }).slug ?? listing.id)}
+                  <ProjectCardPremium
+                    project={listingToProjectForCard(listing, imageMap[listing.id] ?? null, profileOwner)}
                   />
                 </li>
               ))}
             </ul>
           )}
           {ownedProducts.length > 0 && (
-            <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {ownedProducts.map((listing) => (
                 <li key={listing.id}>
-                  <ProductCard
-                    listing={listing}
-                    imageUrl={imageMap[listing.id]}
-                    href={getCanonicalUrl("product", (listing as { slug?: string }).slug ?? listing.id)}
+                  <ProductCardPremium
+                    product={listingToProductForCard(listing, imageMap[listing.id] ?? null, profileOwner)}
                   />
                 </li>
               ))}
@@ -220,16 +226,13 @@ export default async function ProfileByIdPage({
         ) : (
           <>
             {taggedProjects.length > 0 && (
-              <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {taggedProjects.map((row) => {
                   const listing = taggedToCardData(row);
-                  const href = getCanonicalUrl("project", row.slug ?? row.id);
                   return (
                     <li key={row.id}>
-                      <ProjectCard
-                        listing={listing}
-                        imageUrl={imageMap[row.id] ?? row.cover_image_url}
-                        href={href}
+                      <ProjectCardPremium
+                        project={listingToProjectForCard(listing, imageMap[row.id] ?? row.cover_image_url ?? null, null)}
                       />
                     </li>
                   );
@@ -237,16 +240,13 @@ export default async function ProfileByIdPage({
               </ul>
             )}
             {taggedProducts.length > 0 && (
-              <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {taggedProducts.map((row) => {
                   const listing = taggedToCardData(row);
-                  const href = getCanonicalUrl("product", row.slug ?? row.id);
                   return (
                     <li key={row.id}>
-                      <ProductCard
-                        listing={listing}
-                        imageUrl={imageMap[row.id] ?? row.cover_image_url}
-                        href={href}
+                      <ProductCardPremium
+                        product={listingToProductForCard(listing, imageMap[row.id] ?? row.cover_image_url ?? null, null)}
                       />
                     </li>
                   );
@@ -274,6 +274,7 @@ function ProfileHeader({
   showClaimButton,
   showDiscipline,
   showBrandTypeLabel,
+  firstListingForContact,
 }: {
   profile: Profile;
   profileId: string;
@@ -282,6 +283,7 @@ function ProfileHeader({
   showClaimButton: boolean;
   showDiscipline: boolean;
   showBrandTypeLabel: boolean;
+  firstListingForContact?: ListingCardData | null;
 }) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-6 dark:border-zinc-800 dark:bg-zinc-900/50 sm:p-8">
@@ -368,6 +370,15 @@ function ProfileHeader({
               </a>
             )}
           </div>
+          {firstListingForContact && (
+            <div className="mt-4">
+              <ProfileContactButton
+                listingId={firstListingForContact.id}
+                listingType={firstListingForContact.type === "product" ? "product" : "project"}
+                listingTitle={firstListingForContact.title ?? "Listing"}
+              />
+            </div>
+          )}
           {showClaimButton && (
             <div className="mt-4">
               <Button

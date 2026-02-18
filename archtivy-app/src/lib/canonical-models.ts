@@ -236,7 +236,21 @@ export function normalizeProject(
     connectionCount,
     created_at: String(raw.created_at ?? ""),
     updated_at: (raw.updated_at as string | null) ?? null,
+    status: (raw.status as "PENDING" | "APPROVED") ?? "APPROVED",
+    mentioned_products: parseMentionedProducts(raw.mentioned_products),
   };
+}
+
+function parseMentionedProducts(
+  val: unknown
+): { brand_name_text: string; product_name_text: string }[] {
+  if (!Array.isArray(val)) return [];
+  return val
+    .filter((m) => m && typeof m === "object" && "brand_name_text" in m && "product_name_text" in m)
+    .map((m) => ({
+      brand_name_text: String((m as { brand_name_text: unknown }).brand_name_text ?? "").trim(),
+      product_name_text: String((m as { product_name_text: unknown }).product_name_text ?? "").trim(),
+    }));
 }
 
 /** Normalize raw product + product_images to ProductCanonical. Gallery from product_images only. */

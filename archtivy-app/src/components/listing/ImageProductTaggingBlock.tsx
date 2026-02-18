@@ -69,6 +69,9 @@ export function ImageProductTaggingBlock({
           imageAlt: image.imageAlt,
           initial: {
             product_id: productId,
+            product_type_id: null,
+            product_category_id: null,
+            product_subcategory_id: null,
             category_text: null,
             color_text: null,
             material_id: null,
@@ -216,7 +219,7 @@ export function ImageProductTaggingBlock({
                       key={t.id}
                       className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-sm dark:border-zinc-600 dark:bg-zinc-800"
                     >
-                      {t.product_title ?? t.product_id || "—"}
+                      {(t.product_title ?? t.product_id) || "—"}
                       <button
                         type="button"
                         onClick={() => handleRemove(t.id)}

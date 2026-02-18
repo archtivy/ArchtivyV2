@@ -8,6 +8,7 @@ import { Container } from "@/components/layout/Container";
 import { TopNavAuth } from "@/components/layout/TopNavAuth";
 import { ShareCTA } from "@/components/layout/ShareCTA";
 import { TopNavLinks } from "@/components/layout/TopNavLinks";
+import { HeaderSearch } from "@/components/layout/HeaderSearch";
 
 import type { ProfileRole } from "@/lib/auth/config";
 
@@ -102,8 +103,9 @@ export function TopNav() {
               <TopNavLinks />
             </nav>
           </div>
-          {/* Right: Share CTA + auth + theme on desktop; on mobile: Share + burger */}
+          {/* Right: Search + Share CTA + auth + theme on desktop; on mobile: Search + Share + burger */}
           <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+            <HeaderSearch />
             <ShareCTA userId={userId} role={profile.role} />
             <div className="hidden md:block">
               <TopNavAuth displayName={profile.displayName} role={profile.role} />

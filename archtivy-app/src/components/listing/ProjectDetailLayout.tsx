@@ -3,14 +3,18 @@
 import * as React from "react";
 import { ProjectHeroGallery } from "./ProjectHeroGallery";
 import { ProjectDetailHeader } from "./ProjectDetailHeader";
-import { ProjectOverviewSidebar } from "./ProjectOverviewSidebar";
+import { NetworkSidebar } from "./NetworkSidebar";
 import { ProjectDetailContent } from "./ProjectDetailContent";
 import { LightboxGallery, type RelatedItem } from "@/components/gallery/LightboxGallery";
+import type { MetaLinePart } from "./MetaLine";
 import type { GalleryImage } from "@/lib/db/gallery";
 import type { ProjectCanonical } from "@/lib/canonical-models";
 import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
 import type { UsedProductItem } from "./ProjectDetailContent";
 import type { ProjectDocumentItem } from "./ProjectDetailContent";
+import { projectExploreUrl } from "@/lib/exploreUrls";
+import { areaSqftToBucket } from "@/lib/exploreFilters";
+import { getCityLabel, getOwnerProfileHref } from "@/lib/cardUtils";
 
 export interface ProjectDetailLayoutProps {
   images: GalleryImage[];
@@ -61,10 +65,47 @@ export function ProjectDetailLayout({
   if (project.year != null && !Number.isNaN(project.year)) metadataParts.push(String(project.year));
   const metadataLine = metadataParts.join(" · ") || null;
 
-  const styleVal = (project as { style?: string | null }).style ?? null;
+  const cityShort = getCityLabel(project);
+  const categoryTrim = project.category?.trim() ?? null;
+  const areaSqft = project.area_sqft != null && !Number.isNaN(project.area_sqft) ? project.area_sqft : null;
+  const areaBucket = areaSqft != null ? areaSqftToBucket(areaSqft) : null;
+  const metaLineParts: MetaLinePart[] = [];
+  if (cityShort) {
+    metaLineParts.push({
+      label: cityShort,
+      href: projectExploreUrl({ city: cityShort, country: project.location?.country?.trim() ?? undefined }),
+    });
+  }
+  if (project.year != null && !Number.isNaN(project.year)) {
+    metaLineParts.push({ label: String(project.year), href: projectExploreUrl({ year: project.year }) });
+  }
+  if (categoryTrim) {
+    metaLineParts.push({ label: categoryTrim, href: projectExploreUrl({ category: categoryTrim }) });
+  }
+  if (areaBucket) {
+    metaLineParts.push({
+      label: areaSqft != null ? `${Math.round(areaSqft)} sqft` : areaBucket,
+      href: projectExploreUrl({ area_bucket: areaBucket }),
+    });
+  }
 
   const teamMembersFallback = project.team_members ?? [];
   const materials = project.materials ?? [];
+  const teamForSidebar = (teamWithProfiles ?? []).map((m) => ({
+    profile_id: m.profile_id,
+    display_name: m.display_name ?? null,
+    title: m.title ?? null,
+    username: m.username ?? null,
+    avatar_url: null,
+  }));
+  const fallbackTeam = teamMembersFallback.map((m, i) => ({
+    profile_id: `fallback-${i}`,
+    display_name: m.name?.trim() ?? null,
+    title: m.role?.trim() ?? null,
+    username: null,
+    avatar_url: null,
+  }));
+  const allTeam = teamForSidebar.length > 0 ? teamForSidebar : fallbackTeam;
 
   return (
     <>
@@ -91,35 +132,21 @@ export function ProjectDetailLayout({
             entityId={project.id}
             currentPath={currentPath}
             isSaved={isSaved}
+            metaLineParts={metaLineParts}
           />
 
           <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
             <div className="min-w-0 lg:col-span-8">
-              <ProjectDetailContent
-                project={project}
-                usedProducts={usedProducts}
-                teamWithProfiles={teamWithProfiles}
-                documents={documents}
-              />
+              <ProjectDetailContent project={project} />
             </div>
             <div className="lg:col-span-4">
-              <ProjectOverviewSidebar
-                category={project.category}
-                year={project.year}
-                areaSqft={project.area_sqft}
-                style={styleVal}
-                location={locationText}
-                locationCity={project.location?.city ?? null}
-                locationCountry={project.location?.country ?? null}
-                connectionLine={connectionLine}
-                mapHref={mapHref}
-                owner={project.owner ?? null}
-                teamWithProfiles={teamWithProfiles}
-                teamMembersFallback={teamMembersFallback}
-                materials={materials}
-                documents={documents}
+              <NetworkSidebar
+                teamMembers={allTeam}
                 usedProducts={usedProducts}
-                mentionedItems={mentionedResolved}
+                materials={materials}
+                sharedByDisplayName={project.owner?.displayName?.trim() ?? null}
+                sharedByHref={getOwnerProfileHref(project.owner) ?? null}
+                mapHref={mapHref}
               />
             </div>
           </div>
