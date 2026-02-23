@@ -51,7 +51,7 @@ export async function POST(
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  return Response.json({ url: result.data });
+  return Response.json({ ok: true, avatar_url: result.data });
 }
 
 export async function DELETE(

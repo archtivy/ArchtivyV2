@@ -1,8 +1,9 @@
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 
+// Bucket must be created in Supabase Dashboard: Storage → New bucket → name "avatars"
 const BUCKET = "avatars";
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
+const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 export type UploadAvatarResult =
   | { data: string; error: null }
@@ -20,7 +21,8 @@ function getExtension(mime: string): string {
 
 /**
  * Upload an avatar image to Supabase Storage.
- * Path: users/{profileId}/avatar.{ext}
+ * Path: profiles/{profileId}/avatar.{ext}
+ * Overwrite allowed (upsert: true).
  * Returns public URL on success.
  */
 export async function uploadAvatar(
@@ -34,12 +36,12 @@ export async function uploadAvatar(
     };
   }
   if (file.size > MAX_SIZE_BYTES) {
-    return { data: null, error: "Image must be under 2MB." };
+    return { data: null, error: "Image must be under 5MB." };
   }
 
   const supabase = getSupabaseServiceClient();
   const ext = getExtension(file.type);
-  const path = `users/${profileId}/avatar.${ext}`;
+  const path = `profiles/${profileId}/avatar.${ext}`;
 
   const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
     cacheControl: "3600",
@@ -47,7 +49,11 @@ export async function uploadAvatar(
   });
 
   if (error) {
-    return { data: null, error: error.message };
+    const msg = error.message;
+    if (/bucket/i.test(msg) && /not found|does not exist|not exist/i.test(msg)) {
+      return { data: null, error: "Storage bucket 'avatars' not found in this Supabase project." };
+    }
+    return { data: null, error: msg };
   }
 
   const {
@@ -58,16 +64,19 @@ export async function uploadAvatar(
 
 /**
  * Delete avatar from Supabase Storage.
- * Removes users/{profileId}/avatar.* files (any extension).
+ * Removes profiles/{profileId}/avatar.* files (any extension).
  */
 export async function deleteAvatar(
   profileId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = getSupabaseServiceClient();
-  const prefix = `users/${profileId}/`;
+  const prefix = `profiles/${profileId}/`;
 
-  const { data: files, error: listError } = await supabase.storage.from(BUCKET).list(`users/${profileId}`);
+  const { data: files, error: listError } = await supabase.storage.from(BUCKET).list(`profiles/${profileId}`);
   if (listError) {
+    if (/bucket/i.test(listError.message) && /not found|does not exist|not exist/i.test(listError.message)) {
+      return { ok: false, error: "Storage bucket 'avatars' not found in this Supabase project." };
+    }
     return { ok: true };
   }
   if (files && files.length > 0) {

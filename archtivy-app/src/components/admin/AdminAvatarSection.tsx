@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export interface AdminAvatarSectionProps {
   profileId: string;
@@ -24,6 +25,7 @@ export function AdminAvatarSection({
   displayName,
   onAvatarChange,
 }: AdminAvatarSectionProps) {
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInput, setUrlInput] = useState(avatarUrl ?? "");
@@ -48,8 +50,9 @@ export function AdminAvatarSection({
         setError(data.error ?? "Upload failed");
         return;
       }
-      onAvatarChange?.(data.url);
-      window.location.reload();
+      const newUrl = data.avatar_url ?? data.url ?? null;
+      onAvatarChange?.(newUrl);
+      router.refresh();
     } catch {
       setError("Upload failed");
     } finally {
@@ -72,7 +75,7 @@ export function AdminAvatarSection({
       }
       onAvatarChange?.(null);
       setUrlInput("");
-      window.location.reload();
+      router.refresh();
     } catch {
       setError("Remove failed");
     } finally {

@@ -1,16 +1,19 @@
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { ExploreMapView } from "@/components/explore/ExploreMapView";
+import { Suspense } from "react";
+import { ExploreIntelligenceLayout } from "@/components/explore/ExploreIntelligenceLayout";
 
 /**
- * Premium Explore Map: map + cards discovery.
- * Map shows projects and profiles (designers/brands); products appear via "Used here" later.
+ * Premium Explore Intelligence: mapless editorial layout.
+ * Hero, Live Signal Strip, 2-column Intelligence Modules, slide-over panel.
  */
 export default function ExplorePage() {
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <ExploreMapView />
+    <div className="min-h-screen" style={{ backgroundColor: "#fafafa" }}>
+      <Suspense fallback={<div className="flex min-h-[50vh] items-center justify-center text-zinc-500">Loading…</div>}>
+        <ExploreIntelligenceLayout />
+      </Suspense>
     </div>
   );
 }
