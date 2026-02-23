@@ -6,6 +6,10 @@ export type PhotoTagMarker = {
   product_id: string;
   product_title?: string;
   product_slug?: string;
+  /** Product thumbnail: cover image or first gallery image. */
+  product_thumbnail?: string;
+  /** Display name of the user who shared the product. */
+  product_owner_name?: string;
 };
 export type GalleryImage = {
   id: string;

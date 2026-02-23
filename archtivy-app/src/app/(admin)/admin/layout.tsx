@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import type { ReactNode } from "react";
 import { requireAdmin } from "@/lib/admin/guard";
 import { AdminShell } from "@/components/admin/AdminShell";

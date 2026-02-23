@@ -42,6 +42,22 @@ export async function completeOnboardingAction(
   const designerDiscipline = (formData.get("designer_discipline") as string)?.trim() || null;
   const brandType = (formData.get("brand_type") as string)?.trim() || null;
   const readerType = (formData.get("reader_type") as string)?.trim() || null;
+  const locationPlaceName = (formData.get("location_place_name") as string)?.trim() || null;
+  const locationCity = (formData.get("location_city") as string)?.trim() || null;
+  const locationCountry = (formData.get("location_country") as string)?.trim() || null;
+  const locationLatRaw = formData.get("location_lat");
+  const locationLngRaw = formData.get("location_lng");
+  const locationLat =
+    locationLatRaw != null && String(locationLatRaw).trim() !== ""
+      ? Number(String(locationLatRaw).trim())
+      : null;
+  const locationLng =
+    locationLngRaw != null && String(locationLngRaw).trim() !== ""
+      ? Number(String(locationLngRaw).trim())
+      : null;
+  const locationMapboxId = (formData.get("location_mapbox_id") as string)?.trim() || null;
+  const locationVisibility =
+    (formData.get("location_visibility") as string)?.trim() === "private" ? "private" : "public";
 
   if (role === "designer" && !designerDiscipline) {
     return { error: "Please select a discipline for designers." };
@@ -51,6 +67,15 @@ export async function completeOnboardingAction(
   }
   if (role === "reader" && !readerType) {
     return { error: "Please select a reader type." };
+  }
+  if (
+    !locationPlaceName ||
+    locationLat == null ||
+    locationLng == null ||
+    Number.isNaN(locationLat) ||
+    Number.isNaN(locationLng)
+  ) {
+    return { error: "Please select a location from the suggestions." };
   }
 
   if (!username) {
@@ -75,6 +100,13 @@ export async function completeOnboardingAction(
     designer_discipline: role === "designer" ? designerDiscipline : null,
     brand_type: role === "brand" ? brandType : null,
     reader_type: role === "reader" ? readerType : null,
+    location_place_name: locationPlaceName,
+    location_city: locationCity,
+    location_country: locationCountry,
+    location_lat: locationLat,
+    location_lng: locationLng,
+    location_mapbox_id: locationMapboxId,
+    location_visibility: locationVisibility,
   });
 
   if (profileResult.error) {

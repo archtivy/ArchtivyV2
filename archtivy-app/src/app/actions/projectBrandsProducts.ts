@@ -11,7 +11,9 @@ import {
   getPhotoProductTagsByImageIds,
   addPhotoProductTag as dbAddPhotoProductTag,
   removePhotoProductTag as dbRemovePhotoProductTag,
+  getListingIdByTagId,
 } from "@/lib/db/photoProductTags";
+import { getListingSlugById } from "@/lib/db/listings";
 
 const PPL = "project_product_links";
 
@@ -138,10 +140,24 @@ export async function addPhotoProductTagAction(
   x: number,
   y: number
 ): Promise<{ data: { id: string } | null; error: string | null }> {
+  console.log("[addPhotoProductTagAction] insert input", {
+    listingImageId,
+    listingId,
+    productId,
+    x,
+    y,
+  });
   const res = await dbAddPhotoProductTag(listingImageId, listingId, productId, x, y);
+  console.log("[addPhotoProductTagAction] db result", {
+    hasData: !!res.data,
+    tagId: res.data?.id,
+    error: res.error ?? null,
+  });
   if (res.error) return { data: null, error: res.error };
-  if (!res.data) return { data: null, error: "No tag returned" };
-  revalidatePath(`/projects/[slug]`, "page");
+  if (!res.data) return { data: null, error: "No tag returned from insert" };
+  revalidatePath(`/admin/projects/${listingId}`, "page");
+  const projectSlug = await getListingSlugById(listingId);
+  if (projectSlug) revalidatePath(`/projects/${projectSlug}`, "page");
   return { data: { id: res.data.id }, error: null };
 }
 
@@ -151,7 +167,11 @@ export async function removePhotoProductTagAction(
 ): Promise<ActionResult> {
   const res = await dbRemovePhotoProductTag(tagId);
   if (res.error) return { ok: false, error: res.error };
-  revalidatePath(`/projects/[slug]`, "page");
+  const listingId = await getListingIdByTagId(tagId);
+  if (listingId) {
+    const projectSlug = await getListingSlugById(listingId);
+    if (projectSlug) revalidatePath(`/projects/${projectSlug}`, "page");
+  }
   return { ok: true };
 }
 
@@ -168,7 +188,7 @@ export async function getPhotoProductTagsAction(
     data: (res.data ?? []).map((t) => ({
       id: t.id,
       listing_image_id: t.listing_image_id,
-      product_id: t.product_id,
+      product_id: t.product_id ?? "",
       x: t.x,
       y: t.y,
     })),

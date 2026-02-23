@@ -102,8 +102,14 @@ export interface ListingCardData {
   brands_used: BrandUsed[];
   views_count: number;
   saves_count: number;
-  /** Number of linked items (e.g. project_product_links). For "+X connections" label. */
+  /** Number of linked items (e.g. project_product_links). @deprecated Use products_count/used_in_projects_count + team for card metrics. */
   connection_count?: number;
+  /** Products count for project cards (from actual product links/mentions). Optional. */
+  products_count?: number;
+  /** Brands count for project cards (from brands_used). Optional; do not use as products_count. */
+  brands_count?: number;
+  /** Used-in projects count for product cards. Optional; only set when fetched (e.g. from explore). */
+  used_in_projects_count?: number;
   updated_at: string | null;
   materials?: MaterialTag[];
 }

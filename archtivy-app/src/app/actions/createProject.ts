@@ -97,6 +97,25 @@ function parseMaterialIds(value: FormDataEntryValue | null): string[] {
   }
 }
 
+export type MentionedProductEntry = { brand_name_text: string; product_name_text: string };
+
+function parseMentionedProducts(value: FormDataEntryValue | null): MentionedProductEntry[] {
+  if (!value || typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (x): x is MentionedProductEntry =>
+        typeof x === "object" &&
+        x !== null &&
+        typeof (x as MentionedProductEntry).brand_name_text === "string" &&
+        typeof (x as MentionedProductEntry).product_name_text === "string"
+    );
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Persist team members to listing_team_members: for each member call
  * get_or_create_unclaimed_profile(name, titleLabel) then insert row.
@@ -152,10 +171,6 @@ export async function createProject(
   if (!profile?.username) {
     return { error: "Complete onboarding first." };
   }
-  if (profile.role !== "designer") {
-    return { error: "Only designers can create projects." };
-  }
-
   const title = (formData.get("title") as string)?.trim();
   const description = (formData.get("description") as string)?.trim() ?? null;
   const location = (formData.get("location") as string)?.trim() ?? null;
@@ -182,8 +197,8 @@ export async function createProject(
   const year = (formData.get("year") as string)?.trim() ?? null;
   const material_or_finish = (formData.get("material_or_finish") as string)?.trim() ?? null;
   const team_members = parseTeamMembers(formData.get("team_members"));
-  const brands_used = parseBrandsUsed(formData.get("brands_used"));
   const material_ids = parseMaterialIds(formData.get("project_material_ids"));
+  const mentioned_products = parseMentionedProducts(formData.get("mentioned_products"));
 
   const isDraft = formData.get("draft") === "1";
 
@@ -214,6 +229,7 @@ export async function createProject(
     .insert({
       type: "project",
       listing_type: "project",
+      status: "PENDING",
       title,
       description: description || null,
       slug,
@@ -229,7 +245,8 @@ export async function createProject(
       location_lng: location_lng != null && !Number.isNaN(location_lng) ? location_lng : null,
       material_or_finish: material_or_finish || null,
       team_members,
-      brands_used,
+      brands_used: [],
+      mentioned_products: mentioned_products.length > 0 ? mentioned_products : [],
       owner_clerk_user_id: userId,
     })
     .select("id")

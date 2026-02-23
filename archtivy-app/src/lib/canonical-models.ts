@@ -37,6 +37,8 @@ export interface ProjectOwner {
   displayName: string;
   avatarUrl?: string | null;
   profileId?: string | null;
+  /** For profile link: /u/[username] when set; else /u/id/[profileId]. */
+  username?: string | null;
 }
 
 export interface ProjectCanonical {
@@ -58,12 +60,18 @@ export interface ProjectCanonical {
   team_members: { name: string; role: string }[];
   documents: unknown[];
   owner_clerk_user_id: string | null;
-  /** Resolved from profiles; use for card subtitle. Fallback "by Archtivy" when null. */
+  /** Resolved from profiles; use for card subtitle. */
   owner: ProjectOwner | null;
   /** team_members.length + brands_used.length. For "X connections" label. */
   connectionCount: number;
   created_at: string;
   updated_at: string | null;
+  /** PENDING until admin approves; only APPROVED in public explore. */
+  status: "PENDING" | "APPROVED";
+  /** User-provided { brand_name_text, product_name_text }[]; link if match existing product. */
+  mentioned_products: { brand_name_text: string; product_name_text: string }[];
+  /** Brands credited on project (from raw.brands_used). Used for brands_count, not products_count. */
+  brands_used?: { name: string; logo_url?: string | null }[];
 }
 
 export interface ProductCanonical {
@@ -72,8 +80,12 @@ export interface ProductCanonical {
   title: string;
   description: string | null;
   category: string | null;
+  /** Product taxonomy category (listings.product_category). */
+  product_category?: string | null;
   material_type: string | null;
   color: string | null;
+  /** Array of color names for filtering and tag suggestions. Default []. */
+  color_options?: string[];
   year: number | null;
   brand_profile_id: string | null;
   team_members: unknown[];
@@ -81,12 +93,18 @@ export interface ProductCanonical {
   cover: string | null;
   gallery: { url: string; alt: string }[];
   owner_clerk_user_id?: string | null;
-  /** team_members.length + usedInProjectsCount (project_product_links). For "X connections" label. */
+  /** Resolved from profiles; use for card subtitle (owner display name). */
+  owner?: ProjectOwner | null;
+  /** @deprecated Use usedInProjectsCount + team_members for card metrics. */
   connectionCount: number;
+  /** Number of projects this product is linked to (project_product_links). Set by explore layer. */
+  usedInProjectsCount?: number;
   created_at: string;
   /** Hydrated via product_material_links -> materials. Use for sidebar/cards. */
   materials: { id: string; name: string; slug: string }[];
   material_tags: MaterialTag[];
+  /** PENDING until admin approves; only APPROVED in public explore. */
+  status: "PENDING" | "APPROVED";
 }
 
 /** Single source of truth: project rows are listings with type = 'project'. Tolerant: type ?? listing_type. */
@@ -195,6 +213,14 @@ export function normalizeProject(
   const teamMembersCount = safeArrayLength(raw.team_members);
   const brandsUsedCount = safeArrayLength(raw.brands_used);
   const connectionCount = teamMembersCount + brandsUsedCount;
+  const brands_used = Array.isArray(raw.brands_used)
+    ? (raw.brands_used as { name?: string; logo_url?: string | null }[]).filter(
+        (b) => b && typeof b === "object" && typeof (b as { name?: unknown }).name === "string"
+      ).map((b) => ({
+        name: String((b as { name: string }).name ?? ""),
+        logo_url: (b as { logo_url?: string | null }).logo_url ?? null,
+      }))
+    : [];
 
   return {
     id: String(raw.id),
@@ -224,7 +250,22 @@ export function normalizeProject(
     connectionCount,
     created_at: String(raw.created_at ?? ""),
     updated_at: (raw.updated_at as string | null) ?? null,
+    status: (raw.status as "PENDING" | "APPROVED") ?? "APPROVED",
+    mentioned_products: parseMentionedProducts(raw.mentioned_products),
+    brands_used,
   };
+}
+
+function parseMentionedProducts(
+  val: unknown
+): { brand_name_text: string; product_name_text: string }[] {
+  if (!Array.isArray(val)) return [];
+  return val
+    .filter((m) => m && typeof m === "object" && "brand_name_text" in m && "product_name_text" in m)
+    .map((m) => ({
+      brand_name_text: String((m as { brand_name_text: unknown }).brand_name_text ?? "").trim(),
+      product_name_text: String((m as { product_name_text: unknown }).product_name_text ?? "").trim(),
+    }));
 }
 
 /** Normalize raw product + product_images to ProductCanonical. Gallery from product_images only. */
@@ -266,12 +307,19 @@ export function normalizeProduct(
       (raw.subtitle as string | null)?.trim() ??
       null,
     category: (raw.category as string | null)?.trim() ?? null,
+    product_category: (raw.product_category as string | null)?.trim() ?? null,
     material_type: (raw.material_type as string | null)?.trim() ?? null,
     color: (raw.color as string | null)?.trim() ?? null,
     year: yearNum,
     brand_profile_id: (raw.brand_profile_id as string | null) ?? null,
     team_members: Array.isArray(raw.team_members) ? raw.team_members : [],
-    documents: Array.isArray(raw.documents) ? raw.documents : [],
+    documents: (() => {
+      const r = raw.documents;
+      if (Array.isArray(r)) return r;
+      if (r && typeof r === "object" && "files" in r && Array.isArray((r as { files: unknown }).files))
+        return (r as { files: unknown[] }).files;
+      return [];
+    })(),
     cover,
     gallery,
     owner_clerk_user_id: (raw.owner_clerk_user_id as string | null) ?? null,
@@ -279,6 +327,7 @@ export function normalizeProduct(
     created_at: String(raw.created_at ?? ""),
     materials: materialTags.map((m) => ({ id: m.id, name: m.display_name, slug: m.slug })),
     material_tags: materialTags,
+    status: (raw.status as "PENDING" | "APPROVED") ?? "APPROVED",
   };
 }
 
@@ -302,10 +351,26 @@ export function productMetaDisplay(p: ProductCanonical): string[] {
   return parts;
 }
 
+/** Compute products_count from project product arrays (in priority order). Returns undefined if none present. */
+function projectProductsCount(p: ProjectCanonical & Record<string, unknown>): number | undefined {
+  const arr =
+    (p.mentionedProducts as unknown[] | undefined) ??
+    (p.connectedProducts as unknown[] | undefined) ??
+    (p.productsUsed as unknown[] | undefined) ??
+    (p.linkedProducts as unknown[] | undefined) ??
+    (p.productLinks as unknown[] | undefined) ??
+    (Array.isArray(p.mentioned_products) && p.mentioned_products.length > 0 ? p.mentioned_products : undefined);
+  if (Array.isArray(arr) && arr.length > 0) return arr.length;
+  return undefined;
+}
+
 /** Build ListingCardData from ProjectCanonical for use in ProjectCard. */
 export function projectCanonicalToCardData(
   p: ProjectCanonical
 ): import("@/lib/types/listings").ListingCardData {
+  const productsCount = projectProductsCount(p as ProjectCanonical & Record<string, unknown>);
+  const brandsUsed = p.brands_used ?? [];
+  const brandsCount = productsCount === undefined && brandsUsed.length > 0 ? brandsUsed.length : undefined;
   return {
     id: p.id,
     type: "project",
@@ -326,17 +391,21 @@ export function projectCanonicalToCardData(
     material_or_finish: null,
     dimensions: null,
     team_members: p.team_members,
-    brands_used: [],
+    brands_used: brandsUsed.map((b) => ({ name: b.name, logo_url: b.logo_url ?? null })),
     materials: p.materials.map((m) => ({ id: m.id, display_name: m.name, slug: m.slug })),
     views_count: 0,
     saves_count: 0,
-    connection_count: p.connectionCount,
+    ...(productsCount != null && { products_count: productsCount }),
+    ...(brandsCount != null && { brands_count: brandsCount }),
     updated_at: p.updated_at,
   };
 }
 
 /** Build ListingCardData from ProductCanonical for use in ProductCard. */
 export function productCanonicalToCardData(p: ProductCanonical): ListingCardData {
+  const team = Array.isArray(p.team_members)
+    ? (p.team_members as { name?: string; role?: string }[]).filter((m) => m && typeof (m as { name?: unknown }).name === "string")
+    : [];
   return {
     id: p.id,
     type: "product",
@@ -356,12 +425,12 @@ export function productCanonicalToCardData(p: ProductCanonical): ListingCardData
     feature_highlight: p.color,
     material_or_finish: p.material_type,
     dimensions: null,
-    team_members: [],
+    team_members: team.map((m) => ({ name: String((m as { name: string }).name ?? ""), role: String((m as { role?: string }).role ?? "") })),
     brands_used: [],
     materials: p.materials.map((m) => ({ id: m.id, display_name: m.name, slug: m.slug })),
     views_count: 0,
     saves_count: 0,
-    connection_count: p.connectionCount,
+    used_in_projects_count: p.usedInProjectsCount ?? 0,
     updated_at: null,
   };
 }

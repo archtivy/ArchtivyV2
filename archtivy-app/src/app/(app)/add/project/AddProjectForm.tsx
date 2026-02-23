@@ -1,41 +1,38 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormState } from "react-dom";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import type { ActionResult } from "@/app/actions/types";
 import { createProject } from "@/app/actions/createProject";
 import { createAdminProjectFull } from "@/app/(admin)/admin/_actions/listings";
 import { Button } from "@/components/ui/Button";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { AddListingLayout } from "@/components/add/AddListingLayout";
-import { CompletionChecklist, type ChecklistItem } from "@/components/add/CompletionChecklist";
+import { GalleryUploadCard } from "@/components/add/GalleryUploadCard";
+import { ListingPreviewCard } from "@/components/add/ListingPreviewCard";
+import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
+import { SubmissionProgressBar } from "@/components/add/SubmissionProgressBar";
 import { LocationPicker, type LocationValue } from "@/components/location/LocationPicker";
 import { PROJECT_CATEGORIES } from "@/lib/auth/config";
-import type { BrandUsed } from "@/lib/types/listings";
 import { MaterialsMultiSelect } from "@/components/materials/MaterialsMultiSelect";
 import type { MaterialRow } from "@/lib/db/materials";
 import type { MemberTitleRow } from "./TeamMembersField";
 import { TeamMembersField } from "./TeamMembersField";
 
 const inputClass =
-  "w-full rounded-md border border-zinc-200 dark:border-zinc-700 bg-white px-3 py-2.5 text-zinc-900 placeholder-zinc-500 focus:border-archtivy-primary focus:outline-none focus:ring-1 focus:ring-archtivy-primary/50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-400";
-const labelClass = "mb-1.5 block text-sm font-medium text-zinc-900 dark:text-zinc-100";
+  "h-11 w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white px-3 py-2.5 text-zinc-900 placeholder-zinc-500 focus:border-[#002abf]/40 focus:outline-none focus:ring-1 focus:ring-[#002abf]/15 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-400";
+const textareaClass =
+  "w-full min-h-[120px] rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white px-3 py-2.5 text-zinc-900 placeholder-zinc-500 focus:border-[#002abf]/40 focus:outline-none focus:ring-1 focus:ring-[#002abf]/15 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-400";
+const labelClass = "mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400";
 const sectionClass =
-  "space-y-5 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900/50";
+  "space-y-5 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900/50";
 const sectionTitleClass = "text-base font-semibold text-zinc-900 dark:text-zinc-100 border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-1";
 
 const MIN_DESC_WORDS = 300;
 const MAX_DESC_WORDS = 500;
 const MIN_GALLERY = 3;
-
-export interface BrandOption {
-  id: string;
-  display_name: string | null;
-  username: string | null;
-  avatar_url: string | null;
-}
+const PROJECT_REQUIRED_COUNT = 7;
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -43,108 +40,195 @@ function countWords(text: string): number {
 
 export type OwnerProfileOption = { id: string; display_name: string | null; username: string | null };
 
+export interface ProjectFormInitialData {
+  listingId: string;
+  title: string;
+  description: string;
+  locationValue: LocationValue | null;
+  category: string;
+  areaSqft: string;
+  year: string;
+  teamRows: Array<{ name: string; role: string }>;
+  materialIds: string[];
+  mentionedRows: Array<{ brand_name_text: string; product_name_text: string }>;
+}
+
 export function AddProjectForm({
-  brands,
   materials,
   memberTitles,
   formMode = "user",
   ownerProfileOptions = [],
+  initialData,
+  updateAction,
 }: {
-  brands: BrandOption[];
   materials: MaterialRow[];
   memberTitles: MemberTitleRow[];
   formMode?: "user" | "admin";
   ownerProfileOptions?: OwnerProfileOption[];
+  initialData?: ProjectFormInitialData;
+  updateAction?: (prev: ActionResult, formData: FormData) => Promise<ActionResult>;
 }) {
   const router = useRouter();
-  const action = formMode === "admin" ? createAdminProjectFull : createProject;
+  const action = updateAction ?? (formMode === "admin" ? createAdminProjectFull : createProject);
   const [state, formAction] = useFormState(action, null as ActionResult);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [locationValue, setLocationValue] = useState<LocationValue | null>(null);
-  const [category, setCategory] = useState("");
-  const [areaSqft, setAreaSqft] = useState("");
-  const [year, setYear] = useState("");
-  const [imageFiles, setImageFiles] = useState<FileList | null>(null);
-  const [teamRows, setTeamRows] = useState<Array<{ name: string; role: string }>>([]);
-  const [selectedBrands, setSelectedBrands] = useState<BrandUsed[]>([]);
+  const [title, setTitle] = useState(initialData?.title ?? "");
+  const [description, setDescription] = useState(initialData?.description ?? "");
+  const [locationValue, setLocationValue] = useState<LocationValue | null>(initialData?.locationValue ?? null);
+  const [category, setCategory] = useState(initialData?.category ?? "");
+  const [areaSqft, setAreaSqft] = useState(initialData?.areaSqft ?? "");
+  const [year, setYear] = useState(initialData?.year ?? "");
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [teamRows, setTeamRows] = useState<Array<{ name: string; role: string }>>(() => {
+    const t = initialData?.teamRows;
+    return t && t.length > 0 ? t : [{ name: "", role: "" }];
+  });
   const [teamMembersJson, setTeamMembersJson] = useState("[]");
-  const [brandsUsedJson, setBrandsUsedJson] = useState("[]");
-  const [materialIds, setMaterialIds] = useState<string[]>([]);
+  const [materialIds, setMaterialIds] = useState<string[]>(initialData?.materialIds ?? []);
   const [materialIdsJson, setMaterialIdsJson] = useState("[]");
+  const [mentionedRows, setMentionedRows] = useState<
+    Array<{ brand_name_text: string; product_name_text: string }>
+  >(() => {
+    const m = initialData?.mentionedRows;
+    return m && m.length > 0 ? m : [{ brand_name_text: "", product_name_text: "" }];
+  });
+  const [mentionedProductsJson, setMentionedProductsJson] = useState("[]");
 
   useEffect(() => {
-    if (formMode === "admin") return;
+    if (formMode === "admin" || updateAction) return;
     const result = state as ActionResult;
     const target = result?.slug ?? result?.id;
     if (target) router.push(`/projects/${target}`);
-  }, [formMode, state, router]);
+  }, [formMode, updateAction, state, router]);
 
   useEffect(() => {
     setTeamMembersJson(JSON.stringify(teamRows.filter((r) => r.name.trim() || r.role.trim())));
   }, [teamRows]);
 
   useEffect(() => {
-    setBrandsUsedJson(JSON.stringify(selectedBrands));
-  }, [selectedBrands]);
-
-  useEffect(() => {
     setMaterialIdsJson(JSON.stringify(materialIds));
   }, [materialIds]);
 
+  useEffect(() => {
+    setMentionedProductsJson(
+      JSON.stringify(
+        mentionedRows.filter(
+          (r) => r.brand_name_text.trim() !== "" || r.product_name_text.trim() !== ""
+        )
+      )
+    );
+  }, [mentionedRows]);
+
   const wordCount = useMemo(() => countWords(description), [description]);
   const descValid = wordCount >= MIN_DESC_WORDS && wordCount <= MAX_DESC_WORDS;
-  const galleryCount = imageFiles ? imageFiles.length : 0;
+  const galleryCount = imageFiles.length;
   const galleryValid = galleryCount >= MIN_GALLERY;
+  const [primaryImagePreviewUrl, setPrimaryImagePreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (imageFiles.length === 0) {
+      setPrimaryImagePreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      return;
+    }
+    const url = URL.createObjectURL(imageFiles[0]);
+    setPrimaryImagePreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return url;
+    });
+    return () => URL.revokeObjectURL(url);
+  }, [imageFiles]);
   const hasLocation = Boolean(locationValue?.location_text?.trim());
+  const galleryRequired = !initialData;
   const canPublish =
     title.trim() !== "" &&
     descValid &&
     hasLocation &&
     category.trim() !== "" &&
     year.trim() !== "" &&
-    galleryValid;
+    (galleryRequired ? galleryValid : true);
 
-  const checklistItems: ChecklistItem[] = useMemo(
-    () => [
-      { id: "title", label: "Title", done: title.trim() !== "" },
-      {
-        id: "description",
-        label: `Description (${MIN_DESC_WORDS}–${MAX_DESC_WORDS} words)`,
-        done: descValid,
-      },
-      { id: "location", label: "Location", done: hasLocation },
-      { id: "category", label: "Category", done: category.trim() !== "" },
-      { id: "area", label: "Area & year", done: year.trim() !== "" },
-      { id: "gallery", label: `Gallery (min ${MIN_GALLERY} images)`, done: galleryValid },
-    ],
-    [title, descValid, hasLocation, category, year, galleryValid]
-  );
+  const projectProgressPercent = useMemo(() => {
+    const done = [
+      title.trim() !== "",
+      category.trim() !== "",
+      hasLocation,
+      year.trim() !== "",
+      areaSqft.trim() !== "" && !Number.isNaN(Number(areaSqft)) && Number(areaSqft) > 0,
+      descValid,
+      galleryRequired ? galleryValid : true,
+    ].filter(Boolean).length;
+    return Math.round((done / PROJECT_REQUIRED_COUNT) * 100);
+  }, [title, category, hasLocation, year, areaSqft, descValid, galleryRequired, galleryValid]);
 
   const addTeamRow = () => setTeamRows((r) => [...r, { name: "", role: "" }]);
   const updateTeamRow = (i: number, field: "name" | "role", value: string) => {
     setTeamRows((r) => r.map((row, j) => (j === i ? { ...row, [field]: value } : row)));
   };
-  const removeTeamRow = (i: number) => setTeamRows((r) => r.filter((_, j) => j !== i));
-
-  const toggleBrand = (b: BrandOption) => {
-    const name = b.display_name || b.username || "Brand";
-    const logoUrl = b.avatar_url ?? undefined;
-    setSelectedBrands((prev) => {
-      const exists = prev.some((x) => x.name === name);
-      if (exists) return prev.filter((x) => x.name !== name);
-      return [...prev, { name, logo_url: logoUrl || null }];
+  const removeTeamRow = (i: number) => {
+    setTeamRows((r) => {
+      if (r.length <= 1) return [{ name: "", role: "" }];
+      return r.filter((_, j) => j !== i);
     });
   };
 
+  const addMentionedRow = () =>
+    setMentionedRows((r) => [...r, { brand_name_text: "", product_name_text: "" }]);
+  const updateMentionedRow = (
+    i: number,
+    field: "brand_name_text" | "product_name_text",
+    value: string
+  ) => {
+    setMentionedRows((r) =>
+      r.map((row, j) => (j === i ? { ...row, [field]: value } : row))
+    );
+  };
+  const removeMentionedRow = (i: number) => {
+    setMentionedRows((r) => {
+      if (r.length <= 1) return [{ brand_name_text: "", product_name_text: "" }];
+      return r.filter((_, j) => j !== i);
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = formRef.current;
+    if (!form) return;
+    const fd = new FormData(form);
+    fd.delete("images");
+    fd.delete("documents");
+    imageFiles.forEach((f) => fd.append("images", f));
+    documentFiles.forEach((f) => fd.append("documents", f));
+    if (initialData?.listingId) fd.set("_listingId", initialData.listingId);
+    formAction(fd);
+  };
+
+  const locationDisplay =
+    locationValue?.location_text?.trim() ||
+    (locationValue?.location_city && locationValue?.location_country
+      ? `${locationValue.location_city}, ${locationValue.location_country}`
+      : null);
+
   return (
-    <form action={formAction} encType="multipart/form-data" className="space-y-8">
+    <form
+      ref={formRef}
+      action={formAction}
+      onSubmit={handleSubmit}
+      encType="multipart/form-data"
+      className="space-y-8"
+    >
+      <SubmissionProgressBar percent={projectProgressPercent} className="mb-6" />
       <input type="hidden" name="team_members" value={teamMembersJson} />
-      <input type="hidden" name="brands_used" value={brandsUsedJson} />
       <input type="hidden" name="draft" value="0" id="draft-value" />
       <input type="hidden" name="project_material_ids" value={materialIdsJson} />
+      <input type="hidden" name="mentioned_products" value={mentionedProductsJson} />
+      {initialData?.listingId && (
+        <input type="hidden" name="_listingId" value={initialData.listingId} />
+      )}
 
-      {formMode === "admin" && ownerProfileOptions.length > 0 && (
+      {formMode === "admin" && ownerProfileOptions.length > 0 && !initialData && (
         <section className={sectionClass}>
           <h2 className={sectionTitleClass}>Owner</h2>
           <div>
@@ -171,7 +255,24 @@ export function AddProjectForm({
 
       <AddListingLayout
         sidebar={
-          <CompletionChecklist items={checklistItems} defaultCollapsed={false} />
+          <>
+            <GalleryUploadCard
+              files={imageFiles}
+              onChange={setImageFiles}
+              minCount={MIN_GALLERY}
+              inputName=""
+            />
+            <ListingPreviewCard
+              title={title}
+              subtitle={locationDisplay}
+              imageUrl={primaryImagePreviewUrl}
+            />
+            <DocumentsUploadCard
+              id="documents"
+              files={documentFiles}
+              onChange={setDocumentFiles}
+            />
+          </>
         }
         mobileActions={
           <div className="flex gap-3">
@@ -201,6 +302,7 @@ export function AddProjectForm({
           </div>
         }
       >
+        <div className="space-y-8">
         {/* Section: Basics */}
         <section className={sectionClass}>
           <h2 className={sectionTitleClass}>Basics</h2>
@@ -266,7 +368,7 @@ export function AddProjectForm({
               required
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className={inputClass}
+              className={textareaClass}
               placeholder="Describe the project, context, and outcomes."
             />
             <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite">
@@ -323,33 +425,45 @@ export function AddProjectForm({
           </div>
         </section>
 
-        {/* Section: Media */}
+        {/* Section: Mentioned products (optional) */}
         <section className={sectionClass}>
-          <h2 className={sectionTitleClass}>Media</h2>
-          <div>
-            <label htmlFor="images" className={labelClass}>
-              Gallery images <span className="text-archtivy-primary">*</span> (min {MIN_GALLERY})
-            </label>
-            <input
-              id="images"
-              type="file"
-              name="images"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              multiple
-              required={!canPublish}
-              className={inputClass}
-              aria-describedby="images-hint"
-              onChange={(e) => setImageFiles(e.target.files)}
-            />
-            <p id="images-hint" className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-              {galleryCount} selected. JPEG, PNG, WebP or GIF, max 5MB each. First image is the cover.
-              {!galleryValid && galleryCount > 0 && (
-                <span className="ml-1 font-medium text-amber-600 dark:text-amber-400">
-                  — Add at least {MIN_GALLERY} images to publish
-                </span>
-              )}
-            </p>
-          </div>
+          <h2 className={sectionTitleClass}>Mentioned products (optional)</h2>
+          <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+            List products mentioned in this project. Brand and product name only — no URLs.
+          </p>
+          {mentionedRows.map((row, i) => (
+            <div key={i} className="flex flex-wrap items-start gap-3 rounded-lg border border-zinc-100 p-3 dark:border-zinc-800">
+              <input
+                type="text"
+                placeholder="Brand name"
+                value={row.brand_name_text}
+                onChange={(e) => updateMentionedRow(i, "brand_name_text", e.target.value)}
+                className="flex-1 min-w-[120px] rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+              />
+              <input
+                type="text"
+                placeholder="Product name"
+                value={row.product_name_text}
+                onChange={(e) => updateMentionedRow(i, "product_name_text", e.target.value)}
+                className="flex-1 min-w-[120px] rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+              />
+              <button
+                type="button"
+                onClick={() => removeMentionedRow(i)}
+                className="rounded p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
+                aria-label="Remove row"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addMentionedRow}
+            className="mt-2 rounded-lg border border-dashed border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-600 hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            + Add product
+          </button>
         </section>
 
         {/* Section: Connections */}
@@ -362,64 +476,6 @@ export function AddProjectForm({
             onUpdateRow={updateTeamRow}
             onRemoveRow={removeTeamRow}
           />
-          {brands.length > 0 && (
-            <div>
-              <span className={labelClass}>Brands used (optional)</span>
-              <p className="mb-2 text-sm text-zinc-500 dark:text-zinc-400">
-                Select brands featured in this project.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                {brands.map((b) => {
-                  const name = b.display_name || b.username || "Brand";
-                  const selected = selectedBrands.some((x) => x.name === name);
-                  return (
-                    <button
-                      key={b.id}
-                      type="button"
-                      onClick={() => toggleBrand(b)}
-                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition ${
-                        selected
-                          ? "border-archtivy-primary bg-archtivy-primary/10 dark:bg-archtivy-primary/20"
-                          : "border-zinc-200 dark:border-zinc-700"
-                      }`}
-                    >
-                      {b.avatar_url ? (
-                        <Image
-                          src={b.avatar_url}
-                          alt=""
-                          width={28}
-                          height={28}
-                          className="rounded-full object-cover"
-                        />
-                      ) : (
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-200 text-xs font-medium dark:bg-zinc-700">
-                          {(name[0] ?? "?").toUpperCase()}
-                        </span>
-                      )}
-                      <span>{name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          <div>
-            <label htmlFor="documents" className={labelClass}>
-              Files / documents (optional)
-            </label>
-            <input
-              id="documents"
-              type="file"
-              name="documents"
-              accept=".pdf,.docx,.pptx,.zip,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/zip"
-              multiple
-              className={inputClass}
-              aria-describedby="documents-hint"
-            />
-            <p id="documents-hint" className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-              PDF, DOCX, PPTX or ZIP. Max 20MB each.
-            </p>
-          </div>
         </section>
 
         {state?.error && (
@@ -427,6 +483,7 @@ export function AddProjectForm({
             <ErrorMessage message={state.error} className="max-w-xl text-red-800 dark:text-red-200" />
           </div>
         )}
+        </div>
       </AddListingLayout>
     </form>
   );

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
+import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 
 const TABLE = "listing_images";
 
@@ -147,6 +148,7 @@ export async function getListingImagesWithIds(
     { id: string; listing_id: string; image_url: string; alt: string | null; sort_order: number }[]
   >
 > {
+  const supabase = getSupabaseServiceClient();
   const { data, error } = await supabase
     .from(TABLE)
     .select("id, listing_id, image_url, alt, sort_order")

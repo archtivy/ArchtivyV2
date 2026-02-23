@@ -8,6 +8,7 @@ import { getProfileByClerkIdForAdmin } from "@/lib/db/profiles";
 import { createAuditLog } from "@/lib/db/audit";
 import { uploadGalleryImagesServer } from "@/lib/storage/gallery";
 import { uploadListingDocumentsServer } from "@/lib/storage/documents";
+import { persistListingDocuments } from "@/lib/db/listingDocumentsWrite";
 import { addDocuments } from "@/lib/db/listingDocuments";
 import { setProjectMaterials, setProductMaterials } from "@/lib/db/materials";
 import type { TeamMember, BrandUsed } from "@/lib/types/listings";
@@ -95,6 +96,36 @@ function parseMaterialIds(value: FormDataEntryValue | null): string[] {
   }
 }
 
+function parseColorOptions(value: FormDataEntryValue | null): string[] {
+  if (!value || typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((x) => String(x).trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+type MentionedProductEntry = { brand_name_text: string; product_name_text: string };
+
+function parseMentionedProducts(value: FormDataEntryValue | null): MentionedProductEntry[] {
+  if (!value || typeof value !== "string" || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (x): x is MentionedProductEntry =>
+        typeof x === "object" &&
+        x !== null &&
+        typeof (x as MentionedProductEntry).brand_name_text === "string" &&
+        typeof (x as MentionedProductEntry).product_name_text === "string"
+    );
+  } catch {
+    return [];
+  }
+}
+
 export type AdminCreateResult = { error?: string };
 
 export async function createAdminProjectFull(
@@ -133,8 +164,8 @@ export async function createAdminProjectFull(
   const year = (formData.get("year") as string)?.trim() ?? null;
   const material_or_finish = (formData.get("material_or_finish") as string)?.trim() ?? null;
   const team_members = parseTeamMembers(formData.get("team_members"));
-  const brands_used = parseBrandsUsed(formData.get("brands_used"));
   const material_ids = parseMaterialIds(formData.get("project_material_ids"));
+  const mentioned_products = parseMentionedProducts(formData.get("mentioned_products"));
 
   if (!title) return { error: "Title is required." };
   if (!description?.trim()) return { error: "Description is required." };
@@ -161,6 +192,7 @@ export async function createAdminProjectFull(
     .insert({
       type: "project",
       listing_type: "project",
+      status: "APPROVED",
       title,
       description: description || null,
       slug,
@@ -176,7 +208,8 @@ export async function createAdminProjectFull(
       location_lng: location_lng != null && !Number.isNaN(location_lng) ? location_lng : null,
       material_or_finish: material_or_finish || null,
       team_members,
-      brands_used,
+      brands_used: [],
+      mentioned_products: mentioned_products.length > 0 ? mentioned_products : [],
       owner_clerk_user_id: null,
       owner_profile_id: ownerProfileId,
       cover_image_url: null,
@@ -285,11 +318,6 @@ export async function createAdminProductFull(
   formData: FormData
 ): Promise<AdminCreateResult> {
   const docFiles = getDocumentFiles(formData);
-  console.log("[ADMIN CREATE START]", {
-    hasDocFiles: !!docFiles,
-    docFilesLength: docFiles?.length,
-    docFiles,
-  });
 
   const admin = await ensureAdmin();
   if (!admin.ok) return { error: admin.error };
@@ -300,16 +328,19 @@ export async function createAdminProductFull(
   const title = (formData.get("title") as string)?.trim();
   const description = (formData.get("description") as string)?.trim() ?? null;
   const product_type = (formData.get("product_type") as string)?.trim() ?? null;
-  const feature_highlight = (formData.get("feature_highlight") as string)?.trim() ?? null;
+  const product_category = (formData.get("product_category") as string)?.trim() ?? null;
+  const product_subcategory = (formData.get("product_subcategory") as string)?.trim() ?? null;
   const material_or_finish = (formData.get("material_or_finish") as string)?.trim() ?? null;
   const dimensions = (formData.get("dimensions") as string)?.trim() ?? null;
   const year = (formData.get("year") as string)?.trim() ?? null;
   const team_members = parseTeamMembers(formData.get("team_members"));
   const material_ids = parseMaterialIds(formData.get("product_material_ids"));
+  const color_options = parseColorOptions(formData.get("color_options"));
 
   if (!title) return { error: "Product title is required." };
   if (!description?.trim()) return { error: "Product description is required." };
   if (!product_type?.trim()) return { error: "Product type is required." };
+  if (!product_subcategory?.trim()) return { error: "Product subcategory is required." };
 
   const descWords = (description ?? "").trim().split(/\s+/).filter(Boolean).length;
   if (descWords < 200) return { error: "Description must be at least 200 words." };
@@ -328,11 +359,13 @@ export async function createAdminProductFull(
     .insert({
       type: "product",
       listing_type: "product",
+      status: "APPROVED",
       title,
       description: description || null,
       slug,
       product_type: product_type || null,
-      feature_highlight: feature_highlight || null,
+      product_category: product_category || null,
+      product_subcategory: product_subcategory || null,
       material_or_finish: material_or_finish || null,
       dimensions: dimensions || null,
       year: year || null,
@@ -351,8 +384,21 @@ export async function createAdminProductFull(
   if (insertError) return { error: insertError.message };
   if (!listing?.id) return { error: "Failed to create product." };
   const listingId = listing.id as string;
+  console.log("[product taxonomy]", { listingId, product_type: product_type, product_category: product_category, product_subcategory: product_subcategory });
   const { data: check } = await supabase.from("listings").select("type").eq("id", listingId).maybeSingle();
   if (!check?.type) return { error: "Listing created but type is missing (data integrity)." };
+
+  const { error: productRowError } = await supabase.from("products").insert({
+    id: listingId,
+    slug,
+    title,
+    subtitle: description?.trim() || null,
+    color_options: [],
+  });
+  if (productRowError) {
+    await supabase.from("listings").delete().eq("id", listingId);
+    return { error: `Failed to create product record: ${productRowError.message}` };
+  }
 
   if (team_members.length > 0) {
     try {
@@ -400,27 +446,23 @@ export async function createAdminProductFull(
     console.warn("[admin createProduct] matches pipeline non-fatal:", e);
   }
 
-  console.log("[DOCS] docFiles", docFiles.length);
   if (docFiles.length > 0) {
     const docUpload = await uploadListingDocumentsServer(listingId, docFiles);
-    console.log("[DOCS] upload", { ok: !docUpload.error, count: docUpload.data?.length, error: docUpload.error });
     if (docUpload.error || !docUpload.data?.length) {
       await supabase.from("listings").delete().eq("id", listingId);
       return { error: `Document upload failed: ${docUpload.error ?? "no files returned"}` };
     }
-    const insert = await addDocuments(
-      listingId,
-      docUpload.data.map((d) => ({
-        file_url: d.url,
-        file_name: d.fileName,
-        file_type: d.fileType,
-        storage_path: d.storagePath,
-      }))
-    );
-    console.log("[DOCS] insert", { ok: !insert.error, inserted: insert.data });
-    if (insert.error) {
+    const filesToPersist = docUpload.data.map((d, i) => ({
+      url: d.url,
+      name: d.fileName,
+      mime: d.fileType,
+      storage_path: d.storagePath,
+      size: docFiles[i]?.size,
+    }));
+    const err = await persistListingDocuments(listingId, filesToPersist);
+    if (err.error) {
       await supabase.from("listings").delete().eq("id", listingId);
-      return { error: `Document DB insert failed: ${insert.error}` };
+      return { error: `Document save failed: ${err.error}` };
     }
   }
 
@@ -455,7 +497,6 @@ export async function bulkUpdateListings(input: {
     category: string | null;
     year: string | null;
     product_type: string | null;
-    feature_highlight: string | null;
     material_or_finish: string | null;
     dimensions: string | null;
     cover_image_url: string | null;
@@ -473,7 +514,6 @@ export async function bulkUpdateListings(input: {
   if ("category" in patch) patch.category = toNullableText(patch.category);
   if ("year" in patch) patch.year = toNullableText(patch.year);
   if ("product_type" in patch) patch.product_type = toNullableText(patch.product_type);
-  if ("feature_highlight" in patch) patch.feature_highlight = toNullableText(patch.feature_highlight);
   if ("material_or_finish" in patch) patch.material_or_finish = toNullableText(patch.material_or_finish);
   if ("dimensions" in patch) patch.dimensions = toNullableText(patch.dimensions);
   if ("cover_image_url" in patch) patch.cover_image_url = toNullableText(patch.cover_image_url);
@@ -667,10 +707,294 @@ export async function bulkDeleteListings(ids: string[]) {
   return { ok: true as const };
 }
 
+/** Full update of a project listing using same form schema as create. Admin only. */
+export async function updateProjectAction(
+  _prev: AdminCreateResult | null,
+  formData: FormData
+): Promise<AdminCreateResult> {
+  const admin = await ensureAdmin();
+  if (!admin.ok) return { error: admin.error };
+
+  const listingId = (formData.get("_listingId") as string)?.trim();
+  if (!listingId) return { error: "Missing listing id." };
+
+  const title = (formData.get("title") as string)?.trim();
+  const description = (formData.get("description") as string)?.trim() ?? null;
+  const location_text = (formData.get("location_text") as string)?.trim() || (formData.get("location") as string)?.trim() || null;
+  const location_city = (formData.get("location_city") as string)?.trim() || null;
+  const location_country = (formData.get("location_country") as string)?.trim() || null;
+  const location_latRaw = formData.get("location_lat");
+  const location_lngRaw = formData.get("location_lng");
+  const location_lat = location_latRaw != null && String(location_latRaw).trim() !== "" ? Number(String(location_latRaw).trim()) : null;
+  const location_lng = location_lngRaw != null && String(location_lngRaw).trim() !== "" ? Number(String(location_lngRaw).trim()) : null;
+  const category = (formData.get("category") as string)?.trim() ?? null;
+  const areaSqftRaw = formData.get("area_sqft");
+  const area_sqft = areaSqftRaw !== null && areaSqftRaw !== "" ? Number(String(areaSqftRaw).trim()) : null;
+  const year = (formData.get("year") as string)?.trim() ?? null;
+  const material_or_finish = (formData.get("material_or_finish") as string)?.trim() ?? null;
+  const team_members = parseTeamMembers(formData.get("team_members"));
+  const material_ids = parseMaterialIds(formData.get("project_material_ids"));
+  const mentioned_products = parseMentionedProducts(formData.get("mentioned_products"));
+
+  if (!title) return { error: "Title is required." };
+  if (!description?.trim()) return { error: "Description is required." };
+  if (!location_text?.trim()) return { error: "Project location is required." };
+  if (!category?.trim()) return { error: "Project category is required." };
+  if (!year?.trim()) return { error: "Year is required." };
+
+  const supabase = getSupabaseServiceClient();
+  const { error: updateError } = await supabase
+    .from("listings")
+    .update({
+      title,
+      description: description || null,
+      location: location_text,
+      location_text,
+      location_city: location_city || null,
+      location_country: location_country || null,
+      location_lat: location_lat != null && !Number.isNaN(location_lat) ? location_lat : null,
+      location_lng: location_lng != null && !Number.isNaN(location_lng) ? location_lng : null,
+      category: category || null,
+      year: year || null,
+      area_sqft: area_sqft != null && !Number.isNaN(area_sqft) && area_sqft > 0 ? area_sqft : null,
+      material_or_finish: material_or_finish || null,
+      team_members,
+      brands_used: [],
+      mentioned_products: mentioned_products.length > 0 ? mentioned_products : [],
+    })
+    .eq("id", listingId);
+
+  if (updateError) return { error: updateError.message };
+
+  try {
+    await persistListingTeamMembers(supabase, listingId, team_members);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to save team members." };
+  }
+
+  const imageFiles = getImageFiles(formData);
+  if (imageFiles.length >= MIN_GALLERY_IMAGES) {
+    await supabase.from("listing_images").delete().eq("listing_id", listingId);
+    const uploadResult = await uploadGalleryImagesServer(listingId, imageFiles);
+    if (uploadResult.error || !uploadResult.data?.length) {
+      return { error: uploadResult.error ?? "Image upload failed." };
+    }
+    const imageRows = uploadResult.data.map((image_url, i) => ({
+      listing_id: listingId,
+      image_url,
+      alt: null as string | null,
+      sort_order: i,
+    }));
+    const { error: imgErr } = await supabase.from("listing_images").insert(imageRows);
+    if (imgErr) return { error: `Failed to save gallery: ${imgErr.message}` };
+    const coverImageUrl = uploadResult.data[0];
+    await supabase.from("listings").update({ cover_image_url: coverImageUrl }).eq("id", listingId);
+    try {
+      await processProjectImages(listingId);
+      await computeAndUpsertMatchesForProject(listingId);
+    } catch {
+      // non-fatal
+    }
+  }
+
+  const docFiles = getDocumentFiles(formData);
+  if (docFiles.length > 0) {
+    const docUpload = await uploadListingDocumentsServer(listingId, docFiles);
+    if (docUpload.data?.length) {
+      await addDocuments(
+        listingId,
+        docUpload.data.map((d) => ({
+          file_url: d.url,
+          file_name: d.fileName,
+          file_type: d.fileType,
+          storage_path: d.storagePath,
+        }))
+      );
+    }
+  }
+
+  if (material_ids.length >= 0) {
+    const { error: materialErr } = await setProjectMaterials(listingId, material_ids);
+    if (materialErr) return { error: `Failed to save materials: ${materialErr}` };
+  }
+
+  if (admin.ok) {
+    await createAuditLog({
+      adminUserId: admin.adminUserId,
+      action: "listing.update",
+      entityType: "listing",
+      entityId: listingId,
+      metadata: { type: "project" },
+    });
+  }
+  revalidatePath("/admin/projects");
+  revalidatePath("/admin/projects/[id]");
+  revalidatePath("/projects");
+  revalidatePath("/explore/projects");
+  redirect(`/admin/projects/${listingId}?saved=1`);
+}
+
+/** Full update of a product listing using same form schema as create. Admin only. */
+export async function updateProductAction(
+  _prev: AdminCreateResult | null,
+  formData: FormData
+): Promise<AdminCreateResult> {
+  const admin = await ensureAdmin();
+  if (!admin.ok) return { error: admin.error };
+
+  const listingId = (formData.get("_listingId") as string)?.trim();
+  if (!listingId) return { error: "Missing listing id." };
+
+  const title = (formData.get("title") as string)?.trim();
+  const description = (formData.get("description") as string)?.trim() ?? null;
+  const product_type = (formData.get("product_type") as string)?.trim() ?? null;
+  const product_category = (formData.get("product_category") as string)?.trim() ?? null;
+  const product_subcategory = (formData.get("product_subcategory") as string)?.trim() ?? null;
+  const material_or_finish = (formData.get("material_or_finish") as string)?.trim() ?? null;
+  const dimensions = (formData.get("dimensions") as string)?.trim() ?? null;
+  const year = (formData.get("year") as string)?.trim() ?? null;
+  const team_members = parseTeamMembers(formData.get("team_members"));
+  const material_ids = parseMaterialIds(formData.get("product_material_ids"));
+  const color_options = parseColorOptions(formData.get("color_options"));
+
+  if (!title) return { error: "Product title is required." };
+  if (!description?.trim()) return { error: "Description is required." };
+  if (!product_type?.trim()) return { error: "Product type is required." };
+  if (!product_subcategory?.trim()) return { error: "Product subcategory is required." };
+
+  console.log("[product taxonomy]", { listingId, product_type, product_category, product_subcategory });
+  const supabase = getSupabaseServiceClient();
+  const { error: updateError } = await supabase
+    .from("listings")
+    .update({
+      title,
+      description: description || null,
+      product_type: product_type || null,
+      product_category: product_category || null,
+      product_subcategory: product_subcategory || null,
+      material_or_finish: material_or_finish || null,
+      dimensions: dimensions || null,
+      year: year || null,
+      team_members,
+    })
+    .eq("id", listingId);
+
+  if (updateError) return { error: updateError.message };
+
+  await supabase
+    .from("products")
+    .update({
+      color_options,
+      color: color_options.length > 0 ? color_options[0] : null,
+    })
+    .eq("id", listingId);
+
+  try {
+    await persistListingTeamMembers(supabase, listingId, team_members);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to save team members." };
+  }
+
+  const imageFiles = getImageFiles(formData);
+  if (imageFiles.length >= MIN_GALLERY_IMAGES) {
+    await supabase.from("listing_images").delete().eq("listing_id", listingId);
+    const uploadResult = await uploadGalleryImagesServer(listingId, imageFiles);
+    if (uploadResult.error || !uploadResult.data?.length) {
+      return { error: uploadResult.error ?? "Image upload failed." };
+    }
+    const imageRows = uploadResult.data.map((image_url, i) => ({
+      listing_id: listingId,
+      image_url,
+      alt: null as string | null,
+      sort_order: i,
+    }));
+    const { error: imgErr } = await supabase.from("listing_images").insert(imageRows);
+    if (imgErr) return { error: `Failed to save gallery: ${imgErr.message}` };
+    await supabase.from("listings").update({ cover_image_url: uploadResult.data[0] }).eq("id", listingId);
+    try {
+      await processProductImages(listingId);
+      await computeAndUpsertAllMatches();
+    } catch {
+      // non-fatal
+    }
+  }
+
+  const docFiles = getDocumentFiles(formData);
+  if (docFiles.length > 0) {
+    const docUpload = await uploadListingDocumentsServer(listingId, docFiles);
+    if (docUpload.data?.length) {
+      const filesToPersist = docUpload.data.map((d, i) => ({
+        url: d.url,
+        name: d.fileName,
+        mime: d.fileType,
+        storage_path: d.storagePath,
+        size: docFiles[i]?.size,
+      }));
+      const err = await persistListingDocuments(listingId, filesToPersist);
+      if (err.error) return { error: `Document save failed: ${err.error}` };
+    }
+  }
+
+  if (material_ids.length >= 0) {
+    const { error: materialErr } = await setProductMaterials(listingId, material_ids);
+    if (materialErr) return { error: `Failed to save materials: ${materialErr}` };
+  }
+
+  if (admin.ok) {
+    await createAuditLog({
+      adminUserId: admin.adminUserId,
+      action: "listing.update",
+      entityType: "listing",
+      entityId: listingId,
+      metadata: { type: "product" },
+    });
+  }
+  revalidatePath("/admin/products");
+  revalidatePath("/admin/products/[id]");
+  revalidatePath("/products");
+  revalidatePath("/explore/products");
+  redirect(`/admin/products/${listingId}?saved=1`);
+}
+
+/** Admin-only: approve a pending listing (set status = APPROVED). */
+export async function approveListingAction(listingId: string) {
+  const admin = await ensureAdmin();
+  if (!admin.ok) return { ok: false as const, error: admin.error };
+  const supabase = getSupabaseServiceClient();
+  const { error } = await supabase.from("listings").update({ status: "APPROVED" }).eq("id", listingId);
+  if (error) return { ok: false as const, error: error.message };
+  await createAuditLog({
+    adminUserId: admin.adminUserId,
+    action: "listing.approve",
+    entityType: "listing",
+    entityId: listingId,
+    metadata: {},
+  });
+  revalidatePath("/admin");
+  revalidatePath("/admin/projects");
+  revalidatePath("/admin/products");
+  revalidatePath("/projects");
+  revalidatePath("/products");
+  return { ok: true as const };
+}
+
+/** Form action: approve listing by _listingId from form data. */
+export async function approveListingFormAction(formData: FormData) {
+  const listingId = formData.get("_listingId");
+  if (typeof listingId !== "string" || !listingId.trim()) return { ok: false as const, error: "Missing listing id" };
+  return approveListingAction(listingId.trim());
+}
+
+/** Void-returning form action for use with <form action={…}> (React expects void | Promise<void>). */
+export async function approveListingFormActionVoid(formData: FormData): Promise<void> {
+  await approveListingFormAction(formData);
+}
+
 /** Admin-only: delete a single project listing by id. Use from Admin Projects list. */
 export async function deleteAdminProjectAction(listingId: string) {
   return deleteListing(listingId);
-}/** Admin-only: delete a single product listing by id. Use from Admin Products list. */
+}
+/** Admin-only: delete a single product listing by id. Use from Admin Products list. */
 export async function deleteAdminProductAction(listingId: string) {
   return deleteListing(listingId);
 }

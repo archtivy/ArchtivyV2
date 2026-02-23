@@ -11,6 +11,7 @@ import {
 } from "@/lib/db/listings";
 import { addImages } from "@/lib/db/listingImages";
 import { addDocuments } from "@/lib/db/listingDocuments";
+import { persistListingDocuments } from "@/lib/db/listingDocumentsWrite";
 import { uploadGalleryImages } from "@/lib/storage/gallery";
 import {
   uploadGalleryImagesForProject,
@@ -109,10 +110,6 @@ export async function createProject(
   if (!profile?.username) {
     return { error: "Complete onboarding first." };
   }
-  if (profile.role !== "designer") {
-    return { error: "Only designers can create projects." };
-  }
-
   const title = (formData.get("title") as string)?.trim();
   const description = (formData.get("description") as string)?.trim() ?? null;
   const location = (formData.get("location") as string)?.trim() ?? null;
@@ -222,7 +219,6 @@ export async function createProduct(
   const productType = (formData.get("product_type") as string)?.trim() ?? null;
   const productCategory = (formData.get("product_category") as string)?.trim() ?? null;
   const productSubcategory = (formData.get("product_subcategory") as string)?.trim() ?? null;
-  const featureHighlight = (formData.get("feature_highlight") as string)?.trim() ?? null;
   const materialOrFinish = (formData.get("material_or_finish") as string)?.trim() ?? null;
   const dimensions = (formData.get("dimensions") as string)?.trim() ?? null;
   const year = (formData.get("year") as string)?.trim() ?? null;
@@ -265,7 +261,6 @@ export async function createProduct(
     product_type: productType.trim() || null,
     product_category: productCategory || null,
     product_subcategory: productSubcategory.trim() || null,
-    feature_highlight: featureHighlight || null,
     material_or_finish: materialOrFinish || null,
     dimensions: dimensions || null,
     year: year || null,
@@ -412,12 +407,13 @@ export async function createProductCanonical(
   const profileResult = await getProfileByClerkId(userId);
   const profile = profileResult.data;
   if (!profile?.username) return { error: "Complete onboarding first." };
-  if (profile.role !== "brand") return { error: "Only brands can create products." };
-
   const title = (formData.get("title") as string)?.trim();
   const description = (formData.get("description") as string)?.trim() ?? null;
   const subtitle = description?.trim() || null;
   const isDraft = formData.get("draft") === "1";
+  const productType = (formData.get("product_type") as string)?.trim() ?? null;
+  const productCategory = (formData.get("product_category") as string)?.trim() ?? null;
+  const productSubcategory = (formData.get("product_subcategory") as string)?.trim() ?? null;
   const materialIds = parseMaterialIds(formData.get("product_material_ids"));
 
   if (!title) return { error: "Product title is required." };
@@ -439,13 +435,37 @@ export async function createProductCanonical(
   if (!row) return { error: "Failed to create product." };
   const { id: productId, slug } = row;
 
+  const colorOptionsRaw = formData.get("color_options");
+  let colorOptions: string[] = [];
+  if (colorOptionsRaw && typeof colorOptionsRaw === "string" && colorOptionsRaw.trim()) {
+    try {
+      const arr = JSON.parse(colorOptionsRaw) as unknown;
+      if (Array.isArray(arr)) colorOptions = arr.map((x) => String(x).trim()).filter(Boolean);
+    } catch {
+      // ignore
+    }
+  }
+  const supabaseForProduct = getSupabaseServiceClient();
+  await supabaseForProduct
+    .from("products")
+    .update({
+      color_options: colorOptions,
+      color: colorOptions.length > 0 ? colorOptions[0] : null,
+    })
+    .eq("id", productId);
+
   const listingPayload = {
     slug,
     title,
     description: description ?? null,
     owner_clerk_user_id: userId,
     owner_profile_id: profile.id ?? null,
+    status: "PENDING" as const,
+    product_type: productType ?? null,
+    product_category: productCategory ?? null,
+    product_subcategory: productSubcategory ?? null,
   };
+  console.log("[product taxonomy]", { listingId: productId, product_type: productType, product_category: productCategory, product_subcategory: productSubcategory });
   const listingErr = await upsertListingForProduct(productId, listingPayload);
   if (listingErr.error) {
     await deleteProductRow(productId);
@@ -503,29 +523,25 @@ export async function createProductCanonical(
   }
 
   const docFiles = getDocumentFiles(formData);
-  console.log("[DOCS] docFiles", docFiles.length);
   if (docFiles.length > 0) {
     const docUpload = await uploadListingDocumentsServer(productId, docFiles);
-    console.log("[DOCS] upload", { ok: !docUpload.error, count: docUpload.data?.length, error: docUpload.error });
     if (docUpload.error || !docUpload.data?.length) {
       await dbDeleteListing(productId);
       await deleteProductRow(productId);
       return { error: `Document upload failed: ${docUpload.error ?? "no files returned"}` };
     }
-    const insert = await addDocuments(
-      productId,
-      docUpload.data.map((d) => ({
-        file_name: d.fileName,
-        file_url: d.url,
-        file_type: d.fileType,
-        storage_path: d.storagePath,
-      }))
-    );
-    console.log("[DOCS] insert", { ok: !insert.error, inserted: insert.data });
-    if (insert.error) {
+    const filesToPersist = docUpload.data.map((d, i) => ({
+      url: d.url,
+      name: d.fileName,
+      mime: d.fileType,
+      storage_path: d.storagePath,
+      size: docFiles[i]?.size,
+    }));
+    const err = await persistListingDocuments(productId, filesToPersist);
+    if (err.error) {
       await dbDeleteListing(productId);
       await deleteProductRow(productId);
-      return { error: `Document DB insert failed: ${insert.error}` };
+      return { error: `Document save failed: ${err.error}` };
     }
   }
 

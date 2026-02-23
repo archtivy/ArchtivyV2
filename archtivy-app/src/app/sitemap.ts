@@ -14,8 +14,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   const [projectsRes, productsRes, profilesRes] = await Promise.all([
-    supabase.from("listings").select("id, slug").eq("type", "project").is("deleted_at", null).order("updated_at", { ascending: false }).limit(5000),
-    supabase.from("listings").select("id, slug").eq("type", "product").is("deleted_at", null).order("updated_at", { ascending: false }).limit(5000),
+    supabase.from("listings").select("id, slug").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).order("updated_at", { ascending: false }).limit(5000),
+    supabase.from("listings").select("id, slug").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).order("updated_at", { ascending: false }).limit(5000),
     supabase.from("profiles").select("id, username").eq("is_hidden", false).not("username", "is", null).limit(5000),
   ]);
 

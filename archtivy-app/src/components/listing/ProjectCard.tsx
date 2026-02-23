@@ -5,10 +5,9 @@ import { getListingUrl } from "@/lib/canonical";
 import { MetaRow } from "./MetaRow";
 import { AvatarStack, type AvatarItem } from "./AvatarStack";
 import { LogoStack, type LogoItem } from "./LogoStack";
-import { formatConnections } from "./connectionsLabel";
+import { buildProjectCardMetrics } from "./cardMetrics";
 
 const FALLBACK = "Not specified";
-const OWNER_FALLBACK = "by Archtivy";
 const SQM_TO_SQFT = 10.7639;
 const MAX_TEAM = 3;
 const MAX_BRANDS = 4;
@@ -18,7 +17,7 @@ export interface ProjectCardProps {
   imageUrl?: string | null;
   /** Override canonical URL. When not provided, uses getListingUrl(listing). */
   href?: string | null;
-  /** Posted-by: owner display name. Fallback "by Archtivy" when not provided. */
+  /** Owner display name. Shown only when provided. */
   postedBy?: string | null;
   /** Location text (overrides listing.location if provided) */
   location?: string | null;
@@ -63,7 +62,7 @@ export function ProjectCard({
     listing.year != null && String(listing.year).trim() !== ""
       ? String(listing.year).trim()
       : FALLBACK;
-  const postedByLabel = postedBy?.trim() || OWNER_FALLBACK;
+  const postedByLabel = postedBy?.trim() || null;
 
   const team = listing.team_members ?? [];
   const brands = listing.brands_used ?? [];
@@ -81,11 +80,14 @@ export function ProjectCard({
   const viewsCount = listing.views_count ?? 0;
   const savesCount = listing.saves_count ?? 0;
   const hasCounts = viewsCount > 0 || savesCount > 0;
-  const connectionsText = formatConnections(listing.connection_count);
+  const productsCount = listing.products_count;
+  const brandsCount = listing.brands_count ?? (productsCount == null ? brands.length : 0);
+  const teamCount = team.length;
+  const metricsText = buildProjectCardMetrics({ productsCount, brandsCount, teamCount });
   const hasTeam = teamAvatarsResolved.length > 0;
   const hasBrands = brandLogosResolved.length > 0;
   const hasMaterials = materials.length > 0;
-  const hasFooterContent = hasTeam || hasBrands || connectionsText != null || hasMaterials;
+  const hasFooterContent = hasTeam || hasBrands || metricsText != null || hasMaterials;
 
   const linkHref = (href?.trim() || "") || getListingUrl(listing);
 
@@ -114,13 +116,15 @@ export function ProjectCard({
           </div>
         )}
       </div>
-      <div className="p-4">
-        <h3 className="truncate font-semibold text-zinc-900 group-hover:text-archtivy-primary dark:text-zinc-100 dark:group-hover:text-archtivy-primary">
+      <div className="p-5">
+        <h3 className="font-serif text-lg font-medium tracking-tight text-zinc-900 group-hover:text-archtivy-primary dark:text-zinc-100 dark:group-hover:text-archtivy-primary line-clamp-2">
           {listing.title?.trim() || FALLBACK}
         </h3>
-        <p className="mt-0.5 truncate text-sm text-zinc-500 dark:text-zinc-400">
-          {postedByLabel}
-        </p>
+        {postedByLabel && (
+          <p className="mt-1 truncate text-sm text-zinc-500 dark:text-zinc-400">
+            {postedByLabel}
+          </p>
+        )}
         <MetaRow
           items={[metaLocation, ...(hasArea ? [metaArea] : []), metaYear].filter(Boolean)}
           className="mt-1.5"
@@ -139,9 +143,9 @@ export function ProjectCard({
                 moreLabel="more brands"
                 hideWhenEmpty
               />
-              {connectionsText != null && (
+              {metricsText != null && (
                 <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {connectionsText}
+                  {metricsText}
                 </span>
               )}
             </div>

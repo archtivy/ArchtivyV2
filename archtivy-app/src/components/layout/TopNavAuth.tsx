@@ -40,7 +40,7 @@ interface TopNavAuthProps {
 }
 
 const itemClass =
-  "flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-zinc-900 transition hover:bg-zinc-100 focus:bg-zinc-100 focus:outline-none dark:text-zinc-100 dark:hover:bg-zinc-800 dark:focus:bg-zinc-800";
+  "flex w-full items-center gap-2 rounded px-3 py-2.5 text-left text-sm font-medium text-[#1a1a1a] transition hover:bg-[#f5f7fb] focus:outline-none focus:outline-2 focus:outline-offset-0 focus:outline-[rgba(0,42,191,0.15)] dark:text-zinc-100 dark:hover:bg-zinc-800";
 
 export function TopNavAuth({ displayName, role }: TopNavAuthProps) {
   const { user } = useUser();
@@ -95,13 +95,13 @@ export function TopNavAuth({ displayName, role }: TopNavAuthProps) {
       <SignedOut>
         <Link
           href="/sign-in"
-          className="rounded px-2 py-1 text-zinc-500 transition hover:text-zinc-900 focus:outline-none dark:text-zinc-400 dark:hover:text-zinc-100 dark:focus:text-zinc-100"
+          className="rounded px-2 py-1 text-[15px] font-medium text-[#2b2b2b] transition-colors hover:text-[#002abf] focus:outline-none focus:outline-2 focus:outline-offset-2 focus:outline-[rgba(0,42,191,0.15)] dark:text-zinc-300 dark:hover:text-[#002abf]"
         >
           Sign in
         </Link>
         <Link
           href="/sign-up"
-          className="rounded px-2 py-1 text-zinc-500 transition hover:text-zinc-900 focus:outline-none dark:text-zinc-400 dark:hover:text-zinc-100 dark:focus:text-zinc-100"
+          className="rounded px-2 py-1 text-[15px] font-medium text-[#2b2b2b] transition-colors hover:text-[#002abf] focus:outline-none focus:outline-2 focus:outline-offset-2 focus:outline-[rgba(0,42,191,0.15)] dark:text-zinc-300 dark:hover:text-[#002abf]"
         >
           Sign up
         </Link>
@@ -114,7 +114,7 @@ export function TopNavAuth({ displayName, role }: TopNavAuthProps) {
             aria-expanded={open}
             aria-haspopup="true"
             aria-label="Account menu"
-            className="flex items-center gap-2 rounded-lg py-1 pr-1 text-left transition hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-archtivy-primary focus:ring-offset-2 focus:ring-offset-white dark:hover:bg-zinc-800 dark:focus:ring-offset-zinc-950"
+            className="flex items-center gap-2 rounded-lg py-1 pr-1 text-left transition hover:bg-zinc-100 focus:outline-none focus:outline-2 focus:outline-offset-2 focus:outline-[rgba(0,42,191,0.15)] dark:hover:bg-zinc-800"
           >
             <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
               {imageUrl ? (
@@ -140,10 +140,10 @@ export function TopNavAuth({ displayName, role }: TopNavAuthProps) {
           {open && (
             <div
               role="menu"
-              className="absolute right-0 top-full z-50 mt-2.5 min-w-[200px] rounded-lg border border-zinc-200 bg-white py-1.5 shadow-xl dark:border-zinc-800 dark:bg-zinc-900"
+              className="absolute right-0 top-full z-50 mt-2.5 min-w-[200px] rounded-lg border border-zinc-200/80 bg-white py-3 shadow-[0_4px_20px_rgba(0,0,0,0.06)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-xl"
             >
               {/* Menu items only (no user name/role inside dropdown) */}
-              <div role="none" className="py-1">
+              <div role="none" className="px-1 py-0.5">
                 <Link
                   role="menuitem"
                   href="/me"
@@ -183,10 +183,10 @@ export function TopNavAuth({ displayName, role }: TopNavAuthProps) {
 
               <div
                 role="separator"
-                className="my-1 border-t border-zinc-200 dark:border-zinc-700"
+                className="my-2 border-t border-[#f0f0f0] dark:border-zinc-700"
               />
 
-              <div role="none" className="py-1">
+              <div role="none" className="px-1 py-0.5">
                 <button
                   type="button"
                   role="menuitem"

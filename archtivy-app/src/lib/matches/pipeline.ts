@@ -1,10 +1,11 @@
 /**
- * AI pipeline: generate embedding + attributes for an image and save to image_ai.
+ * AI pipeline: generate alt, embedding (from alt text), attributes for an image and save to image_ai.
  * Trigger when a new listing_image (project) or product_image is created.
  */
 
-import { getImageEmbedding } from "@/lib/ai/embedding";
+import { getImageAltText } from "@/lib/ai/attributes";
 import { getImageAttributes } from "@/lib/ai/attributes";
+import { getImageEmbedding } from "@/lib/ai/embedding";
 import { upsertImageAi } from "@/lib/db/imageAi";
 import type { ImageSource } from "@/lib/matches/types";
 import { EMBEDDING_DIM } from "@/lib/matches/types";
@@ -16,6 +17,8 @@ export interface ProcessImageInput {
   /** When set, stored in image_ai for project/product lookups. */
   listing_id?: string | null;
   listing_type?: "project" | "product" | null;
+  /** When set, called with generated alt so caller can update listing_images.alt (e.g. backfill). */
+  onAltGenerated?: (imageId: string, alt: string) => Promise<void>;
 }
 
 export interface ProcessImageResult {
@@ -24,63 +27,80 @@ export interface ProcessImageResult {
 }
 
 /**
- * Generate embedding and attributes for one image and upsert into image_ai.
- * Call this after a new project image (listing_images) or product image (listing_images) is created.
+ * Generate alt, persist to listing_images.alt, then embedding and attributes and upsert into image_ai.
+ * Errors in one image do not throw; they return { ok: false, error } so batch runs can continue.
  */
 export async function processImage(input: ProcessImageInput): Promise<ProcessImageResult> {
   const { source, listing_id, listing_type, imageUrl } = input;
-  console.log("[processImage] called with", { source, listing_id, listing_type, imageUrl: imageUrl ?? "(empty)" });
 
   if (listing_id == null || listing_id === "") {
-    const msg = "image_ai requires listing_id (never null).";
-    console.error("[processImage] validation FAILED:", msg);
-    throw new Error(msg);
+    return { ok: false, error: "image_ai requires listing_id (never null)." };
   }
   if (source === "product" && listing_type !== "product") {
-    const msg = "Product image_ai requires listing_type='product'.";
-    console.error("[processImage] validation FAILED:", msg);
-    throw new Error(msg);
+    return { ok: false, error: "Product image_ai requires listing_type='product'." };
   }
   if (source === "project" && listing_type !== "project") {
-    const msg = "Project image_ai requires listing_type='project'.";
-    console.error("[processImage] validation FAILED:", msg);
-    throw new Error(msg);
+    return { ok: false, error: "Project image_ai requires listing_type='project'." };
   }
   if (typeof imageUrl !== "string" || !imageUrl.trim()) {
-    const msg = "processImage requires imageUrl (non-empty string).";
-    console.error("[processImage] validation FAILED:", msg);
-    throw new Error(msg);
+    return { ok: false, error: "processImage requires imageUrl (non-empty string)." };
   }
 
-  console.log("[processImage] generating embedding for", imageUrl);
-  const embedResult = await getImageEmbedding(imageUrl);
-  const raw = embedResult.embedding;
-  const embedding: number[] =
-    Array.isArray(raw) && raw.length === EMBEDDING_DIM
-      ? raw
-      : Array.from({ length: EMBEDDING_DIM }, () => 0);
-  console.log("[processImage] embedding length after generation:", embedding.length);
+  try {
+    console.log("[processImage] alt+embed+attrs for image_id", input.imageId, "listing_id", listing_id);
 
-  const attrResult = await getImageAttributes(imageUrl);
-  const attrs = attrResult.attrs ?? {};
-  const confidence = Math.min(100, Math.max(0, attrResult.confidence ?? 0));
+    const altResult = await getImageAltText(imageUrl);
+    const altForEmbed = (altResult.alt ?? "").trim() || undefined;
+    const altToStore = altForEmbed || "Architecture or product image.";
 
-  const { error } = await upsertImageAi({
-    image_id: input.imageId,
-    source: input.source,
-    listing_id: input.listing_id,
-    listing_type: input.listing_type,
-    embedding,
-    attrs,
-    confidence,
-  });
+    if (input.onAltGenerated) {
+      await input.onAltGenerated(input.imageId, altToStore);
+    }
+    if (!input.onAltGenerated) {
+      const { getSupabaseServiceClient } = await import("@/lib/supabaseServer");
+      const sup = getSupabaseServiceClient();
+      const { error: updateError } = await sup
+        .from("listing_images")
+        .update({ alt: altToStore })
+        .eq("id", input.imageId);
+      if (updateError) {
+        console.error("[processImage] listing_images.alt update failed:", updateError.message);
+        return { ok: false, error: `alt update: ${updateError.message}` };
+      }
+    }
 
-  if (error) {
-    console.error("[processImage] upsertImageAi failed:", error);
-    return { ok: false, error };
+    const embedResult = await getImageEmbedding(imageUrl, altForEmbed);
+    const raw = embedResult.embedding;
+    const embedding: number[] =
+      Array.isArray(raw) && raw.length === EMBEDDING_DIM
+        ? raw
+        : Array.from({ length: EMBEDDING_DIM }, () => 0);
+
+    const attrResult = await getImageAttributes(imageUrl);
+    const attrs = attrResult.attrs ?? {};
+    const confidence = Math.min(100, Math.max(0, attrResult.confidence ?? altResult.confidence ?? 0));
+
+    const { error } = await upsertImageAi({
+      image_id: input.imageId,
+      source: input.source,
+      listing_id: input.listing_id,
+      listing_type: input.listing_type,
+      embedding,
+      attrs,
+      confidence,
+    });
+
+    if (error) {
+      console.error("[processImage] upsertImageAi failed:", error);
+      return { ok: false, error };
+    }
+    console.log("[processImage] image_ai upserted for image_id", input.imageId);
+    return { ok: true };
+  } catch (e) {
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error("[processImage] failed for image_id", input.imageId, errMsg);
+    return { ok: false, error: errMsg };
   }
-  console.log("[processImage] image_ai upserted for image_id", input.imageId);
-  return { ok: true };
 }
 
 /**

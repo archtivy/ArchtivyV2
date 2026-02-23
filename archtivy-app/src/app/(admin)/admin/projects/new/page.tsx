@@ -19,14 +19,12 @@ async function getActiveMemberTitles(): Promise<MemberTitleRow[]> {
 }
 
 export default async function AdminNewProjectPage() {
-  const [{ data: profileOptions }, brandsResult, materialOptions, memberTitles] = await Promise.all([
+  const [profileOptions, materialOptions, memberTitles] = await Promise.all([
     searchProfilesForOwner("", "project"),
-    getProfilesByRole("brand"),
     getProjectMaterialOptions(),
     getActiveMemberTitles(),
   ]);
-  const profiles = profileOptions ?? [];
-  const brands = brandsResult.data ?? [];
+  const profiles = profileOptions?.data ?? [];
   const materials = materialOptions ?? [];
 
   return (
@@ -49,7 +47,6 @@ export default async function AdminNewProjectPage() {
         <AddProjectForm
           formMode="admin"
           ownerProfileOptions={profiles}
-          brands={brands}
           materials={materials}
           memberTitles={memberTitles}
         />

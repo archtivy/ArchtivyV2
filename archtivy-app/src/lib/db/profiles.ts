@@ -126,6 +126,23 @@ export async function getProfileById(
 }
 
 /**
+ * Get profiles by multiple ids (e.g. brand_profile_id on products). Read-only; for owner resolution.
+ * Returns id, display_name, username; order not guaranteed.
+ */
+export async function getProfilesByIds(
+  ids: string[]
+): Promise<DbResult<Pick<Profile, "id" | "display_name" | "username">[]>> {
+  if (ids.length === 0) return { data: [], error: null };
+  const unique = Array.from(new Set(ids.filter(Boolean)));
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("id, display_name, username")
+    .in("id", unique);
+  if (error) return { data: null, error: error.message };
+  return { data: (data ?? []) as Pick<Profile, "id" | "display_name" | "username">[], error: null };
+}
+
+/**
  * Get full profile by id for public profile page (/u/id/[profileId]).
  * Uses service client so unclaimed profiles (username NULL) are readable when RLS
  * would otherwise block anonymous access.
@@ -269,6 +286,13 @@ export type OnboardingProfileInput = {
   designer_discipline: string | null;
   brand_type: string | null;
   reader_type: string | null;
+  location_place_name: string | null;
+  location_city: string | null;
+  location_country: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
+  location_mapbox_id: string | null;
+  location_visibility: "public" | "private";
 };
 
 export async function upsertProfileFromOnboarding(
@@ -284,6 +308,13 @@ export async function upsertProfileFromOnboarding(
     designer_discipline: input.designer_discipline ?? null,
     brand_type: input.brand_type ?? null,
     reader_type: input.reader_type ?? null,
+    location_place_name: input.location_place_name ?? null,
+    location_city: input.location_city ?? null,
+    location_country: input.location_country ?? null,
+    location_lat: input.location_lat ?? null,
+    location_lng: input.location_lng ?? null,
+    location_mapbox_id: input.location_mapbox_id ?? null,
+    location_visibility: input.location_visibility ?? "public",
     updated_at: now,
   };
 

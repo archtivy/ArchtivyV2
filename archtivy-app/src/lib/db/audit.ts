@@ -6,6 +6,7 @@
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 
 export type AuditAction =
+  | "listing.approve"
   | "listing.delete"
   | "listing.bulk_delete"
   | "listing.create"

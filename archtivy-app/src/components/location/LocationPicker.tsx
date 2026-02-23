@@ -103,6 +103,7 @@ export function LocationPicker({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const suppressNextFetchRef = useRef(false);
 
   const fetchSuggestions = useCallback(
     (q: string) => {
@@ -224,6 +225,7 @@ export function LocationPicker({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => suggestions.length > 0 && setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 100)}
           required={required}
           disabled={disabled}
           className={inputClass}
@@ -250,7 +252,10 @@ export function LocationPicker({
                 aria-selected={false}
                 tabIndex={0}
                 className="cursor-pointer px-3 py-2 text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
-                onMouseDown={() => selectPlace(f)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  selectPlace(f);
+                }}
               >
                 {f.place_name}
               </li>

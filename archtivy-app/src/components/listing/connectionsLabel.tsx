@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode } from "react";
 
 /**
@@ -34,4 +36,16 @@ export function ConnectionsLabel({
   const text = formatConnections(count);
   if (text == null) return null;
   return <span className={className ?? ""}>{text}</span>;
+}
+
+/** Tooltip explaining Matched vs Confirmed. Use on project/product cards. */
+export function ConnectionsTooltip({ children }: { children: ReactNode }) {
+  return (
+    <span
+      className="inline-flex cursor-help items-center"
+      title="Matched = AI-suggested links; Confirmed = manually linked team members and products."
+    >
+      {children}
+    </span>
+  );
 }

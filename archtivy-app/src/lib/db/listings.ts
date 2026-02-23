@@ -126,6 +126,20 @@ export async function getListingsByIds(
 }
 
 /**
+ * Fetch listing slug by id (for revalidation paths). Returns slug or null.
+ */
+export async function getListingSlugById(id: string): Promise<string | null> {
+  const { data, error } = await getSupabaseServiceClient()
+    .from(LISTINGS)
+    .select("slug")
+    .eq("id", id)
+    .maybeSingle();
+  if (error || !data) return null;
+  const slug = (data as { slug?: string | null }).slug;
+  return typeof slug === "string" && slug.trim() ? slug.trim() : null;
+}
+
+/**
  * Fetch a single listing by id (detail view). Returns normalized ListingDetail.
  */
 export async function getListingById(id: string): Promise<DbResult<ListingDetail | null>> {
@@ -314,6 +328,12 @@ export async function upsertListingForProduct(
     description: string | null;
     owner_clerk_user_id: string | null;
     owner_profile_id: string | null;
+    /** PENDING for new user submissions; APPROVED for backfill. */
+    status?: "PENDING" | "APPROVED";
+    /** Product taxonomy (PRODUCT_TAXONOMY ids/slugs). */
+    product_type?: string | null;
+    product_category?: string | null;
+    product_subcategory?: string | null;
   }
 ): Promise<DbResult<void>> {
   const client = getSupabaseServiceClient();
@@ -321,6 +341,7 @@ export async function upsertListingForProduct(
     id: productId,
     type: "product" as const,
     listing_type: "product" as const,
+    status: payload.status ?? "APPROVED",
     slug: payload.slug,
     title: payload.title.trim(),
     description: (payload.description?.trim() ?? null) || null,
@@ -331,9 +352,9 @@ export async function upsertListingForProduct(
     category: null,
     area_sqft: null,
     year: null,
-    product_type: null,
-    product_category: null,
-    product_subcategory: null,
+    product_type: payload.product_type ?? null,
+    product_category: payload.product_category ?? null,
+    product_subcategory: payload.product_subcategory ?? null,
     feature_highlight: null,
     material_or_finish: null,
     dimensions: null,

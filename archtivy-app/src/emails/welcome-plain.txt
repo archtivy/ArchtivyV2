@@ -1,0 +1,12 @@
+Welcome to Archtivy
+
+Architecture, intelligently connected. Discover how projects, products, and professionals connect across cities.
+
+Your first connection in 60 seconds:
+1. Pick your role (designer, brand, or reader)
+2. Create your first listing or explore the network
+3. Connect projects to products and get discovered
+
+Explore Projects: {{exploreUrl}}
+
+Questions? Reply to this email or contact support@archtivy.com.

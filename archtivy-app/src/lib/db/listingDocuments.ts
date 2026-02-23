@@ -37,11 +37,6 @@ export async function addDocuments(
   listingId: string,
   docs: DocumentInsert[]
 ): Promise<DbResult<number>> {
-  console.log("[addDocuments called]", {
-    listingId,
-    docsCount: docs.length,
-    docs,
-  });
   if (docs.length === 0) {
     return { data: 0, error: null };
   }

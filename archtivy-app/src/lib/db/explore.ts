@@ -7,7 +7,7 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { projectListingSelect, productListingSelect } from "@/lib/db/selects";
 import { getImagesByListingIds, type ListingImageRow } from "@/lib/db/listingImages";
 import type { ProductImageRow } from "@/lib/db/gallery";
-import { getProfilesByClerkIds } from "@/lib/db/profiles";
+import { getProfilesByClerkIds, getProfilesByIds } from "@/lib/db/profiles";
 import {
   isProjectListing,
   normalizeProject,
@@ -22,8 +22,6 @@ import type { ProjectFilters, ProductFilters } from "@/lib/exploreFilters";
 import { areaBucketToRange } from "@/lib/exploreFilters";
 import type { ProjectSortOption, ProductSortOption } from "@/lib/exploreFilters";
 import { getMaterialsByProjectIds, getMaterialsByProductIds } from "@/lib/db/materials";
-
-const OWNER_FALLBACK = "by Archtivy";
 
 const supabase = () => getSupabaseServiceClient();
 
@@ -81,12 +79,13 @@ async function getUsedInProjectsCountByProductIds(
   return map;
 }
 
-/** Fetch project listings (listings.type = 'project') with canonical select. */
+/** Fetch project listings (listings.type = 'project') with canonical select. Public: only APPROVED. */
 async function getProjectListingRows(limit: number): Promise<RawListingRow[]> {
   const { data, error } = await supabase()
     .from("listings")
     .select(projectListingSelect)
     .eq("type", "project")
+    .eq("status", "APPROVED")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -123,11 +122,11 @@ async function getProjectIdsBySearch(q: string): Promise<string[]> {
   const ids = new Set<string>();
 
   const [t, d, loc, locCity, locCountry] = await Promise.all([
-    sup.from("listings").select("id").eq("type", "project").is("deleted_at", null).ilike("title", pattern).limit(300),
-    sup.from("listings").select("id").eq("type", "project").is("deleted_at", null).ilike("description", pattern).limit(300),
-    sup.from("listings").select("id").eq("type", "project").is("deleted_at", null).ilike("location", pattern).limit(300),
-    sup.from("listings").select("id").eq("type", "project").is("deleted_at", null).ilike("location_city", pattern).limit(300),
-    sup.from("listings").select("id").eq("type", "project").is("deleted_at", null).ilike("location_country", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).ilike("title", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).ilike("description", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).ilike("location", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).ilike("location_city", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).ilike("location_country", pattern).limit(300),
   ]);
   for (const res of [t, d, loc, locCity, locCountry])
     for (const r of res.data ?? []) ids.add((r as { id: string }).id);
@@ -143,6 +142,7 @@ async function getProjectIdsBySearch(q: string): Promise<string[]> {
       .from("listings")
       .select("id")
       .eq("type", "project")
+      .eq("status", "APPROVED")
       .is("deleted_at", null)
       .in("owner_clerk_user_id", clerkIds)
       .limit(500);
@@ -173,9 +173,9 @@ async function getProductIdsBySearch(q: string): Promise<string[]> {
   const ids = new Set<string>();
 
   const [t, d, cat] = await Promise.all([
-    sup.from("listings").select("id").eq("type", "product").is("deleted_at", null).ilike("title", pattern).limit(300),
-    sup.from("listings").select("id").eq("type", "product").is("deleted_at", null).ilike("description", pattern).limit(300),
-    sup.from("listings").select("id").eq("type", "product").is("deleted_at", null).ilike("category", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).ilike("title", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).ilike("description", pattern).limit(300),
+    sup.from("listings").select("id").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).ilike("category", pattern).limit(300),
   ]);
   for (const res of [t, d, cat])
     for (const r of res.data ?? []) ids.add((r as { id: string }).id);
@@ -192,6 +192,7 @@ async function getProductIdsBySearch(q: string): Promise<string[]> {
       .from("listings")
       .select("id")
       .eq("type", "product")
+      .eq("status", "APPROVED")
       .is("deleted_at", null)
       .in("owner_profile_id", brandIds)
       .limit(500);
@@ -339,6 +340,7 @@ async function getProjectListingRowsFiltered(
     .from("listings")
     .select(projectListingSelect, { count: "exact" })
     .eq("type", "project")
+    .eq("status", "APPROVED")
     .is("deleted_at", null);
 
   if (projectIdConstraint !== undefined) {
@@ -427,6 +429,7 @@ async function getProductRowsFiltered(
     .from("listings")
     .select(productListingSelect, { count: "exact" })
     .eq("type", "product")
+    .eq("status", "APPROVED")
     .is("deleted_at", null);
 
   if (productIdConstraint !== undefined) {
@@ -467,12 +470,13 @@ async function getProductRowsFiltered(
   return { rows: rows.map(listingRowToRawProductRow), total: count ?? 0 };
 }
 
-/** Fetch all product listings with canonical columns. Source: listings (type=product). */
+/** Fetch all product listings with canonical columns. Source: listings (type=product). Public: only APPROVED. */
 async function getProductRows(limit: number): Promise<RawProductRow[]> {
   const { data, error } = await supabase()
     .from("listings")
     .select(productListingSelect)
     .eq("type", "product")
+    .eq("status", "APPROVED")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -497,13 +501,12 @@ export async function getProjectsCanonical(
   const rows = await getProjectListingRows(limit);
   if (rows.length === 0) return [];
   const ids = rows.map((r) => String(r.id));
-  const [imageResult, profilesResult, materialsMap] = await Promise.all([
+  const clerkIds = Array.from(new Set(rows.map((r) => r.owner_clerk_user_id as string | null).filter(Boolean) as string[]));
+  const ownerProfileIds = Array.from(new Set(rows.map((r) => (r as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id).filter(Boolean) as string[]));
+  const [imageResult, profilesByClerk, profilesById, materialsMap] = await Promise.all([
     getImagesByListingIds(ids),
-    getProfilesByClerkIds(
-      rows
-        .map((r) => r.owner_clerk_user_id as string | null)
-        .filter(Boolean) as string[]
-    ),
+    clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
+    ownerProfileIds.length > 0 ? getProfilesByIds(ownerProfileIds) : Promise.resolve({ data: [] }),
     getMaterialsByProjectIds(ids),
   ]);
   const { data: imageRows, error: imgError } = imageResult;
@@ -515,18 +518,21 @@ export async function getProjectsCanonical(
     if (!byListingId[img.listing_id]) byListingId[img.listing_id] = [];
     byListingId[img.listing_id].push(img);
   }
-  const profiles = profilesResult.data ?? [];
   const ownerByClerkId: Record<string, ProjectOwner> = {};
-  for (const p of profiles) {
-    const displayName =
-      (p.display_name && p.display_name.trim()) ||
-      (p.username && p.username.trim()) ||
-      OWNER_FALLBACK;
+  for (const p of profilesByClerk.data ?? []) {
+    const displayName = (p.display_name && p.display_name.trim()) || (p.username && p.username.trim()) || "";
+    if (!displayName) continue;
     ownerByClerkId[p.clerk_user_id] = {
       displayName,
       avatarUrl: p.avatar_url ?? null,
       profileId: p.id,
+      username: (p as { username?: string | null }).username ?? null,
     };
+  }
+  const ownerByProfileId: Record<string, ProjectOwner> = {};
+  for (const p of profilesById.data ?? []) {
+    const o = toProjectOwner(p);
+    if (o.displayName) ownerByProfileId[p.id] = o;
   }
   const result: ProjectCanonical[] = [];
   for (const row of rows) {
@@ -534,11 +540,9 @@ export async function getProjectsCanonical(
     const listingImages = byListingId[String(row.id)] ?? [];
     const projectMaterials = materialsMap[String(row.id)] ?? [];
     const project = normalizeProject(row, listingImages, projectMaterials);
+    const profileId = (row as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id ?? null;
     const clerkId = (row.owner_clerk_user_id as string) ?? null;
-    project.owner = clerkId ? ownerByClerkId[clerkId] ?? null : null;
-    if (!project.owner) {
-      project.owner = { displayName: OWNER_FALLBACK };
-    }
+    project.owner = profileId ? ownerByProfileId[profileId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
     result.push(project);
   }
   return result;
@@ -554,17 +558,42 @@ export async function getProductsCanonical(
   const rows = await getProductRows(limit);
   if (rows.length === 0) return [];
   const ids = rows.map((r) => String(r.id));
-  const [imageResult, usedCounts, materialMap] = await Promise.all([
+  const clerkIds = Array.from(new Set(rows.map((r) => (r as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id).filter(Boolean) as string[]));
+  const brandProfileIds = Array.from(new Set(rows.map((r) => (r as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id).filter(Boolean) as string[]));
+  const [imageResult, usedCounts, materialMap, profilesByClerk, profilesById] = await Promise.all([
     getImagesByListingIds(ids),
     getUsedInProjectsCountByProductIds(ids),
     getMaterialsByProductIds(ids),
+    clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
+    brandProfileIds.length > 0 ? getProfilesByIds(brandProfileIds) : Promise.resolve({ data: [] }),
   ]);
   const imageRows = imageResult.data ?? [];
+  const ownerByClerkId: Record<string, ProjectOwner> = {};
+  for (const p of profilesByClerk.data ?? []) {
+    const displayName = (p.display_name && p.display_name.trim()) || (p.username && p.username.trim()) || "";
+    if (!displayName) continue;
+    ownerByClerkId[p.clerk_user_id] = {
+      displayName,
+      avatarUrl: p.avatar_url ?? null,
+      profileId: p.id,
+      username: (p as { username?: string | null }).username ?? null,
+    };
+  }
+  const ownerByProfileId: Record<string, ProjectOwner> = {};
+  for (const p of profilesById.data ?? []) {
+    const o = toProjectOwner(p);
+    if (o.displayName) ownerByProfileId[p.id] = o;
+  }
   return rows.map((row) => {
     const productImages = listingImagesToProductImageRows(String(row.id), imageRows);
     const productMaterials = materialMap[String(row.id)] ?? [];
     const product = normalizeProduct(row, productImages, productMaterials);
-    product.connectionCount += usedCounts[String(row.id)] ?? 0;
+    const usedCount = usedCounts[String(row.id)] ?? 0;
+    product.usedInProjectsCount = usedCount;
+    product.connectionCount += usedCount;
+    const brandId = (row as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id ?? null;
+    const clerkId = (row as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id ?? null;
+    product.owner = brandId ? ownerByProfileId[brandId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
     return product;
   });
 }
@@ -594,13 +623,12 @@ export async function getProjectsCanonicalFiltered({
   if (rows.length === 0) return { data: [], total };
 
   const ids = rows.map((r) => String(r.id));
-  const [imageResult, profilesResult, materialsMap] = await Promise.all([
+  const clerkIds = Array.from(new Set(rows.map((r) => r.owner_clerk_user_id as string | null).filter(Boolean) as string[]));
+  const ownerProfileIds = Array.from(new Set(rows.map((r) => (r as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id).filter(Boolean) as string[]));
+  const [imageResult, profilesByClerk, profilesById, materialsMap] = await Promise.all([
     getImagesByListingIds(ids),
-    getProfilesByClerkIds(
-      rows
-        .map((r) => r.owner_clerk_user_id as string | null)
-        .filter(Boolean) as string[]
-    ),
+    clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
+    ownerProfileIds.length > 0 ? getProfilesByIds(ownerProfileIds) : Promise.resolve({ data: [] }),
     getMaterialsByProjectIds(ids),
   ]);
   const { data: imageRows } = imageResult;
@@ -609,18 +637,21 @@ export async function getProjectsCanonicalFiltered({
     if (!byListingId[img.listing_id]) byListingId[img.listing_id] = [];
     byListingId[img.listing_id].push(img);
   }
-  const profiles = profilesResult.data ?? [];
   const ownerByClerkId: Record<string, ProjectOwner> = {};
-  for (const p of profiles) {
-    const displayName =
-      (p.display_name && p.display_name.trim()) ||
-      (p.username && p.username.trim()) ||
-      OWNER_FALLBACK;
+  for (const p of profilesByClerk.data ?? []) {
+    const displayName = (p.display_name && p.display_name.trim()) || (p.username && p.username.trim()) || "";
+    if (!displayName) continue;
     ownerByClerkId[p.clerk_user_id] = {
       displayName,
       avatarUrl: p.avatar_url ?? null,
       profileId: p.id,
+      username: (p as { username?: string | null }).username ?? null,
     };
+  }
+  const ownerByProfileId: Record<string, ProjectOwner> = {};
+  for (const p of profilesById.data ?? []) {
+    const o = toProjectOwner(p);
+    if (o.displayName) ownerByProfileId[p.id] = o;
   }
   const data: ProjectCanonical[] = [];
   for (const row of rows) {
@@ -628,12 +659,26 @@ export async function getProjectsCanonicalFiltered({
     const listingImages = byListingId[String(row.id)] ?? [];
     const projectMaterials = materialsMap[String(row.id)] ?? [];
     const project = normalizeProject(row, listingImages, projectMaterials);
+    const profileId = (row as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id ?? null;
     const clerkId = (row.owner_clerk_user_id as string) ?? null;
-    project.owner = clerkId ? ownerByClerkId[clerkId] ?? null : null;
-    if (!project.owner) project.owner = { displayName: OWNER_FALLBACK };
+    project.owner = profileId ? ownerByProfileId[profileId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
     data.push(project);
   }
   return { data, total };
+}
+
+/** Build ProjectOwner from profile row (id, display_name, username). */
+function toProjectOwner(p: { id: string; display_name: string | null; username: string | null }): ProjectOwner {
+  const displayName =
+    (p.display_name && p.display_name.trim()) ||
+    (p.username && p.username.trim()) ||
+    "";
+  return {
+    displayName,
+    avatarUrl: null,
+    profileId: p.id,
+    username: p.username?.trim() || null,
+  };
 }
 
 /**
@@ -659,17 +704,58 @@ export async function getProductsCanonicalFiltered({
   if (rows.length === 0) return { data: [], total };
 
   const ids = rows.map((r) => String(r.id));
-  const [imageResult, usedCounts, materialMap] = await Promise.all([
+  const clerkIds = Array.from(
+    new Set(
+      rows
+        .map((r) => (r as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id)
+        .filter(Boolean) as string[]
+    )
+  );
+  const brandProfileIds = Array.from(
+    new Set(
+      rows
+        .map((r) => (r as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id)
+        .filter(Boolean) as string[]
+    )
+  );
+  const [imageResult, usedCounts, materialMap, profilesByClerk, profilesById] = await Promise.all([
     getImagesByListingIds(ids),
     getUsedInProjectsCountByProductIds(ids),
     getMaterialsByProductIds(ids),
+    clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
+    brandProfileIds.length > 0 ? getProfilesByIds(brandProfileIds) : Promise.resolve({ data: [] }),
   ]);
   const imageRows = imageResult.data ?? [];
+  const ownerByClerkId: Record<string, ProjectOwner> = {};
+  for (const p of profilesByClerk.data ?? []) {
+    const displayName = (p.display_name && p.display_name.trim()) || (p.username && p.username.trim()) || "";
+    if (!displayName) continue;
+    ownerByClerkId[p.clerk_user_id] = {
+      displayName,
+      avatarUrl: (p as { avatar_url?: string | null }).avatar_url ?? null,
+      profileId: p.id,
+      username: (p as { username?: string | null }).username ?? null,
+    };
+  }
+  const ownerByProfileId: Record<string, ProjectOwner> = {};
+  for (const p of profilesById.data ?? []) {
+    const o = toProjectOwner(p);
+    if (o.displayName) ownerByProfileId[p.id] = o;
+  }
   const data = rows.map((row) => {
     const productImages = listingImagesToProductImageRows(String(row.id), imageRows);
     const productMaterials = materialMap[String(row.id)] ?? [];
     const product = normalizeProduct(row, productImages, productMaterials);
-    product.connectionCount += usedCounts[String(row.id)] ?? 0;
+    const usedCount = usedCounts[String(row.id)] ?? 0;
+    product.usedInProjectsCount = usedCount;
+    product.connectionCount += usedCount;
+    const brandId = (row as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id ?? null;
+    const clerkId = (row as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id ?? null;
+    product.owner = brandId
+      ? ownerByProfileId[brandId] ?? null
+      : clerkId
+        ? ownerByClerkId[clerkId] ?? null
+        : null;
     return product;
   });
   return { data, total };
@@ -689,12 +775,13 @@ export async function getProjectFilterOptions(): Promise<{
 }> {
   const sup = supabase();
   const [catRes, matRes, listingRes, profilesRes] = await Promise.all([
-    sup.from("listings").select("category").eq("type", "project").is("deleted_at", null).not("category", "is", null),
+    sup.from("listings").select("category").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).not("category", "is", null),
     sup.from("materials").select("name, slug").order("name", { ascending: true }),
     sup
       .from("listings")
       .select("location_city, location_country, owner_clerk_user_id, year, brands_used")
       .eq("type", "project")
+      .eq("status", "APPROVED")
       .is("deleted_at", null)
       .limit(2000),
     sup.from("profiles").select("clerk_user_id, display_name, username").eq("is_hidden", false).not("username", "is", null),
@@ -769,10 +856,10 @@ export async function getProductFilterOptions(): Promise<{
 }> {
   const sup = supabase();
   const [catRes, brandProfiles, materialRes, yearRes] = await Promise.all([
-    sup.from("listings").select("category").eq("type", "product").is("deleted_at", null).not("category", "is", null),
+    sup.from("listings").select("category").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).not("category", "is", null),
     sup.from("profiles").select("id, display_name, username").eq("role", "brand").eq("is_hidden", false).not("username", "is", null),
     sup.from("materials").select("name, slug").order("name", { ascending: true }),
-    sup.from("listings").select("year").eq("type", "product").is("deleted_at", null).not("year", "is", null),
+    sup.from("listings").select("year").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).not("year", "is", null),
   ]);
   const categories = Array.from(new Set((catRes.data ?? []).map((r) => (r as { category: string | null }).category?.trim()).filter(Boolean) as string[])).sort();
   const materialTypes: string[] = [];
@@ -824,9 +911,9 @@ export async function getExploreStats(type: ExploreStatsType): Promise<ExploreSt
 
     if (type === "projects") {
       const [listingsCountRes, pplRes, listingRowsRes] = await Promise.all([
-        sup.from("listings").select("id", { count: "exact", head: true }).eq("type", "project").is("deleted_at", null),
+        sup.from("listings").select("id", { count: "exact", head: true }).eq("type", "project").eq("status", "APPROVED").is("deleted_at", null),
         sup.from("project_product_links").select("project_id", { count: "exact", head: true }),
-        sup.from("listings").select("team_members, brands_used").eq("type", "project").is("deleted_at", null).range(0, 9999),
+        sup.from("listings").select("team_members, brands_used").eq("type", "project").eq("status", "APPROVED").is("deleted_at", null).range(0, 9999),
       ]);
       const totalListings = listingsCountRes.count ?? 0;
       const pplCount = pplRes.error ? 0 : pplRes.count ?? 0;
@@ -841,9 +928,9 @@ export async function getExploreStats(type: ExploreStatsType): Promise<ExploreSt
 
     // products (listings type=product)
     const [productsCountRes, pplRes, productRowsRes] = await Promise.all([
-      sup.from("listings").select("id", { count: "exact", head: true }).eq("type", "product").is("deleted_at", null),
+      sup.from("listings").select("id", { count: "exact", head: true }).eq("type", "product").eq("status", "APPROVED").is("deleted_at", null),
       sup.from("project_product_links").select("product_id", { count: "exact", head: true }),
-      sup.from("listings").select("team_members, owner_profile_id").eq("type", "product").is("deleted_at", null).range(0, 9999),
+      sup.from("listings").select("team_members, owner_profile_id").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).range(0, 9999),
     ]);
     const totalListings = productsCountRes.count ?? 0;
     const pplCount = pplRes.error ? 0 : pplRes.count ?? 0;
@@ -856,6 +943,33 @@ export async function getExploreStats(type: ExploreStatsType): Promise<ExploreSt
     }
     const totalConnections = teamSum + pplCount + brandCount;
     return { totalListings, totalConnections };
+  } catch {
+    return null;
+  }
+}
+
+export interface ExploreNetworkCounts {
+  projectCount: number;
+  productCount: number;
+  connectionCount: number | null;
+}
+
+/**
+ * Read-only counts for Explore header: projects, products, and total connections (project_product_links).
+ * Returns null on error; connectionCount may be null if that query fails.
+ */
+export async function getExploreNetworkCounts(): Promise<ExploreNetworkCounts | null> {
+  try {
+    const sup = supabase();
+    const [projectsRes, productsRes, pplRes] = await Promise.all([
+      sup.from("listings").select("id", { count: "exact", head: true }).eq("type", "project").eq("status", "APPROVED").is("deleted_at", null),
+      sup.from("listings").select("id", { count: "exact", head: true }).eq("type", "product").eq("status", "APPROVED").is("deleted_at", null),
+      sup.from("project_product_links").select("id", { count: "exact", head: true }),
+    ]);
+    const projectCount = projectsRes.count ?? 0;
+    const productCount = productsRes.count ?? 0;
+    const connectionCount = pplRes.error ? null : (pplRes.count ?? 0);
+    return { projectCount, productCount, connectionCount };
   } catch {
     return null;
   }
@@ -911,12 +1025,12 @@ export async function getProjectCanonicalBySlugOrId(
       displayName:
         (ownerProfile.display_name && ownerProfile.display_name.trim()) ||
         (ownerProfile.username && ownerProfile.username.trim()) ||
-        OWNER_FALLBACK,
+        "",
       avatarUrl: ownerProfile.avatar_url ?? null,
       profileId: ownerProfile.id,
     };
   } else {
-    project.owner = { displayName: OWNER_FALLBACK };
+    project.owner = null;
   }
   return project;
 }
@@ -938,21 +1052,27 @@ export async function getProductListingBySlugOrId(
   return listingRowToRawProductRow(data as Record<string, unknown>);
 }
 
-/** Get one product in canonical form for detail page. Source: listings + listing_images. */
+/** Get one product in canonical form for detail page. Source: listings + listing_images + products.documents. */
 export async function getProductCanonicalBySlug(
   slug: string
 ): Promise<ProductCanonical | null> {
   const row = await getProductListingBySlugOrId(slug);
   if (!row) return null;
   const id = String(row.id);
-  const [imageResult, usedCounts, materialMap] = await Promise.all([
+  const [imageResult, usedCounts, materialMap, productRow] = await Promise.all([
     getImagesByListingIds([id]),
     getUsedInProjectsCountByProductIds([id]),
     getMaterialsByProductIds([id]),
+    supabase().from("products").select("documents").eq("id", id).maybeSingle(),
   ]);
+  if (productRow?.data && "documents" in productRow.data) {
+    (row as Record<string, unknown>).documents = productRow.data.documents;
+  }
   const imageRows = imageResult.data ?? [];
   const productImages = listingImagesToProductImageRows(id, imageRows);
   const product = normalizeProduct(row, productImages, materialMap[id] ?? []);
-  product.connectionCount += usedCounts[id] ?? 0;
+  const usedCount = usedCounts[id] ?? 0;
+  product.usedInProjectsCount = usedCount;
+  product.connectionCount += usedCount;
   return product;
 }

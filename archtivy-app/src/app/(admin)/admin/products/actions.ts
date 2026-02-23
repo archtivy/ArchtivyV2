@@ -16,7 +16,6 @@ export async function updateAdminProductAction(formData: FormData) {
     year: toText(formData.get("year")) || null,
     category: toText(formData.get("category")) || null,
     product_type: toText(formData.get("product_type")) || null,
-    feature_highlight: toText(formData.get("feature_highlight")) || null,
     material_or_finish: toText(formData.get("material_or_finish")) || null,
     dimensions: toText(formData.get("dimensions")) || null,
     description: toText(formData.get("description")) || null,

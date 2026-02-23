@@ -1,27 +1,23 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { auth } from "@clerk/nextjs/server";
 import { getProductForProductPage } from "@/app/actions/listings";
+import { getProductsCanonicalFiltered } from "@/lib/db/explore";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { getProjectsForProduct } from "@/lib/db/projectProductLinks";
 import { getFirstImageUrlPerListingIds } from "@/lib/db/listingImages";
-import { getProfileById } from "@/lib/db/profiles";
+import { getProfileById, getProfileByClerkId } from "@/lib/db/profiles";
 import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
 import { getGalleryBookmarkState } from "@/app/actions/galleryBookmarks";
 import { getListingDocumentsServer } from "@/lib/db/listingDocuments";
-import { PageContainer } from "@/components/layout/PageContainer";
-import { DetailLayout } from "@/components/listing/DetailLayout";
-import { ProductSidebarDocuments } from "@/components/listing/ProductSidebarDocuments";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
-import { DetailHeaderBar } from "@/components/listing/DetailHeaderBar";
-import { DetailSidebar, type DetailSidebarRow } from "@/components/listing/DetailSidebar";
-import { TeamMemberLinks } from "@/components/listing/TeamMemberLinks";
-import { MatchesStrip } from "@/components/matches/MatchesStrip";
-import { productExploreUrl } from "@/lib/exploreUrls";
-import { connectionsLabelText } from "@/components/listing/connectionsLabel";
+import { ProductDetailLayout } from "@/components/listing/ProductDetailLayout";
+import { DEFAULT_PRODUCT_FILTERS } from "@/lib/exploreFilters";
 import type { GalleryImage } from "@/lib/db/gallery";
-import type { ProductCanonical } from "@/lib/canonical-models";
-import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
 
 function canonicalGalleryToGalleryImages(
   gallery: { url: string; alt: string }[]
@@ -34,104 +30,6 @@ function canonicalGalleryToGalleryImages(
   }));
 }
 
-function buildProductSidebarRows(
-  product: ProductCanonical,
-  brandName: string | null,
-  brandHref: string | null,
-  teamWithProfiles: ListingTeamMemberWithProfile[] | null
-): DetailSidebarRow[] {
-  const rows: DetailSidebarRow[] = [];
-
-  const connectionsText = connectionsLabelText(product.connectionCount);
-  if (connectionsText) {
-    rows.push({
-      label: "Connections",
-      value: connectionsText,
-    });
-  }
-
-  const materials = product.materials ?? [];
-  if (materials.length > 0) {
-    rows.push({
-      label: "Materials",
-      value: (
-        <div className="flex flex-wrap gap-2">
-          {materials.map((m) => (
-            <Link
-              key={m.id}
-              href={productExploreUrl({ materials: [m.slug] })}
-              className="rounded-full bg-archtivy-primary/10 px-3 py-1 text-xs font-medium text-archtivy-primary transition hover:bg-archtivy-primary/15 hover:underline dark:bg-archtivy-primary/20"
-            >
-              {m.name}
-            </Link>
-          ))}
-        </div>
-      ),
-    });
-  }
-
-  if (product.category?.trim()) {
-    rows.push({
-      label: "Category",
-      value: product.category.trim(),
-      href: productExploreUrl({ category: product.category }),
-    });
-  }
-
-  if (product.material_type?.trim()) {
-    rows.push({
-      label: "Material Type",
-      value: product.material_type.trim(),
-      href: productExploreUrl({ material_type: product.material_type }),
-    });
-  }
-
-  if (product.color?.trim()) {
-    rows.push({
-      label: "Color",
-      value: product.color.trim(),
-      href: productExploreUrl({ color: product.color }),
-    });
-  }
-
-  if (product.year != null && !Number.isNaN(product.year)) {
-    rows.push({
-      label: "Year",
-      value: String(product.year),
-      href: productExploreUrl({ year: product.year }),
-    });
-  }
-
-  if (brandName?.trim() || brandHref) {
-    rows.push({
-      label: "Brand",
-      value: brandName?.trim() || "View profile",
-      href: brandHref ?? undefined,
-    });
-  }
-
-  if (teamWithProfiles && teamWithProfiles.length > 0) {
-    rows.push({
-      label: "Team Members",
-      value: <TeamMemberLinks members={teamWithProfiles} />,
-    });
-  } else {
-    const teamMembers = Array.isArray(product.team_members) ? product.team_members : [];
-    const names = teamMembers
-      .filter((m) => m && typeof m === "object" && typeof (m as { name?: string }).name === "string")
-      .map((m) => ((m as { name: string }).name || "").trim())
-      .filter(Boolean);
-    if (names.length > 0) {
-      rows.push({
-        label: "Team Members",
-        value: names.join(", "),
-      });
-    }
-  }
-
-  return rows;
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -140,6 +38,9 @@ export async function generateMetadata({
   const { slug } = await params;
   const product = await getProductForProductPage(slug);
   if (!product) return {};
+  if (product.status === "PENDING") {
+    return { title: "Product" };
+  }
   const path = `/products/${product.slug ?? product.id}`;
   const title = product.title?.trim() || "Product";
   const description =
@@ -169,6 +70,14 @@ export default async function ProductPage({
   const { slug } = await params;
   const product = await getProductForProductPage(slug);
   if (!product) notFound();
+  if (product.status === "PENDING") {
+    const { userId } = await auth();
+    const profileRes = await getProfileByClerkId(userId ?? "");
+    const profile = profileRes.data as { is_admin?: boolean } | null;
+    const isOwner = Boolean(userId && product.owner_clerk_user_id === userId);
+    const isAdmin = Boolean(profile?.is_admin);
+    if (!isOwner && !isAdmin) notFound();
+  }
 
   const [relatedResult, isSaved, brandResult, teamResult, docsResult] = await Promise.all([
     getProjectsForProduct(product.id),
@@ -185,6 +94,30 @@ export default async function ProductPage({
       ? (await getFirstImageUrlPerListingIds(projectIds)).data ?? {}
       : {};
 
+  const productCategory =
+    (product.product_category ?? product.category)?.trim() ?? "";
+
+  // Fetch same-category products for relatedProducts fallback and "More in this category" (limit 6)
+  const sameCategoryProducts: { id: string; slug: string; title: string; thumbnail?: string | null }[] = productCategory
+    ? ((await getProductsCanonicalFiltered({
+        filters: { ...DEFAULT_PRODUCT_FILTERS, product_category: productCategory },
+        limit: 7,
+        sort: "newest",
+      })).data ?? [])
+        .filter((p) => p.id !== product.id)
+        .slice(0, 6)
+        .map((p) => ({
+          id: p.id,
+          slug: p.slug ?? p.id,
+          title: p.title,
+          thumbnail: p.cover ?? null,
+        }))
+    : [];
+
+  const relatedProducts =
+    relatedListings.length === 0 ? sameCategoryProducts : [];
+  const moreInCategory = sameCategoryProducts;
+
   const relatedItems = relatedListings.map((p) => {
     const row = p as { id: string; slug?: string; title: string };
     return {
@@ -196,22 +129,33 @@ export default async function ProductPage({
     };
   });
 
-  const brandProfile = brandResult.data;
+  const brandProfile = brandResult.data as { display_name?: string; username?: string; avatar_url?: string } | null;
   const brandName = brandProfile?.display_name?.trim() || brandProfile?.username?.trim() || null;
-  const brandHref = brandProfile?.username ? `/u/${brandProfile.username}` : null;
+  const brandHref =
+    brandProfile?.username
+      ? `/u/${brandProfile.username}`
+      : product.brand_profile_id
+        ? `/u/id/${product.brand_profile_id}`
+        : null;
+  const brandLogoUrl = brandProfile?.avatar_url?.trim() ?? null;
   const teamWithProfiles = teamResult.data ?? null;
 
   const images = canonicalGalleryToGalleryImages(product.gallery);
   const currentPath = `/products/${product.slug ?? product.id}`;
-  const sidebarRows = buildProductSidebarRows(product, brandName, brandHref, teamWithProfiles);
   const listingDocuments = docsResult.data ?? [];
   const productPath = `/products/${product.slug ?? product.id}`;
 
+  const relatedListingsForLayout = relatedListings.map((p) => {
+    const row = p as { id: string; slug?: string; title: string; location?: string | null };
+    return { id: row.id, slug: row.slug, title: row.title, location: row.location ?? null };
+  });
+
   return (
-    <PageContainer>
+    <div className="min-h-screen bg-white dark:bg-zinc-950">
+      <div className="pt-1 pb-6 sm:pt-2 sm:pb-8">
       <ListingViewTracker type="product" id={product.id} />
       <nav
-        className="mb-4 flex flex-wrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400"
+        className="mb-6 flex flex-wrap items-center gap-2 text-sm text-[#374151] dark:text-zinc-400"
         aria-label="Breadcrumb"
       >
         <Link href="/" className="hover:text-zinc-900 dark:hover:text-zinc-100">
@@ -222,61 +166,28 @@ export default async function ProductPage({
           Products
         </Link>
         <span aria-hidden>/</span>
-        <span className="text-zinc-500 dark:text-zinc-400">{product.title}</span>
+        <span className="text-[#374151] dark:text-zinc-400">{product.title}</span>
       </nav>
 
-      <DetailLayout
+      <ProductDetailLayout
         images={images}
-        listingTitle={product.title}
-        context="product"
-        relatedItems={relatedItems}
-        entityType="product"
-        entityId={product.id}
-        entitySlug={product.slug ?? product.id}
+        product={product}
+        brandName={brandName}
+        brandHref={brandHref}
+        brandLogoUrl={brandLogoUrl}
         isSaved={isSaved}
         currentPath={currentPath}
-        headerBar={
-          <DetailHeaderBar
-            entityType="product"
-            entityId={product.id}
-            currentPath={currentPath}
-            isSaved={isSaved}
-            brandLine={
-              brandName && brandHref ? { name: brandName, href: brandHref } : undefined
-            }
-            connectionCount={product.connectionCount}
-          />
-        }
-        belowHeader={<MatchesStrip type="product" id={product.id} title="Used in Projects" showBadge />}
-        title={
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 md:text-3xl">
-            {product.title}
-          </h1>
-        }
-        description={
-          product.description?.trim() ? (
-            <section className="prose prose-zinc dark:prose-invert max-w-none">
-              <div className="whitespace-pre-wrap text-zinc-600 dark:text-zinc-400">
-                {product.description.trim()}
-              </div>
-            </section>
-          ) : null
-        }
-        sidebar={
-          <>
-            <DetailSidebar title="Product details" rows={sidebarRows} />
-            {listingDocuments.length > 0 && (
-              <div className="mt-5">
-                <ProductSidebarDocuments
-                  documents={listingDocuments}
-                  listingId={product.id}
-                  signInRedirectUrl={getAbsoluteUrl(productPath)}
-                />
-              </div>
-            )}
-          </>
-        }
+        relatedItems={relatedItems}
+        listingDocuments={listingDocuments}
+        signInRedirectUrl={getAbsoluteUrl(productPath)}
+        relatedListings={relatedListingsForLayout}
+        thumbnailMap={thumbnailMap}
+        teamWithProfiles={teamWithProfiles}
+        relatedProducts={relatedProducts}
+        mapHref={null}
+        moreInCategory={moreInCategory}
       />
-    </PageContainer>
+      </div>
+    </div>
   );
 }

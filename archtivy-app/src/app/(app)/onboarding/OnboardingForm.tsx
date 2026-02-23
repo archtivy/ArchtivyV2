@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { completeOnboardingAction, suggestUsernameAction } from "@/app/actions/onboarding";
 import type { OnboardingResult } from "@/app/actions/onboarding";
 import { AuthSplitLayout, authInputClass, authLabelClass } from "@/components/auth/AuthSplitLayout";
+import {
+  ProfileLocationPicker,
+  type ProfileLocationValue,
+} from "@/components/location/ProfileLocationPicker";
 import { Button } from "@/components/ui/Button";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import type { ProfileRole } from "@/lib/auth/config";
@@ -37,6 +41,8 @@ export function OnboardingForm({
   const [designerDiscipline, setDesignerDiscipline] = useState("");
   const [brandType, setBrandType] = useState("");
   const [readerType, setReaderType] = useState("");
+  const [locationValue, setLocationValue] = useState<ProfileLocationValue | null>(null);
+  const [locationVisibility, setLocationVisibility] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
@@ -131,6 +137,15 @@ export function OnboardingForm({
     formData.set("designer_discipline", role === "designer" ? designerDiscipline : "");
     formData.set("brand_type", role === "brand" ? brandType : "");
     formData.set("reader_type", role === "reader" ? readerType : "");
+    if (locationValue) {
+      formData.set("location_place_name", locationValue.place_name);
+      formData.set("location_city", locationValue.city ?? "");
+      formData.set("location_country", locationValue.country ?? "");
+      formData.set("location_lat", String(locationValue.lat));
+      formData.set("location_lng", String(locationValue.lng));
+      formData.set("location_mapbox_id", locationValue.mapbox_id);
+      formData.set("location_visibility", locationVisibility ? "public" : "private");
+    }
     const result = await completeOnboardingAction(null as unknown as OnboardingResult, formData);
     setLoading(false);
     if (result && "error" in result && result.error) {
@@ -315,6 +330,27 @@ export function OnboardingForm({
                 </select>
               </div>
             )}
+            <div>
+              <ProfileLocationPicker
+                value={locationValue}
+                onChange={setLocationValue}
+                required
+                label="Location"
+                placeholder="Search for a city or place…"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="location_visibility"
+                type="checkbox"
+                checked={locationVisibility}
+                onChange={(e) => setLocationVisibility(e.target.checked)}
+                className="h-4 w-4 rounded border-zinc-300 text-archtivy-primary focus:ring-archtivy-primary"
+              />
+              <label htmlFor="location_visibility" className="text-sm text-zinc-700 dark:text-zinc-300">
+                Show my location on the map
+              </label>
+            </div>
           </>
         )}
 

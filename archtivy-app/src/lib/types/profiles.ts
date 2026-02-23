@@ -12,8 +12,13 @@ export interface Profile {
   is_admin?: boolean;
   display_name: string | null;
   username: string | null;
+  location_place_name: string | null;
   location_city: string | null;
   location_country: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
+  location_mapbox_id: string | null;
+  location_visibility?: "public" | "private";
   bio: string | null;
   website: string | null;
   instagram: string | null;
@@ -22,6 +27,8 @@ export interface Profile {
   designer_discipline: string | null;
   brand_type: string | null;
   reader_type: string | null;
+  show_designer_discipline?: boolean;
+  show_brand_type?: boolean;
   created_by?: CreatedBy;
   owner_user_id?: string | null;
   claim_status?: ClaimStatus;
@@ -61,8 +68,13 @@ export type ProfileUpdateInput = Partial<
     Profile,
     | "display_name"
     | "username"
+    | "location_place_name"
     | "location_city"
     | "location_country"
+    | "location_lat"
+    | "location_lng"
+    | "location_mapbox_id"
+    | "location_visibility"
     | "bio"
     | "website"
     | "instagram"
@@ -71,6 +83,8 @@ export type ProfileUpdateInput = Partial<
     | "designer_discipline"
     | "brand_type"
     | "reader_type"
+    | "show_designer_discipline"
+    | "show_brand_type"
   >
 >;
 

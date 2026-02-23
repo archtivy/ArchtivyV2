@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { getListingUrl } from "@/lib/canonical";
-import { projectCanonicalToCardData } from "@/lib/canonical-models";
-import { ProjectCard } from "@/components/listing/ProjectCard";
+import { ProjectCardPremium } from "@/components/listing/ProjectCardPremium";
 import { Button } from "@/components/ui/Button";
 import { fetchProjectsPage } from "@/app/actions/explore";
 import type { ProjectCanonical } from "@/lib/canonical-models";
@@ -45,17 +43,10 @@ export function ExploreProjectsContent({
   return (
     <div className="flex flex-col gap-6">
       {children}
-      <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3" aria-label="Projects">
+      <ul className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Projects">
         {projects.map((p) => (
-          <li key={p.id}>
-            <ProjectCard
-              listing={projectCanonicalToCardData(p)}
-              imageUrl={p.cover}
-              href={getListingUrl({ id: p.id, type: "project" })}
-              postedBy={p.owner?.displayName ?? "by Archtivy"}
-              location={p.location_text}
-              areaSqft={p.area_sqft}
-            />
+          <li key={p.id} className="h-full">
+            <ProjectCardPremium project={p} />
           </li>
         ))}
       </ul>

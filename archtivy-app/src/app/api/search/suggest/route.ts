@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
         .from("listings")
         .select("id, title")
         .eq("type", "project")
+        .eq("status", "APPROVED")
         .is("deleted_at", null)
         .ilike("title", pattern)
         .limit(LIMIT_PER_QUERY),
@@ -53,6 +54,7 @@ export async function GET(request: NextRequest) {
         .from("listings")
         .select("location_city, location_country")
         .eq("type", "project")
+        .eq("status", "APPROVED")
         .is("deleted_at", null)
         .or(`location_city.ilike.${pattern},location_country.ilike.${pattern}`)
         .limit(LIMIT_PER_QUERY),
@@ -91,7 +93,7 @@ export async function GET(request: NextRequest) {
     }
   } else {
     const [productsRes, materialsRes, profilesRes] = await Promise.all([
-      sup.from("listings").select("id, title").eq("type", "product").is("deleted_at", null).ilike("title", pattern).limit(LIMIT_PER_QUERY),
+      sup.from("listings").select("id, title").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).ilike("title", pattern).limit(LIMIT_PER_QUERY),
       sup.from("materials").select("id, name, slug").or(`name.ilike.${pattern},slug.ilike.${pattern}`).limit(LIMIT_PER_QUERY),
       sup
         .from("profiles")
