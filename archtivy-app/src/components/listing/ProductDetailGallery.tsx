@@ -3,7 +3,7 @@
 import Image from "next/image";
 import type { GalleryImage } from "@/lib/db/gallery";
 
-const RADIUS = 8;
+const RADIUS = 4;
 const GAP = 12;
 
 const HERO_SIZES = "(max-width: 768px) 100vw, 65vw";
@@ -38,9 +38,9 @@ export function ProductDetailGallery({
 
   return (
     <section className="w-full" aria-label="Gallery">
-      {/* Hero: landscape */}
+      {/* Desktop: hero + rows */}
       <div
-        className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800"
+        className="relative hidden aspect-[4/3] w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800 md:block"
         style={{ borderRadius: RADIUS }}
       >
         <button
@@ -76,7 +76,7 @@ export function ProductDetailGallery({
       {/* Row 2: two smaller, same height */}
       {hasRow2 && (
         <div
-          className="mt-3 grid grid-cols-2 gap-3"
+          className="mt-3 hidden grid-cols-2 gap-3 md:grid"
           style={{ gap: GAP }}
         >
           {row2.map((img, i) => {
@@ -114,7 +114,7 @@ export function ProductDetailGallery({
       {/* Row 3: optional — one wide or 2x2 */}
       {hasRow3 && (
         <div
-          className="mt-3 grid grid-cols-2 gap-3"
+          className="mt-3 hidden grid-cols-2 gap-3 md:grid"
           style={{ gap: GAP }}
         >
           {row3.slice(0, 4).map((img, i) => {

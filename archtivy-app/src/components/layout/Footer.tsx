@@ -137,11 +137,6 @@ export async function Footer() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/feedback" className="text-sm text-zinc-600 transition hover:text-[#002abf] dark:text-zinc-400 dark:hover:text-[#002abf]">
-                    Feedback
-                  </Link>
-                </li>
-                <li>
                   <Link href="/contact" className="text-sm text-zinc-600 transition hover:text-[#002abf] dark:text-zinc-400 dark:hover:text-[#002abf]">
                     Contact
                   </Link>

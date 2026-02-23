@@ -226,7 +226,7 @@ export default async function FAQPage() {
             Still need help?
           </h2>
           <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-            Use the <Link href="/contact" className="font-medium text-[#002abf] underline underline-offset-2 hover:no-underline dark:text-[#002abf]">Contact</Link> or <Link href="/feedback" className="font-medium text-[#002abf] underline underline-offset-2 hover:no-underline dark:text-[#002abf]">Feedback</Link> link in the footer. Include the page URL and what you were trying to do so we can respond quickly.
+            Use the <Link href="/contact" className="font-medium text-[#002abf] underline underline-offset-2 hover:no-underline dark:text-[#002abf]">Contact</Link> link in the footer. Include the page URL and what you were trying to do so we can respond quickly.
           </p>
         </div>
       </section>

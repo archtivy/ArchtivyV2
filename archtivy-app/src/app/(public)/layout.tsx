@@ -8,6 +8,7 @@ export default function PublicLayout({
   return (
     <>
       {children}
+      <div className="min-h-[60px] sm:min-h-[80px]" aria-hidden />
       <Footer />
     </>
   );

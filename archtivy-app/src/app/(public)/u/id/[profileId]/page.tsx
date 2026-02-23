@@ -286,8 +286,8 @@ function ProfileHeader({
   firstListingForContact?: ListingCardData | null;
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-6 dark:border-zinc-800 dark:bg-zinc-900/50 sm:p-8">
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+    <div className="border border-zinc-200 bg-zinc-50/80 p-6 dark:border-zinc-800 dark:bg-zinc-900/50 sm:p-8" style={{ borderRadius: 4 }}>
+      <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:items-start sm:text-left">
         <div className="shrink-0">
           {profile.avatar_url ? (
             <Image
@@ -325,7 +325,7 @@ function ProfileHeader({
               {profile.bio}
             </p>
           )}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
             {profile.website && (
               <a
                 href={profile.website.startsWith("http") ? profile.website : `https://${profile.website}`}

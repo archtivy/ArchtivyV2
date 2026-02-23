@@ -3,6 +3,7 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { SiteShell } from "@/components/layout/SiteShell";
+import { Analytics } from "@vercel/analytics/next"; // ✅ bunu ekle
 
 export const runtime = "nodejs";
 
@@ -31,6 +32,9 @@ export default function RootLayout({
           <ThemeProvider>
             <SiteShell>{children}</SiteShell>
           </ThemeProvider>
+
+          {/* ✅ BURAYA EKLE */}
+          <Analytics />
         </body>
       </html>
     </ClerkProvider>

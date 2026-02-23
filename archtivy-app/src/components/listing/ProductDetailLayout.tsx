@@ -128,7 +128,8 @@ export function ProductDetailLayout({
   }, [product.id]);
 
   const ctaClass =
-    "inline-flex items-center gap-2 rounded border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:ring-offset-zinc-950";
+    "inline-flex flex-1 items-center justify-center gap-2 rounded border border-zinc-200 bg-white px-3 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:ring-offset-zinc-950 sm:flex-initial";
+  const btnRadius = { borderRadius: 4 };
 
   const materials = product.materials ?? [];
   const teamForList = (teamWithProfiles ?? []).map((m) => ({
@@ -168,19 +169,21 @@ export function ProductDetailLayout({
                   disabled={!isLoaded}
                   aria-label={saved ? "Saved" : "Save to folder"}
                   className={ctaClass}
+                  style={btnRadius}
                 >
-                  <BookmarkIcon className="h-4 w-4" />
+                  <BookmarkIcon className="h-4 w-4 shrink-0" />
                   {saved ? "Saved" : "Save"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setContactModalOpen(true)}
-                  aria-label="Contact via Archtivy"
+                  aria-label="Contact"
                   className={ctaClass}
+                  style={btnRadius}
                 >
-                  Contact via Archtivy
+                  Contact
                 </button>
-                <button type="button" onClick={handleShare} aria-label="Share" className={ctaClass}>
+                <button type="button" onClick={handleShare} aria-label="Share" className={ctaClass} style={btnRadius}>
                   <ShareIcon className="h-4 w-4" />
                   Share
                 </button>
