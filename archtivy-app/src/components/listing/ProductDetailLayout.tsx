@@ -17,7 +17,7 @@ import { TeamList } from "./TeamList";
 import { FilesSection } from "@/components/files/FilesSection";
 import { LightboxGallery, type RelatedItem } from "@/components/gallery/LightboxGallery";
 import { productExploreUrl } from "@/lib/exploreUrls";
-import { MoreInCategoryBlock, type MoreInCategoryItem } from "./MoreInCategoryBlock";
+import { RelatedSection, type RelatedSectionItem } from "@/components/related/RelatedSection";
 import type { GalleryImage } from "@/lib/db/gallery";
 import type { ProductCanonical } from "@/lib/canonical-models";
 import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
@@ -73,7 +73,12 @@ export interface ProductDetailLayoutProps {
   teamWithProfiles: ListingTeamMemberWithProfile[] | null;
   relatedProducts?: RelatedProductItem[];
   mapHref?: string | null;
-  moreInCategory?: MoreInCategoryItem[];
+  /** Used in projects (for RelatedSection). */
+  usedInProjects?: RelatedSectionItem[];
+  usedInProjectsTotalCount?: number;
+  /** More in this category (for RelatedSection). Excludes current product. */
+  moreInCategory?: RelatedSectionItem[];
+  categoryTotalCount?: number;
 }
 
 export function ProductDetailLayout({
@@ -92,7 +97,10 @@ export function ProductDetailLayout({
   teamWithProfiles,
   relatedProducts = [],
   mapHref,
+  usedInProjects = [],
+  usedInProjectsTotalCount,
   moreInCategory = [],
+  categoryTotalCount,
 }: ProductDetailLayoutProps) {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
@@ -139,8 +147,13 @@ export function ProductDetailLayout({
     username: m.username ?? null,
     avatar_url: null,
   }));
-  const hasUsedInProjects = relatedListings.length > 0;
-  const hasRelatedProducts = relatedProducts.length > 0;
+  const usedProjects = usedInProjects.length > 0 ? usedInProjects : relatedListings.map((p) => ({
+    id: p.id,
+    slug: p.slug ?? null,
+    title: p.title,
+    thumbnail: thumbnailMap[p.id] ?? null,
+    location: p.location ?? null,
+  }));
 
   return (
     <>
@@ -232,94 +245,34 @@ export function ProductDetailLayout({
           </aside>
         </div>
 
-        {/* Full-width: Used in Projects or Related Products */}
-        <section
-          id="used-in-projects"
-          className="mt-16 border-t border-zinc-100 pt-10 dark:border-zinc-800"
-          aria-labelledby="below-fold-heading"
-        >
-          {hasUsedInProjects && (
-            <>
-              <h2 id="below-fold-heading" className="mb-6 font-serif text-xl font-normal text-zinc-900 dark:text-zinc-100">
-                Used in Projects
-              </h2>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {relatedListings.map((p) => {
-                  const href = `/projects/${p.slug ?? p.id}`;
-                  const thumb = thumbnailMap[p.id];
-                  const location = p.location?.trim() || null;
-                  return (
-                    <Link
-                      key={p.id}
-                      href={href}
-                      className="group flex flex-col focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 rounded-lg dark:focus:ring-offset-zinc-950"
-                    >
-                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
-                        {thumb ? (
-                          <Image
-                            src={thumb}
-                            alt=""
-                            fill
-                            className="object-cover transition-opacity group-hover:opacity-95"
-                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                            unoptimized={thumb.startsWith("http")}
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-sm text-zinc-400 dark:text-zinc-500">—</div>
-                        )}
-                      </div>
-                      <span className="mt-2 truncate text-sm font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-[#002abf] dark:group-hover:text-[#002abf]">
-                        {p.title}
-                      </span>
-                      {location && (
-                        <span className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{location}</span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            </>
-          )}
-          {!hasUsedInProjects && hasRelatedProducts && (
-            <>
-              <h2 id="below-fold-related" className="mb-6 font-serif text-xl font-normal text-zinc-900 dark:text-zinc-100">
-                Related Products
-              </h2>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                {relatedProducts.map((p) => {
-                  const href = `/products/${p.slug ?? p.id}`;
-                  return (
-                    <Link
-                      key={p.id}
-                      href={href}
-                      className="group flex flex-col focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 rounded-lg dark:focus:ring-offset-zinc-950"
-                    >
-                      <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
-                        {p.thumbnail ? (
-                          <Image
-                            src={p.thumbnail}
-                            alt=""
-                            fill
-                            className="object-cover transition-opacity group-hover:opacity-95"
-                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                            unoptimized={String(p.thumbnail).startsWith("http")}
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-sm text-zinc-400 dark:text-zinc-500">—</div>
-                        )}
-                      </div>
-                      <span className="mt-2 truncate text-sm font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-[#002abf] dark:group-hover:text-[#002abf]">
-                        {p.title}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </section>
+        {/* Used in Projects (only if at least 1 project) */}
+        {usedProjects.length > 0 && (
+          <RelatedSection
+            title="Used in Projects"
+            items={usedProjects}
+            totalCount={usedInProjectsTotalCount ?? usedProjects.length}
+            viewAllHref={null}
+            variant="project"
+            mobileLayout={usedProjects.length === 1 ? "featured" : "scroll"}
+            desktopShown={4}
+          />
+        )}
+
+        {/* More in this category (always if items exist) */}
         {moreInCategory.length > 0 && (
-          <MoreInCategoryBlock type="products" items={moreInCategory} />
+          <RelatedSection
+            title="More in this category"
+            items={moreInCategory}
+            totalCount={categoryTotalCount ?? moreInCategory.length}
+            viewAllHref={
+              (product.product_category ?? product.category)?.trim()
+                ? productExploreUrl({ category: (product.product_category ?? product.category)!.trim() })
+                : null
+            }
+            variant="product"
+            mobileLayout="scroll"
+            desktopShown={4}
+          />
         )}
       </div>
 

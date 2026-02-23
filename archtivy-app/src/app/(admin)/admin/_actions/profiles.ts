@@ -11,6 +11,11 @@ const toNull = (v: unknown) => {
   const s = toText(v);
   return s.length ? s : null;
 };
+const toNumOrNull = (v: unknown): number | null => {
+  if (v == null || v === "") return null;
+  const n = Number(String(v).trim());
+  return Number.isNaN(n) ? null : n;
+};
 
 /** Pick only keys that exist in the object; returns a new object. */
 function pick<T extends Record<string, unknown>>(obj: T, keys: string[]): Record<string, unknown> {
@@ -140,16 +145,21 @@ export async function updateProfile(input: {
   patch: Record<string, unknown>;
 }) {
   const supabase = getSupabaseServiceClient();
-  const patch = {
+  const patch: Record<string, unknown> = {
     display_name: toNull(input.patch.display_name),
     username: toNull(input.patch.username),
     location_city: toNull(input.patch.location_city),
     location_country: toNull(input.patch.location_country),
+    location_place_name: toNull(input.patch.location_place_name),
+    location_lat: toNumOrNull(input.patch.location_lat),
+    location_lng: toNumOrNull(input.patch.location_lng),
+    location_mapbox_id: toNull(input.patch.location_mapbox_id),
     bio: toNull(input.patch.bio),
     website: toNull(input.patch.website),
     instagram: toNull(input.patch.instagram),
     linkedin: toNull(input.patch.linkedin),
     avatar_url: toNull(input.patch.avatar_url),
+    role: toNull(input.patch.role),
     designer_discipline: toNull(input.patch.designer_discipline),
     brand_type: toNull(input.patch.brand_type),
     reader_type: toNull(input.patch.reader_type),

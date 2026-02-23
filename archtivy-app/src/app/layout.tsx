@@ -3,7 +3,7 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { SiteShell } from "@/components/layout/SiteShell";
-import { Analytics } from "@vercel/analytics/next"; // ✅ bunu ekle
+import { Analytics } from "@vercel/analytics/react"; // ✅ bunu ekle
 
 export const runtime = "nodejs";
 
