@@ -24,7 +24,7 @@ export default async function ContactPage() {
           Get in touch
         </h1>
         <p className="mx-auto max-w-2xl text-lg leading-relaxed text-zinc-600 dark:text-zinc-400">
-          Have a question about Archtivy, your account, or how to link projects and products? We're here to help.
+          Have a question about Archtivy, your account, or how to link projects and products? We&apos;re here to help.
         </p>
       </header>
 
@@ -49,7 +49,7 @@ export default async function ContactPage() {
 
       <section className="border-t border-zinc-200 pt-16 text-center dark:border-zinc-800 sm:pt-20">
         <p className="mb-6 text-zinc-600 dark:text-zinc-400">
-          Ready to share your work or explore what's on the platform?
+          Ready to share your work or explore what&apos;s on the platform?
         </p>
         <PageCTA userId={userId} role={role} />
       </section>
