@@ -1,4 +1,5 @@
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 import { ExploreMapView } from "@/components/explore/ExploreMapView";
 

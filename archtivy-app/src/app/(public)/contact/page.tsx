@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { PageCTA } from "@/components/layout/PageCTA";
 
-const CONTACT_EMAIL = "hello@archtivy.com";
+const CONTACT_EMAIL = "info@archtivy.com";
 
 export const metadata = {
   title: "Contact | Archtivy",
@@ -25,7 +24,7 @@ export default async function ContactPage() {
           Get in touch
         </h1>
         <p className="mx-auto max-w-2xl text-lg leading-relaxed text-zinc-600 dark:text-zinc-400">
-          Have a question about Archtivy, your account, or how to link projects and products? We’re here to help.
+          Have a question about Archtivy, your account, or how to link projects and products? We're here to help.
         </p>
       </header>
 
@@ -46,17 +45,11 @@ export default async function ContactPage() {
             </a>
           </p>
         </div>
-        <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
-          <Link href="/feedback" className="text-archtivy-primary hover:underline dark:text-archtivy-primary">
-            Submit feedback
-          </Link>{" "}
-          if you’d like to suggest improvements or report an issue.
-        </p>
       </section>
 
       <section className="border-t border-zinc-200 pt-16 text-center dark:border-zinc-800 sm:pt-20">
         <p className="mb-6 text-zinc-600 dark:text-zinc-400">
-          Ready to share your work or explore what’s on the platform?
+          Ready to share your work or explore what's on the platform?
         </p>
         <PageCTA userId={userId} role={role} />
       </section>

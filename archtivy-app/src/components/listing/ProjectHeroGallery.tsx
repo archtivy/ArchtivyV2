@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { GalleryImage } from "@/lib/db/gallery";
@@ -22,14 +23,15 @@ export interface ProjectHeroGalleryProps {
 }
 
 /**
- * Hero: left = 1 large square (1:1), right = 2x2 squares (1:1). Equal height; 4px radius; one overlay.
- * When usedProductTeaser is provided, the 4th right tile is a teaser linking to #used-in-project-heading.
+ * Mobile: 1 main image + horizontal scroll thumbnails. Click thumbnail swaps main.
+ * Desktop: left large square + 2x2 grid. 4px radius throughout.
  */
 export function ProjectHeroGallery({
   images,
   onImageClick,
   usedProductTeaser = null,
 }: ProjectHeroGalleryProps) {
+  const [mobileSelectedIndex, setMobileSelectedIndex] = React.useState(0);
   const count = images.length;
   if (count === 0) return null;
 
@@ -40,11 +42,80 @@ export function ProjectHeroGallery({
     usedProductTeaser?.src && grid.length >= 3 ? usedProductTeaser : null;
   const mainOptimized = isOptimizedSrc(main.src);
 
+  const mobileMain = images[mobileSelectedIndex] ?? main;
+
+  /** Mobile: main image + horizontal thumbnails */
+  const MobileGallery = () => (
+    <section className="listing-gallery block w-full md:hidden" aria-label="Gallery">
+      <div
+        className="relative aspect-square w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800"
+        style={{ borderRadius: RADIUS }}
+      >
+        <button
+          type="button"
+          onClick={() => onImageClick(mobileSelectedIndex)}
+          className="absolute inset-0 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
+          aria-label={`View image ${mobileSelectedIndex + 1}: ${mobileMain.alt}`}
+        >
+          <Image
+            src={mobileMain.src}
+            alt={mobileMain.alt}
+            fill
+            className="object-cover"
+            style={{ objectPosition: "50% 50%" }}
+            sizes="100vw"
+            quality={90}
+            unoptimized={!isOptimizedSrc(mobileMain.src)}
+            priority={mobileSelectedIndex === 0}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={() => onImageClick(0)}
+          className="absolute bottom-3 right-3 bg-black/50 px-3 py-2 text-sm font-medium text-white backdrop-blur-sm hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+          style={{ borderRadius: RADIUS }}
+        >
+          View all photos
+        </button>
+      </div>
+      <div className="mt-3 overflow-x-auto overflow-y-hidden pb-1">
+        <div className="flex gap-2" style={{ minWidth: "min-content" }}>
+          {images.map((img, i) => (
+            <button
+              key={img.id}
+              type="button"
+              onClick={() => setMobileSelectedIndex(i)}
+              className="relative h-16 w-16 shrink-0 overflow-hidden rounded border-2 bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#002abf] dark:bg-zinc-800"
+              style={{
+                borderRadius: RADIUS,
+                borderColor: i === mobileSelectedIndex ? "#002abf" : "transparent",
+              }}
+              aria-label={`Show image ${i + 1}`}
+              aria-pressed={i === mobileSelectedIndex}
+            >
+              <Image
+                src={img.src}
+                alt=""
+                fill
+                className="object-cover"
+                sizes="64px"
+                unoptimized={!isOptimizedSrc(img.src)}
+              />
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+
   if (!hasGrid) {
     return (
       <section className="listing-gallery w-full" aria-label="Gallery">
+        <div className="md:hidden">
+          <MobileGallery />
+        </div>
         <div
-          className="relative aspect-square w-full max-w-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-800"
+          className="relative aspect-square w-full max-w-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 hidden md:block"
           style={{ borderRadius: RADIUS }}
         >
           <button
@@ -79,8 +150,11 @@ export function ProjectHeroGallery({
 
   return (
     <section className="listing-gallery w-full" aria-label="Gallery">
+      <div className="md:hidden">
+        <MobileGallery />
+      </div>
       <div
-        className="relative grid grid-cols-1 md:grid-cols-2 md:items-stretch"
+        className="relative hidden grid-cols-1 md:grid md:grid-cols-2 md:items-stretch"
         style={{ gap: GAP }}
       >
         {/* Left: one large square (width-driven, aspect 1:1); defines row height */}

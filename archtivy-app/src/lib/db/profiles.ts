@@ -221,7 +221,7 @@ export async function getProfilesByRole(
 ): Promise<DbResult<Profile[]>> {
   const { data, error } = await supabase
     .from(TABLE)
-    .select("id, display_name, username, avatar_url")
+    .select("id, display_name, username, avatar_url, role, website, instagram, linkedin, designer_discipline, brand_type")
     .eq("role", role)
     .eq("is_hidden", false)
     .not("username", "is", null)

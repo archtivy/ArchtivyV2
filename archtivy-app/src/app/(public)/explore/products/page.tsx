@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import type { Metadata } from "next";
 import { getProductsCanonicalFiltered, getExploreNetworkCounts } from "@/lib/db/explore";
 import { EXPLORE_PAGE_SIZE } from "@/lib/db/explore";
