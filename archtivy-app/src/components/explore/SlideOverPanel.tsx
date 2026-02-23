@@ -1,31 +1,52 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+export interface PanelRow {
+  id: string;
+  name: string;
+  slug: string | null;
+  score?: string;
+  growth?: string;
+  count?: number;
+  metric?: string;
+}
 
 export interface SlideOverPanelProps {
   open: boolean;
+  panel: string | null;
   title: string;
   subtext?: string;
+  city: string | null;
   onClose: () => void;
-  children: React.ReactNode;
 }
-
-const SAMPLE_ROWS: { name: string; score?: string; growth?: string; brands?: number }[] = [
-  { name: "Luna Architects", score: "8.4", growth: "+12%", brands: 6 },
-  { name: "Atelier Design Studio", score: "7.9", growth: "+8%", brands: 4 },
-  { name: "Urban Form Collective", score: "7.2", growth: "+24%", brands: 5 },
-  { name: "Material Space", score: "6.8", growth: "+5%", brands: 3 },
-  { name: "Studio North", score: "6.5", growth: "+18%", brands: 7 },
-  { name: "Landscape Praxis", score: "6.2", growth: "+3%", brands: 2 },
-];
 
 export function SlideOverPanel({
   open,
+  panel,
   title,
   subtext,
+  city,
   onClose,
-  children,
 }: SlideOverPanelProps) {
+  const [rows, setRows] = useState<PanelRow[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !panel) return;
+    setLoading(true);
+    const params = new URLSearchParams();
+    params.set("panel", panel);
+    if (city) params.set("city", city);
+    fetch(`/api/explore/panel?${params.toString()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setRows(data.rows ?? []);
+      })
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false));
+  }, [open, panel, city]);
+
   const handleEsc = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -51,7 +72,7 @@ export function SlideOverPanel({
         onClick={handleBackdropClick}
       />
       <aside
-        className="fixed right-0 top-0 z-50 flex h-full w-[32%] min-w-[320px] max-w-[480px] flex-col border-l border-[#eeeeee] bg-white"
+        className="fixed right-0 top-0 z-50 flex h-full w-full flex-col border-l border-[#eeeeee] bg-white md:w-[32%] md:min-w-[320px] md:max-w-[480px]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="slide-over-title"
@@ -61,9 +82,7 @@ export function SlideOverPanel({
             <h2 id="slide-over-title" className="font-serif text-xl font-normal text-zinc-900">
               {title}
             </h2>
-            {subtext && (
-              <p className="mt-1 text-sm text-zinc-600">{subtext}</p>
-            )}
+            {subtext && <p className="mt-1 text-sm text-zinc-600">{subtext}</p>}
           </div>
           <button
             type="button"
@@ -75,19 +94,24 @@ export function SlideOverPanel({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {children ?? (
+          {loading ? (
+            <p className="px-5 py-8 text-sm text-zinc-500">Loading…</p>
+          ) : rows.length > 0 ? (
             <ul className="divide-y divide-[#eeeeee] px-5 py-2">
-              {SAMPLE_ROWS.map((r, i) => (
-                <li key={i} className="flex items-center justify-between py-3">
+              {rows.map((r) => (
+                <li key={r.id} className="flex items-center justify-between py-3">
                   <span className="text-sm font-medium text-zinc-900">{r.name}</span>
                   <div className="flex items-center gap-4 text-xs text-zinc-500">
-                    {r.score && <span>Score {r.score}</span>}
-                    {r.growth && <span>{r.growth}</span>}
-                    {r.brands != null && <span>{r.brands} brands</span>}
+                    {r.score != null && <span>Score {r.score}</span>}
+                    {r.growth != null && <span>{r.growth}</span>}
+                    {r.count != null && <span>{r.count}</span>}
+                    {r.metric && <span>{r.metric}</span>}
                   </div>
                 </li>
               ))}
             </ul>
+          ) : (
+            <p className="px-5 py-8 text-sm text-zinc-500">No results.</p>
           )}
         </div>
       </aside>

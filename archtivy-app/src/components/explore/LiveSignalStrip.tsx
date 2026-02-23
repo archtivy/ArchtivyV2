@@ -1,20 +1,16 @@
 "use client";
 
-const SIGNALS = [
-  { label: "Most Connected Designer", value: "Luna Architects", metric: "Score 8.4" },
-  { label: "Most Integrated Brand", value: "Atelier Materials", metric: "14 Projects" },
-  { label: "Fastest Rising Category", value: "Courtyard Houses", metric: "+32%" },
-  { label: "Highest Collaboration Density", value: "Residential", metric: "6.8 Avg Teams" },
-];
+import type { ExploreSignal } from "@/lib/explore/queries";
 
-export function LiveSignalStrip() {
+export interface LiveSignalStripProps {
+  signals: ExploreSignal[];
+}
+
+export function LiveSignalStrip({ signals }: LiveSignalStripProps) {
   return (
-    <section
-      className="border-t border-[#eeeeee] bg-white py-6"
-      aria-label="Live signals"
-    >
+    <section className="border-t border-[#eeeeee] bg-white py-6" aria-label="Live signals">
       <div className="mx-auto flex max-w-[1040px] flex-wrap justify-between gap-6 px-4 sm:px-6">
-        {SIGNALS.map((s) => (
+        {signals.map((s) => (
           <div
             key={s.label}
             className="min-w-0 flex-1 basis-[200px] border-b-2 border-[#002abf] pb-1"

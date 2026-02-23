@@ -3,7 +3,7 @@
  * Used for slide-over panel state and deep-linking.
  */
 
-export type ExplorePanelType = "designers" | "brands" | "signals" | "market-leaders" | "network-growth" | null;
+export type ExplorePanelType = "designers" | "brands" | "signals" | "projects" | "products" | "categories" | "collaboration" | "market-leaders" | "network-growth" | null;
 
 export interface ExploreParams {
   panel: ExplorePanelType;
@@ -15,7 +15,7 @@ export function parseExploreParams(searchParams: URLSearchParams): ExploreParams
   const city = searchParams.get("city")?.trim() ?? null;
 
   const validPanel =
-    panel && ["designers", "brands", "signals", "market-leaders", "network-growth"].includes(panel)
+    panel && ["designers", "brands", "signals", "projects", "products", "categories", "collaboration", "market-leaders", "network-growth"].includes(panel)
       ? (panel as ExplorePanelType)
       : null;
 
