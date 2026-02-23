@@ -5,6 +5,7 @@ import Image from "next/image";
 import type { ProjectCanonical } from "@/lib/canonical-models";
 import { getListingUrl } from "@/lib/canonical";
 import { getCityLabel, getOwnerProfileHref } from "@/lib/cardUtils";
+import { buildProjectCardMetrics } from "./cardMetrics";
 
 export interface ProjectCardPremiumProps {
   project: ProjectCanonical;
@@ -22,7 +23,31 @@ export function ProjectCardPremium({ project }: ProjectCardPremiumProps) {
   const href = getListingUrl({ id: project.id, type: "project" });
   const title = project.title?.trim() || "Project";
   const meta = metaLine(project);
-  const connectionCount = project.connectionCount ?? 0;
+  const teamCount = (project.team_members ?? []).length;
+  const p = project as ProjectCanonical & {
+    mentionedProducts?: unknown[];
+    connectedProducts?: unknown[];
+    productsUsed?: unknown[];
+    linkedProducts?: unknown[];
+    productLinks?: unknown[];
+  };
+  const candidates = [
+    p.mentionedProducts,
+    p.connectedProducts,
+    p.productsUsed,
+    p.linkedProducts,
+    p.productLinks,
+    p.mentioned_products,
+  ];
+  const productsArr = candidates.find((arr) => Array.isArray(arr) && arr.length > 0);
+  const productsCount = productsArr != null ? productsArr.length : undefined;
+  const brandsUsed = p.brands_used ?? [];
+  const brandsCount = productsCount == null && brandsUsed.length > 0 ? brandsUsed.length : undefined;
+  const metricsText = buildProjectCardMetrics({
+    productsCount,
+    brandsCount,
+    teamCount,
+  });
   const owner = project.owner;
   const ownerLabel = owner?.displayName?.trim() || null;
   const ownerHref = ownerLabel ? getOwnerProfileHref(owner) : null;
@@ -80,9 +105,11 @@ export function ProjectCardPremium({ project }: ProjectCardPremiumProps) {
             {meta}
           </p>
         )}
-        <p className="mt-auto pt-1.5 text-sm font-medium text-zinc-600 dark:text-zinc-500">
-          {connectionCount} {connectionCount === 1 ? "connection" : "connections"}
-        </p>
+        {metricsText != null && (
+          <p className="mt-auto pt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+            {metricsText}
+          </p>
+        )}
       </div>
     </div>
   );

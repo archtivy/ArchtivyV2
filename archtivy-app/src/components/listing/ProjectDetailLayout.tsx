@@ -13,6 +13,8 @@ import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
 import type { UsedProductItem } from "./ProjectDetailContent";
 import type { ProjectDocumentItem } from "./ProjectDetailContent";
 import { projectExploreUrl } from "@/lib/exploreUrls";
+import { MoreInCategoryBlock } from "./MoreInCategoryBlock";
+import { FilesSection } from "@/components/files/FilesSection";
 import { areaSqftToBucket } from "@/lib/exploreFilters";
 import { getCityLabel, getOwnerProfileHref } from "@/lib/cardUtils";
 
@@ -31,6 +33,8 @@ export interface ProjectDetailLayoutProps {
   connectionLine?: string | null;
   /** Optional map URL for Explore on Map (e.g. from project.location lat/lng). */
   mapHref?: string | null;
+  /** More in this category items. */
+  moreInCategory?: { id: string; slug: string | null; title: string; thumbnail?: string | null; location?: string | null }[];
 }
 
 export function ProjectDetailLayout({
@@ -45,6 +49,7 @@ export function ProjectDetailLayout({
   currentPath,
   connectionLine,
   mapHref,
+  moreInCategory = [],
 }: ProjectDetailLayoutProps) {
   const [lightboxOpen, setLightboxOpen] = React.useState(false);
   const [lightboxIndex, setLightboxIndex] = React.useState(0);
@@ -133,6 +138,8 @@ export function ProjectDetailLayout({
             currentPath={currentPath}
             isSaved={isSaved}
             metaLineParts={metaLineParts}
+            authorDisplayName={project.owner?.displayName ?? null}
+            authorHref={getOwnerProfileHref(project.owner) ?? null}
           />
 
           <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
@@ -148,8 +155,19 @@ export function ProjectDetailLayout({
                 sharedByHref={getOwnerProfileHref(project.owner) ?? null}
                 mapHref={mapHref}
               />
+              <div className="mt-6">
+                <FilesSection
+                  raw={[]}
+                  listingDocuments={documents.map((d) => ({ id: d.id, file_url: d.file_url, file_name: d.file_name }))}
+                  listingId={project.id}
+                  useDownloadApi
+                />
+              </div>
             </div>
           </div>
+          {moreInCategory.length > 0 && (
+            <MoreInCategoryBlock type="projects" items={moreInCategory} />
+          )}
         </div>
       </div>
 

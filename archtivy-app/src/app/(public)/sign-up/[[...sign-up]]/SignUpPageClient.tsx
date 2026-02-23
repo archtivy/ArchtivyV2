@@ -17,7 +17,7 @@ export function SignUpPageClient() {
           },
         }}
         signInUrl="/sign-in"
-        afterSignUpUrl="/onboarding"
+        afterSignUpUrl="/welcome"
       />
     </div>
   );

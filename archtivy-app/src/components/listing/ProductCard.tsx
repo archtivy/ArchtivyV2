@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { ListingCardData } from "@/lib/types/listings";
 import { getListingUrl } from "@/lib/canonical";
-import { formatConnections } from "./connectionsLabel";
+import { buildProductCardMetrics } from "./cardMetrics";
 
 export interface ProductCardProps {
   listing: ListingCardData;
@@ -19,7 +19,9 @@ export function ProductCard({
   href,
   postedBy,
 }: ProductCardProps) {
-  const connectionsText = formatConnections(listing.connection_count);
+  const teamCount = (listing.team_members ?? []).length;
+  const projectsCount = listing.used_in_projects_count ?? 0;
+  const metricsText = buildProductCardMetrics(projectsCount, teamCount);
   const linkHref = (href?.trim() || "") || getListingUrl(listing);
   const title = listing.title?.trim() || "Product";
 
@@ -57,9 +59,9 @@ export function ProductCard({
             {postedBy}
           </p>
         )}
-        {connectionsText != null && (
+        {metricsText != null && (
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            {connectionsText}
+            {metricsText}
           </p>
         )}
       </div>

@@ -25,13 +25,7 @@ export interface ProjectDetailContentProps {
 
 function DescriptionSection({ text }: { text: string }) {
   return (
-    <section className="mb-12" aria-labelledby="project-description-heading">
-      <h2
-        id="project-description-heading"
-        className="mb-4 font-serif text-xl font-normal text-[#111827] dark:text-zinc-100"
-      >
-        Description
-      </h2>
+    <section className="mb-12" aria-label="Description">
       <div
         className="max-w-[65ch] whitespace-pre-wrap text-[15px] leading-relaxed text-[#374151] dark:text-zinc-400"
         style={{ lineHeight: 1.7 }}

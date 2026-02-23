@@ -34,7 +34,8 @@ export function listingToProjectForCard(
     created_at: listing.created_at ?? "",
     updated_at: listing.updated_at ?? null,
     status: "APPROVED",
-    mentioned_products: [],
+    mentioned_products: (listing as { mentioned_products?: { brand_name_text: string; product_name_text: string }[] }).mentioned_products ?? [],
+    brands_used: (listing.brands_used ?? []).map((b) => ({ name: b.name, logo_url: b.logo_url ?? null })),
   } as ProjectCanonical;
 }
 

@@ -588,7 +588,9 @@ export async function getProductsCanonical(
     const productImages = listingImagesToProductImageRows(String(row.id), imageRows);
     const productMaterials = materialMap[String(row.id)] ?? [];
     const product = normalizeProduct(row, productImages, productMaterials);
-    product.connectionCount += usedCounts[String(row.id)] ?? 0;
+    const usedCount = usedCounts[String(row.id)] ?? 0;
+    product.usedInProjectsCount = usedCount;
+    product.connectionCount += usedCount;
     const brandId = (row as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id ?? null;
     const clerkId = (row as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id ?? null;
     product.owner = brandId ? ownerByProfileId[brandId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
@@ -744,7 +746,9 @@ export async function getProductsCanonicalFiltered({
     const productImages = listingImagesToProductImageRows(String(row.id), imageRows);
     const productMaterials = materialMap[String(row.id)] ?? [];
     const product = normalizeProduct(row, productImages, productMaterials);
-    product.connectionCount += usedCounts[String(row.id)] ?? 0;
+    const usedCount = usedCounts[String(row.id)] ?? 0;
+    product.usedInProjectsCount = usedCount;
+    product.connectionCount += usedCount;
     const brandId = (row as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id ?? null;
     const clerkId = (row as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id ?? null;
     product.owner = brandId
@@ -1048,21 +1052,27 @@ export async function getProductListingBySlugOrId(
   return listingRowToRawProductRow(data as Record<string, unknown>);
 }
 
-/** Get one product in canonical form for detail page. Source: listings + listing_images. */
+/** Get one product in canonical form for detail page. Source: listings + listing_images + products.documents. */
 export async function getProductCanonicalBySlug(
   slug: string
 ): Promise<ProductCanonical | null> {
   const row = await getProductListingBySlugOrId(slug);
   if (!row) return null;
   const id = String(row.id);
-  const [imageResult, usedCounts, materialMap] = await Promise.all([
+  const [imageResult, usedCounts, materialMap, productRow] = await Promise.all([
     getImagesByListingIds([id]),
     getUsedInProjectsCountByProductIds([id]),
     getMaterialsByProductIds([id]),
+    supabase().from("products").select("documents").eq("id", id).maybeSingle(),
   ]);
+  if (productRow?.data && "documents" in productRow.data) {
+    (row as Record<string, unknown>).documents = productRow.data.documents;
+  }
   const imageRows = imageResult.data ?? [];
   const productImages = listingImagesToProductImageRows(id, imageRows);
   const product = normalizeProduct(row, productImages, materialMap[id] ?? []);
-  product.connectionCount += usedCounts[id] ?? 0;
+  const usedCount = usedCounts[id] ?? 0;
+  product.usedInProjectsCount = usedCount;
+  product.connectionCount += usedCount;
   return product;
 }

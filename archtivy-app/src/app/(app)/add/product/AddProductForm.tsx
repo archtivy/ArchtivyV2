@@ -84,6 +84,7 @@ export function AddProductForm({
   const [productCategory, setProductCategory] = useState(initialData?.productCategory ?? "");
   const [productSubcategory, setProductSubcategory] = useState(initialData?.productSubcategory ?? "");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const [teamRows, setTeamRows] = useState<Array<{ name: string; role: string }>>(() => {
     const t = initialData?.teamRows;
@@ -207,7 +208,9 @@ export function AddProductForm({
     const form = formRef.current ?? e.currentTarget;
     const formData = new FormData(form);
     formData.delete("images");
+    formData.delete("documents");
     imageFiles.forEach((f) => formData.append("images", f));
+    documentFiles.forEach((f) => formData.append("documents", f));
     try {
       const result = await action(null, formData);
       if (result?.error) {
@@ -277,7 +280,11 @@ export function AddProductForm({
               title={title}
               imageUrl={primaryImagePreviewUrl}
             />
-            <DocumentsUploadCard id="documents" name="documents" />
+            <DocumentsUploadCard
+              id="documents"
+              files={documentFiles}
+              onChange={setDocumentFiles}
+            />
           </>
         }
         mobileActions={

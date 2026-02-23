@@ -25,6 +25,7 @@ export function ImageAiBackfillAndRebuildButton() {
       const backfillRes = await fetch("/api/admin/image-ai-backfill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        cache: "no-store",
       });
 
       if (!backfillRes.ok) {

@@ -8,6 +8,7 @@ import { getProfileByClerkIdForAdmin } from "@/lib/db/profiles";
 import { createAuditLog } from "@/lib/db/audit";
 import { uploadGalleryImagesServer } from "@/lib/storage/gallery";
 import { uploadListingDocumentsServer } from "@/lib/storage/documents";
+import { persistListingDocuments } from "@/lib/db/listingDocumentsWrite";
 import { addDocuments } from "@/lib/db/listingDocuments";
 import { setProjectMaterials, setProductMaterials } from "@/lib/db/materials";
 import type { TeamMember, BrandUsed } from "@/lib/types/listings";
@@ -317,11 +318,6 @@ export async function createAdminProductFull(
   formData: FormData
 ): Promise<AdminCreateResult> {
   const docFiles = getDocumentFiles(formData);
-  console.log("[ADMIN CREATE START]", {
-    hasDocFiles: !!docFiles,
-    docFilesLength: docFiles?.length,
-    docFiles,
-  });
 
   const admin = await ensureAdmin();
   if (!admin.ok) return { error: admin.error };
@@ -339,6 +335,7 @@ export async function createAdminProductFull(
   const year = (formData.get("year") as string)?.trim() ?? null;
   const team_members = parseTeamMembers(formData.get("team_members"));
   const material_ids = parseMaterialIds(formData.get("product_material_ids"));
+  const color_options = parseColorOptions(formData.get("color_options"));
 
   if (!title) return { error: "Product title is required." };
   if (!description?.trim()) return { error: "Product description is required." };
@@ -449,27 +446,23 @@ export async function createAdminProductFull(
     console.warn("[admin createProduct] matches pipeline non-fatal:", e);
   }
 
-  console.log("[DOCS] docFiles", docFiles.length);
   if (docFiles.length > 0) {
     const docUpload = await uploadListingDocumentsServer(listingId, docFiles);
-    console.log("[DOCS] upload", { ok: !docUpload.error, count: docUpload.data?.length, error: docUpload.error });
     if (docUpload.error || !docUpload.data?.length) {
       await supabase.from("listings").delete().eq("id", listingId);
       return { error: `Document upload failed: ${docUpload.error ?? "no files returned"}` };
     }
-    const insert = await addDocuments(
-      listingId,
-      docUpload.data.map((d) => ({
-        file_url: d.url,
-        file_name: d.fileName,
-        file_type: d.fileType,
-        storage_path: d.storagePath,
-      }))
-    );
-    console.log("[DOCS] insert", { ok: !insert.error, inserted: insert.data });
-    if (insert.error) {
+    const filesToPersist = docUpload.data.map((d, i) => ({
+      url: d.url,
+      name: d.fileName,
+      mime: d.fileType,
+      storage_path: d.storagePath,
+      size: docFiles[i]?.size,
+    }));
+    const err = await persistListingDocuments(listingId, filesToPersist);
+    if (err.error) {
       await supabase.from("listings").delete().eq("id", listingId);
-      return { error: `Document DB insert failed: ${insert.error}` };
+      return { error: `Document save failed: ${err.error}` };
     }
   }
 
@@ -888,7 +881,13 @@ export async function updateProductAction(
 
   if (updateError) return { error: updateError.message };
 
-  await supabase.from("products").update({ color_options }).eq("id", listingId);
+  await supabase
+    .from("products")
+    .update({
+      color_options,
+      color: color_options.length > 0 ? color_options[0] : null,
+    })
+    .eq("id", listingId);
 
   try {
     await persistListingTeamMembers(supabase, listingId, team_members);
@@ -924,15 +923,15 @@ export async function updateProductAction(
   if (docFiles.length > 0) {
     const docUpload = await uploadListingDocumentsServer(listingId, docFiles);
     if (docUpload.data?.length) {
-      await addDocuments(
-        listingId,
-        docUpload.data.map((d) => ({
-          file_url: d.url,
-          file_name: d.fileName,
-          file_type: d.fileType,
-          storage_path: d.storagePath,
-        }))
-      );
+      const filesToPersist = docUpload.data.map((d, i) => ({
+        url: d.url,
+        name: d.fileName,
+        mime: d.fileType,
+        storage_path: d.storagePath,
+        size: docFiles[i]?.size,
+      }));
+      const err = await persistListingDocuments(listingId, filesToPersist);
+      if (err.error) return { error: `Document save failed: ${err.error}` };
     }
   }
 

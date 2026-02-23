@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getProductForProductPage } from "@/app/actions/listings";
+import { getProductsCanonicalFiltered } from "@/lib/db/explore";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { getProjectsForProduct } from "@/lib/db/projectProductLinks";
 import { getFirstImageUrlPerListingIds } from "@/lib/db/listingImages";
@@ -15,7 +16,6 @@ import { getGalleryBookmarkState } from "@/app/actions/galleryBookmarks";
 import { getListingDocumentsServer } from "@/lib/db/listingDocuments";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { ProductDetailLayout } from "@/components/listing/ProductDetailLayout";
-import { getProductsCanonicalFiltered } from "@/lib/db/explore";
 import { DEFAULT_PRODUCT_FILTERS } from "@/lib/exploreFilters";
 import type { GalleryImage } from "@/lib/db/gallery";
 
@@ -94,23 +94,29 @@ export default async function ProductPage({
       ? (await getFirstImageUrlPerListingIds(projectIds)).data ?? {}
       : {};
 
-  let relatedProducts: { id: string; slug?: string; title: string; thumbnail?: string | null }[] = [];
-  if (relatedListings.length === 0 && product.category?.trim()) {
-    const { data: sameCategory } = await getProductsCanonicalFiltered({
-      filters: { ...DEFAULT_PRODUCT_FILTERS, category: [product.category.trim()] },
-      limit: 9,
-      sort: "newest",
-    });
-    relatedProducts = (sameCategory ?? [])
-      .filter((p) => p.id !== product.id)
-      .slice(0, 8)
-      .map((p) => ({
-        id: p.id,
-        slug: p.slug ?? p.id,
-        title: p.title,
-        thumbnail: p.cover ?? null,
-      }));
-  }
+  const productCategory =
+    (product.product_category ?? product.category)?.trim() ?? "";
+
+  // Fetch same-category products for relatedProducts fallback and "More in this category" (limit 6)
+  const sameCategoryProducts: { id: string; slug: string; title: string; thumbnail?: string | null }[] = productCategory
+    ? ((await getProductsCanonicalFiltered({
+        filters: { ...DEFAULT_PRODUCT_FILTERS, product_category: productCategory },
+        limit: 7,
+        sort: "newest",
+      })).data ?? [])
+        .filter((p) => p.id !== product.id)
+        .slice(0, 6)
+        .map((p) => ({
+          id: p.id,
+          slug: p.slug ?? p.id,
+          title: p.title,
+          thumbnail: p.cover ?? null,
+        }))
+    : [];
+
+  const relatedProducts =
+    relatedListings.length === 0 ? sameCategoryProducts : [];
+  const moreInCategory = sameCategoryProducts;
 
   const relatedItems = relatedListings.map((p) => {
     const row = p as { id: string; slug?: string; title: string };
@@ -179,6 +185,7 @@ export default async function ProductPage({
         teamWithProfiles={teamWithProfiles}
         relatedProducts={relatedProducts}
         mapHref={null}
+        moreInCategory={moreInCategory}
       />
       </div>
     </div>

@@ -78,6 +78,7 @@ export function AddProjectForm({
   const [areaSqft, setAreaSqft] = useState(initialData?.areaSqft ?? "");
   const [year, setYear] = useState(initialData?.year ?? "");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const [teamRows, setTeamRows] = useState<Array<{ name: string; role: string }>>(() => {
     const t = initialData?.teamRows;
@@ -197,7 +198,9 @@ export function AddProjectForm({
     if (!form) return;
     const fd = new FormData(form);
     fd.delete("images");
+    fd.delete("documents");
     imageFiles.forEach((f) => fd.append("images", f));
+    documentFiles.forEach((f) => fd.append("documents", f));
     if (initialData?.listingId) fd.set("_listingId", initialData.listingId);
     formAction(fd);
   };
@@ -264,7 +267,11 @@ export function AddProjectForm({
               subtitle={locationDisplay}
               imageUrl={primaryImagePreviewUrl}
             />
-            <DocumentsUploadCard id="documents" name="documents" />
+            <DocumentsUploadCard
+              id="documents"
+              files={documentFiles}
+              onChange={setDocumentFiles}
+            />
           </>
         }
         mobileActions={

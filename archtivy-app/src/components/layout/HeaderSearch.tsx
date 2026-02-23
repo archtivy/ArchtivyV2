@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 function SearchIcon({ className }: { className?: string }) {
   return (
@@ -25,18 +25,35 @@ function SearchIcon({ className }: { className?: string }) {
 
 export function HeaderSearch() {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const isHidden =
-    pathname === "/" ||
-    pathname === "/explore/projects" ||
-    pathname === "/explore/products";
+  const isHidden = pathname === "/";
 
   const close = useCallback(() => setOpen(false), []);
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      const q = query.trim();
+      const type =
+        pathname === "/explore/products"
+          ? "products"
+          : pathname === "/explore/projects"
+            ? "projects"
+            : "projects";
+      const base = `/explore/${type}`;
+      const url = q ? `${base}?q=${encodeURIComponent(q)}` : base;
+      router.push(url);
+      close();
+    },
+    [query, pathname, router, close]
+  );
 
   useEffect(() => {
     const check = () => setIsMobile(typeof window !== "undefined" && window.innerWidth < 768);
@@ -110,21 +127,23 @@ export function HeaderSearch() {
                 ref={popoverRef}
                 role="dialog"
                 aria-label="Search"
-                className="fixed inset-x-0 top-0 z-50 border-b border-[#f3f3f3] bg-white"
+                className="fixed inset-x-0 top-0 z-50 border-b border-[#f3f3f3] bg-white dark:border-zinc-800 dark:bg-zinc-900"
               >
-                <div className="flex items-center gap-2 p-4">
+                <form onSubmit={handleSubmit} className="flex items-center gap-2 p-4">
                   <input
                     ref={inputRef}
                     type="search"
                     placeholder="Type to search…"
                     autoComplete="off"
-                    className="flex-1 rounded border border-zinc-200 bg-zinc-50 px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-500 focus:border-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf]/20"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="flex-1 rounded border border-zinc-200 bg-zinc-50 px-4 py-3 text-base text-zinc-900 placeholder:text-zinc-500 focus:border-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf]/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
                     aria-label="Search"
                   />
                   <button
                     type="button"
                     onClick={close}
-                    className="shrink-0 rounded p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#002abf]"
+                    className="shrink-0 rounded p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#002abf] dark:hover:bg-zinc-700 dark:text-zinc-400"
                     aria-label="Close search"
                   >
                     <svg
@@ -139,7 +158,7 @@ export function HeaderSearch() {
                       <path d="M18 6L6 18M6 6l12 12" />
                     </svg>
                   </button>
-                </div>
+                </form>
                 <div className="border-t border-zinc-100 px-4 py-6">
                   <p className="text-sm text-zinc-500">
                     Type to search projects, products, and people.
@@ -152,20 +171,23 @@ export function HeaderSearch() {
               ref={popoverRef}
               role="dialog"
               aria-label="Search"
-              className="absolute right-0 top-full z-50 mt-1.5 w-[420px] max-w-[calc(100vw-2rem)] rounded border bg-white p-4"
+              className="absolute right-0 top-full z-50 mt-1.5 w-[420px] max-w-[calc(100vw-2rem)] rounded border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900"
               style={{
-                borderColor: "#f3f3f3",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
               }}
             >
-              <input
-                ref={inputRef}
-                type="search"
-                placeholder="Type to search…"
-                autoComplete="off"
-                className="w-full rounded border border-zinc-200 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf]/20"
-                aria-label="Search"
-              />
+              <form onSubmit={handleSubmit}>
+                <input
+                  ref={inputRef}
+                  type="search"
+                  placeholder="Type to search…"
+                  autoComplete="off"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="w-full rounded border border-zinc-200 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf]/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                  aria-label="Search"
+                />
+              </form>
               <div className="mt-3 border-t border-zinc-100 pt-3">
                 <p className="text-xs text-zinc-500">
                   Type to search projects, products, and people.

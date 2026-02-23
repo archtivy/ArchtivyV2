@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
@@ -59,6 +60,10 @@ export interface ProjectDetailHeaderProps {
   isSaved: boolean;
   /** Meta line under title: City · Year · Category · Area (each optional, with explore links). */
   metaLineParts?: MetaLinePart[];
+  /** Author/studio display name (editorial pill under title). */
+  authorDisplayName?: string | null;
+  /** Profile URL for author. */
+  authorHref?: string | null;
   /** For "Contact via Archtivy" lead modal. */
   listingType?: "project" | "product";
 }
@@ -69,6 +74,8 @@ export function ProjectDetailHeader({
   currentPath,
   isSaved: initialSaved,
   metaLineParts,
+  authorDisplayName,
+  authorHref,
   listingType = "project",
 }: ProjectDetailHeaderProps) {
   const { isLoaded, userId } = useAuth();
@@ -106,6 +113,20 @@ export function ProjectDetailHeader({
         <h1 className="font-serif text-3xl font-normal tracking-tight text-zinc-900 dark:text-zinc-100 md:text-4xl lg:text-[2.5rem]">
           {title}
         </h1>
+        {authorDisplayName?.trim() && (
+          <span
+            className="mt-2 inline-flex rounded-full bg-[#f5f5f5] px-2.5 py-1 text-sm font-medium tracking-wide text-[#374151] dark:bg-zinc-800 dark:text-zinc-300"
+            aria-label={`By ${authorDisplayName.trim()}`}
+          >
+            {authorHref?.trim() ? (
+              <Link href={authorHref} className="hover:text-[#002abf] dark:hover:text-[#5b7cff] focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-1 rounded-full">
+                {authorDisplayName.trim()}
+              </Link>
+            ) : (
+              authorDisplayName.trim()
+            )}
+          </span>
+        )}
         {metaLineParts && metaLineParts.length > 0 && (
           <MetaLine parts={metaLineParts} className="mt-2" />
         )}

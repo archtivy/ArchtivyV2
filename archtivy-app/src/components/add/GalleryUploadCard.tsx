@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { UploadBox } from "./UploadBox";
 
 const MIN_GALLERY = 3;
 
@@ -27,16 +28,13 @@ export function GalleryUploadCard({
   id = "gallery-upload",
   inputName = "images",
 }: GalleryUploadCardProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
-
   const count = files.length;
   const valid = count >= minCount;
 
   const addFiles = useCallback(
-    (newFiles: FileList | File[] | null) => {
-      if (!newFiles?.length) return;
-      const list = Array.from(newFiles).filter(
+    (newFiles: File[]) => {
+      if (!newFiles.length) return;
+      const list = newFiles.filter(
         (f) => f.type.startsWith("image/") && f.size > 0
       );
       if (list.length === 0) return;
@@ -72,24 +70,6 @@ export function GalleryUploadCard({
     [files, onChange]
   );
 
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(false);
-      addFiles(e.dataTransfer.files);
-    },
-    [addFiles]
-  );
-
-  const onDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(true);
-  }, []);
-
-  const onDragLeave = useCallback(() => {
-    setDragOver(false);
-  }, []);
-
   return (
     <div
       className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900/50"
@@ -98,44 +78,14 @@ export function GalleryUploadCard({
       <h3 id={`${id}-heading`} className="text-base font-semibold text-zinc-900 dark:text-zinc-100 border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-4">
         Gallery
       </h3>
-      <input
-        ref={inputRef}
-        type="file"
-        name={inputName}
-        accept={accept}
-        multiple
-        className="sr-only"
-        aria-describedby={`${id}-hint`}
-        onChange={(e) => {
-          addFiles(e.target.files);
-          e.target.value = "";
-        }}
-      />
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            inputRef.current?.click();
-          }
-        }}
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        className={`mb-4 flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-200 bg-white p-4 transition dark:border-zinc-600 dark:bg-zinc-900/30 ${
-          dragOver
-            ? "border-[#002abf]/40 bg-[#002abf]/5"
-            : "hover:border-zinc-300 dark:hover:border-zinc-500"
-        }`}
-      >
-        <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
-          Drag & drop images or click to upload
-        </span>
-        <span className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-          JPEG, PNG, WebP or GIF · max 5MB each
-        </span>
+      <div className="mb-4">
+        <UploadBox
+          id={id}
+          accept={accept}
+          primaryText="Drag & drop images or click to upload"
+          hintText="JPEG, PNG, WebP or GIF · max 5MB each"
+          onFilesSelected={(list) => addFiles(Array.from(list))}
+        />
       </div>
       <p
         id={`${id}-hint`}

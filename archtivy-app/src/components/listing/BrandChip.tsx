@@ -41,7 +41,8 @@ export function BrandChip({ name, href, logoUrl, variant = "default", className 
   const baseClass = "inline-flex items-center gap-2 rounded px-3 py-1.5 text-sm font-medium text-zinc-900 transition-colors focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-1 dark:text-zinc-100";
   const chipClass =
     variant === "pill"
-      ? baseClass + " bg-zinc-100 hover:bg-zinc-200 hover:text-[#002abf] dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:hover:text-[#5b7cff]"
+      ? "inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-sm font-medium text-[#374151] tracking-wide focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-1 dark:text-zinc-300 " +
+        "bg-[#f5f5f5] hover:bg-[#ebebeb] hover:text-[#002abf] dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:hover:text-[#5b7cff]"
       : baseClass + " rounded-md border border-zinc-200 bg-white hover:border-[#002abf]/30 hover:text-[#002abf] dark:border-zinc-600 dark:bg-zinc-900 dark:hover:border-[#002abf]/40 dark:hover:text-[#002abf]";
 
   if (href?.trim()) {

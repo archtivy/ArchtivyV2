@@ -14,9 +14,10 @@ import { BrandChip } from "./BrandChip";
 import { ExpandableDescription } from "./ExpandableDescription";
 import { MaterialsList } from "./MaterialsList";
 import { TeamList } from "./TeamList";
-import { CompactDocumentsList } from "./CompactDocumentsList";
+import { FilesSection } from "@/components/files/FilesSection";
 import { LightboxGallery, type RelatedItem } from "@/components/gallery/LightboxGallery";
 import { productExploreUrl } from "@/lib/exploreUrls";
+import { MoreInCategoryBlock, type MoreInCategoryItem } from "./MoreInCategoryBlock";
 import type { GalleryImage } from "@/lib/db/gallery";
 import type { ProductCanonical } from "@/lib/canonical-models";
 import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
@@ -72,6 +73,7 @@ export interface ProductDetailLayoutProps {
   teamWithProfiles: ListingTeamMemberWithProfile[] | null;
   relatedProducts?: RelatedProductItem[];
   mapHref?: string | null;
+  moreInCategory?: MoreInCategoryItem[];
 }
 
 export function ProductDetailLayout({
@@ -90,6 +92,7 @@ export function ProductDetailLayout({
   teamWithProfiles,
   relatedProducts = [],
   mapHref,
+  moreInCategory = [],
 }: ProductDetailLayoutProps) {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
@@ -190,7 +193,6 @@ export function ProductDetailLayout({
                 <ExpandableDescription
                   text={product.description.trim()}
                   id="product-description"
-                  heading="Description"
                   className="border-t border-zinc-100 pt-6 dark:border-zinc-800"
                 />
               )}
@@ -216,16 +218,13 @@ export function ProductDetailLayout({
                   <TeamList members={teamForList} compact />
                 </div>
               )}
-              {/* Documents */}
-              {listingDocuments.length > 0 && (
-                <div className="border-t border-zinc-100 pt-6 dark:border-zinc-800">
-                  <CompactDocumentsList
-                    documents={listingDocuments.map((d) => ({ id: d.id, file_url: d.file_url, file_name: d.file_name }))}
-                    listingId={product.id}
-                    useDownloadApi
-                  />
-                </div>
-              )}
+              {/* Files */}
+              <FilesSection
+                raw={product.documents}
+                listingDocuments={listingDocuments}
+                listingId={product.id}
+                useDownloadApi
+              />
             </div>
           </aside>
         </div>
@@ -280,7 +279,7 @@ export function ProductDetailLayout({
           )}
           {!hasUsedInProjects && hasRelatedProducts && (
             <>
-              <h2 id="below-fold-heading" className="mb-6 font-serif text-xl font-normal text-zinc-900 dark:text-zinc-100">
+              <h2 id="below-fold-related" className="mb-6 font-serif text-xl font-normal text-zinc-900 dark:text-zinc-100">
                 Related Products
               </h2>
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -315,15 +314,10 @@ export function ProductDetailLayout({
               </div>
             </>
           )}
-          {!hasUsedInProjects && !hasRelatedProducts && (
-            <>
-              <h2 id="below-fold-heading" className="mb-6 font-serif text-xl font-normal text-zinc-900 dark:text-zinc-100">
-                Used in Projects
-              </h2>
-              <p className="text-[15px] text-zinc-500 dark:text-zinc-400">No linked projects yet.</p>
-            </>
-          )}
         </section>
+        {moreInCategory.length > 0 && (
+          <MoreInCategoryBlock type="products" items={moreInCategory} />
+        )}
       </div>
 
       <LightboxGallery

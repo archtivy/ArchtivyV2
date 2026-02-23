@@ -89,7 +89,6 @@ function ExploreMapProjectCard({
         {meta.length > 0 && (
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{meta.join(" · ")}</p>
         )}
-        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">Connections —</p>
       </div>
     </Link>
   );

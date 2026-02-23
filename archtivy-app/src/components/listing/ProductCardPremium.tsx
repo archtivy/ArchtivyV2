@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ProductCanonical } from "@/lib/canonical-models";
+import { buildProductCardMetrics } from "./cardMetrics";
 import { getListingUrl } from "@/lib/canonical";
 import { getOwnerProfileHref } from "@/lib/cardUtils";
 
@@ -13,7 +14,9 @@ export interface ProductCardPremiumProps {
 export function ProductCardPremium({ product }: ProductCardPremiumProps) {
   const href = getListingUrl({ id: product.id, type: "product" });
   const title = product.title?.trim() || "Product";
-  const connectionCount = product.connectionCount ?? 0;
+  const teamCount = Array.isArray(product.team_members) ? product.team_members.length : 0;
+  const projectsCount = product.usedInProjectsCount ?? 0;
+  const metricsText = buildProductCardMetrics(projectsCount, teamCount);
   const owner = product.owner;
   const ownerLabel = owner?.displayName?.trim() || null;
   const ownerHref = ownerLabel ? getOwnerProfileHref(owner) : null;
@@ -66,9 +69,11 @@ export function ProductCardPremium({ product }: ProductCardPremiumProps) {
             )}
           </p>
         )}
-        <p className="mt-auto pt-1.5 text-sm font-medium text-zinc-600 dark:text-zinc-500">
-          {connectionCount} {connectionCount === 1 ? "connection" : "connections"}
-        </p>
+        {metricsText != null && (
+          <p className="mt-auto pt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+            {metricsText}
+          </p>
+        )}
       </div>
     </div>
   );

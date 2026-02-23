@@ -11,6 +11,7 @@ import {
 } from "@/lib/db/listings";
 import { addImages } from "@/lib/db/listingImages";
 import { addDocuments } from "@/lib/db/listingDocuments";
+import { persistListingDocuments } from "@/lib/db/listingDocumentsWrite";
 import { uploadGalleryImages } from "@/lib/storage/gallery";
 import {
   uploadGalleryImagesForProject,
@@ -445,7 +446,13 @@ export async function createProductCanonical(
     }
   }
   const supabaseForProduct = getSupabaseServiceClient();
-  await supabaseForProduct.from("products").update({ color_options: colorOptions }).eq("id", productId);
+  await supabaseForProduct
+    .from("products")
+    .update({
+      color_options: colorOptions,
+      color: colorOptions.length > 0 ? colorOptions[0] : null,
+    })
+    .eq("id", productId);
 
   const listingPayload = {
     slug,
@@ -516,29 +523,25 @@ export async function createProductCanonical(
   }
 
   const docFiles = getDocumentFiles(formData);
-  console.log("[DOCS] docFiles", docFiles.length);
   if (docFiles.length > 0) {
     const docUpload = await uploadListingDocumentsServer(productId, docFiles);
-    console.log("[DOCS] upload", { ok: !docUpload.error, count: docUpload.data?.length, error: docUpload.error });
     if (docUpload.error || !docUpload.data?.length) {
       await dbDeleteListing(productId);
       await deleteProductRow(productId);
       return { error: `Document upload failed: ${docUpload.error ?? "no files returned"}` };
     }
-    const insert = await addDocuments(
-      productId,
-      docUpload.data.map((d) => ({
-        file_name: d.fileName,
-        file_url: d.url,
-        file_type: d.fileType,
-        storage_path: d.storagePath,
-      }))
-    );
-    console.log("[DOCS] insert", { ok: !insert.error, inserted: insert.data });
-    if (insert.error) {
+    const filesToPersist = docUpload.data.map((d, i) => ({
+      url: d.url,
+      name: d.fileName,
+      mime: d.fileType,
+      storage_path: d.storagePath,
+      size: docFiles[i]?.size,
+    }));
+    const err = await persistListingDocuments(productId, filesToPersist);
+    if (err.error) {
       await dbDeleteListing(productId);
       await deleteProductRow(productId);
-      return { error: `Document DB insert failed: ${insert.error}` };
+      return { error: `Document save failed: ${err.error}` };
     }
   }
 

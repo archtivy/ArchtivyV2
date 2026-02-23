@@ -5,7 +5,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
-import { getProjectCanonicalBySlugOrId } from "@/lib/db/explore";
+import {
+  getProjectCanonicalBySlugOrId,
+  getProjectsCanonicalFiltered,
+} from "@/lib/db/explore";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getAbsoluteUrl, getBaseUrl } from "@/lib/canonical";
 import { getProductsForProject } from "@/lib/db/projectProductLinks";
@@ -21,10 +24,12 @@ import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
 import { getGalleryBookmarkState } from "@/app/actions/galleryBookmarks";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { ProjectDetailLayout } from "@/components/listing/ProjectDetailLayout";
+import { MoreInCategoryBlock } from "@/components/listing/MoreInCategoryBlock";
 import type { GalleryImage } from "@/lib/db/gallery";
 import type { ProjectCanonical } from "@/lib/canonical-models";
 import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
 import type { UsedProductItem } from "@/components/listing/ProjectDetailContent";
+import { DEFAULT_PROJECT_FILTERS } from "@/lib/exploreFilters";
 
 function canonicalGalleryToGalleryImages(
   gallery: { url: string; alt: string }[]
@@ -213,6 +218,26 @@ export default async function ProjectPage({
   const mentionedRaw = project.mentioned_products ?? [];
   const mentionedResolved = mentionedRaw.length > 0 ? await resolveMentionedProducts(mentionedRaw) : [];
 
+  let moreInCategory: { id: string; slug: string | null; title: string; thumbnail?: string | null; location?: string | null }[] = [];
+  const categoryTrim = project.category?.trim();
+  if (categoryTrim) {
+    const { data: sameCat } = await getProjectsCanonicalFiltered({
+      filters: { ...DEFAULT_PROJECT_FILTERS, category: [categoryTrim] },
+      limit: 9,
+      sort: "newest",
+    });
+    moreInCategory = (sameCat ?? [])
+      .filter((p) => p.id !== project.id)
+      .slice(0, 8)
+      .map((p) => ({
+        id: p.id,
+        slug: p.slug ?? null,
+        title: p.title,
+        thumbnail: p.cover ?? null,
+        location: p.location_text ?? null,
+      }));
+  }
+
   const currentPath = `/projects/${project.slug ?? project.id}`;
   const productsCount = usedProducts.length;
   const professionalsCount = teamWithProfiles?.length ?? 0;
@@ -224,12 +249,6 @@ export default async function ProjectPage({
     project.location?.lat != null && project.location?.lng != null
       ? `https://www.google.com/maps?q=${project.location.lat},${project.location.lng}`
       : null;
-
-  console.log("[ProjectPage] gallery images debug", images.map((img) => ({
-    id: img.id,
-    photoTagsCount: img.photoTags?.length ?? 0,
-    keys: Object.keys(img),
-  })));
 
   return (
     <div className="pt-1 pb-6 sm:pt-2 sm:pb-8">
@@ -261,6 +280,7 @@ export default async function ProjectPage({
         currentPath={currentPath}
         connectionLine={connectionLine}
         mapHref={mapHref}
+        moreInCategory={moreInCategory}
       />
     </div>
   );
