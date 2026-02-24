@@ -101,7 +101,9 @@ export function AddProductForm({
   useEffect(() => {
     if (formMode === "admin" || updateAction) return;
     const result = state as ActionResult;
-    if (result?.slug) router.push(`/products/${result.slug}`);
+    if (result?.error) return;
+    const target = result?.slug ?? result?.id;
+    if (target) router.replace(`/products/${target}`);
   }, [formMode, updateAction, state, router]);
 
   useEffect(() => {

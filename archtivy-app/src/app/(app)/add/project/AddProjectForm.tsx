@@ -98,8 +98,9 @@ export function AddProjectForm({
   useEffect(() => {
     if (formMode === "admin" || updateAction) return;
     const result = state as ActionResult;
+    if (result?.error) return;
     const target = result?.slug ?? result?.id;
-    if (target) router.push(`/projects/${target}`);
+    if (target) router.replace(`/projects/${target}`);
   }, [formMode, updateAction, state, router]);
 
   useEffect(() => {

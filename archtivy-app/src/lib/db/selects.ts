@@ -6,7 +6,7 @@
 
 /** Columns needed for listing cards. Select type (NOT NULL); normalizers use type ?? listing_type. */
 export const listingCardSelect =
-  "id, type, title, description, created_at, updated_at, owner_clerk_user_id, owner_profile_id, cover_image_url, location, category, area_sqft, year, product_type, product_category, product_subcategory, feature_highlight, material_or_finish, dimensions, team_members, brands_used";
+  "id, type, title, description, created_at, updated_at, owner_clerk_user_id, owner_profile_id, cover_image_url, location, category, area_sqft, year, product_type, product_category, product_subcategory, feature_highlight, material_or_finish, dimensions, team_members, brands_used, views_count, saves_count";
 
 /**
  * Canonical project listing select: all fields needed for ProjectCanonical.
@@ -26,5 +26,5 @@ export const productListingSelect =
  * Normalize already defaults them to 0 when missing.
  */
 
-/** Same as card for now; detail page may add more columns later (e.g. full description). */
+/** Same as card; detail page includes views_count, saves_count for display. */
 export const listingDetailSelect = listingCardSelect;

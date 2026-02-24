@@ -14,8 +14,6 @@ import { OnboardingPanel } from "@/components/onboarding/OnboardingPanel";
 import type { ListingSummary } from "@/lib/types/listings";
 import type { ProfileRole } from "@/lib/auth/config";
 
-const FREE_LISTING_LIMIT = 3;
-
 export default async function ListingsPage({
   searchParams,
 }: {
@@ -48,7 +46,6 @@ export default async function ListingsPage({
         : listings ?? [];
 
   const addHref = role === "designer" ? "/add/project" : "/add/product";
-  const atLimit = (listings?.length ?? 0) >= FREE_LISTING_LIMIT;
   const showOnboardingPanel = (listings?.length ?? 0) === 0;
 
   return (
@@ -66,21 +63,9 @@ export default async function ListingsPage({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
-              {listings?.length ?? 0} / {FREE_LISTING_LIMIT} listings used
-            </span>
-            {atLimit ? (
-              <span
-                className="inline-block rounded-[20px] border border-zinc-300 bg-zinc-100 px-4 py-2 text-sm text-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                title="You've reached the current listing limit."
-              >
-                Add {role === "designer" ? "project" : "product"}
-              </span>
-            ) : (
-              <Button as="link" href={addHref} variant="primary" className="rounded-[20px]">
-                Add {role === "designer" ? "project" : "product"}
-              </Button>
-            )}
+            <Button as="link" href={addHref} variant="primary" className="rounded-[20px]">
+              Add {role === "designer" ? "project" : "product"}
+            </Button>
           </div>
         </div>
 
@@ -116,11 +101,9 @@ export default async function ListingsPage({
                 : undefined
             }
             action={
-              !atLimit && (
-                <Button as="link" href={addHref} variant="primary">
-                  Add {role === "designer" ? "project" : "product"}
-                </Button>
-              )
+              <Button as="link" href={addHref} variant="primary">
+                Add {role === "designer" ? "project" : "product"}
+              </Button>
             }
           />
         )}
@@ -217,8 +200,8 @@ function ListingCard({
           Last updated {formatDate(listing.created_at)}
         </p>
         <div className="mt-1 flex flex-wrap gap-3 text-xs text-zinc-500 dark:text-zinc-400">
-          <span>0 views</span>
-          <span>0 saves</span>
+          <span>{listing.views_count ?? 0} views</span>
+          <span>{listing.saves_count ?? 0} saves</span>
         </div>
       </div>
       <div className="shrink-0">

@@ -3,6 +3,7 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { listingCardSelect, listingDetailSelect } from "@/lib/db/selects";
 import type {
   CreateListingInput,
+  CreateListingLocation,
   Listing,
   ListingCardData,
   ListingDetail,
@@ -13,6 +14,7 @@ import type {
 } from "@/lib/types/listings";
 
 const LISTINGS = "listings";
+const LISTING_STATUS_APPROVED = "APPROVED";
 
 export type DbResult<T> =
   | { data: T; error: null }
@@ -65,7 +67,7 @@ function normalizeListingDetailRow(row: Record<string, unknown>): ListingDetail 
 }
 
 /**
- * Fetch listings by type, newest first. Returns normalized card contract.
+ * Fetch listings by type, newest first. Returns only approved, non-deleted (public-safe).
  */
 export async function getListingsByType(
   type: ListingType
@@ -74,6 +76,8 @@ export async function getListingsByType(
     .from(LISTINGS)
     .select(listingCardSelect)
     .eq("type", type)
+    .eq("status", LISTING_STATUS_APPROVED)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -84,7 +88,7 @@ export async function getListingsByType(
 }
 
 /**
- * Fetch featured listings by type, newest first, with limit (e.g. for homepage). Returns normalized card contract.
+ * Fetch featured listings by type, newest first, with limit (e.g. for homepage). Approved, non-deleted only.
  */
 export async function getFeaturedListings(
   type: ListingType,
@@ -94,6 +98,8 @@ export async function getFeaturedListings(
     .from(LISTINGS)
     .select(listingCardSelect)
     .eq("type", type)
+    .eq("status", LISTING_STATUS_APPROVED)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -156,47 +162,122 @@ export async function getListingById(id: string): Promise<DbResult<ListingDetail
   return { data: normalizeListingDetailRow(data as Record<string, unknown>), error: null };
 }
 
+/** Map CreateListingInput.location (string or object) to DB location columns. */
+function mapLocationToDb(loc: CreateListingInput["location"]): {
+  location: string | null;
+  location_text: string | null;
+  location_city: string | null;
+  location_country: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
+  location_place_id: string | null;
+  location_country_code: string | null;
+} {
+  if (loc == null) {
+    return {
+      location: null,
+      location_text: null,
+      location_city: null,
+      location_country: null,
+      location_lat: null,
+      location_lng: null,
+      location_place_id: null,
+      location_country_code: null,
+    };
+  }
+  if (typeof loc === "string") {
+    const t = loc.trim() || null;
+    return {
+      location: t,
+      location_text: t,
+      location_city: null,
+      location_country: null,
+      location_lat: null,
+      location_lng: null,
+      location_place_id: null,
+      location_country_code: null,
+    };
+  }
+  const o = loc as CreateListingLocation;
+  const text =
+    (o.location_text?.trim() ?? null) ||
+    [o.location_city, o.location_country].filter(Boolean).join(", ") ||
+    null;
+  const lat =
+    o.location_lat != null && typeof o.location_lat === "number" && !Number.isNaN(o.location_lat)
+      ? o.location_lat
+      : null;
+  const lng =
+    o.location_lng != null && typeof o.location_lng === "number" && !Number.isNaN(o.location_lng)
+      ? o.location_lng
+      : null;
+  return {
+    location: text,
+    location_text: text ?? null,
+    location_city: (o.location_city?.trim() ?? null) || null,
+    location_country: (o.location_country?.trim() ?? null) || null,
+    location_lat: lat,
+    location_lng: lng,
+    location_place_id: (o.location_place_id?.trim() ?? null) || null,
+    location_country_code: (o.location_country_code?.trim() ?? null) || null,
+  };
+}
+
 /**
  * Create a listing. Returns the new listing id on success.
+ * Inserts with status APPROVED, deleted_at null, views_count/saves_count 0 so rows satisfy Explore filters.
  */
 export async function createListing(
   input: CreateListingInput
 ): Promise<DbResult<{ id: string }>> {
+  const loc = mapLocationToDb(input.location);
+  const row: Record<string, unknown> = {
+    type: input.type,
+    listing_type: input.type,
+    status: LISTING_STATUS_APPROVED,
+    deleted_at: null,
+    views_count: 0,
+    saves_count: 0,
+    title: input.title.trim(),
+    description: (input.description?.trim() ?? null) || null,
+    owner_clerk_user_id: input.owner_clerk_user_id ?? null,
+    owner_profile_id: input.owner_profile_id ?? null,
+    cover_image_url: input.cover_image_url ?? null,
+    category: input.category ?? null,
+    area_sqft: input.area_sqft ?? null,
+    year: input.year ?? null,
+    product_type: input.product_type ?? null,
+    product_category: input.product_category ?? null,
+    product_subcategory: input.product_subcategory ?? null,
+    feature_highlight: input.feature_highlight ?? null,
+    material_or_finish: input.material_or_finish ?? null,
+    dimensions: input.dimensions ?? null,
+    team_members: input.team_members ?? [],
+    brands_used: input.brands_used ?? [],
+    ...loc,
+  };
+  if (input.slug?.trim()) row.slug = input.slug.trim();
+  if (input.type === "project") {
+    row.project_category = input.category ?? null;
+  }
+
   const { data, error } = await supabase
     .from(LISTINGS)
-    .insert({
-      listing_type: input.type,
-      title: input.title.trim(),
-      description: (input.description?.trim() ?? null) || null,
-      owner_clerk_user_id: input.owner_clerk_user_id ?? null,
-      cover_image_url: input.cover_image_url ?? null,
-      location: input.location ?? null,
-      category: input.category ?? null,
-      area_sqft: input.area_sqft ?? null,
-      year: input.year ?? null,
-      product_type: input.product_type ?? null,
-      product_category: input.product_category ?? null,
-      product_subcategory: input.product_subcategory ?? null,
-      feature_highlight: input.feature_highlight ?? null,
-      material_or_finish: input.material_or_finish ?? null,
-      dimensions: input.dimensions ?? null,
-      team_members: input.team_members ?? [],
-      brands_used: input.brands_used ?? [],
-    })
+    .insert(row)
     .select("id, type")
     .single();
 
   if (error) {
     return { data: null, error: error.message };
   }
-  const row = data as { id: string; type: string | null } | null;
-  if (!row?.id) {
+  const out = data as { id: string; type: string | null } | null;
+  if (!out?.id) {
     return { data: null, error: "No id returned from insert" };
   }
-  if (!row.type) {
+  if (!out.type) {
     return { data: null, error: "Listing created but type is missing (data integrity)." };
   }
-  return { data: { id: row.id }, error: null };
+  return { data: { id: out.id }, error: null };
 }
 
 /**

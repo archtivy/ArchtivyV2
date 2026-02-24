@@ -50,14 +50,26 @@ export interface ListingDetail extends Listing {
   saves_count: number;
 }
 
+/** Location shape for create listing (DB columns: location_text, location_city, location_country, location_lat, location_lng, etc.). */
+export interface CreateListingLocation {
+  location_text?: string | null;
+  location_city?: string | null;
+  location_country?: string | null;
+  location_lat?: number | null;
+  location_lng?: number | null;
+  location_place_id?: string | null;
+  location_country_code?: string | null;
+}
+
 /**
- * Input for creating a listing (omit id, created_at)
+ * Input for creating a listing (omit id, created_at).
+ * location: string (legacy) or object with location_* fields. For Explore, projects need location_lat/lng set.
  */
 export interface CreateListingInput {
   type: ListingType;
   title: string;
   description: string | null;
-  location?: string | null;
+  location?: string | CreateListingLocation | null;
   owner_clerk_user_id?: string | null;
   owner_profile_id?: string | null;
   cover_image_url?: string | null;

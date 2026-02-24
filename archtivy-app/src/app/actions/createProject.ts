@@ -208,6 +208,9 @@ export async function createProject(
     if (!location) return { error: "Project location is required." };
     if (!category) return { error: "Project category is required." };
     if (!year) return { error: "Year is required." };
+    if (location_lat == null || location_lng == null || Number.isNaN(location_lat) || Number.isNaN(location_lng)) {
+      return { error: "Please select a place from the location search so the project can appear on Explore." };
+    }
   }
 
   const imageFiles = getImageFiles(formData);
@@ -229,11 +232,15 @@ export async function createProject(
     .insert({
       type: "project",
       listing_type: "project",
-      status: "PENDING",
+      status: "APPROVED",
+      deleted_at: null,
+      views_count: 0,
+      saves_count: 0,
       title,
       description: description || null,
       slug,
       category: category || null,
+      project_category: category || null,
       year: year || null,
       area_sqft: area_sqft != null && !Number.isNaN(area_sqft) && area_sqft > 0 ? area_sqft : null,
       location: location_text,
@@ -248,6 +255,7 @@ export async function createProject(
       brands_used: [],
       mentioned_products: mentioned_products.length > 0 ? mentioned_products : [],
       owner_clerk_user_id: userId,
+      owner_profile_id: profile?.id ?? null,
     })
     .select("id")
     .single();
@@ -341,6 +349,7 @@ export async function createProject(
     }
   }
 
+  revalidatePath("/explore");
   revalidatePath("/explore/projects");
   revalidatePath("/");
   return {
