@@ -39,11 +39,15 @@ function parseFeature(f: MapboxFeature): LocationValue {
   const [lng, lat] = f.geometry.coordinates;
   let city: string | null = null;
   let country: string | null = null;
+
   for (const c of f.context ?? []) {
     if (c.id.startsWith("place.")) city = c.text;
     if (c.id.startsWith("country.")) country = c.text;
   }
-  const location_text = f.place_name || (city && country ? `${city}, ${country}` : `${lat}, ${lng}`);
+
+  const location_text =
+    f.place_name || (city && country ? `${city}, ${country}` : `${lat}, ${lng}`);
+
   return {
     location_place_name: f.place_name,
     location_city: city,
@@ -60,7 +64,9 @@ function staticMapUrl(token: string, lng: number, lat: number): string {
   const pinColor = "173DED"; // Archtivy brand blue (no #)
   const overlay = `pin-s+${pinColor}(${lng},${lat})`;
   const position = `${lng},${lat},12,0`;
-  return `${base}/${overlay}/${position}/600x360?access_token=${encodeURIComponent(token)}`;
+  return `${base}/${overlay}/${position}/600x360?access_token=${encodeURIComponent(
+    token
+  )}`;
 }
 
 export interface LocationPickerProps {
@@ -89,8 +95,13 @@ export function LocationPicker({
   /** True when static image failed to load; we show nothing in map area. */
   const [staticImageFailed, setStaticImageFailed] = useState(false);
 
+  // ✅ FIX 1: Support both env var names (old + new)
   useEffect(() => {
-    setClientToken(process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? "");
+    const token =
+      process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ||
+      process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
+      "";
+    setClientToken(token);
   }, []);
 
   const token = clientToken;
@@ -103,6 +114,8 @@ export function LocationPicker({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // ✅ FIX 2: Actually use suppress to avoid re-fetch after selecting an item
   const suppressNextFetchRef = useRef(false);
 
   const fetchSuggestions = useCallback(
@@ -112,7 +125,14 @@ export function LocationPicker({
         return;
       }
       setLoading(true);
-      const url = `${GEOCODE_URL}/${encodeURIComponent(q.trim())}.json?access_token=${token}&limit=5&types=place,locality,address`;
+
+      // ✅ FIX 3: encode token safely
+      const url = `${GEOCODE_URL}/${encodeURIComponent(
+        q.trim()
+      )}.json?access_token=${encodeURIComponent(
+        token
+      )}&limit=5&types=place,locality,address`;
+
       fetch(url)
         .then((res) => res.json())
         .then((data: MapboxGeocodeResponse) => {
@@ -131,22 +151,36 @@ export function LocationPicker({
   }, [value?.location_text, canUseMapbox]);
 
   useEffect(() => {
+    if (!canUseMapbox) return;
+
+    // ✅ don't fetch immediately after selecting a suggestion
+    if (suppressNextFetchRef.current) {
+      suppressNextFetchRef.current = false;
+      return;
+    }
+
     if (!query.trim()) {
       setSuggestions([]);
       setOpen(false);
       return;
     }
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchSuggestions(query), 300);
+
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, fetchSuggestions]);
+  }, [query, fetchSuggestions, canUseMapbox]);
 
   const selectPlace = useCallback(
     (feature: MapboxFeature) => {
       const next = parseFeature(feature);
       onChange(next);
+
+      // ✅ prevent re-fetch on the immediate setQuery()
+      suppressNextFetchRef.current = true;
+
       setQuery(next.location_text);
       setSuggestions([]);
       setOpen(false);
@@ -169,7 +203,8 @@ export function LocationPicker({
         ...(value ?? emptyValue),
         location_lat: lat,
         location_lng: lng,
-        location_text: value?.location_text || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+        location_text:
+          value?.location_text || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
       });
     },
     [value, onChange]
@@ -183,7 +218,10 @@ export function LocationPicker({
   if (!canUseMapbox) {
     return (
       <div className={className}>
-        <label htmlFor={inputId} className="mb-1.5 block text-sm font-medium text-zinc-900 dark:text-zinc-100">
+        <label
+          htmlFor={inputId}
+          className="mb-1.5 block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+        >
           Location {required && <span className="text-archtivy-primary">*</span>}
         </label>
         <input
@@ -214,9 +252,13 @@ export function LocationPicker({
 
   return (
     <div className={className}>
-      <label htmlFor={inputId} className="mb-1.5 block text-sm font-medium text-zinc-900 dark:text-zinc-100">
+      <label
+        htmlFor={inputId}
+        className="mb-1.5 block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+      >
         Location {required && <span className="text-archtivy-primary">*</span>}
       </label>
+
       <div className="relative">
         <input
           ref={inputRef}
@@ -234,11 +276,16 @@ export function LocationPicker({
           aria-autocomplete="list"
           aria-controls={namePrefix + "_suggestions"}
         />
+
         {loading && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400" aria-hidden>
+          <span
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-400"
+            aria-hidden
+          >
             Searching…
           </span>
         )}
+
         {open && suggestions.length > 0 && (
           <ul
             id={namePrefix + "_suggestions"}
@@ -263,6 +310,7 @@ export function LocationPicker({
           </ul>
         )}
       </div>
+
       <input type="hidden" name="location" value={value?.location_text ?? query} />
       <input type="hidden" name="location_text" value={value?.location_text ?? query} />
       <input type="hidden" name="location_city" value={value?.location_city ?? ""} />
@@ -294,6 +342,7 @@ export function LocationPicker({
               </p>
             </div>
           )}
+
           {mapFailed && !staticImageFailed && (
             <div className="mt-3 overflow-hidden rounded-[12px] border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-700/80 dark:bg-zinc-900/50">
               <img
