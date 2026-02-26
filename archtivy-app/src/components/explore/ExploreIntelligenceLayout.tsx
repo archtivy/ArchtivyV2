@@ -7,6 +7,7 @@ import { LiveSignalStrip } from "./LiveSignalStrip";
 import { IntelligenceModules } from "./IntelligenceModules";
 import { RisingSignalsSection } from "./RisingSignalsSection";
 import { SlideOverPanel } from "./SlideOverPanel";
+import { ExploreBottomSearch } from "./ExploreBottomSearch";
 import type { ExploreSignal } from "@/lib/explore/queries";
 import type { ExploreModules } from "@/lib/explore/queries";
 import type { ExploreRisingSignals } from "@/lib/explore/queries";
@@ -21,7 +22,6 @@ const PANEL_TITLES: Record<string, string> = {
   categories: "Trending Categories",
   collaboration: "Collaboration Density",
   "market-leaders": "Market Leaders",
-  "network-growth": "Designers aligned with your interests",
 };
 
 const PANEL_SUBTEXTS: Record<string, string> = {
@@ -33,8 +33,18 @@ const PANEL_SUBTEXTS: Record<string, string> = {
   categories: "Categories by project count and growth",
   collaboration: "Categories ranked by avg team members",
   "market-leaders": "Top designers by collaboration score",
-  "network-growth": "Based on your selected interests",
 };
+
+const VALID_PANELS: string[] = [
+  "designers",
+  "brands",
+  "signals",
+  "projects",
+  "products",
+  "categories",
+  "collaboration",
+  "market-leaders",
+];
 
 export interface ExploreIntelligenceLayoutProps {
   signals: ExploreSignal[];
@@ -53,21 +63,10 @@ export function ExploreIntelligenceLayout({
   const searchParams = useSearchParams();
 
   const panel = (searchParams.get("panel") ?? "") as string;
-  const validPanels = [
-    "designers",
-    "brands",
-    "signals",
-    "projects",
-    "products",
-    "categories",
-    "collaboration",
-    "market-leaders",
-    "network-growth",
-  ];
-  const open = !!panel && validPanels.includes(panel);
+  const open = !!panel && VALID_PANELS.includes(panel);
 
   const title =
-    city && ["designers", "market-leaders", "network-growth"].includes(panel)
+    city && ["designers", "market-leaders"].includes(panel)
       ? `${PANEL_TITLES[panel] ?? "Results"} in ${city.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}`
       : (PANEL_TITLES[panel] ?? "Results");
   const subtext = PANEL_SUBTEXTS[panel];
@@ -91,10 +90,14 @@ export function ExploreIntelligenceLayout({
   }, [router, searchParams]);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#fafafa" }}>
-      <div className={open ? "opacity-[0.94]" : ""}>
-        <ExploreIntelligenceHero />
-        <LiveSignalStrip signals={signals} />
+    <div className="min-h-screen pb-20" style={{ backgroundColor: "#fafafa" }}>
+      {/* Content area — dimmed when panel is open */}
+      <div
+        className={open ? "pointer-events-none select-none" : ""}
+        aria-hidden={open}
+      >
+        <ExploreIntelligenceHero city={city} />
+        <LiveSignalStrip signals={signals} onOpen={openPanel} />
         <IntelligenceModules modules={modules} city={city} onViewAll={openPanel} />
         <RisingSignalsSection data={risingSignals} city={city} onViewAll={openPanel} />
       </div>
@@ -107,6 +110,8 @@ export function ExploreIntelligenceLayout({
         city={city}
         onClose={closePanel}
       />
+
+      <ExploreBottomSearch city={city} />
     </div>
   );
 }

@@ -1,90 +1,54 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import type { ExplorePanelType } from "@/lib/explore/exploreParams";
 
-const ACCENT = "#002abf";
+export interface ExploreMastheadProps {
+  city?: string | null;
+}
 
-export function ExploreIntelligenceHero() {
+export function ExploreIntelligenceHero({ city }: ExploreMastheadProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
-  const [q, setQ] = useState("");
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const term = q.trim();
-    if (!term) return;
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("q", term);
-    startTransition(() => {
-      router.push(`/explore/projects?${params.toString()}`);
-    });
+  const dismissCity = () => {
+    router.push("/explore");
   };
 
-  const handleQuickButton = (action: "nearby" | "trending" | "connected") => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("quick", action);
-    startTransition(() => {
-      router.push(`/explore?${params.toString()}`);
-    });
-  };
-
-  const inputClass =
-    "w-full rounded border border-[#eeeeee] bg-white px-4 py-3.5 text-base text-zinc-900 placeholder-zinc-400 outline-none focus:border-[#002abf] focus:ring-1 focus:ring-[#002abf]/20";
-  const btnClass =
-    "rounded border border-[#eeeeee] bg-white px-4 py-2.5 text-sm font-medium text-[#002abf] hover:bg-[#fafafa] hover:border-[#002abf]/40 focus:outline-none focus:ring-1 focus:ring-[#002abf]/30 disabled:opacity-50";
+  const cityLabel = city
+    ? city.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    : null;
 
   return (
-    <section className="py-16 sm:py-20" aria-label="Explore hero">
+    <section className="py-16 sm:py-24" aria-label="Explore masthead">
       <div className="mx-auto max-w-[1040px] px-4 sm:px-6">
-        <h1 className="font-serif text-3xl font-normal tracking-tight text-zinc-900 sm:text-4xl md:text-5xl">
-          Where would you like to position your architecture?
+        <p className="text-xs font-medium uppercase tracking-widest text-zinc-400">
+          Architecture Intelligence
+        </p>
+        <h1 className="mt-3 font-serif text-4xl font-light tracking-tight text-zinc-900 sm:text-5xl">
+          Global network of projects,
+          <br className="hidden sm:block" /> designers and brands.
         </h1>
-        <p className="mt-3 text-base text-zinc-600 sm:text-lg">
-          Search projects, designers, brands or cities to explore network intelligence.
+        <p className="mt-4 text-base text-zinc-500 sm:text-lg">
+          Live signals from the architecture network — ranked by collaboration, integration and influence.
         </p>
 
-        <form onSubmit={handleSearch} className="mt-8 max-w-2xl">
-          <input
-            type="search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search city, material, designer, brand or project…"
-            className={inputClass}
-            style={{ borderRadius: 4 }}
-            aria-label="Search"
-          />
-          <div className="mt-4 flex flex-wrap gap-2">
+        {cityLabel && (
+          <div className="mt-6 inline-flex items-center gap-2 rounded border border-[#002abf]/20 bg-[#002abf]/5 px-3 py-1.5">
+            <span className="text-sm font-medium text-[#002abf]">
+              Filtered to {cityLabel}
+            </span>
             <button
               type="button"
-              onClick={() => handleQuickButton("nearby")}
-              disabled={isPending}
-              className={btnClass}
-              style={{ borderRadius: 4 }}
+              onClick={dismissCity}
+              aria-label="Remove city filter"
+              className="flex h-4 w-4 items-center justify-center rounded-full text-[#002abf]/60 hover:text-[#002abf]"
             >
-              Nearby Me
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickButton("trending")}
-              disabled={isPending}
-              className={btnClass}
-              style={{ borderRadius: 4 }}
-            >
-              Trending Now
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickButton("connected")}
-              disabled={isPending}
-              className={btnClass}
-              style={{ borderRadius: 4 }}
-            >
-              Most Connected
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+                <path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
             </button>
           </div>
-        </form>
+        )}
       </div>
     </section>
   );
