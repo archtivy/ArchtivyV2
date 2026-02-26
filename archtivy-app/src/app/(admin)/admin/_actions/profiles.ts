@@ -171,6 +171,10 @@ export async function updateProfile(input: {
   revalidatePath("/admin/profiles");
   revalidatePath(`/admin/profiles/${input.id}`);
   revalidatePath("/admin");
+  revalidatePath("/u/[username]", "page");
+  revalidatePath("/u/id/[profileId]", "page");
+  revalidatePath("/me/listings");
+  revalidatePath("/explore");
   return { ok: true as const };
 }
 
@@ -199,6 +203,7 @@ export async function bulkUpdateProfiles(input: {
 
   revalidatePath("/admin/profiles");
   revalidatePath("/admin");
+  revalidatePath("/u/[username]", "page");
   return { ok: true as const };
 }
 

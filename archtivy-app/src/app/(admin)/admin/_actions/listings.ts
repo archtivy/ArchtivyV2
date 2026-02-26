@@ -535,6 +535,12 @@ export async function bulkUpdateListings(input: {
   revalidatePath("/admin/products");
   revalidatePath("/admin/listings");
   revalidatePath("/admin");
+  revalidatePath("/projects");
+  revalidatePath("/products");
+  revalidatePath("/projects/[slug]", "page");
+  revalidatePath("/products/[slug]", "page");
+  revalidatePath("/explore/projects");
+  revalidatePath("/explore/products");
   return { ok: true as const };
 }
 
@@ -674,6 +680,12 @@ export async function deleteListing(listingId: string) {
   revalidatePath("/admin/listings");
   revalidatePath("/admin/projects");
   revalidatePath("/admin/products");
+  revalidatePath("/projects");
+  revalidatePath("/products");
+  revalidatePath("/projects/[slug]", "page");
+  revalidatePath("/products/[slug]", "page");
+  revalidatePath("/explore/projects");
+  revalidatePath("/explore/products");
   return { ok: true as const };
 }
 
@@ -704,6 +716,12 @@ export async function bulkDeleteListings(ids: string[]) {
   revalidatePath("/admin/listings");
   revalidatePath("/admin/projects");
   revalidatePath("/admin/products");
+  revalidatePath("/projects");
+  revalidatePath("/products");
+  revalidatePath("/projects/[slug]", "page");
+  revalidatePath("/products/[slug]", "page");
+  revalidatePath("/explore/projects");
+  revalidatePath("/explore/products");
   return { ok: true as const };
 }
 
@@ -830,7 +848,9 @@ export async function updateProjectAction(
   revalidatePath("/admin/projects");
   revalidatePath("/admin/projects/[id]");
   revalidatePath("/projects");
+  revalidatePath("/projects/[slug]", "page");
   revalidatePath("/explore/projects");
+  revalidatePath("/u/[username]", "page");
   redirect(`/admin/projects/${listingId}?saved=1`);
 }
 
@@ -952,7 +972,9 @@ export async function updateProductAction(
   revalidatePath("/admin/products");
   revalidatePath("/admin/products/[id]");
   revalidatePath("/products");
+  revalidatePath("/products/[slug]", "page");
   revalidatePath("/explore/products");
+  revalidatePath("/u/[username]", "page");
   redirect(`/admin/products/${listingId}?saved=1`);
 }
 
@@ -975,6 +997,10 @@ export async function approveListingAction(listingId: string) {
   revalidatePath("/admin/products");
   revalidatePath("/projects");
   revalidatePath("/products");
+  revalidatePath("/projects/[slug]", "page");
+  revalidatePath("/products/[slug]", "page");
+  revalidatePath("/explore/projects");
+  revalidatePath("/explore/products");
   return { ok: true as const };
 }
 
