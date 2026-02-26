@@ -140,7 +140,7 @@ export default async function ProjectPage({
     const baseUrl = getBaseUrl();
     const matchesUrl = `${baseUrl}/api/matches/project?projectId=${encodeURIComponent(project.id)}&tier=all&limit=8`;
     try {
-      const res = await fetch(matchesUrl, { next: { revalidate: 300 } });
+      const res = await fetch(matchesUrl, { cache: "no-store" });
       const data = (await res.json()) as { items?: { id: string; slug: string; title: string; primary_image?: string | null }[] };
       const items = Array.isArray(data.items) ? data.items : [];
       suggestedItems = items.map((item) => ({

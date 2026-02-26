@@ -1,7 +1,8 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import {
   createListing as dbCreateListing,
   deleteListing as dbDeleteListing,
@@ -194,6 +195,8 @@ export async function createProject(
   revalidatePath("/explore/projects");
   revalidatePath("/me/listings");
   revalidatePath("/");
+  revalidateTag(CACHE_TAGS.listings);
+  revalidateTag(CACHE_TAGS.explore);
   return { id: listingId };
 }
 
@@ -324,6 +327,8 @@ export async function createProduct(
   revalidatePath("/explore/products");
   revalidatePath("/");
   revalidatePath("/me/listings");
+  revalidateTag(CACHE_TAGS.listings);
+  revalidateTag(CACHE_TAGS.explore);
   return { slug: resolvedSlug };
 }
 
@@ -347,6 +352,8 @@ export async function deleteListing(listingId: string): Promise<ActionResult> {
   revalidatePath("/explore/projects");
   revalidatePath("/explore/products");
   revalidatePath("/");
+  revalidateTag(CACHE_TAGS.listings);
+  revalidateTag(CACHE_TAGS.explore);
   return {};
 }
 
@@ -390,6 +397,8 @@ export async function createProjectCanonical(
 
   revalidatePath("/");
   revalidatePath("/explore/projects");
+  revalidateTag(CACHE_TAGS.listings);
+  revalidateTag(CACHE_TAGS.explore);
   return { slug };
 }
 
@@ -548,6 +557,8 @@ export async function createProductCanonical(
   revalidatePath("/");
   revalidatePath("/explore/products");
   revalidatePath(`/products/${slug}`);
+  revalidateTag(CACHE_TAGS.listings);
+  revalidateTag(CACHE_TAGS.explore);
   return { slug };
 }
 

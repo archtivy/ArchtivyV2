@@ -1,7 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { auth } from "@clerk/nextjs/server";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getProfileByClerkIdForAdmin } from "@/lib/db/profiles";
@@ -541,6 +542,9 @@ export async function bulkUpdateListings(input: {
   revalidatePath("/products/[slug]", "page");
   revalidatePath("/explore/projects");
   revalidatePath("/explore/products");
+  revalidatePath("/explore");
+  revalidateTag(CACHE_TAGS.listings);
+  revalidateTag(CACHE_TAGS.explore);
   return { ok: true as const };
 }
 
@@ -686,6 +690,9 @@ export async function deleteListing(listingId: string) {
   revalidatePath("/products/[slug]", "page");
   revalidatePath("/explore/projects");
   revalidatePath("/explore/products");
+  revalidatePath("/explore");
+  revalidateTag(CACHE_TAGS.listings);
+  revalidateTag(CACHE_TAGS.explore);
   return { ok: true as const };
 }
 
@@ -722,6 +729,9 @@ export async function bulkDeleteListings(ids: string[]) {
   revalidatePath("/products/[slug]", "page");
   revalidatePath("/explore/projects");
   revalidatePath("/explore/products");
+  revalidatePath("/explore");
+  revalidateTag(CACHE_TAGS.listings);
+  revalidateTag(CACHE_TAGS.explore);
   return { ok: true as const };
 }
 
@@ -851,6 +861,8 @@ export async function updateProjectAction(
   revalidatePath("/projects/[slug]", "page");
   revalidatePath("/explore/projects");
   revalidatePath("/u/[username]", "page");
+  revalidateTag(CACHE_TAGS.listings);
+  revalidateTag(CACHE_TAGS.explore);
   redirect(`/admin/projects/${listingId}?saved=1`);
 }
 
@@ -975,6 +987,8 @@ export async function updateProductAction(
   revalidatePath("/products/[slug]", "page");
   revalidatePath("/explore/products");
   revalidatePath("/u/[username]", "page");
+  revalidateTag(CACHE_TAGS.listings);
+  revalidateTag(CACHE_TAGS.explore);
   redirect(`/admin/products/${listingId}?saved=1`);
 }
 
@@ -1001,6 +1015,9 @@ export async function approveListingAction(listingId: string) {
   revalidatePath("/products/[slug]", "page");
   revalidatePath("/explore/projects");
   revalidatePath("/explore/products");
+  revalidatePath("/explore");
+  revalidateTag(CACHE_TAGS.listings);
+  revalidateTag(CACHE_TAGS.explore);
   return { ok: true as const };
 }
 

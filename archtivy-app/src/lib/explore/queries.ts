@@ -696,3 +696,39 @@ export async function getExplorePanelList(
 
   return rows;
 }
+
+// ---------------------------------------------------------------------------
+// Cached variants — wrap each query in unstable_cache so revalidateTag works.
+// The page-level `force-dynamic` keeps pages re-rendering on every request, but
+// the Data Cache serves the DB result until a tag is invalidated by a mutation.
+// TTL of 60 s is a safety net; mutations trigger immediate invalidation via
+// revalidateTag(CACHE_TAGS.explore / listings / profiles).
+// ---------------------------------------------------------------------------
+import { unstable_cache } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
+
+const EXPLORE_REVALIDATE = 60; // seconds
+
+export const getExploreSignalsCached = unstable_cache(
+  getExploreSignals,
+  ["explore:signals"],
+  { tags: [CACHE_TAGS.explore, CACHE_TAGS.listings, CACHE_TAGS.profiles], revalidate: EXPLORE_REVALIDATE }
+);
+
+export const getExploreModulesCached = unstable_cache(
+  getExploreModules,
+  ["explore:modules"],
+  { tags: [CACHE_TAGS.explore, CACHE_TAGS.listings, CACHE_TAGS.profiles], revalidate: EXPLORE_REVALIDATE }
+);
+
+export const getExploreRisingSignalsCached = unstable_cache(
+  getExploreRisingSignals,
+  ["explore:rising"],
+  { tags: [CACHE_TAGS.explore, CACHE_TAGS.listings], revalidate: EXPLORE_REVALIDATE }
+);
+
+export const getExplorePanelListCached = unstable_cache(
+  getExplorePanelList,
+  ["explore:panel"],
+  { tags: [CACHE_TAGS.explore, CACHE_TAGS.listings, CACHE_TAGS.profiles], revalidate: EXPLORE_REVALIDATE }
+);

@@ -1,11 +1,11 @@
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { getProfilesByRole } from "@/lib/db/profiles";
+import { getProfilesByRoleCached } from "@/lib/db/profiles";
 import { ProfileCard } from "@/components/explore/ProfileCard";
 
 export default async function ExploreDesignersPage() {
-  const { data: profiles } = await getProfilesByRole("designer");
+  const { data: profiles } = await getProfilesByRoleCached("designer");
   const designers = profiles ?? [];
 
   return (

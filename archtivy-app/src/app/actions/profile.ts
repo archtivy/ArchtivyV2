@@ -1,7 +1,8 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getProfileByClerkId, updateProfile, isUsernameTaken } from "@/lib/db/profiles";
 import type { ProfileUpdateInput } from "@/lib/types/profiles";
 
@@ -86,9 +87,14 @@ export async function updateProfileAction(
   revalidatePath("/me");
   revalidatePath("/");
   revalidatePath(`/u/id/${profileId}`);
+  revalidatePath("/explore/designers");
+  revalidatePath("/explore/brands");
+  revalidatePath("/explore");
   if (result.data?.username) {
     revalidatePath(`/u/${encodeURIComponent(result.data.username)}`);
   }
+  revalidateTag(CACHE_TAGS.profiles);
+  revalidateTag(CACHE_TAGS.explore);
   return { ok: true };
 }
 

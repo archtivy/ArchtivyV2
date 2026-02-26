@@ -456,3 +456,15 @@ export async function markPlaceholderAsClaimedAndHidden(
   if (error) return { data: null, error: error.message };
   return { data: undefined, error: null };
 }
+
+// ---------------------------------------------------------------------------
+// Cached variant — pairs with revalidateTag(CACHE_TAGS.profiles) in mutations.
+// ---------------------------------------------------------------------------
+import { unstable_cache } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
+
+export const getProfilesByRoleCached = unstable_cache(
+  getProfilesByRole,
+  ["profiles:by-role"],
+  { tags: [CACHE_TAGS.profiles, CACHE_TAGS.explore], revalidate: 60 }
+);

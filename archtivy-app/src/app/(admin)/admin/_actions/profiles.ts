@@ -2,9 +2,10 @@
 
 import { createHash } from "crypto";
 import { randomBytes } from "crypto";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 
 const toText = (v: unknown) => (v == null ? "" : String(v).trim());
 const toNull = (v: unknown) => {
@@ -175,6 +176,10 @@ export async function updateProfile(input: {
   revalidatePath("/u/id/[profileId]", "page");
   revalidatePath("/me/listings");
   revalidatePath("/explore");
+  revalidatePath("/explore/designers");
+  revalidatePath("/explore/brands");
+  revalidateTag(CACHE_TAGS.profiles);
+  revalidateTag(CACHE_TAGS.explore);
   return { ok: true as const };
 }
 
@@ -204,6 +209,10 @@ export async function bulkUpdateProfiles(input: {
   revalidatePath("/admin/profiles");
   revalidatePath("/admin");
   revalidatePath("/u/[username]", "page");
+  revalidatePath("/explore/designers");
+  revalidatePath("/explore/brands");
+  revalidateTag(CACHE_TAGS.profiles);
+  revalidateTag(CACHE_TAGS.explore);
   return { ok: true as const };
 }
 

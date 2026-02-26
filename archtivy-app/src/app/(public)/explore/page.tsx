@@ -3,9 +3,9 @@ export const revalidate = 0;
 
 import { Suspense } from "react";
 import {
-  getExploreSignals,
-  getExploreModules,
-  getExploreRisingSignals,
+  getExploreSignalsCached,
+  getExploreModulesCached,
+  getExploreRisingSignalsCached,
 } from "@/lib/explore/queries";
 import { ExploreIntelligenceLayout } from "@/components/explore/ExploreIntelligenceLayout";
 
@@ -23,9 +23,9 @@ export default async function ExplorePage({
   const city = typeof params.city === "string" ? params.city.trim() || null : null;
 
   const [signals, modules, risingSignals] = await Promise.all([
-    getExploreSignals(city),
-    getExploreModules(city, 5),
-    getExploreRisingSignals(city, 5),
+    getExploreSignalsCached(city),
+    getExploreModulesCached(city, 5),
+    getExploreRisingSignalsCached(city, 5),
   ]);
 
   return (

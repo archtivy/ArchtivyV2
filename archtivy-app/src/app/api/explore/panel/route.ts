@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getExplorePanelList } from "@/lib/explore/queries";
+import { getExplorePanelListCached } from "@/lib/explore/queries";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   const canonicalPanel = panel === "market-leaders" || panel === "network-growth" ? "designers" : panel === "signals" ? "categories" : panel;
 
-  const rows = await getExplorePanelList(
+  const rows = await getExplorePanelListCached(
     canonicalPanel as "designers" | "projects" | "brands" | "products" | "categories" | "collaboration",
     city,
     limit
