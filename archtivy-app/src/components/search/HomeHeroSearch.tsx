@@ -7,7 +7,7 @@ import { getRecentSearches, addRecentSearch, clearRecentSearches, type SearchSco
 import { track } from "@/lib/events";
 
 const PLACEHOLDER = "Search projects, products, materials, locations…";
-const HINT = "Try: 'travertine', 'Bodrum', 'oak chair', 'concrete'…";
+const HINT = "Try: residential renovation, travertine flooring, oak wood panel, hospitality interior…";
 
 function SearchIcon() {
   return (

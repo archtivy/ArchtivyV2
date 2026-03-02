@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface ActivityItem {
   text: string;
@@ -8,6 +8,9 @@ interface ActivityItem {
 
 export function LiveActivityStrip() {
   const [items, setItems] = useState<ActivityItem[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [visible, setVisible] = useState(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetch("/api/activity")
@@ -20,54 +23,40 @@ export function LiveActivityStrip() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (items.length <= 1) return;
+
+    intervalRef.current = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setActiveIndex((i) => (i + 1) % items.length);
+        setVisible(true);
+      }, 250);
+    }, 6000);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [items]);
+
   if (items.length === 0) return null;
 
-  // Duplicate items to create a seamless infinite loop
-  const displayItems = [...items, ...items];
-  const duration = items.length * 5;
+  const currentText = items[activeIndex]?.text ?? "";
 
   return (
-    <>
-      <style>{`
-        @keyframes archtivy-ticker {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-      `}</style>
-      <div
-        className="relative mt-8 overflow-hidden border-y border-zinc-100 py-2.5 dark:border-zinc-800"
-        aria-hidden
+    <div className="mt-8 border-t border-zinc-100 pt-5 dark:border-zinc-800">
+      <p
+        className="text-center text-sm font-medium text-gray-700 dark:text-zinc-300"
+        style={{
+          opacity: visible ? 1 : 0,
+          transition: "opacity 250ms ease",
+          minHeight: "1.25rem",
+        }}
+        aria-live="polite"
+        aria-atomic="true"
       >
-        <div
-          className="flex gap-10 whitespace-nowrap"
-          style={{
-            animation: `archtivy-ticker ${duration}s linear infinite`,
-            willChange: "transform",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLDivElement).style.animationPlayState = "paused";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLDivElement).style.animationPlayState = "running";
-          }}
-        >
-          {displayItems.map((item, i) => (
-            <span
-              key={i}
-              className="flex shrink-0 items-center gap-3 text-xs text-zinc-400 dark:text-zinc-500"
-            >
-              <span
-                className="h-1 w-1 rounded-full bg-zinc-300 dark:bg-zinc-600"
-                aria-hidden
-              />
-              {item.text}
-            </span>
-          ))}
-        </div>
-        {/* Fade edges */}
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-white dark:from-zinc-950" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-white dark:from-zinc-950" />
-      </div>
-    </>
+        {currentText}
+      </p>
+    </div>
   );
 }

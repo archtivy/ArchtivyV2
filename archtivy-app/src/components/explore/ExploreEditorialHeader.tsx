@@ -69,45 +69,53 @@ export function ExploreEditorialHeader({
     [currentFilters, type, pathname, router]
   );
 
-  // Build stats pill row
-  const statParts: string[] = [];
+  // Primary dominant metric
+  const primaryCount =
+    counts != null
+      ? type === "projects"
+        ? `${formatCount(counts.projectCount)} Projects`
+        : `${formatCount(counts.productCount)} Products`
+      : null;
+
+  // Secondary metrics line (contextual labeling per page type)
+  const secondaryParts: string[] = [];
   if (counts != null) {
     if (type === "projects") {
-      statParts.push(`${formatCount(counts.projectCount)} Projects`);
-      statParts.push(`${formatCount(counts.productCount)} Products`);
-      if (counts.connectionCount != null) {
-        statParts.push(`${formatCount(counts.connectionCount)} Connections`);
+      if (counts.productCount > 0) {
+        secondaryParts.push(`${formatCount(counts.productCount)} Connected Products`);
       }
       if (platformStats?.professionalsCount) {
-        statParts.push(`${formatCount(platformStats.professionalsCount)} Professionals`);
-      }
-      if (platformStats?.countriesCount) {
-        statParts.push(`${platformStats.countriesCount} Countries`);
+        const profStr = `${formatCount(platformStats.professionalsCount)} Professionals`;
+        const locStr =
+          platformStats.countriesCount > 0
+            ? `${profStr} across ${platformStats.countriesCount} ${platformStats.countriesCount === 1 ? "Country" : "Countries"}`
+            : profStr;
+        secondaryParts.push(locStr);
       }
     } else {
-      statParts.push(`${formatCount(counts.productCount)} Products`);
-      statParts.push(`${formatCount(counts.projectCount)} Projects`);
-      if (counts.connectionCount != null) {
-        statParts.push(`${formatCount(counts.connectionCount)} Connections`);
+      if (counts.connectionCount != null && counts.connectionCount > 0) {
+        secondaryParts.push(`${formatCount(counts.connectionCount)} Appearances in Projects`);
       }
       if (platformStats?.professionalsCount) {
-        statParts.push(`${formatCount(platformStats.professionalsCount)} Professionals`);
+        secondaryParts.push(`${formatCount(platformStats.professionalsCount)} Professionals`);
+      }
+      if (platformStats?.countriesCount) {
+        secondaryParts.push(`${platformStats.countriesCount} ${platformStats.countriesCount === 1 ? "Country" : "Countries"}`);
       }
     }
   }
-  const statsLine = statParts.length > 0 ? statParts.join(" · ") : null;
+  const secondaryLine = secondaryParts.length > 0 ? secondaryParts.join(" · ") : null;
 
-  // Micro-activity line (e.g. "3 new projects this week · 12 professionals across 18 countries")
+  // Micro-activity line — real-time signal below stats
   const microParts: string[] = [];
-  if (platformStats) {
-    if (platformStats.projectsThisWeek > 0) {
+  if (platformStats?.projectsThisWeek > 0) {
+    if (type === "projects") {
       microParts.push(
         `${platformStats.projectsThisWeek} new project${platformStats.projectsThisWeek !== 1 ? "s" : ""} this week`
       );
-    }
-    if (type === "products" && platformStats.professionalsCount > 0 && platformStats.countriesCount > 0) {
+    } else {
       microParts.push(
-        `${formatCount(platformStats.professionalsCount)} professionals across ${platformStats.countriesCount} countries`
+        `${platformStats.projectsThisWeek} new project connections this week`
       );
     }
   }
@@ -134,12 +142,12 @@ export function ExploreEditorialHeader({
             />
             <div
               ref={sortPanelRef}
-              className="border border-zinc-200 bg-white py-1 shadow-md dark:border-zinc-700 dark:bg-zinc-900"
+              className="border border-zinc-200 bg-white py-1 shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
               style={{
                 position: "fixed",
                 top: sortPos.top,
                 right: sortPos.right,
-                minWidth: 168,
+                minWidth: 160,
                 zIndex: 1000,
                 borderRadius: 4,
               }}
@@ -152,7 +160,7 @@ export function ExploreEditorialHeader({
                   className={`flex w-full items-center px-4 py-2 text-left text-sm transition hover:bg-zinc-50 dark:hover:bg-zinc-800 ${
                     sort === s
                       ? "font-medium text-[#002abf] dark:text-blue-400"
-                      : "text-zinc-700 dark:text-zinc-300"
+                      : "text-zinc-600 dark:text-zinc-300"
                   }`}
                 >
                   {SORT_LABELS[s] ?? s}
@@ -170,29 +178,39 @@ export function ExploreEditorialHeader({
       aria-label="Explore header"
     >
       <Container>
-        {/* Top row: title/subline/stats ← → sort control */}
-        <div className="flex items-start justify-between gap-4 py-6 sm:py-8">
+        {/* Top section: 2-column — title/stats left, sort right */}
+        <div className="flex items-start justify-between gap-6 pb-6 pt-6 sm:pb-7 sm:pt-8">
+          {/* Left: title + subline + stats hierarchy */}
           <div className="min-w-0">
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-100">
+            <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-100">
               {title}
             </h1>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="mt-2 text-sm font-medium text-gray-800 dark:text-zinc-300">
               {subline}
             </p>
-            {statsLine && (
-              <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500" aria-hidden>
-                {statsLine}
-              </p>
-            )}
-            {microLine && (
-              <p className="mt-1 text-xs text-zinc-300 dark:text-zinc-600" aria-hidden>
-                {microLine}
-              </p>
+
+            {/* Stats — two-tier visual hierarchy */}
+            {primaryCount && (
+              <div className="mt-4 space-y-0.5">
+                <p className="text-lg font-semibold leading-tight text-zinc-900 dark:text-zinc-100">
+                  {primaryCount}
+                </p>
+                {secondaryLine && (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {secondaryLine}
+                  </p>
+                )}
+                {microLine && (
+                  <p className="pt-1.5 text-sm text-gray-600 dark:text-zinc-400">
+                    {microLine}
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
-          {/* Sort control */}
-          <div className="shrink-0 self-start pt-1.5">
+          {/* Right: sort — compact, lower visual weight */}
+          <div className="shrink-0 pt-1">
             <button
               ref={sortTriggerRef}
               type="button"
@@ -200,42 +218,51 @@ export function ExploreEditorialHeader({
                 setSortOpen((prev) => !prev);
                 if (!sortOpen) setTimeout(updateSortPos, 0);
               }}
-              className="flex items-center gap-1.5 border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="flex items-center gap-1.5 border border-zinc-200 bg-white px-2.5 py-1 text-xs text-zinc-600 transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-200"
               style={{ borderRadius: 4 }}
               aria-expanded={sortOpen}
               aria-haspopup="listbox"
             >
-              <span className="text-zinc-400 dark:text-zinc-500">Sort by:</span>
+              <span className="text-zinc-400 dark:text-zinc-500">Sort:</span>
               <span className="font-medium">{currentSortLabel}</span>
               <svg
-                width="11"
-                height="11"
+                width="9"
+                height="9"
                 viewBox="0 0 12 12"
                 fill="none"
                 aria-hidden
                 className={`shrink-0 text-zinc-400 transition-transform duration-150 ${sortOpen ? "rotate-180" : ""}`}
               >
-                <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M2 4l4 4 4-4"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </button>
             {sortPanelContent}
           </div>
         </div>
 
-        {/* Search bar — 48px tall, radius 4px, full-width within Container */}
-        <div className="pb-4">
+        {/* Subtle divider between content and search */}
+        <div className="border-t border-zinc-100 dark:border-zinc-800/60" />
+
+        {/* Search bar — slightly reduced height */}
+        <div className="py-3.5">
           <ExploreSearchBar
             type={type}
             currentFilters={currentFilters}
-            placeholder="Search projects, products, designers, brands, materials, cities…"
+            placeholder="Search by material, category, brand, or location…"
             className="w-full"
-            inputClassName="h-12 border border-zinc-200 bg-white text-sm text-zinc-900 placeholder-zinc-400 focus:border-[#002abf] focus:outline-none focus:ring-1 focus:ring-[#002abf]/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-[#002abf]"
+            inputClassName="h-10 border border-zinc-200 bg-white text-sm text-zinc-900 placeholder-zinc-400 focus:border-[#002abf] focus:outline-none focus:ring-1 focus:ring-[#002abf]/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-[#002abf]"
             showCmdK
           />
         </div>
 
-        {/* Filter row — refined pills, sort handled above */}
-        <div className="pb-5">
+        {/* Filter row */}
+        <div className="pb-4">
           <ExploreFilterBar
             type={type}
             currentFilters={currentFilters}
