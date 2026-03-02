@@ -32,7 +32,7 @@ export function LiveActivityStrip() {
         setActiveIndex((i) => (i + 1) % items.length);
         setVisible(true);
       }, 250);
-    }, 6000);
+    }, 3500);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);

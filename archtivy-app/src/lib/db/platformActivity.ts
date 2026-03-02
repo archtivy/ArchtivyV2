@@ -8,13 +8,14 @@ export interface PlatformActivityItem {
 
 export interface PlatformStats {
   projectsThisWeek: number;
+  productsThisWeek: number;
   professionalsCount: number;
-  countriesCount: number;
+  countriesCount: number; // distinct countries from approved projects (used on projects page only)
 }
 
 /**
  * Returns recent activity items for the rotating activity line.
- * Prioritized order: project publishing > product specifications > geography > new professionals.
+ * Prioritized order: project publishing > platform connection signal > new professionals.
  */
 export async function getPlatformActivityFeed(): Promise<PlatformActivityItem[]> {
   const sup = supabase();
@@ -108,11 +109,18 @@ export async function getPlatformStats(): Promise<PlatformStats> {
   const sup = supabase();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [weekProjectsRes, professionalsRes, countriesRes] = await Promise.all([
+  const [weekProjectsRes, weekProductsRes, professionalsRes, countriesRes] = await Promise.all([
     sup
       .from("listings")
       .select("id", { count: "exact", head: true })
       .eq("type", "project")
+      .eq("status", "APPROVED")
+      .is("deleted_at", null)
+      .gte("created_at", sevenDaysAgo),
+    sup
+      .from("listings")
+      .select("id", { count: "exact", head: true })
+      .eq("type", "product")
       .eq("status", "APPROVED")
       .is("deleted_at", null)
       .gte("created_at", sevenDaysAgo),
@@ -129,6 +137,7 @@ export async function getPlatformStats(): Promise<PlatformStats> {
   ]);
 
   const projectsThisWeek = weekProjectsRes.count ?? 0;
+  const productsThisWeek = weekProductsRes.count ?? 0;
   const professionalsCount = professionalsRes.count ?? 0;
 
   // Manually compute distinct countries (Supabase JS doesn't support SELECT DISTINCT COUNT)
@@ -136,5 +145,5 @@ export async function getPlatformStats(): Promise<PlatformStats> {
   const uniqueCountries = new Set(countryRows.map((r) => r.location_country).filter(Boolean));
   const countriesCount = uniqueCountries.size;
 
-  return { projectsThisWeek, professionalsCount, countriesCount };
+  return { projectsThisWeek, productsThisWeek, professionalsCount, countriesCount };
 }

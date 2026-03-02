@@ -77,7 +77,7 @@ export function ExploreEditorialHeader({
         : `${formatCount(counts.productCount)} Products`
       : null;
 
-  // Secondary metrics line (contextual labeling per page type)
+  // Secondary metrics — contextual labels per page type, no Countries on products
   const secondaryParts: string[] = [];
   if (counts != null) {
     if (type === "projects") {
@@ -86,37 +86,38 @@ export function ExploreEditorialHeader({
       }
       if (platformStats?.professionalsCount) {
         const profStr = `${formatCount(platformStats.professionalsCount)} Professionals`;
-        const locStr =
-          platformStats.countriesCount > 0
-            ? `${profStr} across ${platformStats.countriesCount} ${platformStats.countriesCount === 1 ? "Country" : "Countries"}`
-            : profStr;
-        secondaryParts.push(locStr);
+        const countriesCount = platformStats.countriesCount ?? 0;
+        secondaryParts.push(
+          countriesCount > 0
+            ? `${profStr} across ${countriesCount} ${countriesCount === 1 ? "Country" : "Countries"}`
+            : profStr
+        );
       }
     } else {
+      // Products page: appearances + professionals. No countries (products have no location).
       if (counts.connectionCount != null && counts.connectionCount > 0) {
-        secondaryParts.push(`${formatCount(counts.connectionCount)} Appearances in Projects`);
+        secondaryParts.push(`${formatCount(counts.connectionCount)} Project Appearances`);
       }
       if (platformStats?.professionalsCount) {
         secondaryParts.push(`${formatCount(platformStats.professionalsCount)} Professionals`);
-      }
-      if (platformStats?.countriesCount) {
-        secondaryParts.push(`${platformStats.countriesCount} ${platformStats.countriesCount === 1 ? "Country" : "Countries"}`);
       }
     }
   }
   const secondaryLine = secondaryParts.length > 0 ? secondaryParts.join(" · ") : null;
 
-  // Micro-activity line — real-time signal below stats
+  // Micro-activity — type-specific, safe local variables
   const projectsThisWeek = platformStats?.projectsThisWeek ?? 0;
+  const productsThisWeek = platformStats?.productsThisWeek ?? 0;
   const microParts: string[] = [];
-  if (projectsThisWeek > 0) {
-    if (type === "projects") {
-      microParts.push(
-        `${projectsThisWeek} new project${projectsThisWeek !== 1 ? "s" : ""} this week`
-      );
-    } else {
-      microParts.push(`${projectsThisWeek} new project connections this week`);
-    }
+  if (type === "projects" && projectsThisWeek > 0) {
+    microParts.push(
+      `${projectsThisWeek} new project${projectsThisWeek !== 1 ? "s" : ""} this week`
+    );
+  }
+  if (type === "products" && productsThisWeek > 0) {
+    microParts.push(
+      `${productsThisWeek} new product${productsThisWeek !== 1 ? "s" : ""} this week`
+    );
   }
   const microLine = microParts.length > 0 ? microParts.join(" · ") : null;
 
@@ -177,39 +178,61 @@ export function ExploreEditorialHeader({
       aria-label="Explore header"
     >
       <Container>
-        {/* Top section: 2-column — title/stats left, sort right */}
-        <div className="flex items-start justify-between gap-6 pb-6 pt-6 sm:pb-7 sm:pt-8">
-          {/* Left: title + subline + stats hierarchy */}
-          <div className="min-w-0">
-            <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-100">
-              {title}
-            </h1>
-            <p className="mt-2 text-sm font-medium text-gray-800 dark:text-zinc-300">
-              {subline}
-            </p>
+        {/* Title section — centered */}
+        <div className="pb-5 pt-6 text-center sm:pb-6 sm:pt-8">
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-100">
+            {title}
+          </h1>
+          <p className="mx-auto mt-2 max-w-xl text-sm font-medium text-gray-800 dark:text-zinc-300">
+            {subline}
+          </p>
 
-            {/* Stats — two-tier visual hierarchy */}
-            {primaryCount && (
-              <div className="mt-4 space-y-0.5">
-                <p className="text-lg font-semibold leading-tight text-zinc-900 dark:text-zinc-100">
-                  {primaryCount}
-                </p>
-                {secondaryLine && (
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                    {secondaryLine}
-                  </p>
-                )}
-                {microLine && (
-                  <p className="pt-1.5 text-sm text-gray-600 dark:text-zinc-400">
-                    {microLine}
-                  </p>
-                )}
-              </div>
-            )}
+          {/* Stats — two-tier visual hierarchy, centered */}
+          {primaryCount && (
+            <div className="mt-4 space-y-0.5">
+              <p className="text-lg font-semibold leading-tight text-zinc-900 dark:text-zinc-100">
+                {primaryCount}
+              </p>
+              {secondaryLine && (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">{secondaryLine}</p>
+              )}
+              {microLine && (
+                <p className="pt-1 text-sm text-gray-600 dark:text-zinc-400">{microLine}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Subtle divider between content and search */}
+        <div className="border-t border-zinc-100 dark:border-zinc-800/60" />
+
+        {/* Search bar — centered, max-w-3xl, reduced height */}
+        <div className="mx-auto max-w-3xl py-3">
+          <ExploreSearchBar
+            type={type}
+            currentFilters={currentFilters}
+            placeholder="Search by material, category, brand, or location…"
+            className="w-full"
+            inputClassName="h-9 border border-zinc-200 bg-white text-sm text-zinc-900 placeholder-zinc-400 focus:border-[#002abf] focus:outline-none focus:ring-1 focus:ring-[#002abf]/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-[#002abf]"
+            showCmdK
+          />
+        </div>
+
+        {/* Filter row + sort on the same line */}
+        <div className="flex items-start gap-2 pb-4">
+          {/* Filter pills — flex-1 so sort button sits flush right */}
+          <div className="min-w-0 flex-1">
+            <ExploreFilterBar
+              type={type}
+              currentFilters={currentFilters}
+              options={options}
+              sort={sort}
+              hideSort
+            />
           </div>
 
-          {/* Right: sort — compact, lower visual weight */}
-          <div className="shrink-0 pt-1">
+          {/* Sort button — same visual level as filter pills */}
+          <div className="shrink-0 pt-0.5">
             <button
               ref={sortTriggerRef}
               type="button"
@@ -217,13 +240,12 @@ export function ExploreEditorialHeader({
                 setSortOpen((prev) => !prev);
                 if (!sortOpen) setTimeout(updateSortPos, 0);
               }}
-              className="flex items-center gap-1.5 border border-zinc-200 bg-white px-2.5 py-1 text-xs text-zinc-600 transition hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-200"
-              style={{ borderRadius: 4 }}
+              className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-600 dark:hover:bg-zinc-700"
               aria-expanded={sortOpen}
               aria-haspopup="listbox"
             >
               <span className="text-zinc-400 dark:text-zinc-500">Sort:</span>
-              <span className="font-medium">{currentSortLabel}</span>
+              <span>{currentSortLabel}</span>
               <svg
                 width="9"
                 height="9"
@@ -243,32 +265,6 @@ export function ExploreEditorialHeader({
             </button>
             {sortPanelContent}
           </div>
-        </div>
-
-        {/* Subtle divider between content and search */}
-        <div className="border-t border-zinc-100 dark:border-zinc-800/60" />
-
-        {/* Search bar — slightly reduced height */}
-        <div className="py-3.5">
-          <ExploreSearchBar
-            type={type}
-            currentFilters={currentFilters}
-            placeholder="Search by material, category, brand, or location…"
-            className="w-full"
-            inputClassName="h-10 border border-zinc-200 bg-white text-sm text-zinc-900 placeholder-zinc-400 focus:border-[#002abf] focus:outline-none focus:ring-1 focus:ring-[#002abf]/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-[#002abf]"
-            showCmdK
-          />
-        </div>
-
-        {/* Filter row */}
-        <div className="pb-4">
-          <ExploreFilterBar
-            type={type}
-            currentFilters={currentFilters}
-            options={options}
-            sort={sort}
-            hideSort
-          />
         </div>
       </Container>
     </header>
