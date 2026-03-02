@@ -4,6 +4,7 @@ import { parseExploreFilters } from "@/lib/explore/filters/parse";
 import { exploreFiltersToProjectFilters } from "@/lib/explore/filters/query";
 import { getExploreFilterOptions } from "@/lib/explore/filters/options";
 import { getPlatformStats } from "@/lib/db/platformActivity";
+import { getProfilesForStrip } from "@/lib/db/profiles";
 import { ExploreEditorialHeader } from "@/components/explore/ExploreEditorialHeader";
 import { ExploreProjectsContent } from "@/components/explore/ExploreProjectsContent";
 import { ExploreEmptyState } from "@/components/explore/ExploreEmptyState";
@@ -18,7 +19,7 @@ export default async function ExploreProjectsPage({
   const filters = parseExploreFilters(params, "projects");
   const projectFilters = exploreFiltersToProjectFilters(filters);
 
-  const [result, options, networkCounts, platformStats] = await Promise.all([
+  const [result, options, networkCounts, platformStats, designerProfiles] = await Promise.all([
     getProjectsCanonicalFiltered({
       filters: projectFilters,
       limit: EXPLORE_PAGE_SIZE,
@@ -28,6 +29,7 @@ export default async function ExploreProjectsPage({
     getExploreFilterOptions("projects"),
     getExploreNetworkCounts(),
     getPlatformStats(),
+    getProfilesForStrip(["designer", "brand"], 18),
   ]);
 
   const { data: initialData, total } = result;
@@ -38,14 +40,12 @@ export default async function ExploreProjectsPage({
     ? filters.city.trim().replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : null;
 
-  // Derive designer strip items from already-fetched filter options (no extra DB call).
-  // TODO: enrich with logoUrl + locationText once a lightweight profiles endpoint exists.
-  const designerStripItems = options.designers.slice(0, 30).map((d) => ({
-    id: d.value,
-    name: d.label,
-    logoUrl: null,
-    locationText: null,
-    href: `/u/id/${d.value}`,
+  const designerStripItems = designerProfiles.map((d) => ({
+    id: d.id,
+    name: d.display_name ?? d.username ?? "Designer",
+    logoUrl: d.avatar_url,
+    locationText: d.location_city ?? d.location_country ?? null,
+    href: `/u/${d.username ?? `id/${d.id}`}`,
   }));
 
   return (

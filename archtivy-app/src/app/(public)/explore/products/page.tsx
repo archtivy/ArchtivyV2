@@ -5,6 +5,7 @@ import { parseExploreFilters } from "@/lib/explore/filters/parse";
 import { exploreFiltersToProductFilters, countActiveFilters } from "@/lib/explore/filters/query";
 import { getExploreFilterOptions } from "@/lib/explore/filters/options";
 import { getPlatformStats } from "@/lib/db/platformActivity";
+import { getProfilesForStrip } from "@/lib/db/profiles";
 import { ExploreEditorialHeader } from "@/components/explore/ExploreEditorialHeader";
 import { ExploreProductsContent } from "@/components/explore/ExploreProductsContent";
 import { ExploreEmptyState } from "@/components/explore/ExploreEmptyState";
@@ -31,7 +32,7 @@ export default async function ExploreProductsPage({
   const filters = parseExploreFilters(params, "products");
   const productFilters = exploreFiltersToProductFilters(filters);
 
-  const [result, options, networkCounts, platformStats] = await Promise.all([
+  const [result, options, networkCounts, platformStats, brandProfiles] = await Promise.all([
     getProductsCanonicalFiltered({
       filters: productFilters,
       limit: EXPLORE_PAGE_SIZE,
@@ -41,6 +42,7 @@ export default async function ExploreProductsPage({
     getExploreFilterOptions("products"),
     getExploreNetworkCounts(),
     getPlatformStats(),
+    getProfilesForStrip(["brand"], 18),
   ]);
 
   const { data: initialData, total } = result;
@@ -51,14 +53,12 @@ export default async function ExploreProductsPage({
     ? filters.city.trim().replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : null;
 
-  // Derive brand strip items from already-fetched filter options (no extra DB call).
-  // TODO: enrich with logoUrl once a lightweight brand profiles endpoint exists.
-  const brandStripItems = options.brands.slice(0, 30).map((b) => ({
-    id: b.value,
-    name: b.label,
-    logoUrl: null,
+  const brandStripItems = brandProfiles.map((b) => ({
+    id: b.id,
+    name: b.display_name ?? b.username ?? "Brand",
+    logoUrl: b.avatar_url,
     locationText: null,
-    href: `/u/id/${b.value}`,
+    href: `/u/${b.username ?? `id/${b.id}`}`,
   }));
 
   return (

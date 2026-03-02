@@ -468,3 +468,32 @@ export const getProfilesByRoleCached = unstable_cache(
   ["profiles:by-role"],
   { tags: [CACHE_TAGS.profiles, CACHE_TAGS.explore], revalidate: 60 }
 );
+
+export type ProfileStripItem = {
+  id: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  location_city: string | null;
+  location_country: string | null;
+};
+
+/**
+ * Fetch a lightweight list of profiles for the RelatedProfilesStrip in explore pages.
+ * Ordered by most recently updated so active profiles appear first.
+ */
+export const getProfilesForStrip = unstable_cache(
+  async (roles: Profile["role"][], limit: number): Promise<ProfileStripItem[]> => {
+    const sup = getSupabaseServiceClient();
+    const { data } = await sup
+      .from(TABLE)
+      .select("id, display_name, username, avatar_url, location_city, location_country")
+      .in("role", roles)
+      .eq("is_hidden", false)
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+    return (data ?? []) as ProfileStripItem[];
+  },
+  ["profiles:for-strip"],
+  { tags: [CACHE_TAGS.profiles, CACHE_TAGS.explore], revalidate: 60 }
+);

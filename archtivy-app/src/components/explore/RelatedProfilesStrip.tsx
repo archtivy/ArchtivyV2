@@ -56,17 +56,20 @@ export function RelatedProfilesStrip({
   };
 
   return (
-    <div className="rounded-[4px] bg-zinc-900 px-5 py-5 dark:bg-zinc-800 sm:px-6 sm:py-6">
+    <div className="rounded-[4px] border border-slate-200 bg-white px-5 py-5 sm:px-6 sm:py-5">
       {/* Header row */}
       <div className="mb-5 flex items-center justify-between gap-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+        <p
+          className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+          style={{ color: "#002abf" }}
+        >
           {title}
         </p>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => scroll("left")}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-zinc-500 transition hover:border-white/20 hover:bg-white/8 hover:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-white/20"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-400 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300"
             aria-label="Scroll left"
           >
             <ChevronIcon dir="left" />
@@ -74,7 +77,7 @@ export function RelatedProfilesStrip({
           <button
             type="button"
             onClick={() => scroll("right")}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-zinc-500 transition hover:border-white/20 hover:bg-white/8 hover:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-white/20"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-400 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300"
             aria-label="Scroll right"
           >
             <ChevronIcon dir="right" />
@@ -85,17 +88,17 @@ export function RelatedProfilesStrip({
       {/* Horizontal scroll row */}
       <div
         ref={scrollRef}
-        className="flex gap-5 overflow-x-auto sm:gap-7 [&::-webkit-scrollbar]:hidden"
+        className="flex gap-4 overflow-x-auto sm:gap-6 [&::-webkit-scrollbar]:hidden"
         style={{ scrollbarWidth: "none" }}
       >
         {items.map((item) => (
           <a
             key={item.id}
             href={item.href}
-            className="group flex w-[68px] shrink-0 flex-col items-center gap-2 text-center focus:outline-none sm:w-[76px]"
+            className="group flex w-[110px] shrink-0 flex-col items-center gap-2 text-center focus:outline-none sm:w-[130px]"
           >
             {/* Circle avatar */}
-            <div className="relative h-[60px] w-[60px] overflow-hidden rounded-full border border-white/10 bg-zinc-700 sm:h-[68px] sm:w-[68px]">
+            <div className="relative h-16 w-16 overflow-hidden rounded-full border border-slate-200 bg-slate-100 sm:h-[72px] sm:w-[72px]">
               {item.logoUrl ? (
                 <img
                   src={item.logoUrl}
@@ -104,20 +107,20 @@ export function RelatedProfilesStrip({
                   loading="lazy"
                 />
               ) : (
-                <span className="absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-zinc-400 sm:text-sm">
+                <span className="absolute inset-0 flex items-center justify-center text-[13px] font-semibold text-slate-500 sm:text-sm">
                   {getInitials(item.name)}
                 </span>
               )}
             </div>
 
             {/* Name */}
-            <span className="block w-full truncate text-[12px] font-medium leading-snug text-zinc-300 transition group-hover:text-white sm:text-[13px]">
+            <span className="block w-full truncate text-[12px] font-medium leading-snug text-zinc-700 transition group-hover:text-zinc-900 sm:text-[13px]">
               {item.name}
             </span>
 
             {/* Location — projects only */}
             {variant === "with-location" && item.locationText && (
-              <span className="block w-full truncate text-[10px] leading-tight text-zinc-600 sm:text-[11px]">
+              <span className="block w-full truncate text-[10px] leading-tight text-zinc-400 sm:text-[11px]">
                 {item.locationText}
               </span>
             )}
