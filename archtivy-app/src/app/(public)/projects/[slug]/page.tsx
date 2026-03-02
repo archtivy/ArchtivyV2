@@ -200,16 +200,15 @@ export default async function ProjectPage({
         product_owner_name: product?.brand ?? undefined,
       });
     }
-    images = imagesWithIds.map((img) => {
-      const src = sanitizeListingImageUrl(img.image_url);
-      return {
+    images = imagesWithIds
+      .filter((img) => sanitizeListingImageUrl(img.image_url) !== null)
+      .map((img) => ({
         id: img.id,
-        src: src ?? "",
+        src: sanitizeListingImageUrl(img.image_url) as string,
         alt: img.alt ?? "Image",
         sort_order: img.sort_order,
         photoTags: tagsByImageId[img.id] ?? [],
-      };
-    });
+      }));
     // Each image: id = listing_images.id, photoTags = tags for that image only (for Lightbox per-image sidebar).
   } else {
     images = canonicalGalleryToGalleryImages(project.gallery);

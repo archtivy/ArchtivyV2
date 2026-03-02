@@ -1,5 +1,8 @@
-import { supabase } from "@/lib/supabaseClient";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+
+// All callers are server-side (Server Components / Server Actions).
+// Use the service-role client so reads are never blocked by RLS on listing_images.
+const supa = () => getSupabaseServiceClient();
 
 const TABLE = "listing_images";
 
@@ -45,7 +48,7 @@ export async function addImages(
     alt: null as string | null,
     sort_order: i,
   }));
-  const { data, error } = await supabase
+  const { data, error } = await supa()
     .from(TABLE)
     .insert(rows)
     .select("id");
@@ -66,7 +69,7 @@ export async function getFirstImageUrlPerListingIds(
   if (listingIds.length === 0) {
     return { data: {}, error: null };
   }
-  const { data, error } = await supabase
+  const { data, error } = await supa()
     .from(TABLE)
     .select("listing_id, image_url, sort_order")
     .in("listing_id", listingIds)
@@ -92,7 +95,7 @@ export async function getFirstImageUrlPerListingIds(
 export async function getImages(
   listingId: string
 ): Promise<DbResult<ListingImage[]>> {
-  const { data, error } = await supabase
+  const { data, error } = await supa()
     .from(TABLE)
     .select("id, listing_id, image_url, alt, sort_order, created_at")
     .eq("listing_id", listingId)
@@ -124,7 +127,7 @@ export async function getImagesByListingIds(
   if (listingIds.length === 0) {
     return { data: [], error: null };
   }
-  const { data, error } = await supabase
+  const { data, error } = await supa()
     .from(TABLE)
     .select("listing_id, image_url, alt, sort_order")
     .in("listing_id", listingIds)
@@ -148,8 +151,7 @@ export async function getListingImagesWithIds(
     { id: string; listing_id: string; image_url: string; alt: string | null; sort_order: number }[]
   >
 > {
-  const supabase = getSupabaseServiceClient();
-  const { data, error } = await supabase
+  const { data, error } = await supa()
     .from(TABLE)
     .select("id, listing_id, image_url, alt, sort_order")
     .eq("listing_id", listingId)
@@ -166,7 +168,7 @@ export async function getListingImagesWithIds(
 export async function deleteImage(
   imageId: string
 ): Promise<DbResult<void>> {
-  const { error } = await supabase.from(TABLE).delete().eq("id", imageId);
+  const { error } = await supa().from(TABLE).delete().eq("id", imageId);
   if (error) {
     return { data: null, error: error.message };
   }
@@ -185,7 +187,7 @@ export async function updateSortOrder(
   }
   const updates = orderedImageIds.map((id, i) => ({ id, sort_order: i }));
   for (const u of updates) {
-    const { error } = await supabase
+    const { error } = await supa()
       .from(TABLE)
       .update({ sort_order: u.sort_order })
       .eq("id", u.id)
