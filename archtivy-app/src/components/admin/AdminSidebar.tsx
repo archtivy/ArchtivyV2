@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { ADMIN_NAV } from "@/components/admin/nav";
+import { LiveStatusIndicator } from "@/components/admin/LiveStatusIndicator";
 
 function isActive(pathname: string, href: string) {
   if (href === "/admin") return pathname === "/admin";
@@ -102,7 +103,8 @@ export function AdminSidebar() {
         <NavLinks pathname={pathname} />
       </nav>
 
-      <div className="border-t border-zinc-200/80 p-3">
+      <div className="border-t border-zinc-200/80 p-3 space-y-2">
+        <LiveStatusIndicator />
         <Link
           href="/"
           className="block rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-200/80"
