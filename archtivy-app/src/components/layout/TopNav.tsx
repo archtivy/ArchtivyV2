@@ -16,6 +16,7 @@ interface ProfileData {
   userId: string | null;
   role: ProfileRole | undefined;
   displayName: string | null;
+  locationCity: string | null;
 }
 
 const navLinks = [
@@ -40,6 +41,7 @@ export function TopNav() {
     userId: null,
     role: undefined,
     displayName: null,
+    locationCity: null,
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -47,7 +49,7 @@ export function TopNav() {
 
   useEffect(() => {
     if (!isLoaded || !user?.id) {
-      setProfile({ userId: null, role: undefined, displayName: null });
+      setProfile({ userId: null, role: undefined, displayName: null, locationCity: null });
       return;
     }
     let cancelled = false;
@@ -59,11 +61,12 @@ export function TopNav() {
           userId: data.userId ?? null,
           role: data.role,
           displayName: data.displayName ?? null,
+          locationCity: data.locationCity ?? null,
         });
       })
       .catch(() => {
         if (!cancelled) {
-          setProfile({ userId: user.id, role: undefined, displayName: null });
+          setProfile({ userId: user.id, role: undefined, displayName: null, locationCity: null });
         }
       });
     return () => {
@@ -102,13 +105,15 @@ export function TopNav() {
               <TopNavLinks />
             </nav>
           </div>
-          {/* Right: Search + Share CTA + auth + theme on desktop; on mobile: Search + Share + burger */}
+          {/* Right: Search + Share CTA + auth + theme */}
           <div className="flex shrink-0 items-center gap-2 sm:gap-4">
             <HeaderSearch />
             <ShareCTA userId={userId} role={profile.role} />
-            <div className="hidden md:block">
-              <TopNavAuth displayName={profile.displayName} role={profile.role} />
-            </div>
+            <TopNavAuth
+              displayName={profile.displayName}
+              role={profile.role}
+              locationCity={profile.locationCity}
+            />
             <ThemeToggle />
             <button
               type="button"

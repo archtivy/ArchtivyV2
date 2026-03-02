@@ -15,8 +15,9 @@ export async function GET() {
 
     const role = profile?.role ?? undefined;
     const displayName = profile?.display_name ?? profile?.username ?? null;
+    const locationCity = profile?.location_city ?? null;
 
-    return NextResponse.json({ userId, role, displayName }, { status: 200 });
+    return NextResponse.json({ userId, role, displayName, locationCity }, { status: 200 });
   } catch (error) {
     console.error("Error fetching user profile data:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
