@@ -136,10 +136,10 @@ export function ExploreEditorialHeader({
         {/* Top row: title/subline/stats ← → sort control */}
         <div className="flex items-start justify-between gap-4 py-6 sm:py-8">
           <div className="min-w-0">
-            <h1 className="font-serif text-3xl font-light tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-100">
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-100">
               Explore
             </h1>
-            <p className="mt-1 font-serif text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
               {subline}
             </p>
             {statsLine && (

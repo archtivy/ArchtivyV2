@@ -13,102 +13,6 @@ export interface ProfileDirectoryClientProps {
   items: ProfileDirectoryItem[];
 }
 
-// ─── Hero metric pill ─────────────────────────────────────────────────────────
-
-function MetricPill({ value, label }: { value: number; label: string }) {
-  const formatted =
-    value >= 1000 ? `${(value / 1000).toFixed(1).replace(/\.0$/, "")}K` : String(value);
-  return (
-    <span className="inline-flex items-baseline gap-1.5">
-      <span className="text-lg font-medium text-zinc-900">{formatted}</span>
-      <span className="text-sm text-zinc-500">{label}</span>
-    </span>
-  );
-}
-
-// ─── Filter/sort bar ──────────────────────────────────────────────────────────
-
-const inputClass =
-  "w-full rounded border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 outline-none focus:border-[#002abf] focus:ring-1 focus:ring-[#002abf]/20";
-
-const selectClass =
-  "w-full rounded border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-[#002abf] focus:ring-1 focus:ring-[#002abf]/20 cursor-pointer";
-
-function FilterBar({
-  sort,
-  search,
-  cityFilter,
-  onSort,
-  onSearch,
-  onCity,
-  resultCount,
-  totalCount,
-}: {
-  sort: SortOption;
-  search: string;
-  cityFilter: string;
-  onSort: (v: SortOption) => void;
-  onSearch: (v: string) => void;
-  onCity: (v: string) => void;
-  resultCount: number;
-  totalCount: number;
-}) {
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <label className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">
-          Sort by
-        </label>
-        <select
-          value={sort}
-          onChange={(e) => onSort(e.target.value as SortOption)}
-          className={selectClass}
-          style={{ borderRadius: 4 }}
-        >
-          <option value="newest">Newest</option>
-          <option value="oldest">Oldest</option>
-          <option value="most_listings">Most Listings</option>
-          <option value="most_connected">Most Connected</option>
-        </select>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">
-          Search
-        </label>
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-          placeholder="Name, studio, brand…"
-          className={inputClass}
-          style={{ borderRadius: 4 }}
-        />
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">
-          City
-        </label>
-        <input
-          type="text"
-          value={cityFilter}
-          onChange={(e) => onCity(e.target.value)}
-          placeholder="e.g. London, Tokyo…"
-          className={inputClass}
-          style={{ borderRadius: 4 }}
-        />
-      </div>
-
-      {(search || cityFilter) && (
-        <p className="text-xs text-zinc-400">
-          {resultCount} of {totalCount} shown
-        </p>
-      )}
-    </div>
-  );
-}
-
 // ─── Sort helper ──────────────────────────────────────────────────────────────
 
 function sortItems(
@@ -118,19 +22,23 @@ function sortItems(
   return [...items].sort((a, b) => {
     switch (sort) {
       case "newest":
-        return (
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       case "oldest":
-        return (
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        );
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
       case "most_listings":
         return b.listings_count - a.listings_count;
       case "most_connected":
         return b.connections_count - a.connections_count;
     }
   });
+}
+
+// ─── Stat item ────────────────────────────────────────────────────────────────
+
+function fmt(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
+  return String(n);
 }
 
 // ─── Main client component ────────────────────────────────────────────────────
@@ -145,12 +53,12 @@ export function ProfileDirectoryClient({
 
   const isDesigners = variant === "designers";
 
-  const hero = {
-    eyebrow: "Archtivy Directory",
+  const copy = {
+    label: "ARCHTIVY DIRECTORY",
     title: isDesigners ? "Designers" : "Brands",
-    subtitle: isDesigners
-      ? "A growing network of people, projects, and products — mapped in real places."
-      : "A growing network of brands, products, and projects — mapped in real places.",
+    description: isDesigners
+      ? "A curated network of designers, studios, and creative professionals."
+      : "A curated network of brands, manufacturers, and product makers.",
     profileLabel: isDesigners ? "designers" : "brands",
   };
 
@@ -185,57 +93,99 @@ export function ProfileDirectoryClient({
     return list;
   }, [items, sort, search, cityFilter]);
 
+  const controlClass =
+    "w-full rounded-[6px] border border-[#E8E8E8] bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 outline-none transition focus:border-[#002abf] focus:ring-1 focus:ring-[#002abf]/20";
+
   return (
-    <div style={{ backgroundColor: "#fafafa" }} className="min-h-screen">
-      {/* ── Hero ── */}
-      <section className="border-b border-[#eeeeee] bg-white">
-        <div className="mx-auto max-w-[1040px] px-4 py-12 sm:px-6 sm:py-16">
-          <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:justify-between">
-            {/* Left: text + metrics */}
-            <div className="lg:max-w-[52ch]">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-400">
-                {hero.eyebrow}
+    <div className="min-h-screen bg-white">
+      {/* ── Header ── */}
+      <section className="border-b border-[#EAEAEA] bg-white">
+        <div className="mx-auto max-w-[1280px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+
+            {/* Left: label + title + description + stats */}
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
+                {copy.label}
               </p>
-              <h1 className="mt-2 font-serif text-4xl font-light tracking-tight text-zinc-900 sm:text-5xl">
-                {hero.title}
+              <h1 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">
+                {copy.title}
               </h1>
-              <p className="mt-4 text-base text-zinc-500 sm:text-lg">
-                {hero.subtitle}
+              <p className="mt-2 text-sm text-zinc-500">
+                {copy.description}
               </p>
 
-              {/* Metrics */}
-              <div className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3 border-t border-[#eeeeee] pt-5">
-                <MetricPill value={items.length} label={hero.profileLabel} />
+              {/* Stats row */}
+              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-zinc-500">
+                <span>
+                  <span className="font-semibold text-zinc-900">{fmt(items.length)}</span>{" "}
+                  {copy.profileLabel}
+                </span>
                 {totalListings > 0 && (
-                  <MetricPill value={totalListings} label="listings" />
+                  <span>
+                    <span className="font-semibold text-zinc-900">{fmt(totalListings)}</span>{" "}
+                    listings
+                  </span>
                 )}
                 {totalConnections > 0 && (
-                  <MetricPill value={totalConnections} label="connections" />
+                  <span>
+                    <span className="font-semibold text-zinc-900">{fmt(totalConnections)}</span>{" "}
+                    connections
+                  </span>
                 )}
               </div>
             </div>
 
-            {/* Right: filter bar */}
-            <div className="w-full lg:w-64 shrink-0">
-              <FilterBar
-                sort={sort}
-                search={search}
-                cityFilter={cityFilter}
-                onSort={setSort}
-                onSearch={setSearch}
-                onCity={setCityFilter}
-                resultCount={filtered.length}
-                totalCount={items.length}
+            {/* Right: controls */}
+            <div className="flex w-full shrink-0 flex-col gap-2 lg:w-72">
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortOption)}
+                className={controlClass}
+                aria-label="Sort by"
+              >
+                <option value="newest">Sort: Newest</option>
+                <option value="oldest">Sort: Oldest</option>
+                <option value="most_listings">Sort: Most Listings</option>
+                <option value="most_connected">Sort: Most Connected</option>
+              </select>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={isDesigners ? "Search designer or studio…" : "Search brand or maker…"}
+                className={controlClass}
+                aria-label="Search"
               />
+              <input
+                type="text"
+                value={cityFilter}
+                onChange={(e) => setCityFilter(e.target.value)}
+                placeholder="Filter by city…"
+                className={controlClass}
+                aria-label="Filter by city"
+              />
+              {(search || cityFilter) && (
+                <p className="text-xs text-zinc-400">
+                  {filtered.length} of {items.length} shown ·{" "}
+                  <button
+                    type="button"
+                    onClick={() => { setSearch(""); setCityFilter(""); }}
+                    className="text-[#002abf] hover:underline"
+                  >
+                    Clear
+                  </button>
+                </p>
+              )}
             </div>
           </div>
         </div>
       </section>
 
       {/* ── Grid ── */}
-      <div className="mx-auto max-w-[1040px] px-4 py-10 sm:px-6">
+      <div className="mx-auto max-w-[1280px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
         {filtered.length === 0 ? (
-          <div className="rounded border border-[#eeeeee] bg-white px-4 py-16 text-center" style={{ borderRadius: 4 }}>
+          <div className="rounded-lg border border-[#ECECEC] bg-white px-4 py-16 text-center">
             <p className="text-sm text-zinc-500">
               {search || cityFilter
                 ? "No results match your search."
@@ -259,20 +209,11 @@ export function ProfileDirectoryClient({
             aria-label={isDesigners ? "Designers directory" : "Brands directory"}
           >
             {filtered.map((item) => (
-              <li key={item.id} className="flex">
-                <div className="flex w-full">
-                  <ProfileDirectoryCard item={item} />
-                </div>
+              <li key={item.id}>
+                <ProfileDirectoryCard item={item} />
               </li>
             ))}
           </ul>
-        )}
-
-        {filtered.length > 0 && (search || cityFilter) && (
-          <p className="mt-6 text-xs text-zinc-400">
-            Showing {filtered.length} of {items.length}{" "}
-            {hero.profileLabel}
-          </p>
         )}
       </div>
     </div>
