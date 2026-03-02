@@ -25,6 +25,10 @@ export interface ProjectHeroGalleryProps {
 /**
  * Mobile: 1 main image + horizontal scroll thumbnails. Click thumbnail swaps main.
  * Desktop: left large square + 2x2 grid. 4px radius throughout.
+ *
+ * Structure: <Image> sits directly in each relative container; click buttons/links are
+ * transparent absolute overlays on top. This avoids the stacking-context collapse that
+ * occurs when <Image fill> is nested inside an absolutely-positioned <button>/<a>.
  */
 export function ProjectHeroGallery({
   images,
@@ -51,28 +55,30 @@ export function ProjectHeroGallery({
         className="relative aspect-square w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800"
         style={{ borderRadius: RADIUS }}
       >
+        {/* Image directly in relative container */}
+        <Image
+          src={mobileMain.src}
+          alt={mobileMain.alt}
+          fill
+          className="object-cover"
+          style={{ objectPosition: "50% 50%" }}
+          sizes="100vw"
+          quality={90}
+          unoptimized={!isOptimizedSrc(mobileMain.src)}
+          priority={mobileSelectedIndex === 0}
+        />
+        {/* Transparent click overlay */}
         <button
           type="button"
           onClick={() => onImageClick(mobileSelectedIndex)}
           className="absolute inset-0 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
           aria-label={`View image ${mobileSelectedIndex + 1}: ${mobileMain.alt}`}
-        >
-          <Image
-            src={mobileMain.src}
-            alt={mobileMain.alt}
-            fill
-            className="object-cover"
-            style={{ objectPosition: "50% 50%" }}
-            sizes="100vw"
-            quality={90}
-            unoptimized={!isOptimizedSrc(mobileMain.src)}
-            priority={mobileSelectedIndex === 0}
-          />
-        </button>
+        />
+        {/* "View all photos" — sits above the click overlay in DOM order */}
         <button
           type="button"
           onClick={() => onImageClick(0)}
-          className="absolute bottom-3 right-3 bg-black/50 px-3 py-2 text-sm font-medium text-white backdrop-blur-sm hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+          className="absolute bottom-3 right-3 z-10 bg-black/50 px-3 py-2 text-sm font-medium text-white backdrop-blur-sm hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white/50"
           style={{ borderRadius: RADIUS }}
         >
           View all photos
@@ -81,17 +87,14 @@ export function ProjectHeroGallery({
       <div className="mt-3 overflow-x-auto overflow-y-hidden pb-1">
         <div className="flex gap-2" style={{ minWidth: "min-content" }}>
           {images.map((img, i) => (
-            <button
+            /* Wrapper div is the sized container; button is an overlay */
+            <div
               key={img.id}
-              type="button"
-              onClick={() => setMobileSelectedIndex(i)}
-              className="relative h-16 w-16 shrink-0 overflow-hidden rounded border-2 bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#002abf] dark:bg-zinc-800"
+              className="relative h-16 w-16 shrink-0 overflow-hidden border-2 bg-zinc-100 dark:bg-zinc-800"
               style={{
                 borderRadius: RADIUS,
                 borderColor: i === mobileSelectedIndex ? "#002abf" : "transparent",
               }}
-              aria-label={`Show image ${i + 1}`}
-              aria-pressed={i === mobileSelectedIndex}
             >
               <Image
                 src={img.src}
@@ -101,7 +104,14 @@ export function ProjectHeroGallery({
                 sizes="64px"
                 unoptimized={!isOptimizedSrc(img.src)}
               />
-            </button>
+              <button
+                type="button"
+                onClick={() => setMobileSelectedIndex(i)}
+                className="absolute inset-0 focus:outline-none focus:ring-2 focus:ring-[#002abf]"
+                aria-label={`Show image ${i + 1}`}
+                aria-pressed={i === mobileSelectedIndex}
+              />
+            </div>
           ))}
         </div>
       </div>
@@ -115,30 +125,29 @@ export function ProjectHeroGallery({
           <MobileGallery />
         </div>
         <div
-          className="relative aspect-square w-full max-w-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 hidden md:block"
+          className="relative hidden aspect-square w-full max-w-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 md:block"
           style={{ borderRadius: RADIUS }}
         >
+          <Image
+            src={main.src}
+            alt={main.alt}
+            fill
+            className="object-cover"
+            style={{ objectPosition: "50% 50%" }}
+            sizes={HERO_SIZES}
+            quality={90}
+            unoptimized={!mainOptimized}
+            priority
+            fetchPriority="high"
+          />
           <button
             type="button"
             onClick={() => onImageClick(0)}
             className="absolute inset-0 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
             aria-label={`View image 1: ${main.alt}`}
-          >
-            <Image
-              src={main.src}
-              alt={main.alt}
-              fill
-              className="object-cover"
-              style={{ objectPosition: "50% 50%" }}
-              sizes={HERO_SIZES}
-              quality={90}
-              unoptimized={!mainOptimized}
-              priority
-              fetchPriority="high"
-            />
-          </button>
+          />
           <span
-            className="absolute bottom-3 right-3 bg-black/50 px-3 py-2 text-sm font-medium text-white backdrop-blur-sm"
+            className="absolute bottom-3 right-3 z-10 bg-black/50 px-3 py-2 text-sm font-medium text-white backdrop-blur-sm"
             style={{ borderRadius: RADIUS }}
           >
             View all photos
@@ -158,26 +167,28 @@ export function ProjectHeroGallery({
         style={{ gap: GAP }}
       >
         {/* Left: one large square (width-driven, aspect 1:1); defines row height */}
-        <div className="relative w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800" style={{ borderRadius: RADIUS, aspectRatio: "1 / 1" }}>
+        <div
+          className="relative w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800"
+          style={{ borderRadius: RADIUS, aspectRatio: "1 / 1" }}
+        >
+          <Image
+            src={main.src}
+            alt={main.alt}
+            fill
+            className="object-cover"
+            style={{ objectPosition: "50% 50%" }}
+            sizes={HERO_SIZES}
+            quality={90}
+            unoptimized={!mainOptimized}
+            priority
+            fetchPriority="high"
+          />
           <button
             type="button"
             onClick={() => onImageClick(0)}
-            className="absolute inset-0 block h-full w-full focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
+            className="absolute inset-0 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
             aria-label={`View image 1: ${main.alt}`}
-          >
-            <Image
-              src={main.src}
-              alt={main.alt}
-              fill
-              className="object-cover"
-              style={{ objectPosition: "50% 50%" }}
-              sizes={HERO_SIZES}
-              quality={90}
-              unoptimized={!mainOptimized}
-              priority
-              fetchPriority="high"
-            />
-          </button>
+          />
         </div>
 
         {/* Right: 2x2 grid; when usedProductTeaser is set, 4th tile is teaser linking to #used-in-project-heading */}
@@ -195,21 +206,23 @@ export function ProjectHeroGallery({
                   className="relative min-h-0 overflow-hidden bg-zinc-100 dark:bg-zinc-800"
                   style={{ borderRadius: RADIUS, aspectRatio: "1 / 1" }}
                 >
+                  {/* Image behind the link overlay */}
+                  <Image
+                    src={teaser.src}
+                    alt={teaser.alt}
+                    fill
+                    className="object-cover"
+                    style={{ objectPosition: "50% 50%" }}
+                    sizes={GRID_SIZES}
+                    quality={88}
+                    unoptimized={!teaserOptimized}
+                  />
+                  {/* Link overlay contains only the text label */}
                   <Link
                     href="#used-in-project-heading"
-                    className="absolute inset-0 block h-full w-full focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
+                    className="absolute inset-0 flex items-end focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
                     aria-label="Scroll to Used in this project"
                   >
-                    <Image
-                      src={teaser.src}
-                      alt={teaser.alt}
-                      fill
-                      className="object-cover"
-                      style={{ objectPosition: "50% 50%" }}
-                      sizes={GRID_SIZES}
-                      quality={88}
-                      unoptimized={!teaserOptimized}
-                    />
                     <span
                       className="absolute bottom-2 left-2 right-2 rounded px-2 py-1.5 text-xs font-medium text-white/95 backdrop-blur-sm"
                       style={{
@@ -233,29 +246,28 @@ export function ProjectHeroGallery({
                 className="relative min-h-0 overflow-hidden bg-zinc-100 dark:bg-zinc-800"
                 style={{ borderRadius: RADIUS, aspectRatio: "1 / 1" }}
               >
+                <Image
+                  src={img.src}
+                  alt={img.alt}
+                  fill
+                  className="object-cover"
+                  style={{ objectPosition: "50% 50%" }}
+                  sizes={GRID_SIZES}
+                  quality={88}
+                  unoptimized={!stackOptimized}
+                />
                 <button
                   type="button"
                   onClick={() => onImageClick(idx)}
-                  className="absolute inset-0 block h-full w-full focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
+                  className="absolute inset-0 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
                   aria-label={`View image ${idx + 1}: ${img.alt}`}
-                >
-                  <Image
-                    src={img.src}
-                    alt={img.alt}
-                    fill
-                    className="object-cover"
-                    style={{ objectPosition: "50% 50%" }}
-                    sizes={GRID_SIZES}
-                    quality={88}
-                    unoptimized={!stackOptimized}
-                  />
-                </button>
+                />
               </div>
             );
           })}
         </div>
 
-        <div className="absolute bottom-3 right-3 z-10 md:bottom-3 md:right-3">
+        <div className="absolute bottom-3 right-3 z-10">
           <button
             type="button"
             onClick={() => onImageClick(0)}
