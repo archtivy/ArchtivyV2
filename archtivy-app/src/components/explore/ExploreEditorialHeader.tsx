@@ -107,16 +107,15 @@ export function ExploreEditorialHeader({
   const secondaryLine = secondaryParts.length > 0 ? secondaryParts.join(" · ") : null;
 
   // Micro-activity line — real-time signal below stats
+  const projectsThisWeek = platformStats?.projectsThisWeek ?? 0;
   const microParts: string[] = [];
-  if (platformStats?.projectsThisWeek > 0) {
+  if (projectsThisWeek > 0) {
     if (type === "projects") {
       microParts.push(
-        `${platformStats.projectsThisWeek} new project${platformStats.projectsThisWeek !== 1 ? "s" : ""} this week`
+        `${projectsThisWeek} new project${projectsThisWeek !== 1 ? "s" : ""} this week`
       );
     } else {
-      microParts.push(
-        `${platformStats.projectsThisWeek} new project connections this week`
-      );
+      microParts.push(`${projectsThisWeek} new project connections this week`);
     }
   }
   const microLine = microParts.length > 0 ? microParts.join(" · ") : null;
