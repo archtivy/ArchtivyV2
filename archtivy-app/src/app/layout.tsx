@@ -10,6 +10,10 @@ export const runtime = "nodejs";
 export const metadata: Metadata = {
   title: "Archtivy",
   description: "Projects, products, credits & files for architecture",
+  // To activate Google Search Console: set NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION in your environment.
+  ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+    ? { verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION } }
+    : {}),
 };
 
 const themeScript = `

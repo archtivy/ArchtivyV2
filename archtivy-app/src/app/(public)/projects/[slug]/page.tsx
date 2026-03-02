@@ -1,6 +1,9 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// ISR: data cache revalidates every hour; admin mutations bust it immediately via
+// revalidatePath("/projects/[slug]", "page") + revalidateTag(CACHE_TAGS.listings).
+export const revalidate = 3600;
 
+import { unstable_cache } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -30,6 +33,16 @@ import type { ProjectCanonical } from "@/lib/canonical-models";
 import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
 import type { UsedProductItem } from "@/components/listing/ProjectDetailContent";
 import { DEFAULT_PROJECT_FILTERS } from "@/lib/exploreFilters";
+import { buildProjectJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
+
+/** Per-slug cached project fetch; busted by revalidateTag(CACHE_TAGS.listings). */
+function getCachedProject(slug: string) {
+  return unstable_cache(
+    () => getProjectCanonicalBySlugOrId(slug),
+    [`project:canonical:${slug}`],
+    { tags: [CACHE_TAGS.listings, `project:${slug}`], revalidate: 3600 }
+  )();
+}
 
 function canonicalGalleryToGalleryImages(
   gallery: { url: string; alt: string }[]
@@ -48,7 +61,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const project = await getProjectCanonicalBySlugOrId(slug);
+  const project = await getCachedProject(slug);
   if (!project) return {};
   if (project.status === "PENDING") {
     return { title: "Project" };
@@ -80,7 +93,7 @@ export default async function ProjectPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const project = await getProjectCanonicalBySlugOrId(slug);
+  const project = await getCachedProject(slug);
   if (!project) notFound();
 
   const { userId } = await auth();
@@ -249,8 +262,17 @@ export default async function ProjectPage({
       ? `https://www.google.com/maps?q=${project.location.lat},${project.location.lng}`
       : null;
 
+  const canonicalUrl = getAbsoluteUrl(`/projects/${project.slug ?? project.id}`);
+  const jsonLd = buildProjectJsonLd(project, canonicalUrl);
+
   return (
     <div className="pt-1 pb-6 sm:pt-2 sm:pb-8">
+      {Object.keys(jsonLd).length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+        />
+      )}
       <ListingViewTracker type="project" id={project.id} />
       <nav
         className="mb-4 flex flex-wrap items-center gap-2 text-sm text-[#374151] dark:text-zinc-400"

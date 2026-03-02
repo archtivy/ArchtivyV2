@@ -1,11 +1,15 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// ISR: data cache revalidates every hour; admin mutations bust it via
+// revalidatePath("/products/[slug]", "page") + revalidateTag(CACHE_TAGS.listings).
+export const revalidate = 3600;
 
+import { unstable_cache } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getProductForProductPage } from "@/app/actions/listings";
+import { getProductCanonicalBySlug } from "@/lib/db/explore";
 import { getProductsCanonicalFiltered } from "@/lib/db/explore";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { getProjectsForProduct } from "@/lib/db/projectProductLinks";
@@ -18,6 +22,16 @@ import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { ProductDetailLayout } from "@/components/listing/ProductDetailLayout";
 import { DEFAULT_PRODUCT_FILTERS } from "@/lib/exploreFilters";
 import type { GalleryImage } from "@/lib/db/gallery";
+import { buildProductJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
+
+/** Per-slug cached product fetch; busted by revalidateTag(CACHE_TAGS.listings). */
+function getCachedProduct(slug: string) {
+  return unstable_cache(
+    () => getProductCanonicalBySlug(slug),
+    [`product:canonical:${slug}`],
+    { tags: [CACHE_TAGS.listings, `product:${slug}`], revalidate: 3600 }
+  )();
+}
 
 function canonicalGalleryToGalleryImages(
   gallery: { url: string; alt: string }[]
@@ -36,7 +50,8 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const product = await getProductForProductPage(slug);
+  // Try cached read first; fall back to getProductForProductPage for rare backfill case.
+  const product = (await getCachedProduct(slug)) ?? (await getProductForProductPage(slug));
   if (!product) return {};
   if (product.status === "PENDING") {
     return { title: "Product" };
@@ -68,7 +83,7 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = await getProductForProductPage(slug);
+  const product = (await getCachedProduct(slug)) ?? (await getProductForProductPage(slug));
   if (!product) notFound();
   if (product.status === "PENDING") {
     const { userId } = await auth();
@@ -150,9 +165,18 @@ export default async function ProductPage({
     return { id: row.id, slug: row.slug, title: row.title, location: row.location ?? null };
   });
 
+  const canonicalUrl = getAbsoluteUrl(`/products/${product.slug ?? product.id}`);
+  const jsonLd = buildProductJsonLd(product, brandName, brandHref, canonicalUrl);
+
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
       <div className="pt-1 pb-6 sm:pt-2 sm:pb-8">
+      {Object.keys(jsonLd).length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+        />
+      )}
       <ListingViewTracker type="product" id={product.id} />
       <nav
         className="mb-6 flex flex-wrap items-center gap-2 text-sm text-[#374151] dark:text-zinc-400"

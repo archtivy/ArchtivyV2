@@ -1,6 +1,9 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// ISR: data cache revalidates every hour; profile mutations bust it via
+// revalidatePath("/u/[username]", "page") + revalidateTag(CACHE_TAGS.profiles).
+export const revalidate = 3600;
 
+import { unstable_cache } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -13,6 +16,7 @@ import { getProjectIdsLinkedToProducts } from "@/lib/db/projectProductLinks";
 import { getListingsByIds } from "@/lib/db/listings";
 import { getFirstImageUrlPerListingIds } from "@/lib/db/listingImages";
 import { getAbsoluteUrl } from "@/lib/canonical";
+import { buildProfileJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
 import { ProjectCardPremium } from "@/components/listing/ProjectCardPremium";
 import { ProductCardPremium } from "@/components/listing/ProductCardPremium";
 import { Button } from "@/components/ui/Button";
@@ -24,6 +28,15 @@ import type { ProjectOwner } from "@/lib/canonical-models";
 import type { ListingCardData, ListingSummary } from "@/lib/types/listings";
 import type { TaggedListingRow } from "@/lib/db/listingTeamMembers";
 
+/** Per-username cached profile fetch; busted by revalidateTag(CACHE_TAGS.profiles). */
+function getCachedProfile(username: string) {
+  return unstable_cache(
+    () => getProfileByUsername(username),
+    [`profile:username:${username}`],
+    { tags: [CACHE_TAGS.profiles, `profile:${username}`], revalidate: 3600 }
+  )();
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -31,7 +44,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { username } = await params;
   const decoded = decodeURIComponent(username);
-  const profileResult = await getProfileByUsername(decoded);
+  const profileResult = await getCachedProfile(decoded);
   const profile = profileResult.data;
   if (!profile || (profile as { is_hidden?: boolean }).is_hidden === true) return {};
   const path = `/u/${encodeURIComponent(profile.username ?? username)}`;
@@ -59,7 +72,7 @@ export default async function PublicProfilePage({
   const { username } = await params;
   const decoded = decodeURIComponent(username);
 
-  const profileResult = await getProfileByUsername(decoded);
+  const profileResult = await getCachedProfile(decoded);
   const profile = profileResult.data;
   if (!profile) {
     notFound();
@@ -162,8 +175,30 @@ export default async function PublicProfilePage({
     };
   }
 
+  const profileUrl = getAbsoluteUrl(`/u/${encodeURIComponent(profile.username ?? decoded)}`);
+  const jsonLd = buildProfileJsonLd(
+    {
+      display_name: profile.display_name,
+      username: profile.username,
+      avatar_url: profile.avatar_url,
+      role: profile.role,
+      bio: profile.bio,
+      location_city: profile.location_city,
+      location_country: profile.location_country,
+      location_visibility: (profile as { location_visibility?: "public" | "private" }).location_visibility,
+      website: profile.website,
+    },
+    profileUrl
+  );
+
   return (
     <div className="space-y-8">
+      {Object.keys(jsonLd).length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+        />
+      )}
       <div className="border border-zinc-200 bg-zinc-50/80 p-6 dark:border-zinc-800 dark:bg-zinc-900/50 sm:p-8" style={{ borderRadius: 4 }}>
         <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:items-start sm:text-left">
           <div className="shrink-0">
