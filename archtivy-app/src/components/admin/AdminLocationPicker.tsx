@@ -141,6 +141,7 @@ export function AdminLocationPicker({
               <li
                 key={s.id}
                 role="option"
+                aria-selected={false}
                 tabIndex={0}
                 className="cursor-pointer px-3 py-2 text-sm text-zinc-900 hover:bg-zinc-100"
                 onMouseDown={(e) => {

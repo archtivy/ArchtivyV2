@@ -1,8 +1,9 @@
 /**
  * Unified filter options for explore (projects and products). Sourced from DB.
+ * NO CACHE: Admin can add categories/materials/colors at any time and users must
+ * see them immediately. Pages already set force-dynamic + revalidate=0.
  */
 
-import { unstable_cache } from "next/cache";
 import { getProjectFilterOptions, getProductFilterOptions } from "@/lib/db/explore";
 import type { ExploreType } from "./schema";
 
@@ -18,10 +19,7 @@ export interface ExploreFilterOptions {
   materialTypes: { value: string; label: string }[];
 }
 
-const CACHE_TAG = "explore-filter-options";
-const CACHE_SECONDS = 60 * 5; // 5 minutes
-
-async function getProjectOptionsUncached(): Promise<ExploreFilterOptions> {
+async function getProjectOptions(): Promise<ExploreFilterOptions> {
   const raw = await getProjectFilterOptions();
   const locations = raw.locations.map((loc) => {
     const label = [loc.city, loc.country].filter(Boolean).join(", ") || "Unknown";
@@ -41,7 +39,7 @@ async function getProjectOptionsUncached(): Promise<ExploreFilterOptions> {
   };
 }
 
-async function getProductOptionsUncached(): Promise<ExploreFilterOptions> {
+async function getProductOptions(): Promise<ExploreFilterOptions> {
   const raw = await getProductFilterOptions();
   return {
     categories: raw.categories.map((c) => ({ value: c, label: c })),
@@ -57,17 +55,9 @@ async function getProductOptionsUncached(): Promise<ExploreFilterOptions> {
 }
 
 /**
- * Get filter dropdown options for explore. Cached per type.
+ * Get filter dropdown options for explore. Always fresh — no cache.
+ * Called from force-dynamic pages; Supabase service client is server-only.
  */
 export async function getExploreFilterOptions(type: ExploreType): Promise<ExploreFilterOptions> {
-  if (type === "projects") {
-    return unstable_cache(getProjectOptionsUncached, [CACHE_TAG, "projects"], {
-      revalidate: CACHE_SECONDS,
-      tags: [CACHE_TAG],
-    })();
-  }
-  return unstable_cache(getProductOptionsUncached, [CACHE_TAG, "products"], {
-    revalidate: CACHE_SECONDS,
-    tags: [CACHE_TAG],
-  })();
+  return type === "projects" ? getProjectOptions() : getProductOptions();
 }

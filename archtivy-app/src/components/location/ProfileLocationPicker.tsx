@@ -148,6 +148,8 @@ export function ProfileLocationPicker({
           className={inputClass}
           placeholder={placeholder}
           autoComplete="off"
+          role="combobox"
+          aria-haspopup="listbox"
           aria-autocomplete="list"
           aria-controls="profile-location-suggestions"
           aria-expanded={open && suggestions.length > 0}
@@ -167,6 +169,7 @@ export function ProfileLocationPicker({
               <li
                 key={f.id}
                 role="option"
+                aria-selected={false}
                 tabIndex={0}
                 className="cursor-pointer px-3 py-2 text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
                 onMouseDown={(e) => {

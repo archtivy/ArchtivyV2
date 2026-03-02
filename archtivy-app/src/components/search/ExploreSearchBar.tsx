@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { SearchSuggestionsPopover } from "@/components/search/SearchSuggestionsPopover";
 import { getRecentSearches, addRecentSearch, clearRecentSearches, type SearchScope } from "@/lib/search/recentSearches";
 import { filtersToQueryString } from "@/lib/explore/filters/query";
@@ -14,6 +14,10 @@ export interface ExploreSearchBarProps {
   currentFilters: ExploreFilters;
   placeholder?: string;
   className?: string;
+  /** Extra class applied to the <input> element. When provided, replaces the default input look. */
+  inputClassName?: string;
+  /** Show a subtle "⌘K" badge on the right of the input. */
+  showCmdK?: boolean;
 }
 
 function SearchIcon() {
@@ -37,10 +41,11 @@ export function ExploreSearchBar({
   currentFilters,
   placeholder = "Search by title, designer, brand, material, city…",
   className = "",
+  inputClassName,
+  showCmdK = false,
 }: ExploreSearchBarProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [inputValue, setInputValue] = useState(currentFilters.q ?? "");
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
@@ -119,9 +124,21 @@ export function ExploreSearchBar({
     setRecentSearches([]);
   }, [scope]);
 
+  // When inputClassName is provided it overrides the default input styling.
+  const defaultInputClass =
+    "w-full rounded-xl border border-zinc-200 bg-white py-3 pl-12 pr-11 text-zinc-900 placeholder-zinc-400 focus:border-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf]/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-[#002abf] dark:focus:ring-[#002abf]/30";
+  // When a custom inputClassName is passed we still need the structural pl/pr classes for icons.
+  const resolvedInputClass = inputClassName
+    ? `w-full pl-12 ${inputValue.length > 0 || showCmdK ? "pr-11" : "pr-4"} ${inputClassName}`
+    : defaultInputClass;
+
+  // Right-side adornment: "⌘K" hint or clear button
+  const showClearBtn = inputValue.length > 0;
+  const showCmdKBadge = showCmdK && !showClearBtn;
+
   return (
     <div className={className}>
-      <div className="relative max-w-[720px]">
+      <div className="relative w-full">
         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
           <SearchIcon />
         </div>
@@ -131,6 +148,7 @@ export function ExploreSearchBar({
           autoComplete="off"
           role="combobox"
           aria-expanded={popoverOpen}
+          aria-haspopup="listbox"
           aria-controls="explore-search-suggestions"
           aria-autocomplete="list"
           value={inputValue}
@@ -143,9 +161,9 @@ export function ExploreSearchBar({
             setTimeout(() => setPopoverOpen(false), 150);
           }}
           placeholder={placeholder}
-          className="w-full rounded-xl border border-zinc-200 bg-white py-3 pl-12 pr-11 text-zinc-900 placeholder-zinc-400 focus:border-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf]/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus:border-[#002abf] dark:focus:ring-[#002abf]/30"
+          className={resolvedInputClass}
         />
-        {inputValue.length > 0 && (
+        {showClearBtn && (
           <button
             type="button"
             onClick={handleClear}
@@ -154,6 +172,16 @@ export function ExploreSearchBar({
           >
             <ClearIcon />
           </button>
+        )}
+        {showCmdKBadge && (
+          <span
+            className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3"
+            aria-hidden
+          >
+            <kbd className="rounded border border-zinc-200 bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-500">
+              ⌘K
+            </kbd>
+          </span>
         )}
       </div>
       <SearchSuggestionsPopover

@@ -110,6 +110,8 @@ export function BrandProductsUsedMultiSelect({
           placeholder={brandProfileId ? "Search this brand's products…" : "Search products…"}
           disabled={disabled}
           className={inputClass}
+          role="combobox"
+          aria-haspopup="listbox"
           aria-autocomplete="list"
           aria-expanded={open}
         />
@@ -132,6 +134,7 @@ export function BrandProductsUsedMultiSelect({
                   key={p.id}
                   type="button"
                   role="option"
+                  aria-selected={false}
                   onClick={() => addProduct(p)}
                   className="w-full px-3 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
                 >

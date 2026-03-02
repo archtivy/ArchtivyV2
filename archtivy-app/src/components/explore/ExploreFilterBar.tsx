@@ -18,6 +18,8 @@ export interface ExploreFilterBarProps {
   currentFilters: ExploreFilters;
   options: ExploreFilterOptions;
   sort: string;
+  /** When true, hides the sort control inside the Filters panel (sort is shown externally). */
+  hideSort?: boolean;
 }
 
 export function ExploreFilterBar({
@@ -25,6 +27,7 @@ export function ExploreFilterBar({
   currentFilters,
   options,
   sort,
+  hideSort = false,
 }: ExploreFilterBarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -138,7 +141,7 @@ export function ExploreFilterBar({
           {activeCount === 0 && (
             <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">No filters applied</p>
           )}
-          {sortOptions.length > 1 && (
+          {!hideSort && sortOptions.length > 1 && (
             <div className="mt-3 pt-2 border-t border-zinc-100 dark:border-zinc-700">
               <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
                 Sort

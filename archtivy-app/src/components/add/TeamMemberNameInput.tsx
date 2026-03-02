@@ -83,6 +83,8 @@ export function TeamMemberNameInput({
         onFocus={() => value.trim().length >= 2 && suggestions.length > 0 && setOpen(true)}
         className={`${inputClass} w-full min-w-0 md:min-w-[240px]`}
         aria-label={ariaLabel}
+        role="combobox"
+        aria-haspopup="listbox"
         aria-autocomplete="list"
         aria-expanded={open && suggestions.length > 0}
         aria-controls="team-member-suggestions"
@@ -100,6 +102,7 @@ export function TeamMemberNameInput({
               <li
                 key={p.id}
                 role="option"
+                aria-selected={false}
                 className="cursor-pointer px-3 py-2 text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
                 onClick={() => selectProfile(p)}
               >

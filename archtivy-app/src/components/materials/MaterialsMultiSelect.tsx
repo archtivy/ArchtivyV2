@@ -161,8 +161,10 @@ export function MaterialsMultiSelect({
             placeholder={selectedIds.length === 0 ? placeholder : ""}
             className="min-w-[140px] flex-1 border-none bg-transparent px-1 py-1 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none dark:text-zinc-100"
             aria-label={placeholder}
+            role="combobox"
             aria-expanded={isOpen}
             aria-haspopup="listbox"
+            aria-autocomplete="list"
           />
         </div>
 
@@ -181,7 +183,7 @@ export function MaterialsMultiSelect({
               </li>
             ) : (
               filtered.map((opt) => (
-                <li key={opt.id} role="option">
+                <li key={opt.id} role="option" aria-selected={false}>
                   <button
                     type="button"
                     disabled={disabled}

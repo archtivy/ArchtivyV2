@@ -131,6 +131,8 @@ export function BrandsUsedField({
           placeholder="Search brands..."
           disabled={disabled}
           className={inputClass}
+          role="combobox"
+          aria-haspopup="listbox"
           aria-autocomplete="list"
           aria-expanded={open}
         />
@@ -153,6 +155,7 @@ export function BrandsUsedField({
                   key={b.id}
                   type="button"
                   role="option"
+                  aria-selected={false}
                   onClick={() => addBrand(b)}
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
                 >
