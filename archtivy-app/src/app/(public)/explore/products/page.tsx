@@ -51,6 +51,16 @@ export default async function ExploreProductsPage({
     ? filters.city.trim().replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : null;
 
+  // Derive brand strip items from already-fetched filter options (no extra DB call).
+  // TODO: enrich with logoUrl once a lightweight brand profiles endpoint exists.
+  const brandStripItems = options.brands.slice(0, 30).map((b) => ({
+    id: b.value,
+    name: b.label,
+    logoUrl: null,
+    locationText: null,
+    href: `/u/id/${b.value}`,
+  }));
+
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
       <ExploreEditorialHeader
@@ -82,6 +92,7 @@ export default async function ExploreProductsPage({
             initialTotal={total}
             filters={productFilters}
             sort={filters.sort as "newest" | "year_desc"}
+            stripItems={brandStripItems}
           />
         )}
       </Container>

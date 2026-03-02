@@ -38,6 +38,16 @@ export default async function ExploreProjectsPage({
     ? filters.city.trim().replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : null;
 
+  // Derive designer strip items from already-fetched filter options (no extra DB call).
+  // TODO: enrich with logoUrl + locationText once a lightweight profiles endpoint exists.
+  const designerStripItems = options.designers.slice(0, 30).map((d) => ({
+    id: d.value,
+    name: d.label,
+    logoUrl: null,
+    locationText: null,
+    href: `/u/id/${d.value}`,
+  }));
+
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
       <ExploreEditorialHeader
@@ -69,6 +79,7 @@ export default async function ExploreProjectsPage({
             initialTotal={total}
             filters={projectFilters}
             sort={filters.sort as "newest" | "year_desc" | "area_desc"}
+            stripItems={designerStripItems}
           />
         )}
       </Container>
