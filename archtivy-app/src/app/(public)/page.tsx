@@ -1,9 +1,12 @@
+export const revalidate = 3600; // ISR: revalidate every hour
+
 import Link from "next/link";
 import { getProjectsCanonical, getProductsCanonical } from "@/lib/db/explore";
 import { ProjectCardPremium } from "@/components/listing/ProjectCardPremium";
 import { ProductCardPremium } from "@/components/listing/ProductCardPremium";
 import { HomeHeroSearch } from "@/components/search/HomeHeroSearch";
 import { ShareWorkTrigger } from "@/components/ShareWorkTrigger";
+import { LiveActivityStrip } from "@/components/home/LiveActivityStrip";
 
 const FEATURED_PROJECTS_LIMIT = 6;
 const FEATURED_PRODUCTS_LIMIT = 8;
@@ -18,11 +21,14 @@ export default async function Home() {
     <div className="space-y-16 pb-24 sm:space-y-20 sm:pb-28">
       {/* Hero */}
       <section className="text-center">
-        <h1 className="font-serif text-3xl font-normal tracking-tight text-zinc-900 sm:text-4xl md:text-5xl dark:text-zinc-100">
-          Architecture, intelligently connected.
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-500">
+          Architectural Specification Intelligence
+        </p>
+        <h1 className="mx-auto mt-3 max-w-3xl font-serif text-3xl font-normal tracking-tight text-zinc-900 sm:text-4xl md:text-5xl dark:text-zinc-100">
+          The intelligence layer of architecture.
         </h1>
-        <p className="mx-auto mt-4 max-w-2xl text-lg text-zinc-500 dark:text-zinc-400">
-          Discover how projects, products, and professionals connect across cities.
+        <p className="mx-auto mt-4 max-w-2xl text-base text-zinc-500 sm:text-lg dark:text-zinc-400">
+          The platform where architectural work is documented, products are credited, and professionals connect across cities.
         </p>
         <div className="mt-8 flex flex-col items-center gap-4">
           <HomeHeroSearch />
@@ -39,6 +45,8 @@ export default async function Home() {
             </ShareWorkTrigger>
           </div>
         </div>
+        {/* Live activity ticker — client-side, loads after hydration */}
+        <LiveActivityStrip />
       </section>
 
       {/* Featured Projects */}

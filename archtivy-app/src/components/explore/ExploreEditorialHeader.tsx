@@ -11,6 +11,7 @@ import { EXPLORE_SORT_PROJECTS, EXPLORE_SORT_PRODUCTS } from "@/lib/explore/filt
 import { filtersToQueryString } from "@/lib/explore/filters/query";
 import type { ExploreFilterOptions } from "@/lib/explore/filters/options";
 import type { ExploreNetworkCounts } from "@/lib/db/explore";
+import type { PlatformStats } from "@/lib/db/platformActivity";
 
 const SORT_LABELS: Record<string, string> = {
   newest: "Newest",
@@ -29,6 +30,7 @@ export interface ExploreEditorialHeaderProps {
   counts: ExploreNetworkCounts | null;
   options: ExploreFilterOptions;
   currentFilters: ExploreFilters;
+  platformStats?: PlatformStats | null;
 }
 
 export function ExploreEditorialHeader({
@@ -36,6 +38,7 @@ export function ExploreEditorialHeader({
   counts,
   options,
   currentFilters,
+  platformStats,
 }: ExploreEditorialHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -66,21 +69,55 @@ export function ExploreEditorialHeader({
     [currentFilters, type, pathname, router]
   );
 
-  // Build stats line
+  // Build stats pill row
   const statParts: string[] = [];
   if (counts != null) {
-    statParts.push(`${formatCount(counts.projectCount)} Projects`);
-    statParts.push(`${formatCount(counts.productCount)} Products`);
-    if (counts.connectionCount != null) {
-      statParts.push(`${formatCount(counts.connectionCount)} Connections`);
+    if (type === "projects") {
+      statParts.push(`${formatCount(counts.projectCount)} Projects`);
+      statParts.push(`${formatCount(counts.productCount)} Products`);
+      if (counts.connectionCount != null) {
+        statParts.push(`${formatCount(counts.connectionCount)} Connections`);
+      }
+      if (platformStats?.professionalsCount) {
+        statParts.push(`${formatCount(platformStats.professionalsCount)} Professionals`);
+      }
+      if (platformStats?.countriesCount) {
+        statParts.push(`${platformStats.countriesCount} Countries`);
+      }
+    } else {
+      statParts.push(`${formatCount(counts.productCount)} Products`);
+      statParts.push(`${formatCount(counts.projectCount)} Projects`);
+      if (counts.connectionCount != null) {
+        statParts.push(`${formatCount(counts.connectionCount)} Connections`);
+      }
+      if (platformStats?.professionalsCount) {
+        statParts.push(`${formatCount(platformStats.professionalsCount)} Professionals`);
+      }
     }
   }
   const statsLine = statParts.length > 0 ? statParts.join(" · ") : null;
 
+  // Micro-activity line (e.g. "3 new projects this week · 12 professionals across 18 countries")
+  const microParts: string[] = [];
+  if (platformStats) {
+    if (platformStats.projectsThisWeek > 0) {
+      microParts.push(
+        `${platformStats.projectsThisWeek} new project${platformStats.projectsThisWeek !== 1 ? "s" : ""} this week`
+      );
+    }
+    if (type === "products" && platformStats.professionalsCount > 0 && platformStats.countriesCount > 0) {
+      microParts.push(
+        `${formatCount(platformStats.professionalsCount)} professionals across ${platformStats.countriesCount} countries`
+      );
+    }
+  }
+  const microLine = microParts.length > 0 ? microParts.join(" · ") : null;
+
+  const title = type === "projects" ? "Explore Projects" : "Explore Products";
   const subline =
     type === "projects"
-      ? "Mapped projects. Matched products."
-      : "Explore products by material, brand, and usage.";
+      ? "A living index of architectural work and its material decisions."
+      : "Discover products specified in real architectural projects.";
 
   const currentSortLabel = SORT_LABELS[sort] ?? "Newest";
 
@@ -137,7 +174,7 @@ export function ExploreEditorialHeader({
         <div className="flex items-start justify-between gap-4 py-6 sm:py-8">
           <div className="min-w-0">
             <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-100">
-              Explore
+              {title}
             </h1>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
               {subline}
@@ -145,6 +182,11 @@ export function ExploreEditorialHeader({
             {statsLine && (
               <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500" aria-hidden>
                 {statsLine}
+              </p>
+            )}
+            {microLine && (
+              <p className="mt-1 text-xs text-zinc-300 dark:text-zinc-600" aria-hidden>
+                {microLine}
               </p>
             )}
           </div>

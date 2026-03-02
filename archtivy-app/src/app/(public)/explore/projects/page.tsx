@@ -1,11 +1,9 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 import { getProjectsCanonicalFiltered, getExploreNetworkCounts } from "@/lib/db/explore";
 import { EXPLORE_PAGE_SIZE } from "@/lib/db/explore";
 import { parseExploreFilters } from "@/lib/explore/filters/parse";
 import { exploreFiltersToProjectFilters } from "@/lib/explore/filters/query";
 import { getExploreFilterOptions } from "@/lib/explore/filters/options";
+import { getPlatformStats } from "@/lib/db/platformActivity";
 import { ExploreEditorialHeader } from "@/components/explore/ExploreEditorialHeader";
 import { ExploreProjectsContent } from "@/components/explore/ExploreProjectsContent";
 import { ExploreEmptyState } from "@/components/explore/ExploreEmptyState";
@@ -20,7 +18,7 @@ export default async function ExploreProjectsPage({
   const filters = parseExploreFilters(params, "projects");
   const projectFilters = exploreFiltersToProjectFilters(filters);
 
-  const [result, options, networkCounts] = await Promise.all([
+  const [result, options, networkCounts, platformStats] = await Promise.all([
     getProjectsCanonicalFiltered({
       filters: projectFilters,
       limit: EXPLORE_PAGE_SIZE,
@@ -29,6 +27,7 @@ export default async function ExploreProjectsPage({
     }),
     getExploreFilterOptions("projects"),
     getExploreNetworkCounts(),
+    getPlatformStats(),
   ]);
 
   const { data: initialData, total } = result;
@@ -46,6 +45,7 @@ export default async function ExploreProjectsPage({
         counts={networkCounts}
         options={options}
         currentFilters={filters}
+        platformStats={platformStats}
       />
 
       <Container className="py-6">

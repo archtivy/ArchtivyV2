@@ -1,12 +1,10 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 import type { Metadata } from "next";
 import { getProductsCanonicalFiltered, getExploreNetworkCounts } from "@/lib/db/explore";
 import { EXPLORE_PAGE_SIZE } from "@/lib/db/explore";
 import { parseExploreFilters } from "@/lib/explore/filters/parse";
 import { exploreFiltersToProductFilters, countActiveFilters } from "@/lib/explore/filters/query";
 import { getExploreFilterOptions } from "@/lib/explore/filters/options";
+import { getPlatformStats } from "@/lib/db/platformActivity";
 import { ExploreEditorialHeader } from "@/components/explore/ExploreEditorialHeader";
 import { ExploreProductsContent } from "@/components/explore/ExploreProductsContent";
 import { ExploreEmptyState } from "@/components/explore/ExploreEmptyState";
@@ -33,7 +31,7 @@ export default async function ExploreProductsPage({
   const filters = parseExploreFilters(params, "products");
   const productFilters = exploreFiltersToProductFilters(filters);
 
-  const [result, options, networkCounts] = await Promise.all([
+  const [result, options, networkCounts, platformStats] = await Promise.all([
     getProductsCanonicalFiltered({
       filters: productFilters,
       limit: EXPLORE_PAGE_SIZE,
@@ -42,6 +40,7 @@ export default async function ExploreProductsPage({
     }),
     getExploreFilterOptions("products"),
     getExploreNetworkCounts(),
+    getPlatformStats(),
   ]);
 
   const { data: initialData, total } = result;
@@ -59,6 +58,7 @@ export default async function ExploreProductsPage({
         counts={networkCounts}
         options={options}
         currentFilters={filters}
+        platformStats={platformStats}
       />
 
       <Container className="py-6">
