@@ -490,9 +490,15 @@ export const getProfilesForStrip = unstable_cache(
       .select("id, display_name, username, avatar_url, location_city, location_country")
       .in("role", roles)
       .eq("is_hidden", false)
+      .not("username", "is", null)
+      .not("avatar_url", "is", null)
+      .neq("avatar_url", "")
       .order("updated_at", { ascending: false })
       .limit(limit);
-    return (data ?? []) as ProfileStripItem[];
+    // PostgREST cannot call trim(), so guard whitespace-only values server-side.
+    return ((data ?? []) as ProfileStripItem[]).filter(
+      (p) => p.avatar_url && p.avatar_url.trim().length > 0
+    );
   },
   ["profiles:for-strip"],
   { tags: [CACHE_TAGS.profiles, CACHE_TAGS.explore], revalidate: 60 }
