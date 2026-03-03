@@ -105,16 +105,20 @@ export function TopNav() {
               <TopNavLinks />
             </nav>
           </div>
-          {/* Right: Search + Share CTA + auth + theme */}
-          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+          {/* Right: Search + desktop controls + hamburger */}
+          <div className="flex shrink-0 items-center gap-2">
             <HeaderSearch />
-            <ShareCTA userId={userId} role={profile.role} />
-            <TopNavAuth
-              displayName={profile.displayName}
-              role={profile.role}
-              locationCity={profile.locationCity}
-            />
-            <ThemeToggle />
+            {/* Desktop only: CTA + auth + theme */}
+            <div className="hidden items-center gap-2 md:flex md:gap-4">
+              <ShareCTA userId={userId} role={profile.role} />
+              <TopNavAuth
+                displayName={profile.displayName}
+                role={profile.role}
+                locationCity={profile.locationCity}
+              />
+              <ThemeToggle />
+            </div>
+            {/* Mobile only: hamburger */}
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
@@ -161,6 +165,28 @@ export function TopNav() {
                   </svg>
                 </button>
               </div>
+
+              {/* Mobile primary CTA */}
+              {userId ? (
+                showListings && (
+                  <Link
+                    href="/add/project"
+                    onClick={closeDrawer}
+                    className="w-full rounded-[4px] bg-[#002abf] px-4 py-3 text-center text-sm font-medium text-white hover:opacity-90"
+                  >
+                    Share your work
+                  </Link>
+                )
+              ) : (
+                <Link
+                  href="/sign-in?redirect_url=/add/project"
+                  onClick={closeDrawer}
+                  className="w-full rounded-[4px] bg-[#002abf] px-4 py-3 text-center text-sm font-medium text-white hover:opacity-90"
+                >
+                  Share your work
+                </Link>
+              )}
+
               <nav className="flex flex-col gap-1" aria-label="Main">
                 {navLinks.map(({ href, label }) => (
                   <Link
@@ -240,6 +266,14 @@ export function TopNav() {
                     </Link>
                   ))}
                 </div>
+              </div>
+
+              {/* Theme toggle */}
+              <div className="flex items-center justify-between border-t border-zinc-200 pt-4 dark:border-zinc-700">
+                <span className="px-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                  Appearance
+                </span>
+                <ThemeToggle />
               </div>
             </div>
           </div>
