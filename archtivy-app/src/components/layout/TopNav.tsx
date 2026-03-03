@@ -19,6 +19,7 @@ interface ProfileData {
   locationCity: string | null;
 }
 
+// Desktop nav — used by TopNavLinks (unchanged)
 const navLinks = [
   { href: "/explore/projects", label: "Projects" },
   { href: "/explore/products", label: "Products" },
@@ -27,11 +28,12 @@ const navLinks = [
   { href: "/explore", label: "Explore" },
 ];
 
-const footerLinks = [
-  { href: "/about", label: "About" },
-  { href: "/faq", label: "FAQ" },
-  { href: "/guidelines", label: "Guidelines" },
-  { href: "/contact", label: "Contact" },
+// Mobile drawer nav — core exploration only, no footer duplicates
+const mobileNavLinks = [
+  { href: "/explore/projects", label: "Projects" },
+  { href: "/explore/products", label: "Products" },
+  { href: "/explore/designers", label: "Designers" },
+  { href: "/explore/brands", label: "Brands" },
 ];
 
 export function TopNav() {
@@ -81,6 +83,12 @@ export function TopNav() {
     (user?.firstName || user?.lastName
       ? [user.firstName, user.lastName].filter(Boolean).join(" ")
       : user?.primaryEmailAddress?.emailAddress ?? "Account");
+
+  const initials = name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
 
   return (
     <>
@@ -139,142 +147,163 @@ export function TopNav() {
       {/* Mobile drawer */}
       {drawerOpen && (
         <>
+          {/* Backdrop */}
           <div
             className="fixed inset-0 z-40 bg-black/40 md:hidden"
             aria-hidden
             onClick={closeDrawer}
           />
-          <div
-            className="fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] overflow-y-auto border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 md:hidden"
-            role="dialog"
-            aria-label="Menu"
-          >
-            <div className="flex flex-col gap-6 p-6">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Menu
-                </span>
-                <button
-                  type="button"
-                  onClick={closeDrawer}
-                  className="rounded p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 focus:outline-none focus:ring-2 focus:ring-archtivy-primary dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-                  aria-label="Close menu"
-                >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
 
-              {/* Mobile primary CTA */}
+          {/* Drawer panel: flex-col so bottom area sticks */}
+          <div
+            className="fixed inset-y-0 right-0 z-50 flex w-[88vw] max-w-sm flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 md:hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation menu"
+          >
+            {/* ── Top bar ─────────────────────────────────────────── */}
+            <div className="flex shrink-0 items-center justify-between border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
+                Menu
+              </span>
+              <button
+                type="button"
+                onClick={closeDrawer}
+                className="rounded-[4px] p-1.5 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#002abf] dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                aria-label="Close menu"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* ── Scrollable nav ──────────────────────────────────── */}
+            <nav
+              className="flex-1 overflow-y-auto px-2 py-3"
+              aria-label="Main navigation"
+            >
+              {mobileNavLinks.map(({ href, label }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={closeDrawer}
+                  className="flex items-center rounded-[4px] px-4 py-4 text-base font-medium text-zinc-800 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] dark:text-zinc-100 dark:hover:bg-zinc-900"
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
+
+            {/* ── Sticky bottom: auth + CTA ───────────────────────── */}
+            <div
+              className="shrink-0 border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
+              style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+            >
               {userId ? (
-                showListings && (
+                /* ── Signed-in ─────────────────────────────────── */
+                <>
+                  {/* Profile card */}
+                  <div className="flex items-center gap-3 border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
+                    <div
+                      aria-hidden
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                    >
+                      {initials || "A"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                        {name}
+                      </p>
+                      <Link
+                        href="/me"
+                        onClick={closeDrawer}
+                        className="text-xs text-zinc-400 transition hover:text-[#002abf] dark:text-zinc-500 dark:hover:text-[#4d6fff]"
+                      >
+                        View profile →
+                      </Link>
+                    </div>
+                    <ThemeToggle />
+                  </div>
+
+                  {/* Secondary actions */}
+                  <div className="flex items-center gap-1 px-4 py-3">
+                    {showListings && (
+                      <Link
+                        href="/me/listings"
+                        onClick={closeDrawer}
+                        className="rounded-[4px] px-3 py-2 text-sm text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
+                      >
+                        Listings
+                      </Link>
+                    )}
+                    <Link
+                      href="/me/saved"
+                      onClick={closeDrawer}
+                      className="rounded-[4px] px-3 py-2 text-sm text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
+                    >
+                      Saved
+                    </Link>
+                    <Link
+                      href="/me/settings"
+                      onClick={closeDrawer}
+                      className="rounded-[4px] px-3 py-2 text-sm text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
+                    >
+                      Settings
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => { closeDrawer(); signOut({ redirectUrl: "/" }); }}
+                      className="ml-auto rounded-[4px] px-3 py-2 text-sm text-zinc-400 transition hover:bg-zinc-50 hover:text-zinc-700 dark:text-zinc-500 dark:hover:bg-zinc-900 dark:hover:text-zinc-300"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+
+                  {/* Primary CTA — only for designer / brand */}
+                  {showListings && (
+                    <div className="px-5 pb-5">
+                      <Link
+                        href="/add/project"
+                        onClick={closeDrawer}
+                        className="block w-full rounded-[4px] bg-[#002abf] px-4 py-3 text-center text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2"
+                      >
+                        Share your work
+                      </Link>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* ── Signed-out ─────────────────────────────────── */
+                <div className="space-y-2 px-5 py-5">
                   <Link
-                    href="/add/project"
+                    href="/sign-in?redirect_url=/add/project"
                     onClick={closeDrawer}
-                    className="w-full rounded-[4px] bg-[#002abf] px-4 py-3 text-center text-sm font-medium text-white hover:opacity-90"
+                    className="block w-full rounded-[4px] bg-[#002abf] px-4 py-3 text-center text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2"
                   >
                     Share your work
                   </Link>
-                )
-              ) : (
-                <Link
-                  href="/sign-in?redirect_url=/add/project"
-                  onClick={closeDrawer}
-                  className="w-full rounded-[4px] bg-[#002abf] px-4 py-3 text-center text-sm font-medium text-white hover:opacity-90"
-                >
-                  Share your work
-                </Link>
-              )}
-
-              <nav className="flex flex-col gap-1" aria-label="Main">
-                {navLinks.map(({ href, label }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={closeDrawer}
-                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-archtivy-primary dark:text-zinc-100 dark:hover:bg-zinc-800"
-                  >
-                    {label}
-                  </Link>
-                ))}
-              </nav>
-              <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                <SignedOut>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
                     <Link
                       href="/sign-in"
                       onClick={closeDrawer}
-                      className="rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800"
+                      className="flex-1 rounded-[4px] border border-zinc-200 px-4 py-2.5 text-center text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-600"
                     >
                       Sign in
                     </Link>
                     <Link
                       href="/sign-up"
                       onClick={closeDrawer}
-                      className="rounded-lg bg-archtivy-primary px-3 py-2.5 text-center text-sm font-medium text-white hover:opacity-90"
+                      className="flex-1 rounded-[4px] border border-zinc-200 px-4 py-2.5 text-center text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-zinc-600"
                     >
                       Sign up
                     </Link>
                   </div>
-                </SignedOut>
-                <SignedIn>
-                  <p className="mb-2 truncate px-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                    {name}
-                  </p>
-                  <div className="flex flex-col gap-1">
-                    <Link href="/me" onClick={closeDrawer} className="rounded-lg px-3 py-2.5 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
-                      Profile
-                    </Link>
-                    {showListings && (
-                      <Link href="/me/listings" onClick={closeDrawer} className="rounded-lg px-3 py-2.5 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
-                        Listings
-                      </Link>
-                    )}
-                    <Link href="/me/saved" onClick={closeDrawer} className="rounded-lg px-3 py-2.5 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
-                      Saved
-                    </Link>
-                    <Link href="/me/settings" onClick={closeDrawer} className="rounded-lg px-3 py-2.5 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800">
-                      Settings
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        closeDrawer();
-                        signOut({ redirectUrl: "/" });
-                      }}
-                      className="rounded-lg px-3 py-2.5 text-left text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                    >
-                      Sign out
-                    </button>
+                  <div className="flex justify-end pt-1">
+                    <ThemeToggle />
                   </div>
-                </SignedIn>
-              </div>
-              <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Product
-                </p>
-                <div className="flex flex-col gap-1">
-                  {footerLinks.map(({ href, label }) => (
-                    <Link
-                      key={href}
-                      href={href}
-                      onClick={closeDrawer}
-                      className="rounded-lg px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                    >
-                      {label}
-                    </Link>
-                  ))}
                 </div>
-              </div>
-
-              {/* Theme toggle */}
-              <div className="flex items-center justify-between border-t border-zinc-200 pt-4 dark:border-zinc-700">
-                <span className="px-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Appearance
-                </span>
-                <ThemeToggle />
-              </div>
+              )}
             </div>
           </div>
         </>
