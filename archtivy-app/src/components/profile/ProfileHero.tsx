@@ -53,16 +53,19 @@ export function ProfileHero({
       {/* Flat dark overlay — no gradient per design spec */}
       <div className="absolute inset-0 bg-black/50" />
 
-      {/* Identity + stats anchored to bottom */}
+      {/* Identity + stats anchored to bottom.
+          pb increased from pb-10/pb-14 to pb-14/pb-18 to add ~10px breathing room
+          between the location line and the overlapping sidebar card edge. */}
       <div className="absolute inset-x-0 bottom-0">
         <div
-          className="mx-auto px-4 sm:px-6 lg:px-0 pb-10 sm:pb-14"
+          className="mx-auto px-4 sm:px-6 lg:px-0 pb-14 sm:pb-[4.5rem]"
           style={{ maxWidth: 1040 }}
         >
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 sm:gap-8">
             {/* Left: role label + name + location */}
             <div className="min-w-0">
-              <p className="text-white/60 text-[11px] font-medium uppercase tracking-[0.22em] mb-2.5">
+              {/* Higher opacity (white/80) and tighter tracking for legibility */}
+              <p className="text-white/80 text-[11px] font-medium uppercase tracking-[0.14em] mb-2.5">
                 {roleLabel}
               </p>
               <h1
