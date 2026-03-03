@@ -1,7 +1,6 @@
 /**
- * Footer metrics: total connections for the CTA.
- * totalConnections = project_product_links count + connections table count (if exists).
- * Cached (revalidate: 3600) so the footer updates hourly.
+ * Footer metrics: platform stats for the footer CTA and intelligence strip.
+ * All queries are cached (revalidate: 3600) so the footer updates hourly.
  */
 
 import { unstable_cache } from "next/cache";
@@ -9,13 +8,8 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 
 export const FOOTER_METRICS_REVALIDATE = 3600;
 
-/**
- * Returns total connection count used in the footer CTA.
- * Sums:
- * - project_product_links (project–product links)
- * - connections (from_type, from_id, to_type, to_id) if the table exists
- * Skips any missing table safely.
- */
+// ─── Legacy: total connections ────────────────────────────────────────────────
+
 export async function getTotalConnections(): Promise<number> {
   const sup = getSupabaseServiceClient();
   let total = 0;
@@ -39,11 +33,66 @@ export async function getTotalConnections(): Promise<number> {
   return total;
 }
 
-const CACHE_KEY = "footer-total-connections";
-
-/** Cached total connections for the footer CTA. Revalidates every hour. */
 export const getCachedTotalConnections = unstable_cache(
   getTotalConnections,
-  [CACHE_KEY],
+  ["footer-total-connections"],
+  { revalidate: FOOTER_METRICS_REVALIDATE }
+);
+
+// ─── Platform metrics (new footer) ───────────────────────────────────────────
+
+export interface PlatformMetrics {
+  projects: number;
+  products: number;
+  professionals: number;
+  countries: number;
+}
+
+export async function getPlatformMetrics(): Promise<PlatformMetrics> {
+  const sup = getSupabaseServiceClient();
+
+  const [
+    { count: projectCount },
+    { count: productCount },
+    { count: professionalCount },
+    { data: countryRows },
+  ] = await Promise.all([
+    sup
+      .from("listings")
+      .select("id", { count: "exact", head: true })
+      .eq("type", "project")
+      .is("deleted_at", null),
+    sup
+      .from("listings")
+      .select("id", { count: "exact", head: true })
+      .eq("type", "product")
+      .is("deleted_at", null),
+    sup
+      .from("profiles")
+      .select("id", { count: "exact", head: true }),
+    sup
+      .from("listings")
+      .select("location_country")
+      .is("deleted_at", null)
+      .not("location_country", "is", null),
+  ]);
+
+  const countries = new Set(
+    (countryRows ?? [])
+      .map((r: { location_country: string | null }) => r.location_country)
+      .filter(Boolean)
+  ).size;
+
+  return {
+    projects: projectCount ?? 0,
+    products: productCount ?? 0,
+    professionals: professionalCount ?? 0,
+    countries,
+  };
+}
+
+export const getCachedPlatformMetrics = unstable_cache(
+  getPlatformMetrics,
+  ["footer-platform-metrics"],
   { revalidate: FOOTER_METRICS_REVALIDATE }
 );
