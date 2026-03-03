@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ProfileContactButton } from "@/components/profile/ProfileContactButton";
 import type { Profile } from "@/lib/types/profiles";
@@ -21,6 +22,8 @@ export function ProfileMobilePanel({
   firstListingForContact,
   decodedUsername,
 }: ProfileMobilePanelProps) {
+  const [expanded, setExpanded] = useState(false);
+
   const claimHref = `/u/${encodeURIComponent(profile.username ?? decodedUsername)}/claim`;
 
   return (
@@ -84,9 +87,32 @@ export function ProfileMobilePanel({
 
       {/* Bio */}
       {profile.bio && (
-        <p className="text-sm text-zinc-600 leading-relaxed line-clamp-3 mb-3">
-          {profile.bio}
-        </p>
+        <div className="mb-3">
+          <p className={`text-sm text-zinc-600 leading-relaxed${expanded ? "" : " line-clamp-3"}`}>
+            {profile.bio}
+          </p>
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            aria-label={expanded ? "Collapse bio" : "Expand bio"}
+            className="flex items-center justify-center mx-auto mt-2 w-8 h-8 rounded-full border border-zinc-200 hover:bg-zinc-50 transition-colors"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`text-zinc-500 transition-transform${expanded ? " rotate-180" : ""}`}
+              aria-hidden
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+        </div>
       )}
 
       {/* Social icons row */}
