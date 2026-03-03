@@ -1,58 +1,86 @@
-import { auth } from "@clerk/nextjs/server";
-import { getProfileByClerkId } from "@/lib/db/profiles";
-import { PageCTA } from "@/components/layout/PageCTA";
-
-const CONTACT_EMAIL = "info@archtivy.com";
+import {
+  MarketingPage,
+  MarketingSection,
+} from "@/components/marketing/MarketingPage";
+import { ContactForm } from "@/components/marketing/ContactForm";
 
 export const metadata = {
   title: "Contact | Archtivy",
-  description: "Get in touch with Archtivy. Questions about the platform, partnerships, or support.",
+  description:
+    "Contact Archtivy for partnerships, press inquiries, support, or general questions.",
 };
 
-export default async function ContactPage() {
-  const { userId } = await auth();
-  const profileResult = userId ? await getProfileByClerkId(userId) : { data: null };
-  const role = profileResult.data?.role ?? undefined;
+const DIRECT_LINES = [
+  {
+    category: "Partnerships",
+    description:
+      "Brand intelligence partnerships, institutional access, technology integrations, and co-development discussions.",
+    email: "partnerships@archtivy.com",
+  },
+  {
+    category: "Press",
+    description:
+      "Editorial coverage, interviews, data requests, and media asset access.",
+    email: "press@archtivy.com",
+  },
+  {
+    category: "Support",
+    description:
+      "Account issues, platform questions, submission problems, and profile claims.",
+    email: "support@archtivy.com",
+  },
+];
 
+export default function ContactPage() {
   return (
-    <article className="space-y-20 sm:space-y-28">
-      <header className="space-y-6 pt-4 text-center sm:pt-8">
-        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          Contact
-        </p>
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl md:text-5xl dark:text-zinc-100">
-          Get in touch
-        </h1>
-        <p className="mx-auto max-w-2xl text-lg leading-relaxed text-zinc-600 dark:text-zinc-400">
-          Have a question about Archtivy, your account, or how to link projects and products? We&apos;re here to help.
-        </p>
-      </header>
-
-      <section className="mx-auto max-w-xl space-y-8 border-t border-zinc-200 pt-16 dark:border-zinc-800 sm:pt-20">
-        <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-8">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            Email
-          </h2>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            For general inquiries, platform support, or partnership discussions, reach us at:
-          </p>
-          <p className="mt-4">
-            <a
-              href={`mailto:${CONTACT_EMAIL}`}
-              className="text-archtivy-primary hover:underline dark:text-archtivy-primary"
+    <MarketingPage
+      label="Contact"
+      headline="Direct lines. No requests that disappear."
+      subheadline="We review every message and respond within two business days. Use the category that best describes your inquiry."
+    >
+      {/* Direct lines */}
+      <MarketingSection heading="Direct contact">
+        <div className="grid gap-4 sm:grid-cols-3">
+          {DIRECT_LINES.map(({ category, description, email }) => (
+            <div
+              key={category}
+              className="space-y-3 rounded-[4px] border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
             >
-              {CONTACT_EMAIL}
-            </a>
-          </p>
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500">
+                {category}
+              </h3>
+              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+                {description}
+              </p>
+              <a
+                href={`mailto:${email}`}
+                className="block text-sm font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
+              >
+                {email}
+              </a>
+            </div>
+          ))}
         </div>
-      </section>
+      </MarketingSection>
 
-      <section className="border-t border-zinc-200 pt-16 text-center dark:border-zinc-800 sm:pt-20">
-        <p className="mb-6 text-zinc-600 dark:text-zinc-400">
-          Ready to share your work or explore what&apos;s on the platform?
-        </p>
-        <PageCTA userId={userId} role={role} />
-      </section>
-    </article>
+      {/* Form */}
+      <MarketingSection heading="Send a message">
+        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
+          <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+            <p>
+              Use this form for any inquiry. Select the category that most
+              closely matches your message — it helps us route correctly and
+              respond faster.
+            </p>
+            <p>
+              For technical issues or account-specific problems, include as much
+              detail as possible: your username, the page or feature involved,
+              and a description of what happened.
+            </p>
+          </div>
+          <ContactForm />
+        </div>
+      </MarketingSection>
+    </MarketingPage>
   );
 }

@@ -33,19 +33,19 @@ const PROFESSIONALS_LINKS = [
 ];
 
 const RESOURCES_LINKS = [
-  { label: "Press Kit", href: "/press" },
-  { label: "API Documentation", href: "#" },
-  { label: "Data & Intelligence", href: "/vision" },
-  { label: "Brand Intelligence", href: "#" },
-  { label: "Partner Program", href: "#" },
-  { label: "Status", href: "#" },
+  { label: "Press Kit", href: "/press-kit" },
+  { label: "API Documentation", href: "/api-docs" },
+  { label: "Data & Intelligence", href: "/data-intelligence" },
+  { label: "Brand Intelligence", href: "/brand-intelligence" },
+  { label: "Partner Program", href: "/partners" },
+  { label: "Status", href: "/status" },
 ];
 
 const LEGAL_LINKS = [
-  { label: "Privacy Policy", href: "/legal/privacy" },
-  { label: "Terms of Use", href: "/legal/terms" },
-  { label: "Cookie Preferences", href: "/legal/cookies" },
-  { label: "Data Processing", href: "/legal/data-processing" },
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Terms of Use", href: "/terms" },
+  { label: "Cookie Preferences", href: "/cookies" },
+  { label: "Data Processing", href: "/data-processing" },
 ];
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
@@ -116,22 +116,26 @@ export async function Footer() {
       </div>
 
       {/* ── 2. Five-column link grid ──────────────────────────────────── */}
+      {/*
+        Alignment fix: every column has a fixed min-h-[52px] header zone
+        containing a label + one-line descriptor. This ensures all link lists
+        start at the same vertical position regardless of col-1's brand name
+        being slightly larger than the heading labels in cols 2-5.
+      */}
       <div className="border-b border-zinc-200 dark:border-zinc-800">
         <Container className="py-12 sm:py-14">
           <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-5 lg:gap-8">
 
             {/* Col 1: About the platform */}
-            <div className="space-y-4 sm:col-span-2 lg:col-span-1">
-              <div className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-                Archtivy
+            <div className="flex flex-col gap-4 sm:col-span-2 lg:col-span-1">
+              <div className="min-h-[52px]">
+                <div className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+                  Archtivy
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-zinc-400 dark:text-zinc-500">
+                  Global architecture intelligence.
+                </p>
               </div>
-              <p className="text-xs leading-relaxed text-zinc-400 dark:text-zinc-500">
-                Global architecture intelligence.
-                <br />
-                Structured credits, product traceability,
-                <br />
-                professional records.
-              </p>
               <ul className="space-y-2.5">
                 {COMPANY_LINKS.map((link) => (
                   <li key={link.href}>
@@ -147,10 +151,15 @@ export async function Footer() {
             </div>
 
             {/* Col 2: Platform */}
-            <div className="space-y-4">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
-                Platform
-              </h3>
+            <div className="flex flex-col gap-4">
+              <div className="min-h-[52px]">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
+                  Platform
+                </h3>
+                <p className="mt-2 text-xs leading-relaxed text-zinc-400 dark:text-zinc-500">
+                  Explore the full record.
+                </p>
+              </div>
               <ul className="space-y-2.5">
                 {PLATFORM_LINKS.map((link) => (
                   <li key={link.href}>
@@ -166,10 +175,15 @@ export async function Footer() {
             </div>
 
             {/* Col 3: For Professionals */}
-            <div className="space-y-4">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
-                Professionals
-              </h3>
+            <div className="flex flex-col gap-4">
+              <div className="min-h-[52px]">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
+                  Professionals
+                </h3>
+                <p className="mt-2 text-xs leading-relaxed text-zinc-400 dark:text-zinc-500">
+                  Build your structured record.
+                </p>
+              </div>
               <ul className="space-y-2.5">
                 {PROFESSIONALS_LINKS.map((link) => (
                   <li key={link.href}>
@@ -185,10 +199,15 @@ export async function Footer() {
             </div>
 
             {/* Col 4: Resources */}
-            <div className="space-y-4">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
-                Resources
-              </h3>
+            <div className="flex flex-col gap-4">
+              <div className="min-h-[52px]">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
+                  Resources
+                </h3>
+                <p className="mt-2 text-xs leading-relaxed text-zinc-400 dark:text-zinc-500">
+                  Documentation and insights.
+                </p>
+              </div>
               <ul className="space-y-2.5">
                 {RESOURCES_LINKS.map((link) => (
                   <li key={link.href}>
@@ -204,10 +223,15 @@ export async function Footer() {
             </div>
 
             {/* Col 5: Legal */}
-            <div className="space-y-4">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
-                Legal
-              </h3>
+            <div className="flex flex-col gap-4">
+              <div className="min-h-[52px]">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
+                  Legal
+                </h3>
+                <p className="mt-2 text-xs leading-relaxed text-zinc-400 dark:text-zinc-500">
+                  Policies and data rights.
+                </p>
+              </div>
               <ul className="space-y-2.5">
                 {LEGAL_LINKS.map((link) => (
                   <li key={link.href}>
@@ -220,7 +244,7 @@ export async function Footer() {
                   </li>
                 ))}
               </ul>
-              <p className="pt-1 text-[10px] leading-relaxed text-zinc-400 dark:text-zinc-600">
+              <p className="text-[10px] leading-relaxed text-zinc-400 dark:text-zinc-600">
                 All credits and specifications are reviewed prior to
                 publication.
               </p>

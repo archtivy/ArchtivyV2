@@ -1,147 +1,223 @@
-import { Button } from "@/components/ui/Button";
 import { auth } from "@clerk/nextjs/server";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { AboutCTAs } from "./AboutCTAs";
+import {
+  MarketingSection,
+  MarketingCTA,
+} from "@/components/marketing/MarketingPage";
 
 export const metadata = {
-  title: "About us | Archtivy",
+  title: "About | Archtivy",
   description:
-    "Why Archtivy exists: connecting architectural designers and brands. Real visibility, real connections.",
+    "Archtivy is the structured record of global architecture — connecting every project to its products, every credit to its professional, and every specification to its brand.",
 };
+
+const INDEXED = [
+  {
+    title: "Projects",
+    body: "Architectural projects submitted with structured fields: type, location, year, team credits, and products specified. Every project is a node in a growing network.",
+  },
+  {
+    title: "Products",
+    body: "Architecture product listings with category, type, brand, and specification history. Products accumulate a verifiable record of where and how they are used.",
+  },
+  {
+    title: "Professionals",
+    body: "Designer and architect profiles connected to their work. Every credit attributed in a project becomes part of a permanent, queryable professional record.",
+  },
+  {
+    title: "Brands",
+    body: "Architecture product brands connected to the projects where their products are specified. Brands gain traceable visibility inside real architectural contexts.",
+  },
+];
 
 export default async function AboutPage() {
   const { userId } = await auth();
-  const profileResult = userId ? await getProfileByClerkId(userId) : { data: null };
+  const profileResult = userId
+    ? await getProfileByClerkId(userId)
+    : { data: null };
   const role = profileResult.data?.role ?? undefined;
 
   return (
-    <article className="space-y-20 sm:space-y-28">
+    <article className="space-y-16 sm:space-y-20">
       {/* Hero */}
-      <header className="space-y-6 pt-4 text-center sm:pt-8">
-        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          About us
+      <header className="space-y-5 pt-4 sm:pt-8">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
+          About
         </p>
-        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl md:text-5xl lg:text-6xl dark:text-zinc-100">
-          Architecture runs on connection. Most of it never happens.
+        <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
+          Architecture has always produced intelligence. It was never
+          organised.
         </h1>
-        <p className="mx-auto max-w-2xl text-lg leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-xl">
-          Designers and brands depend on the same thing: being visible to the right people at the right time. Today that visibility is scattered across networks, inboxes, trade fairs, and chance. Archtivy exists so that built work, products, and credits can live in one place—and so that the right connections can happen without depending on luck.
+        <p className="max-w-2xl text-base leading-relaxed text-zinc-500 dark:text-zinc-400">
+          Every completed project carries embedded knowledge — the products
+          specified, the professionals credited, the decisions made across
+          months of design. This information has always existed. What it has
+          never had is structure.
         </p>
-        <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+        <div className="flex flex-wrap gap-3 pt-1">
           <AboutCTAs userId={userId} role={role} />
         </div>
       </header>
 
-      {/* Stats */}
-      <section className="border-t border-zinc-200 pt-16 dark:border-zinc-800 sm:pt-20">
-        <h2 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-          The gap is structural
-        </h2>
-        <ul className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          <li className="space-y-2">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-archtivy-primary/10 text-sm font-semibold text-archtivy-primary">
-              1
-            </span>
-            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-              Designers report spending a large share of project time simply identifying and vetting suitable brands and products—time that could go into design and delivery.
+      {/* Why Archtivy exists */}
+      <MarketingSection heading="Why this exists">
+        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
+          <div className="space-y-5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+            <p>
+              The architectural industry communicates through media, portfolios,
+              and disconnected directories. These formats were built for
+              attention, not accuracy. They capture the exceptional, not the
+              systemic. They reward editorial selection, not professional record.
             </p>
-          </li>
-          <li className="space-y-2">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-archtivy-primary/10 text-sm font-semibold text-archtivy-primary">
-              2
-            </span>
-            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-              Many manufacturers still rely on personal networks and a small set of known studios for the majority of their specification opportunities.
+            <p>
+              The result is an industry that produces enormous amounts of
+              embedded knowledge and has no systematic way to access it. A
+              product brand cannot reliably know which firms specify their
+              products. A designer cannot demonstrate their specification
+              history without manually compiling a portfolio. A researcher
+              cannot query architectural production by material or region
+              without pulling from dozens of incompatible sources.
             </p>
-          </li>
-          <li className="space-y-2">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-archtivy-primary/10 text-sm font-semibold text-archtivy-primary">
-              3
-            </span>
-            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-              A significant proportion of potential collaborations never occur because there is no shared, searchable record of who did what, and with which products.
+          </div>
+          <div className="space-y-5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+            <p>
+              Archtivy was built on a different logic. We are the infrastructure
+              layer beneath global architecture — connecting every project to
+              the products within it, every credit to the professional who
+              earned it, every specification to the brand that made it possible.
             </p>
-          </li>
-          <li className="space-y-2">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-archtivy-primary/10 text-sm font-semibold text-archtivy-primary">
-              4
-            </span>
-            <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-              Without a central place for projects and products, visibility is tied to who you already know, not who you should know.
+            <p>
+              We do not curate. We do not select what deserves attention. We
+              provide infrastructure for the industry to record itself —
+              accurately, permanently, and at scale.
             </p>
-          </li>
-        </ul>
-      </section>
+          </div>
+        </div>
+      </MarketingSection>
 
-      {/* Founder story */}
-      <section className="grid gap-12 border-t border-zinc-200 pt-16 dark:border-zinc-800 sm:pt-20 lg:grid-cols-2 lg:items-start">
-        <div>
-          <h2 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-            Why Archtivy exists
-          </h2>
+      {/* What gets indexed */}
+      <MarketingSection heading="What gets indexed">
+        <div className="grid gap-6 sm:grid-cols-2">
+          {INDEXED.map(({ title, body }) => (
+            <div
+              key={title}
+              className="space-y-3 rounded-[4px] border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+            >
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                {title}
+              </h3>
+              <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+                {body}
+              </p>
+            </div>
+          ))}
         </div>
-        <div className="space-y-6 text-zinc-600 dark:text-zinc-400">
-          <p className="leading-relaxed">
-            Archtivy came from the day-to-day reality of practice: the same search for the right products, the same dependence on PDFs and spreadsheets, the same hope that the right brand would appear at the right moment. It wasn’t conceived as a startup idea. It came from the frustration of seeing good work stay invisible and good products stay undiscovered.
-          </p>
-          <p className="leading-relaxed">
-            The industry still runs on introductions, referrals, and being in the right room. That works for some. For everyone else—emerging studios, smaller brands, designers outside the usual circles—it creates a permanent disadvantage. Archtivy is a response to that: a single place where projects and products can be published, linked, and found. Not a replacement for relationships, but a way for the right ones to form.
-          </p>
-        </div>
-      </section>
+      </MarketingSection>
 
-      {/* For designers */}
-      <section className="grid gap-12 border-t border-zinc-200 pt-16 dark:border-zinc-800 sm:pt-20 lg:grid-cols-2 lg:items-start">
-        <div>
-          <h2 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-            What changes for designers
-          </h2>
+      {/* The intelligence layer */}
+      <MarketingSection heading="The intelligence layer">
+        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
+          <div className="space-y-5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+            <p>
+              When projects are submitted with structured credits — team
+              members, products used, project type, location, year — the data
+              becomes queryable. Patterns emerge. Specification trends become
+              visible. Professional networks become legible. Brand performance
+              inside architectural practice becomes measurable.
+            </p>
+            <p>
+              This is the intelligence layer. It does not require a radical
+              reinvention of how architecture is practised. It requires a
+              platform designed from the ground up to capture the intelligence
+              that already exists in every completed project.
+            </p>
+          </div>
+          <ul className="space-y-3">
+            {[
+              "Product-to-project traceability at global scale",
+              "Verifiable professional credit history",
+              "Specification trend data by region, typology, and material",
+              "Brand specification footprint across markets",
+              "Permanent, queryable record independent of media cycles",
+            ].map((item) => (
+              <li
+                key={item}
+                className="flex items-start gap-4 rounded-[4px] border border-zinc-200 bg-white px-5 py-3.5 dark:border-zinc-800 dark:bg-zinc-900"
+              >
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#002abf]" />
+                <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                  {item}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="space-y-6">
-          <p className="leading-relaxed text-zinc-600 dark:text-zinc-400">
-            Without a shared platform, designers work in relative isolation. Product knowledge stays fragmented across brochures, websites, and word of mouth. Access to brands is uneven—often best for those who already have the strongest networks. The result is more time spent searching and less time designing, and many options never considered simply because they were never seen.
-          </p>
-          <p className="leading-relaxed text-zinc-600 dark:text-zinc-400">
-            Archtivy shifts that. Your work can be published in one place, with clear credits and linked products. That improves discoverability: others can see what you’ve built and with whom. It adds context: projects show how products perform in real use. And it creates lasting visibility that isn’t tied to a single fair, pitch, or email thread. You stay findable. The right brands can find you.
-          </p>
-        </div>
-      </section>
+      </MarketingSection>
 
-      {/* For brands */}
-      <section className="grid gap-12 border-t border-zinc-200 pt-16 dark:border-zinc-800 sm:pt-20 lg:grid-cols-2 lg:items-start">
-        <div>
-          <h2 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-            What changes for brands
-          </h2>
+      {/* Roadmap */}
+      <MarketingSection heading="What we are building toward">
+        <div className="grid gap-6 sm:grid-cols-3">
+          {[
+            {
+              phase: "Now",
+              items: [
+                "Structured project and product submissions",
+                "Team credit attribution",
+                "Product-to-project linking",
+                "Professional profiles",
+                "Global explore and search",
+              ],
+            },
+            {
+              phase: "Next",
+              items: [
+                "Brand specification analytics dashboard",
+                "API access for qualified partners",
+                "Institutional and school partnerships",
+                "Enhanced professional intelligence view",
+                "Specification trend reports",
+              ],
+            },
+            {
+              phase: "Long term",
+              items: [
+                "BIM and CMS integration layer",
+                "Global specification database",
+                "Research and academic data access",
+                "Multi-language support",
+                "Canonical architectural record",
+              ],
+            },
+          ].map(({ phase, items }) => (
+            <div key={phase} className="space-y-4">
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
+                {phase}
+              </h3>
+              <ul className="space-y-2">
+                {items.map((item) => (
+                  <li
+                    key={item}
+                    className="flex items-start gap-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400"
+                  >
+                    <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
-        <div className="space-y-6">
-          <p className="leading-relaxed text-zinc-600 dark:text-zinc-400">
-            Brands know the limits of cold outreach, one-off events, and dependence on reps and fairs. Visibility is often short-lived; presence is hard to maintain. Reaching the designers who actually specify your products—and staying in their view—remains difficult without a stable, searchable place where work and products meet.
-          </p>
-          <p className="leading-relaxed text-zinc-600 dark:text-zinc-400">
-            Archtivy is built for that. It’s a place where your products can sit alongside real projects: specified, documented, and credited. That’s specification and discovery, not advertising. Designers search by project type, location, or product—and find you in context. Your presence is ongoing, not tied to a single campaign or event. You become part of how designers discover and specify, not an interruption.
-          </p>
-        </div>
-      </section>
+      </MarketingSection>
 
-      {/* Closing CTA */}
-      <footer className="space-y-8 border-t border-zinc-200 pt-16 dark:border-zinc-800 sm:pt-20">
-        <h2 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-          Architecture deserves better systems
-        </h2>
-        <p className="max-w-2xl text-lg leading-relaxed text-zinc-600 dark:text-zinc-400">
-          The best work in architecture has always depended on clarity: clear credits, clear links between projects and products, and clear ways for the right people to find each other. Today that clarity is the exception. Archtivy is a step toward making it normal—so that connection isn’t left to chance and good work isn’t left unseen.
-        </p>
-        <p className="text-zinc-600 dark:text-zinc-400">
-          If you design, share your work. If you make, become part of the network. The platform is here. The rest is up to you.
-        </p>
-        <div className="flex flex-wrap items-center gap-4 pt-4">
-          <AboutCTAs userId={userId} role={role} />
-          <Button as="link" href="/sign-up" variant="secondary">
-            Become part of the network
-          </Button>
-        </div>
-      </footer>
+      <MarketingCTA
+        heading="Architecture deserves better infrastructure."
+        body="Submit your work. Every project, product, and credit makes the record more complete and more useful to the entire industry."
+        primaryLabel="Submit Your Work"
+        primaryHref="/add/project"
+        secondaryLabel="Explore the Platform"
+        secondaryHref="/explore/projects"
+      />
     </article>
   );
 }
