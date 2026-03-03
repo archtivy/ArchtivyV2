@@ -113,12 +113,12 @@ export function ProfileSidebar({
                 listingId={firstListingForContact.id}
                 listingType={firstListingForContact.type}
                 listingTitle={firstListingForContact.title}
-                className="flex-1 justify-center !rounded-full !h-10 !py-0 !bg-[#002abf] !text-white !border-[#002abf] hover:!bg-[#0024a8] hover:!border-[#0024a8]"
+                className="flex-1 justify-center !rounded-full !h-9 !py-0 !bg-[#002abf] !text-white !border-[#002abf] hover:!bg-[#0024a8] hover:!border-[#0024a8]"
               />
             ) : null}
             <button
               type="button"
-              className="flex-1 inline-flex items-center justify-center rounded-full h-10 border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-[#002abf] hover:text-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2"
+              className="flex-1 inline-flex items-center justify-center rounded-full h-9 border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-[#002abf] hover:text-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2"
             >
               Follow
             </button>
@@ -144,11 +144,12 @@ export function ProfileSidebar({
               type="button"
               onClick={() => setBioExpanded((v) => !v)}
               aria-label={bioExpanded ? "Collapse bio" : "Expand bio"}
-              className="mt-1.5 flex items-center text-zinc-400 hover:text-zinc-600 transition-colors"
+              className="mt-2 mx-auto flex w-7 h-7 items-center justify-center border border-zinc-200 text-zinc-400 hover:bg-zinc-50 hover:text-zinc-500 transition-colors"
+              style={{ borderRadius: "50%" }}
             >
               <svg
-                width="14"
-                height="14"
+                width="12"
+                height="12"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -167,9 +168,9 @@ export function ProfileSidebar({
           </div>
         )}
 
-        {/* Social text links — plain inline text buttons */}
+        {/* Social links — vertical labeled rows: label (zinc-400) + value (zinc-700) */}
         {(profile.website || profile.instagram || profile.linkedin) && (
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <div className="space-y-2">
             {profile.website && (
               <a
                 href={
@@ -179,9 +180,14 @@ export function ProfileSidebar({
                 }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-zinc-500 hover:text-[#002abf] transition-colors"
+                className="flex items-center gap-2 min-w-0 group"
               >
-                Website
+                <span className="shrink-0 text-[10px] text-zinc-400 uppercase tracking-[0.1em] w-[4.5rem]">
+                  Website
+                </span>
+                <span className="text-xs text-zinc-700 truncate group-hover:text-[#002abf] transition-colors">
+                  {profile.website.replace(/^https?:\/\/(www\.)?/, "")}
+                </span>
               </a>
             )}
             {profile.instagram && (
@@ -189,9 +195,14 @@ export function ProfileSidebar({
                 href={`https://instagram.com/${profile.instagram.replace(/^@/, "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-zinc-500 hover:text-[#002abf] transition-colors"
+                className="flex items-center gap-2 min-w-0 group"
               >
-                Instagram
+                <span className="shrink-0 text-[10px] text-zinc-400 uppercase tracking-[0.1em] w-[4.5rem]">
+                  Instagram
+                </span>
+                <span className="text-xs text-zinc-700 truncate group-hover:text-[#002abf] transition-colors">
+                  @{profile.instagram.replace(/^@/, "")}
+                </span>
               </a>
             )}
             {profile.linkedin && (
@@ -203,9 +214,14 @@ export function ProfileSidebar({
                 }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-zinc-500 hover:text-[#002abf] transition-colors"
+                className="flex items-center gap-2 min-w-0 group"
               >
-                LinkedIn
+                <span className="shrink-0 text-[10px] text-zinc-400 uppercase tracking-[0.1em] w-[4.5rem]">
+                  LinkedIn
+                </span>
+                <span className="text-xs text-zinc-700 truncate group-hover:text-[#002abf] transition-colors">
+                  {profile.linkedin.replace(/^https?:\/\/(www\.)?(linkedin\.com\/)?/, "")}
+                </span>
               </a>
             )}
           </div>

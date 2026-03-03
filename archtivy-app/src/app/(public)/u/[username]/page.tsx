@@ -339,7 +339,7 @@ export default async function PublicProfilePage({
           </aside>
 
           {/* Right: main content */}
-          <main className="min-w-0 flex-1 pb-16">
+          <main className="min-w-0 flex-1 pt-6 lg:pt-8 pb-16">
             {/* ── Designer: Projects ── */}
             {profile.role === "designer" && (
               <section id="projects">
