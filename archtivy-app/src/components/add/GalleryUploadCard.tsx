@@ -14,6 +14,9 @@ export interface GalleryUploadCardProps {
   id?: string;
   /** Optional id for the hidden file input so form can reference it */
   inputName?: string;
+  /** Number of images already saved in the DB (edit mode). When > 0, uploading
+   *  minCount+ new files will replace the existing gallery. */
+  existingCount?: number;
 }
 
 function previewUrl(file: File): string {
@@ -27,9 +30,31 @@ export function GalleryUploadCard({
   accept = "image/jpeg,image/png,image/webp,image/gif",
   id = "gallery-upload",
   inputName = "images",
+  existingCount = 0,
 }: GalleryUploadCardProps) {
   const count = files.length;
-  const valid = count >= minCount;
+  const hasExisting = existingCount > 0;
+
+  // Status text and colour depend on whether we're in edit (hasExisting) or create mode.
+  let statusText: string;
+  let statusColor: string;
+  if (hasExisting && count === 0) {
+    statusText = `${existingCount} existing image${existingCount !== 1 ? "s" : ""} · upload ${minCount}+ new files to replace the gallery`;
+    statusColor = "text-zinc-500 dark:text-zinc-400";
+  } else if (hasExisting && count > 0 && count < minCount) {
+    statusText = `${count}/${minCount} new — need at least ${minCount} to replace the gallery`;
+    statusColor = "text-amber-600 dark:text-amber-400";
+  } else if (hasExisting && count >= minCount) {
+    statusText = `${count} new images · will replace existing gallery on save`;
+    statusColor = "text-green-700 dark:text-green-400";
+  } else {
+    // Create mode (no existing images)
+    const valid = count >= minCount;
+    statusText = `${count}/${minCount} images${!valid && count > 0 ? ` — add at least ${minCount} to publish` : ""}`;
+    statusColor = valid ? "text-zinc-500 dark:text-zinc-400" : "text-amber-600 dark:text-amber-400";
+  }
+
+  const valid = hasExisting ? count === 0 || count >= minCount : count >= minCount;
 
   const addFiles = useCallback(
     (newFiles: File[]) => {
@@ -89,11 +114,10 @@ export function GalleryUploadCard({
       </div>
       <p
         id={`${id}-hint`}
-        className={`mb-3 text-xs ${valid ? "text-zinc-500 dark:text-zinc-400" : "text-amber-600 dark:text-amber-400"}`}
+        className={`mb-3 text-xs ${statusColor}`}
         role="status"
       >
-        {count}/{minCount} images
-        {!valid && count > 0 && " — add at least " + minCount + " to publish"}
+        {statusText}
       </p>
       {files.length > 0 && (
         <ul className="space-y-2">

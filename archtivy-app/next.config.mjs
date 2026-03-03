@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "25mb",
+    },
+  },
   async redirects() {
     return [
       { source: "/pricing", destination: "/", permanent: false },

@@ -801,6 +801,9 @@ export async function updateProjectAction(
   }
 
   const imageFiles = getImageFiles(formData);
+  if (imageFiles.length > 0 && imageFiles.length < MIN_GALLERY_IMAGES) {
+    return { error: `Upload at least ${MIN_GALLERY_IMAGES} images to replace the gallery, or leave the uploader empty to keep the existing images.` };
+  }
   if (imageFiles.length >= MIN_GALLERY_IMAGES) {
     await supabase.from("listing_images").delete().eq("listing_id", listingId);
     const uploadResult = await uploadGalleryImagesServer(listingId, imageFiles);
@@ -928,6 +931,9 @@ export async function updateProductAction(
   }
 
   const imageFiles = getImageFiles(formData);
+  if (imageFiles.length > 0 && imageFiles.length < MIN_GALLERY_IMAGES) {
+    return { error: `Upload at least ${MIN_GALLERY_IMAGES} images to replace the gallery, or leave the uploader empty to keep the existing images.` };
+  }
   if (imageFiles.length >= MIN_GALLERY_IMAGES) {
     await supabase.from("listing_images").delete().eq("listing_id", listingId);
     const uploadResult = await uploadGalleryImagesServer(listingId, imageFiles);

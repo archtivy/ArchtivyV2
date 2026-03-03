@@ -51,6 +51,8 @@ export interface ProjectFormInitialData {
   teamRows: Array<{ name: string; role: string }>;
   materialIds: string[];
   mentionedRows: Array<{ brand_name_text: string; product_name_text: string }>;
+  /** Number of images already saved in the DB. Passed to GalleryUploadCard. */
+  existingImageCount?: number;
 }
 
 export function AddProjectForm({
@@ -262,6 +264,7 @@ export function AddProjectForm({
               onChange={setImageFiles}
               minCount={MIN_GALLERY}
               inputName=""
+              existingCount={initialData?.existingImageCount ?? 0}
             />
             <ListingPreviewCard
               title={title}

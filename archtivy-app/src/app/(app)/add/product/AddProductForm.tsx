@@ -57,6 +57,8 @@ export interface ProductFormInitialData {
   materialIds: string[];
   /** Color options for filtering and tag suggestions. Default []. */
   colorOptions?: string[];
+  /** Number of images already saved in the DB. Passed to GalleryUploadCard. */
+  existingImageCount?: number;
 }
 
 export function AddProductForm({
@@ -277,6 +279,7 @@ export function AddProductForm({
               onChange={setImageFiles}
               minCount={MIN_GALLERY}
               inputName=""
+              existingCount={initialData?.existingImageCount ?? 0}
             />
             <ListingPreviewCard
               title={title}

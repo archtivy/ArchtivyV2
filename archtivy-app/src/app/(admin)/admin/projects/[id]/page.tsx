@@ -170,6 +170,7 @@ export default async function AdminProjectEditPage({
           product_name_text: (p.product_name_text ?? "").trim(),
         }))
       : [{ brand_name_text: "", product_name_text: "" }],
+    existingImageCount: imagesWithIds.length,
   };
 
   const saved = toText(searchParams.saved) === "1";
