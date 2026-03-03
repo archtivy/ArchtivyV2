@@ -113,12 +113,12 @@ export function ProfileSidebar({
                 listingId={firstListingForContact.id}
                 listingType={firstListingForContact.type}
                 listingTitle={firstListingForContact.title}
-                className="flex-1 justify-center !bg-[#002abf] !text-white !border-[#002abf] hover:!bg-[#0024a8] hover:!border-[#0024a8]"
+                className="flex-1 justify-center !rounded-full !h-10 !py-0 !bg-[#002abf] !text-white !border-[#002abf] hover:!bg-[#0024a8] hover:!border-[#0024a8]"
               />
             ) : null}
             <button
               type="button"
-              className="flex-1 inline-flex items-center justify-center rounded border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2"
+              className="flex-1 inline-flex items-center justify-center rounded-full h-10 border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-[#002abf] hover:text-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2"
             >
               Follow
             </button>

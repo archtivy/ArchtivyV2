@@ -100,9 +100,10 @@ export function ProfileHero({
               )}
             </div>
 
-            {/* Right: architectural metadata stats */}
+            {/* Right: architectural metadata stats — hidden on mobile to prevent
+                duplicate count appearance in flex-col stacked layout */}
             {stats.length > 0 && (
-              <div className="flex items-end gap-8 sm:gap-12 shrink-0">
+              <div className="hidden sm:flex items-end gap-8 sm:gap-12 shrink-0">
                 {stats.map((stat) => (
                   <div key={stat.label} className="flex flex-col items-start sm:items-end">
                     <span
