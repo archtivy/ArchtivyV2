@@ -101,10 +101,10 @@ export default function PressPage() {
               coordination.
             </p>
             <a
-              href="mailto:press@archtivy.com"
+              href="mailto:info@archtivy.com"
               className="mt-4 block text-sm font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
             >
-              press@archtivy.com
+              info@archtivy.com
             </a>
           </div>
 
@@ -133,10 +133,10 @@ export default function PressPage() {
               inquiries.
             </p>
             <a
-              href="mailto:hello@archtivy.com"
+              href="mailto:info@archtivy.com"
               className="mt-4 block text-sm font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
             >
-              hello@archtivy.com
+              info@archtivy.com
             </a>
           </div>
         </div>

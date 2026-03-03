@@ -68,10 +68,10 @@ export default function PressKitPage() {
         <p className="mt-6 text-xs text-zinc-400 dark:text-zinc-500">
           Asset files are being prepared. Contact{" "}
           <a
-            href="mailto:press@archtivy.com"
+            href="mailto:info@archtivy.com"
             className="text-[#002abf] hover:underline dark:text-[#4d6fff]"
           >
-            press@archtivy.com
+            info@archtivy.com
           </a>{" "}
           to request files in any format.
         </p>
@@ -179,10 +179,10 @@ export default function PressKitPage() {
           For asset requests, high-resolution files, or questions about brand
           usage, contact{" "}
           <a
-            href="mailto:press@archtivy.com"
+            href="mailto:info@archtivy.com"
             className="font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
           >
-            press@archtivy.com
+            info@archtivy.com
           </a>
           . We respond to all press requests within two business days.
         </p>

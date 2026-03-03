@@ -86,10 +86,10 @@ export default function CareersPage() {
               Contact
             </p>
             <a
-              href="mailto:careers@archtivy.com"
+              href="mailto:info@archtivy.com"
               className="mt-3 block text-base font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
             >
-              careers@archtivy.com
+              info@archtivy.com
             </a>
             <p className="mt-3 text-xs leading-relaxed text-zinc-400 dark:text-zinc-500">
               Include your background, the type of work you are interested in,

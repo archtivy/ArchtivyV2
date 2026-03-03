@@ -175,10 +175,10 @@ export default function DataProcessingPage() {
         <p className="mt-6 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
           To exercise any of these rights, contact{" "}
           <a
-            href="mailto:privacy@archtivy.com"
+            href="mailto:info@archtivy.com"
             className="text-[#002abf] hover:underline dark:text-[#4d6fff]"
           >
-            privacy@archtivy.com
+            info@archtivy.com
           </a>
           . We respond to all requests within 30 days.
         </p>

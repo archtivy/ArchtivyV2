@@ -15,19 +15,19 @@ const DIRECT_LINES = [
     category: "Partnerships",
     description:
       "Brand intelligence partnerships, institutional access, technology integrations, and co-development discussions.",
-    email: "partnerships@archtivy.com",
+    email: "info@archtivy.com",
   },
   {
     category: "Press",
     description:
       "Editorial coverage, interviews, data requests, and media asset access.",
-    email: "press@archtivy.com",
+    email: "info@archtivy.com",
   },
   {
     category: "Support",
     description:
       "Account issues, platform questions, submission problems, and profile claims.",
-    email: "support@archtivy.com",
+    email: "info@archtivy.com",
   },
 ];
 

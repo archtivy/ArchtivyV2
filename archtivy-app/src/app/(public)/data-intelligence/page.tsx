@@ -139,10 +139,10 @@ export default function DataIntelligencePage() {
           <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
             For early access or research partnerships, contact{" "}
             <a
-              href="mailto:intelligence@archtivy.com"
+              href="mailto:info@archtivy.com"
               className="text-[#002abf] hover:underline dark:text-[#4d6fff]"
             >
-              intelligence@archtivy.com
+              info@archtivy.com
             </a>
             .
           </p>

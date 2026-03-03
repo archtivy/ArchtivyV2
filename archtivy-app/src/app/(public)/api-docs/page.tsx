@@ -60,10 +60,10 @@ export default function ApiDocsPage() {
             access is available for qualified research institutions and brand
             intelligence partners. Contact{" "}
             <a
-              href="mailto:api@archtivy.com"
+              href="mailto:info@archtivy.com"
               className="text-[#002abf] hover:underline dark:text-[#4d6fff]"
             >
-              api@archtivy.com
+              info@archtivy.com
             </a>{" "}
             to discuss your use case.
           </p>
@@ -175,10 +175,10 @@ Accept: application/json`}
           For early API access, technical questions, or partnership
           discussions, contact{" "}
           <a
-            href="mailto:api@archtivy.com"
+            href="mailto:info@archtivy.com"
             className="font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
           >
-            api@archtivy.com
+            info@archtivy.com
           </a>
           .
         </p>

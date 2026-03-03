@@ -3,7 +3,7 @@
  * TODO: Wire to Clerk webhook (user.created). Requires RESEND_API_KEY.
  */
 
-const SUPPORT_EMAIL = "support@archtivy.com";
+const SUPPORT_EMAIL = "info@archtivy.com";
 
 function getExploreUrl(): string {
   const base = process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_URL ?? "https://archtivy.com";
@@ -27,7 +27,7 @@ export async function sendWelcomeEmail(to: string): Promise<{ ok: boolean; error
     const exploreUrl = getExploreUrl();
     const html = getWelcomeHtml(exploreUrl);
     const { data, error } = await resend.emails.send({
-      from: "Archtivy <introductions@archtivy.com>",
+      from: "Archtivy <info@archtivy.com>",
       to: [to],
       replyTo: SUPPORT_EMAIL,
       subject: "Welcome to Archtivy",

@@ -105,10 +105,10 @@ export default function StatusPage() {
         <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
           To report an issue or request support, contact{" "}
           <a
-            href="mailto:support@archtivy.com"
+            href="mailto:info@archtivy.com"
             className="font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
           >
-            support@archtivy.com
+            info@archtivy.com
           </a>
           .
         </p>

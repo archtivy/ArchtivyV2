@@ -148,10 +148,10 @@ export default function BrandIntelligencePage() {
             considered for early access.
           </p>
           <a
-            href="mailto:brands@archtivy.com"
+            href="mailto:info@archtivy.com"
             className="mt-4 inline-block text-sm font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
           >
-            brands@archtivy.com
+            info@archtivy.com
           </a>
         </div>
       </MarketingSection>

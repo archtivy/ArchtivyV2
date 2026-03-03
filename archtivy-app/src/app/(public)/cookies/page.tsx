@@ -135,10 +135,10 @@ export default function CookiesPage() {
         <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
           Questions about this policy can be sent to{" "}
           <a
-            href="mailto:privacy@archtivy.com"
+            href="mailto:info@archtivy.com"
             className="text-[#002abf] hover:underline dark:text-[#4d6fff]"
           >
-            privacy@archtivy.com
+            info@archtivy.com
           </a>
           .
         </p>

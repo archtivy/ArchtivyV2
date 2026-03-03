@@ -9,4 +9,4 @@ Your first connection in 60 seconds:
 
 Explore Projects: {{exploreUrl}}
 
-Questions? Reply to this email or contact support@archtivy.com.
+Questions? Reply to this email or contact info@archtivy.com.

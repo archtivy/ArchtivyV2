@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { getLeadById, updateLeadStatus } from "@/lib/db/leads";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM_EMAIL = process.env.FROM_EMAIL?.trim() || "Archtivy <introductions@archtivy.com>";
+const FROM_EMAIL = process.env.FROM_EMAIL?.trim() || "Archtivy <info@archtivy.com>";
 
 export async function approveLeadAction(leadId: string): Promise<{ ok: true } | { error: string }> {
   const { userId } = await auth();

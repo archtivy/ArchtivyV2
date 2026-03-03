@@ -7,7 +7,7 @@ import { getListingForLead, insertLead } from "@/lib/db/leads";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL?.trim() || "";
-const FROM_EMAIL = process.env.FROM_EMAIL?.trim() || "Archtivy <introductions@archtivy.com>";
+const FROM_EMAIL = process.env.FROM_EMAIL?.trim() || "Archtivy <info@archtivy.com>";
 
 const MIN_MESSAGE_LENGTH = 15;
 const MAX_LINKS = 2;

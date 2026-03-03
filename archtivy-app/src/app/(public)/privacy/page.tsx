@@ -151,10 +151,10 @@ export default function PrivacyPage() {
           <p>
             To exercise any of these rights, contact{" "}
             <a
-              href="mailto:privacy@archtivy.com"
+              href="mailto:info@archtivy.com"
               className="text-[#002abf] hover:underline dark:text-[#4d6fff]"
             >
-              privacy@archtivy.com
+              info@archtivy.com
             </a>
             . We respond to all requests within 30 days.
           </p>
