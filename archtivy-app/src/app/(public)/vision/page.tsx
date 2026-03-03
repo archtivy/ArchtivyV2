@@ -124,7 +124,7 @@ export default function VisionPage() {
         <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
           <div className="space-y-5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
             <p>
-              Archtivy's role is not editorial. We do not curate what is
+              Archtivy&apos;s role is not editorial. We do not curate what is
               important or select which projects deserve attention. We provide
               infrastructure for the industry to record itself — accurately,
               permanently, and at scale.
@@ -139,7 +139,7 @@ export default function VisionPage() {
           <div className="space-y-5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
             <p>
               We are building toward a future in which every built project has a
-              permanent, verifiable record. In which a designer's professional
+              permanent, verifiable record. In which a designer&apos;s professional
               history is as structured as a financial record. In which a brand
               can query its specification footprint across 90 countries. In
               which architectural intelligence is no longer fragmented by

@@ -143,7 +143,7 @@ export default function BrandIntelligencePage() {
           </p>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
             The specification data is being collected now. The dashboard —
-            providing queryable access to your brand's specification footprint
+            providing queryable access to your brand&apos;s specification footprint
             — is planned for release to brand partners. Contact us to be
             considered for early access.
           </p>
