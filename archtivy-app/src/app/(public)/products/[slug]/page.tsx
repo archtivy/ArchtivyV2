@@ -5,7 +5,10 @@ export const revalidate = 3600;
 import { unstable_cache } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getProductForProductPage } from "@/app/actions/listings";
@@ -137,6 +140,13 @@ export default async function ProductPage({
   const { slug } = await params;
   const product = (await getCachedProduct(slug)) ?? (await getProductForProductPage(slug));
   if (!product) notFound();
+
+  // If the URL contains a bare UUID and the listing has a canonical slug,
+  // issue a permanent (308) redirect so only the slug URL is indexed.
+  if (UUID_RE.test(slug) && product.slug && product.slug !== slug) {
+    permanentRedirect(`/products/${product.slug}`);
+  }
+
   if (product.status === "PENDING") {
     const { userId } = await auth();
     const profileRes = await getProfileByClerkId(userId ?? "");

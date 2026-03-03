@@ -5,7 +5,12 @@ export const revalidate = 3600;
 import { unstable_cache } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
+
+// Matches bare UUID v4. Used to detect /projects/{uuid} requests that should
+// 308-redirect to the canonical /projects/{slug} URL.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import {
@@ -134,6 +139,12 @@ export default async function ProjectPage({
   const { slug } = await params;
   const project = await getCachedProject(slug);
   if (!project) notFound();
+
+  // If the URL contains a bare UUID and the listing has a canonical slug,
+  // issue a permanent (308) redirect so only the slug URL is indexed.
+  if (UUID_RE.test(slug) && project.slug && project.slug !== slug) {
+    permanentRedirect(`/projects/${project.slug}`);
+  }
 
   const { userId } = await auth();
   const profileRes = await getProfileByClerkId(userId ?? "");

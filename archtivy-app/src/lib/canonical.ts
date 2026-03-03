@@ -32,16 +32,20 @@ export function getAbsoluteUrl(path: string): string {
 export interface ListingRouteParams {
   id: string;
   type: "project" | "product";
+  /** Prefer slug over id for canonical, SEO-safe URLs. */
+  slug?: string | null;
 }
 
 /**
- * Single canonical resolver for listing URLs. Use everywhere instead of hardcoded /listing/[id].
- * Projects → /projects/[id], Products → /products/[id].
+ * Single canonical resolver for listing URLs.
+ * Always prefers slug when available; falls back to id so UUID-based rows
+ * still resolve (they will 308-redirect server-side to the slug URL).
  */
 export function getListingUrl(listing: ListingRouteParams): string {
+  const segment = listing.slug?.trim() || listing.id;
   return listing.type === "project"
-    ? `/projects/${listing.id}`
-    : `/products/${listing.id}`;
+    ? `/projects/${segment}`
+    : `/products/${segment}`;
 }
 
 /**
