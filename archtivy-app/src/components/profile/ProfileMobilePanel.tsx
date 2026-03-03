@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { ProfileContactButton } from "@/components/profile/ProfileContactButton";
 import type { Profile } from "@/lib/types/profiles";
@@ -9,7 +7,6 @@ import type { Profile } from "@/lib/types/profiles";
 interface ProfileMobilePanelProps {
   profile: Profile;
   isOwner: boolean;
-  resolvedAvatarUrl: string | null;
   showClaim: boolean;
   claimPending: boolean;
   firstListingForContact: { id: string; type: "project" | "product"; title: string } | null;
@@ -19,59 +16,55 @@ interface ProfileMobilePanelProps {
 export function ProfileMobilePanel({
   profile,
   isOwner,
-  resolvedAvatarUrl,
   showClaim,
   claimPending,
   firstListingForContact,
   decodedUsername,
 }: ProfileMobilePanelProps) {
-  const [bioExpanded, setBioExpanded] = useState(false);
-
   const claimHref = `/u/${encodeURIComponent(profile.username ?? decodedUsername)}/claim`;
 
   return (
     <div
-      className="bg-white border border-zinc-100"
-      style={{ borderRadius: 16, boxShadow: "0 2px 8px 0 rgba(0,0,0,0.06)", padding: "18px" }}
+      className="relative bg-white border border-zinc-100"
+      style={{ borderRadius: 16, boxShadow: "0 2px 6px 0 rgba(0,0,0,0.05)", padding: "16px" }}
     >
-      {/* Row 1: Avatar + name + @username */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="shrink-0">
-          {resolvedAvatarUrl ? (
-            <Image
-              src={resolvedAvatarUrl}
-              alt={profile.display_name ?? profile.username ?? "Avatar"}
-              width={44}
-              height={44}
-              className="rounded-full object-cover"
-              unoptimized
-            />
-          ) : (
-            <div className="w-11 h-11 rounded-full bg-zinc-100 flex items-center justify-center text-sm font-semibold text-zinc-400">
-              {(profile.display_name ?? profile.username ?? "?")[0].toUpperCase()}
-            </div>
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-zinc-900 leading-tight truncate">
-            {profile.display_name ?? profile.username ?? "Profile"}
-          </p>
-          {profile.username && (
-            <p className="text-xs text-zinc-400 mt-0.5 truncate">@{profile.username}</p>
-          )}
-        </div>
-      </div>
+      {/* Claim icon — top-right, only when not pending */}
+      {showClaim && !claimPending && (
+        <Link
+          href={claimHref}
+          title="Claim this profile"
+          aria-label="Claim this profile"
+          className="absolute top-3 right-3 w-[20px] h-[20px] flex items-center justify-center border border-zinc-200 text-zinc-400 hover:text-[#002abf] hover:border-[#002abf] transition-colors"
+          style={{ borderRadius: "50%" }}
+        >
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+        </Link>
+      )}
 
-      {/* Row 2: CTAs */}
+      {/* CTAs */}
       {isOwner ? (
         <Link
           href="/me"
-          className="mb-4 flex items-center justify-center rounded-full h-9 border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-[#002abf] hover:text-[#002abf]"
+          className="flex items-center justify-center rounded-full h-9 border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-[#002abf] hover:text-[#002abf] mb-3"
         >
           Edit profile
         </Link>
       ) : (
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-3">
           {firstListingForContact ? (
             <ProfileContactButton
               listingId={firstListingForContact.id}
@@ -89,47 +82,16 @@ export function ProfileMobilePanel({
         </div>
       )}
 
-      {/* Row 3: Bio with expand/collapse */}
+      {/* Bio */}
       {profile.bio && (
-        <div className="mb-4">
-          <p
-            className={`text-sm text-zinc-600 leading-relaxed transition-all${
-              !bioExpanded ? " line-clamp-3" : ""
-            }`}
-          >
-            {profile.bio}
-          </p>
-          <button
-            type="button"
-            onClick={() => setBioExpanded((v) => !v)}
-            aria-label={bioExpanded ? "Collapse bio" : "Expand bio"}
-            className="mt-2 mx-auto flex w-7 h-7 items-center justify-center border border-zinc-200 text-zinc-400 hover:bg-zinc-50 hover:text-zinc-500 transition-colors"
-            style={{ borderRadius: "50%" }}
-          >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-              style={{
-                transform: bioExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.2s ease",
-              }}
-            >
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
-        </div>
+        <p className="text-sm text-zinc-600 leading-relaxed line-clamp-3 mb-3">
+          {profile.bio}
+        </p>
       )}
 
-      {/* Row 4: Social links — vertical labeled rows */}
+      {/* Social icons row */}
       {(profile.website || profile.instagram || profile.linkedin) && (
-        <div className="space-y-2">
+        <div className="flex items-center gap-3.5">
           {profile.website && (
             <a
               href={
@@ -139,14 +101,14 @@ export function ProfileMobilePanel({
               }
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 min-w-0 group"
+              className="text-zinc-400 hover:text-[#002abf] transition-colors"
+              aria-label="Website"
             >
-              <span className="shrink-0 text-[10px] text-zinc-400 uppercase tracking-[0.1em] w-[4.5rem]">
-                Website
-              </span>
-              <span className="text-xs text-zinc-700 truncate group-hover:text-[#002abf] transition-colors">
-                {profile.website.replace(/^https?:\/\/(www\.)?/, "")}
-              </span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="2" y1="12" x2="22" y2="12" />
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+              </svg>
             </a>
           )}
           {profile.instagram && (
@@ -154,14 +116,14 @@ export function ProfileMobilePanel({
               href={`https://instagram.com/${profile.instagram.replace(/^@/, "")}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 min-w-0 group"
+              className="text-zinc-400 hover:text-[#002abf] transition-colors"
+              aria-label="Instagram"
             >
-              <span className="shrink-0 text-[10px] text-zinc-400 uppercase tracking-[0.1em] w-[4.5rem]">
-                Instagram
-              </span>
-              <span className="text-xs text-zinc-700 truncate group-hover:text-[#002abf] transition-colors">
-                @{profile.instagram.replace(/^@/, "")}
-              </span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+              </svg>
             </a>
           )}
           {profile.linkedin && (
@@ -173,33 +135,22 @@ export function ProfileMobilePanel({
               }
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 min-w-0 group"
+              className="text-zinc-400 hover:text-[#002abf] transition-colors"
+              aria-label="LinkedIn"
             >
-              <span className="shrink-0 text-[10px] text-zinc-400 uppercase tracking-[0.1em] w-[4.5rem]">
-                LinkedIn
-              </span>
-              <span className="text-xs text-zinc-700 truncate group-hover:text-[#002abf] transition-colors">
-                {profile.linkedin.replace(/^https?:\/\/(www\.)?(linkedin\.com\/)?/, "")}
-              </span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+                <rect x="2" y="9" width="4" height="12" />
+                <circle cx="4" cy="4" r="2" />
+              </svg>
             </a>
           )}
         </div>
       )}
 
-      {/* Claim notice */}
-      {showClaim && (
-        <div className="mt-3">
-          {claimPending ? (
-            <p className="text-xs text-amber-700">Claim request pending review.</p>
-          ) : (
-            <Link
-              href={claimHref}
-              className="text-xs text-zinc-400 hover:text-[#002abf] underline transition-colors"
-            >
-              Claim this profile
-            </Link>
-          )}
-        </div>
+      {/* Claim pending notice */}
+      {showClaim && claimPending && (
+        <p className="text-xs text-amber-700 mt-3">Claim request pending review.</p>
       )}
     </div>
   );

@@ -27,7 +27,7 @@ export function ProfileHero({
 }: ProfileHeroProps) {
   return (
     <div
-      className="relative -mt-6 sm:-mt-8 h-[clamp(260px,50vh,360px)] sm:h-[clamp(380px,60vh,680px)]"
+      className="relative -mt-6 sm:-mt-8 h-[clamp(220px,45vh,300px)] sm:h-[clamp(380px,60vh,680px)]"
       style={{
         marginLeft: "calc(-50vw + 50%)",
         marginRight: "calc(-50vw + 50%)",
@@ -62,7 +62,7 @@ export function ProfileHero({
         >
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 sm:gap-8">
             {/* Left: role label + name + location */}
-            <div className="min-w-0">
+            <div className="min-w-0 text-center sm:text-left">
               {/* Higher opacity (white/80) and tighter tracking for legibility */}
               <p className="text-white/80 text-[11px] font-medium uppercase tracking-[0.14em] mb-2.5">
                 {roleLabel}
@@ -79,7 +79,7 @@ export function ProfileHero({
                 {name}
               </h1>
               {location && (
-                <p className="mt-3 text-white/60 text-sm flex items-center gap-1.5">
+                <p className="mt-3 text-white/60 text-sm flex items-center gap-1.5 justify-center sm:justify-start">
                   <svg
                     width="12"
                     height="12"
@@ -96,6 +96,18 @@ export function ProfileHero({
                   </svg>
                   {location}
                 </p>
+              )}
+              {/* Mobile-only inline stats — hidden on sm+ (desktop uses big right-side stats) */}
+              {stats.length > 0 && (
+                <div className="flex sm:hidden items-center justify-center gap-0 mt-2.5">
+                  {stats.map((stat, i) => (
+                    <span key={stat.label} className="flex items-center text-[11px] text-white/60">
+                      {i > 0 && <span className="mx-2 opacity-50">·</span>}
+                      <span className="text-white/80 tabular-nums mr-1">{stat.value}</span>
+                      {stat.label}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
 
