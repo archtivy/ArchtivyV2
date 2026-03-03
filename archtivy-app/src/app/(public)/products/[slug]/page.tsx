@@ -22,7 +22,20 @@ import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { ProductDetailLayout } from "@/components/listing/ProductDetailLayout";
 import { DEFAULT_PRODUCT_FILTERS } from "@/lib/exploreFilters";
 import type { GalleryImage } from "@/lib/db/gallery";
-import { buildProductJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
+import {
+  buildProductJsonLd,
+  buildFaqJsonLd,
+  buildBreadcrumbJsonLd,
+} from "@/lib/seo/jsonld";
+import {
+  buildProductSeoTitle,
+  buildProductMetaDescription,
+  generateProductFaq,
+  extractMaterialNames,
+  extractBrandName,
+  type ProductSeoInput,
+} from "@/lib/seo/seo-templates";
+import { JsonLd } from "@/components/seo/JsonLd";
 
 /** Per-slug cached product fetch; busted by revalidateTag(CACHE_TAGS.listings). */
 function getCachedProduct(slug: string) {
@@ -50,29 +63,68 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  // Try cached read first; fall back to getProductForProductPage for rare backfill case.
   const product = (await getCachedProduct(slug)) ?? (await getProductForProductPage(slug));
   if (!product) return {};
-  if (product.status === "PENDING") {
-    return { title: "Product" };
-  }
+  if (product.status === "PENDING") return { title: "Product" };
+
   const path = `/products/${product.slug ?? product.id}`;
-  const title = product.title?.trim() || "Product";
-  const description =
-    (typeof product.description === "string" && product.description.trim().slice(0, 160)) ||
-    `${title} on Archtivy. Projects, products & credits for architecture.`;
+  const canonical = getAbsoluteUrl(path);
+
+  const brandName =
+    extractBrandName((product as unknown as Record<string, unknown>).brands_used) ??
+    extractBrandName((product as unknown as Record<string, unknown>).brand);
+
+  const seoInput: ProductSeoInput = {
+    title: product.title?.trim() || "Product",
+    slug: product.slug ?? product.id,
+    brand: brandName,
+    product_type:
+      ((product as unknown as Record<string, unknown>).product_type as string | null | undefined) ??
+      (product.product_category ?? product.category ?? null),
+    category: (product.product_category ?? product.category ?? null),
+    materials: extractMaterialNames(
+      (product as unknown as Record<string, unknown>).materials
+    ),
+    color_options: Array.isArray(
+      (product as unknown as Record<string, unknown>).color_options
+    )
+      ? ((product as unknown as Record<string, unknown>).color_options as string[]).filter(
+          (c) => typeof c === "string"
+        )
+      : [],
+    description:
+      typeof product.description === "string" ? product.description.trim() : null,
+    gallery: product.gallery ?? [],
+  };
+
+  const seoTitle = buildProductSeoTitle(seoInput);
+  const metaDescription = buildProductMetaDescription(seoInput);
   const imageUrl = product.cover
-    ? (product.cover.startsWith("http") ? product.cover : getAbsoluteUrl(product.cover))
+    ? product.cover.startsWith("http")
+      ? product.cover
+      : getAbsoluteUrl(product.cover)
     : undefined;
+
   return {
-    title,
-    description,
-    alternates: { canonical: getAbsoluteUrl(path) },
+    title: seoTitle,
+    description: metaDescription,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
     openGraph: {
-      title,
-      description,
-      url: getAbsoluteUrl(path),
-      ...(imageUrl && { images: [{ url: imageUrl, width: 1200, height: 630, alt: title }] }),
+      type: "article",
+      title: seoTitle,
+      description: metaDescription,
+      url: canonical,
+      siteName: "Archtivy",
+      ...(imageUrl && {
+        images: [{ url: imageUrl, width: 1200, height: 630, alt: seoInput.title }],
+      }),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: seoTitle,
+      description: metaDescription,
+      ...(imageUrl && { images: [imageUrl] }),
     },
   };
 }
@@ -166,17 +218,42 @@ export default async function ProductPage({
   });
 
   const canonicalUrl = getAbsoluteUrl(`/products/${product.slug ?? product.id}`);
-  const jsonLd = buildProductJsonLd(product, brandName, brandHref, canonicalUrl);
+  const mainJsonLd = buildProductJsonLd(product, brandName, brandHref, canonicalUrl);
+
+  const seoInputForPage: ProductSeoInput = {
+    title: product.title?.trim() || "Product",
+    slug: product.slug ?? product.id,
+    brand: brandName,
+    product_type:
+      ((product as unknown as Record<string, unknown>).product_type as string | null | undefined) ??
+      (product.product_category ?? product.category ?? null),
+    category: (product.product_category ?? product.category ?? null),
+    materials: extractMaterialNames(
+      (product as unknown as Record<string, unknown>).materials
+    ),
+    color_options: Array.isArray(
+      (product as unknown as Record<string, unknown>).color_options
+    )
+      ? ((product as unknown as Record<string, unknown>).color_options as string[]).filter(
+          (c) => typeof c === "string"
+        )
+      : [],
+    description:
+      typeof product.description === "string" ? product.description.trim() : null,
+    gallery: product.gallery ?? [],
+  };
+
+  const faqJsonLd = buildFaqJsonLd(generateProductFaq(seoInputForPage));
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: "Home", url: getAbsoluteUrl("/") },
+    { name: "Products", url: getAbsoluteUrl("/explore/products") },
+    { name: product.title, url: canonicalUrl },
+  ]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
       <div className="pt-1 pb-6 sm:pt-2 sm:pb-8">
-      {Object.keys(jsonLd).length > 0 && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
-        />
-      )}
+      <JsonLd schemas={[mainJsonLd, faqJsonLd, breadcrumbJsonLd]} />
       <ListingViewTracker type="product" id={product.id} />
       <nav
         className="mb-6 flex flex-wrap items-center gap-2 text-sm text-[#374151] dark:text-zinc-400"

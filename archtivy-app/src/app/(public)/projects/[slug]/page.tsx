@@ -33,7 +33,19 @@ import type { ProjectCanonical } from "@/lib/canonical-models";
 import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
 import type { UsedProductItem } from "@/components/listing/ProjectDetailContent";
 import { DEFAULT_PROJECT_FILTERS } from "@/lib/exploreFilters";
-import { buildProjectJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
+import {
+  buildProjectJsonLd,
+  buildFaqJsonLd,
+  buildBreadcrumbJsonLd,
+} from "@/lib/seo/jsonld";
+import {
+  buildProjectSeoTitle,
+  buildProjectMetaDescription,
+  generateProjectFaq,
+  extractMaterialNames,
+  type ProjectSeoInput,
+} from "@/lib/seo/seo-templates";
+import { JsonLd } from "@/components/seo/JsonLd";
 
 /** Per-slug cached project fetch; busted by revalidateTag(CACHE_TAGS.listings). */
 function getCachedProject(slug: string) {
@@ -63,26 +75,53 @@ export async function generateMetadata({
   const { slug } = await params;
   const project = await getCachedProject(slug);
   if (!project) return {};
-  if (project.status === "PENDING") {
-    return { title: "Project" };
-  }
+  if (project.status === "PENDING") return { title: "Project" };
+
   const path = `/projects/${project.slug ?? project.id}`;
-  const title = project.title?.trim() || "Project";
-  const description =
-    (typeof project.description === "string" && project.description.trim().slice(0, 160)) ||
-    `${title} on Archtivy. Projects, products & credits for architecture.`;
+  const canonical = getAbsoluteUrl(path);
+
+  const seoInput: ProjectSeoInput = {
+    title: project.title?.trim() || "Project",
+    slug: project.slug ?? project.id,
+    category: project.category ?? null,
+    location_city: project.location?.city ?? null,
+    location_country: project.location?.country ?? null,
+    year: project.year ?? null,
+    area_sqft: project.area_sqft ?? null,
+    materials: extractMaterialNames(project.materials),
+    description:
+      typeof project.description === "string" ? project.description.trim() : null,
+    gallery: project.gallery ?? [],
+  };
+
+  const seoTitle = buildProjectSeoTitle(seoInput);
+  const metaDescription = buildProjectMetaDescription(seoInput);
   const imageUrl = project.cover
-    ? (project.cover.startsWith("http") ? project.cover : getAbsoluteUrl(project.cover))
+    ? project.cover.startsWith("http")
+      ? project.cover
+      : getAbsoluteUrl(project.cover)
     : undefined;
+
   return {
-    title,
-    description,
-    alternates: { canonical: getAbsoluteUrl(path) },
+    title: seoTitle,
+    description: metaDescription,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
     openGraph: {
-      title,
-      description,
-      url: getAbsoluteUrl(path),
-      ...(imageUrl && { images: [{ url: imageUrl, width: 1200, height: 630, alt: title }] }),
+      type: "article",
+      title: seoTitle,
+      description: metaDescription,
+      url: canonical,
+      siteName: "Archtivy",
+      ...(imageUrl && {
+        images: [{ url: imageUrl, width: 1200, height: 630, alt: seoInput.title }],
+      }),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: seoTitle,
+      description: metaDescription,
+      ...(imageUrl && { images: [imageUrl] }),
     },
   };
 }
@@ -263,16 +302,32 @@ export default async function ProjectPage({
       : null;
 
   const canonicalUrl = getAbsoluteUrl(`/projects/${project.slug ?? project.id}`);
-  const jsonLd = buildProjectJsonLd(project, canonicalUrl);
+  const mainJsonLd = buildProjectJsonLd(project, canonicalUrl);
+
+  const seoInputForPage: ProjectSeoInput = {
+    title: project.title?.trim() || "Project",
+    slug: project.slug ?? project.id,
+    category: project.category ?? null,
+    location_city: project.location?.city ?? null,
+    location_country: project.location?.country ?? null,
+    year: project.year ?? null,
+    area_sqft: project.area_sqft ?? null,
+    materials: extractMaterialNames(project.materials),
+    description:
+      typeof project.description === "string" ? project.description.trim() : null,
+    gallery: project.gallery ?? [],
+  };
+
+  const faqJsonLd = buildFaqJsonLd(generateProjectFaq(seoInputForPage));
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: "Home", url: getAbsoluteUrl("/") },
+    { name: "Projects", url: getAbsoluteUrl("/explore/projects") },
+    { name: project.title, url: canonicalUrl },
+  ]);
 
   return (
     <div className="pt-1 pb-6 sm:pt-2 sm:pb-8">
-      {Object.keys(jsonLd).length > 0 && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
-        />
-      )}
+      <JsonLd schemas={[mainJsonLd, faqJsonLd, breadcrumbJsonLd]} />
       <ListingViewTracker type="project" id={project.id} />
       <nav
         className="mb-4 flex flex-wrap items-center gap-2 text-sm text-[#374151] dark:text-zinc-400"
