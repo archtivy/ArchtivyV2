@@ -343,9 +343,6 @@ export default async function PublicProfilePage({
             {/* ── Designer: Projects ── */}
             {profile.role === "designer" && (
               <section id="projects">
-                <h2 className="text-[11px] font-medium text-zinc-400 uppercase tracking-[0.18em] mb-5 mt-2 lg:mt-6">
-                  Projects{projects.length > 0 ? ` · ${projects.length}` : ""}
-                </h2>
                 {projects.length === 0 ? (
                   <p className="text-sm text-zinc-400 py-8">No projects yet.</p>
                 ) : (
@@ -370,9 +367,6 @@ export default async function PublicProfilePage({
             {profile.role === "brand" && (
               <>
                 <section id="products">
-                  <h2 className="text-[11px] font-medium text-zinc-400 uppercase tracking-[0.18em] mb-5 mt-2 lg:mt-6">
-                    Products{products.length > 0 ? ` · ${products.length}` : ""}
-                  </h2>
                   {products.length === 0 ? (
                     <p className="text-sm text-zinc-400 py-8">No products yet.</p>
                   ) : (
@@ -394,9 +388,6 @@ export default async function PublicProfilePage({
 
                 {usedInProjects.length > 0 && (
                   <section id="used-in" className="mt-12">
-                    <h2 className="text-[11px] font-medium text-zinc-400 uppercase tracking-[0.18em] mb-5">
-                      Used In · {usedInProjects.length}
-                    </h2>
                     <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {usedInProjects.map((listing) => (
                         <li key={listing.id}>
@@ -418,9 +409,6 @@ export default async function PublicProfilePage({
             {/* ── Credited In (all roles) ── */}
             {taggedListings.length > 0 && (
               <section id="credited" className="mt-12">
-                <h2 className="text-[11px] font-medium text-zinc-400 uppercase tracking-[0.18em] mb-5">
-                  Credited In · {taggedListings.length}
-                </h2>
                 {taggedProjects.length > 0 && (
                   <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-4">
                     {taggedProjects.map((row) => (
