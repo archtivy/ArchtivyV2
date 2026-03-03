@@ -4,8 +4,6 @@ export const revalidate = 3600;
 
 import { unstable_cache } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
-import Link from "next/link";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { auth, currentUser } from "@clerk/nextjs/server";
@@ -21,6 +19,7 @@ import { ProjectCardPremium } from "@/components/listing/ProjectCardPremium";
 import { ProductCardPremium } from "@/components/listing/ProductCardPremium";
 import { ProfileHero } from "@/components/profile/ProfileHero";
 import { ProfileSidebar } from "@/components/profile/ProfileSidebar";
+import { ProfileMobilePanel } from "@/components/profile/ProfileMobilePanel";
 import { listingToProjectForCard, listingToProductForCard } from "@/lib/profileCardData";
 import type { ProjectOwner } from "@/lib/canonical-models";
 import type { ListingCardData, ListingSummary } from "@/lib/types/listings";
@@ -261,65 +260,17 @@ export default async function PublicProfilePage({
 
       {/* ── Content: pulls 2.5rem up over hero bottom edge ── */}
       <div className="-mt-10 sm:-mt-14 relative z-10">
-        {/* Mobile bio strip (hidden on lg+) */}
-        <div className="block lg:hidden bg-white border-b border-zinc-100 px-4 py-5 mb-6">
-          <div className="flex items-start gap-3">
-            <div className="shrink-0">
-              {resolvedAvatarUrl ? (
-                <Image
-                  src={resolvedAvatarUrl}
-                  alt={profile.display_name ?? profile.username ?? "Avatar"}
-                  width={48}
-                  height={48}
-                  className="rounded-full object-cover"
-                  unoptimized
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center text-sm font-semibold text-zinc-400">
-                  {(profile.display_name ?? profile.username ?? "?")[0].toUpperCase()}
-                </div>
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              {profile.bio && (
-                <p className="text-sm text-zinc-600 leading-relaxed line-clamp-3">{profile.bio}</p>
-              )}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {profile.website && (
-                  <a
-                    href={profile.website.startsWith("http") ? profile.website : `https://${profile.website}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-zinc-500 hover:text-[#002abf] underline transition-colors"
-                  >
-                    Website
-                  </a>
-                )}
-                {profile.instagram && (
-                  <a
-                    href={`https://instagram.com/${profile.instagram.replace(/^@/, "")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-zinc-500 hover:text-[#002abf] transition-colors"
-                    aria-label="Instagram"
-                  >
-                    Instagram
-                  </a>
-                )}
-                {profile.linkedin && (
-                  <a
-                    href={profile.linkedin.startsWith("http") ? profile.linkedin : `https://linkedin.com/in/${profile.linkedin}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-zinc-500 hover:text-[#002abf] transition-colors"
-                    aria-label="LinkedIn"
-                  >
-                    LinkedIn
-                  </a>
-                )}
-              </div>
-            </div>
-          </div>
+        {/* Mobile profile panel (hidden on lg+) */}
+        <div className="block lg:hidden px-4 mb-5">
+          <ProfileMobilePanel
+            profile={profile}
+            isOwner={isOwner}
+            resolvedAvatarUrl={resolvedAvatarUrl}
+            showClaim={showClaim}
+            claimPending={claimPending}
+            firstListingForContact={contactPayload}
+            decodedUsername={decoded}
+          />
         </div>
 
         {/* ── Two-column layout ── */}
@@ -442,23 +393,6 @@ export default async function PublicProfilePage({
               </section>
             )}
 
-            {/* Mobile: sidebar actions below content */}
-            <div className="block lg:hidden mt-10 space-y-4">
-              {showClaim && (
-                <div>
-                  {claimPending ? (
-                    <p className="text-sm text-amber-700">Claim request pending review.</p>
-                  ) : (
-                    <Link
-                      href={`/u/${encodeURIComponent(profile.username ?? decoded)}/claim`}
-                      className="text-sm text-zinc-400 hover:text-[#002abf] underline transition-colors"
-                    >
-                      Claim this profile
-                    </Link>
-                  )}
-                </div>
-              )}
-            </div>
           </main>
         </div>
       </div>

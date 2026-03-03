@@ -27,12 +27,11 @@ export function ProfileHero({
 }: ProfileHeroProps) {
   return (
     <div
-      className="relative -mt-6 sm:-mt-8"
+      className="relative -mt-6 sm:-mt-8 h-[clamp(260px,50vh,360px)] sm:h-[clamp(380px,60vh,680px)]"
       style={{
         marginLeft: "calc(-50vw + 50%)",
         marginRight: "calc(-50vw + 50%)",
         width: "100vw",
-        height: "clamp(380px, 60vh, 680px)",
       }}
     >
       {/* Background: project cover or solid dark */}
