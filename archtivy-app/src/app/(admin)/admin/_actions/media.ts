@@ -41,36 +41,50 @@ function revalidateListingPaths(listingId: string) {
 // ─── Upload images ──────────────────────────────────────────────────────────
 
 export async function uploadListingImages(formData: FormData) {
-  const admin = await ensureAdmin();
-  if (!admin.ok) return { ok: false as const, error: admin.error };
+  try {
+    const admin = await ensureAdmin();
+    if (!admin.ok) return { ok: false as const, error: admin.error };
 
-  const listingId = (formData.get("listingId") as string)?.trim();
-  if (!listingId) return { ok: false as const, error: "Missing listingId" };
+    const listingId = (formData.get("listingId") as string)?.trim();
+    if (!listingId) return { ok: false as const, error: "Missing listingId" };
 
-  const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
-  if (files.length === 0) return { ok: false as const, error: "No files provided" };
+    const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
+    if (files.length === 0) return { ok: false as const, error: "No files provided" };
 
-  // Upload to Supabase Storage
-  const uploadResult = await uploadGalleryImagesServer(listingId, files);
-  if (uploadResult.error || !uploadResult.data?.length) {
-    return { ok: false as const, error: uploadResult.error ?? "Upload failed" };
+    // Reject individual files that are too large (10MB)
+    const MAX_SERVER_FILE = 10 * 1024 * 1024;
+    for (const f of files) {
+      if (f.size > MAX_SERVER_FILE) {
+        const sizeMb = (f.size / (1024 * 1024)).toFixed(1);
+        return { ok: false as const, error: `"${f.name}" is ${sizeMb}MB — max 10MB per file.` };
+      }
+    }
+
+    // Upload to Supabase Storage
+    const uploadResult = await uploadGalleryImagesServer(listingId, files);
+    if (uploadResult.error || !uploadResult.data?.length) {
+      return { ok: false as const, error: uploadResult.error ?? "Upload failed" };
+    }
+
+    // Insert DB rows with correct sort_order
+    const appendResult = await appendImages(listingId, uploadResult.data);
+    if (appendResult.error) {
+      return { ok: false as const, error: appendResult.error };
+    }
+
+    // If these are the first images, set the cover
+    const supabase = getSupabaseServiceClient();
+    const firstInserted = appendResult.data?.[0];
+    if (firstInserted && firstInserted.sort_order === 0) {
+      await supabase.from("listings").update({ cover_image_url: firstInserted.image_url }).eq("id", listingId);
+    }
+
+    revalidateListingPaths(listingId);
+    return { ok: true as const, images: appendResult.data };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Upload failed unexpectedly";
+    return { ok: false as const, error: msg };
   }
-
-  // Insert DB rows with correct sort_order
-  const appendResult = await appendImages(listingId, uploadResult.data);
-  if (appendResult.error) {
-    return { ok: false as const, error: appendResult.error };
-  }
-
-  // If these are the first images, set the cover
-  const supabase = getSupabaseServiceClient();
-  const firstInserted = appendResult.data?.[0];
-  if (firstInserted && firstInserted.sort_order === 0) {
-    await supabase.from("listings").update({ cover_image_url: firstInserted.image_url }).eq("id", listingId);
-  }
-
-  revalidateListingPaths(listingId);
-  return { ok: true as const, images: appendResult.data };
 }
 
 // ─── Delete image ───────────────────────────────────────────────────────────

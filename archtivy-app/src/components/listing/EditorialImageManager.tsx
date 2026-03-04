@@ -25,6 +25,90 @@ const ACCENT = "#002abf";
 const PULSE_THRESHOLD = 0.08;
 const PULSE_DURATION_MS = 1200;
 
+// ─── Upload validation constants ────────────────────────────────────────────
+const MAX_FILE_MB = 10;
+const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
+const COMPRESS_THRESHOLD_BYTES = 3 * 1024 * 1024; // compress if > 3MB
+const MAX_IMAGE_DIMENSION = 2400;
+const ALLOWED_UPLOAD_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const BATCH_SIZE = 5; // max files per server action call
+
+/** Client-side compress via canvas. Skips GIFs (animated). Returns original on failure. */
+async function compressImage(file: File): Promise<File> {
+  if (file.type === "image/gif") return file;
+  if (file.size <= COMPRESS_THRESHOLD_BYTES) return file;
+  return new Promise<File>((resolve) => {
+    const img = new window.Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let { width, height } = img;
+      if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+        const ratio = Math.min(MAX_IMAGE_DIMENSION / width, MAX_IMAGE_DIMENSION / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(file); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob || blob.size >= file.size) { resolve(file); return; }
+          const ext = "webp";
+          const name = file.name.replace(/\.[^.]+$/, `.${ext}`);
+          resolve(new File([blob], name, { type: "image/webp" }));
+        },
+        "image/webp",
+        0.82
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
+    img.src = objectUrl;
+  });
+}
+
+/** Validate files client-side. Returns accepted files and error messages for rejected ones. */
+function validateFiles(files: File[]): { accepted: File[]; errors: string[] } {
+  const accepted: File[] = [];
+  const errors: string[] = [];
+  for (const f of files) {
+    if (f.type === "image/heic" || f.type === "image/heif") {
+      errors.push(`"${f.name}" is HEIC format — please convert to JPEG or WebP first.`);
+      continue;
+    }
+    if (!ALLOWED_UPLOAD_TYPES.has(f.type)) {
+      errors.push(`"${f.name}" has unsupported type (${f.type || "unknown"}). Use JPEG, PNG, WebP or GIF.`);
+      continue;
+    }
+    if (f.size > MAX_FILE_BYTES) {
+      const sizeMb = (f.size / (1024 * 1024)).toFixed(1);
+      errors.push(`"${f.name}" is ${sizeMb}MB — max ${MAX_FILE_MB}MB. Please resize or compress it.`);
+      continue;
+    }
+    if (f.size === 0) continue;
+    accepted.push(f);
+  }
+  return { accepted, errors };
+}
+
+/** Safely call a server action, catching network/413 errors. */
+async function safeServerAction<T extends { ok: boolean; error?: string }>(
+  fn: () => Promise<T>
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Request failed";
+    if (msg.includes("413") || msg.includes("too large") || msg.includes("Body exceeded")) {
+      return { ok: false, error: "Upload too large. Try fewer or smaller images." } as T;
+    }
+    return { ok: false, error: msg } as T;
+  }
+}
+
 export interface EditorialImage {
   listingImageId: string;
   imageUrl: string;
@@ -149,35 +233,64 @@ export function EditorialImageManager({
     });
   }, [selectedImage?.listingImageId, existingTagIds]);
 
+  // ─── Gallery error (auto-dismiss after 8s) ─────────────────────────────────
+  const [galleryError, setGalleryError] = useState<string | null>(null);
+  const galleryErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showGalleryError = useCallback((msg: string) => {
+    setGalleryError(msg);
+    if (galleryErrorTimerRef.current) clearTimeout(galleryErrorTimerRef.current);
+    galleryErrorTimerRef.current = setTimeout(() => setGalleryError(null), 8000);
+  }, []);
+
   // ─── Gallery management handlers ──────────────────────────────────────────
 
   const handleUploadFiles = useCallback(
     (files: File[]) => {
-      const imageFiles = files.filter((f) => f.type.startsWith("image/") && f.size > 0);
-      if (imageFiles.length === 0) return;
+      // 1. Client-side validation
+      const { accepted, errors } = validateFiles(files);
+      if (errors.length > 0) {
+        showGalleryError(errors.join("\n"));
+      }
+      if (accepted.length === 0) return;
+
       startUploadTransition(async () => {
-        const fd = new FormData();
-        fd.set("listingId", listingId);
-        for (const f of imageFiles) fd.append("files", f);
-        const res = await uploadListingImages(fd);
-        if (!res.ok) {
-          setSaveError(res.error ?? "Upload failed");
+        // 2. Compress large files client-side
+        const prepared = await Promise.all(accepted.map(compressImage));
+
+        // 3. Upload in batches to avoid 413 on large payloads
+        const batches: File[][] = [];
+        for (let i = 0; i < prepared.length; i += BATCH_SIZE) {
+          batches.push(prepared.slice(i, i + BATCH_SIZE));
+        }
+
+        const batchErrors: string[] = [];
+        for (const batch of batches) {
+          const fd = new FormData();
+          fd.set("listingId", listingId);
+          for (const f of batch) fd.append("files", f);
+          const res = await safeServerAction(() => uploadListingImages(fd));
+          if (!res.ok) {
+            batchErrors.push(res.error ?? "Upload failed");
+          }
+        }
+
+        if (batchErrors.length > 0) {
+          showGalleryError(batchErrors.join("\n"));
         }
         router.refresh();
       });
     },
-    [listingId, router]
+    [listingId, router, showGalleryError]
   );
 
   const handleDeleteImage = useCallback(
     (imageId: string) => {
       if (!confirm("Delete this image? This cannot be undone.")) return;
       startDeleteTransition(async () => {
-        const res = await deleteListingImage(imageId, listingId);
+        const res = await safeServerAction(() => deleteListingImage(imageId, listingId));
         if (!res.ok) {
-          setSaveError(res.error ?? "Delete failed");
+          showGalleryError(res.error ?? "Delete failed");
         } else {
-          // Adjust selected index
           if (selectedIndex !== null) {
             const delIdx = images.findIndex((img) => img.listingImageId === imageId);
             if (delIdx !== -1 && delIdx <= selectedIndex) {
@@ -188,7 +301,7 @@ export function EditorialImageManager({
         router.refresh();
       });
     },
-    [listingId, selectedIndex, images, router]
+    [listingId, selectedIndex, images, router, showGalleryError]
   );
 
   const handleMoveImage = useCallback(
@@ -199,25 +312,25 @@ export function EditorialImageManager({
       const ids = images.map((img) => img.listingImageId);
       [ids[selectedIndex], ids[newIdx]] = [ids[newIdx], ids[selectedIndex]];
       startReorderTransition(async () => {
-        const res = await reorderListingImages(listingId, ids);
-        if (!res.ok) setSaveError(res.error ?? "Reorder failed");
+        const res = await safeServerAction(() => reorderListingImages(listingId, ids));
+        if (!res.ok) showGalleryError(res.error ?? "Reorder failed");
         setSelectedIndex(newIdx);
         router.refresh();
       });
     },
-    [selectedIndex, images, listingId, router]
+    [selectedIndex, images, listingId, router, showGalleryError]
   );
 
   const handleSetPrimary = useCallback(() => {
     if (selectedIndex === null || selectedIndex === 0) return;
     const imageId = images[selectedIndex].listingImageId;
     startPrimaryTransition(async () => {
-      const res = await setPrimaryListingImage(listingId, imageId);
-      if (!res.ok) setSaveError(res.error ?? "Set primary failed");
+      const res = await safeServerAction(() => setPrimaryListingImage(listingId, imageId));
+      if (!res.ok) showGalleryError(res.error ?? "Set primary failed");
       setSelectedIndex(0);
       router.refresh();
     });
-  }, [selectedIndex, images, listingId, router]);
+  }, [selectedIndex, images, listingId, router, showGalleryError]);
 
   // ─── Save alt text ────────────────────────────────────────────────────────
 
@@ -225,14 +338,19 @@ export function EditorialImageManager({
     if (!selectedImage) return;
     setSaving(true);
     setSaveError(null);
-    const res = await updateImageAltForListing({
-      imageId: selectedImage.listingImageId,
-      alt: altDraft.trim() || null,
-      listingId,
-    });
-    setSaving(false);
-    if (!res.ok) setSaveError(res.error ?? "Failed to save");
-    else router.refresh();
+    try {
+      const res = await updateImageAltForListing({
+        imageId: selectedImage.listingImageId,
+        alt: altDraft.trim() || null,
+        listingId,
+      });
+      if (!res.ok) setSaveError(res.error ?? "Failed to save");
+      else router.refresh();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
   }, [selectedImage, altDraft, listingId, router]);
 
   const handleSaveAndContinue = useCallback(async () => {
@@ -295,12 +413,17 @@ export function EditorialImageManager({
             id="gallery-upload-empty"
             accept="image/jpeg,image/png,image/webp,image/gif"
             primaryText="Add images to get started"
-            hintText="Minimum 3 for publishing · JPEG, PNG, WebP or GIF · max 5MB each"
+            hintText={`Minimum 3 for publishing · JPEG, PNG, WebP or GIF · max ${MAX_FILE_MB}MB each`}
             onFilesSelected={handleUploadFiles}
             disabled={uploadPending}
           />
           {uploadPending && (
             <p className="text-center text-sm text-zinc-500 mt-3">Uploading...</p>
+          )}
+          {galleryError && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 whitespace-pre-line">
+              {galleryError}
+            </div>
           )}
         </div>
       </section>
@@ -369,10 +492,15 @@ export function EditorialImageManager({
                 id="gallery-upload-add"
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 primaryText={uploadPending ? "Uploading..." : "Add more images"}
-                hintText="JPEG, PNG, WebP or GIF · max 5MB each"
+                hintText={`JPEG, PNG, WebP or GIF · max ${MAX_FILE_MB}MB each · large images auto-compressed`}
                 onFilesSelected={handleUploadFiles}
                 disabled={uploadPending}
               />
+              {galleryError && (
+                <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 whitespace-pre-line">
+                  {galleryError}
+                </div>
+              )}
             </div>
 
             {/* Thumbnail strip */}

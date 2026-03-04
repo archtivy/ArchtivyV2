@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { UploadBox } from "./UploadBox";
 
 const MIN_GALLERY = 3;
+const MAX_FILE_MB = 10;
+const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 export interface GalleryUploadCardProps {
   /** Current list of files (order = display order; first is primary/cover) */
@@ -56,14 +59,33 @@ export function GalleryUploadCard({
 
   const valid = hasExisting ? count === 0 || count >= minCount : count >= minCount;
 
+  const [fileError, setFileError] = useState<string | null>(null);
+
   const addFiles = useCallback(
     (newFiles: File[]) => {
       if (!newFiles.length) return;
-      const list = newFiles.filter(
-        (f) => f.type.startsWith("image/") && f.size > 0
-      );
-      if (list.length === 0) return;
-      onChange([...files, ...list]);
+      setFileError(null);
+      const accepted: File[] = [];
+      const errors: string[] = [];
+      for (const f of newFiles) {
+        if (f.size === 0) continue;
+        if (f.type === "image/heic" || f.type === "image/heif") {
+          errors.push(`"${f.name}" is HEIC — convert to JPEG or WebP first.`);
+          continue;
+        }
+        if (!ALLOWED_TYPES.has(f.type)) {
+          errors.push(`"${f.name}" has unsupported type. Use JPEG, PNG, WebP or GIF.`);
+          continue;
+        }
+        if (f.size > MAX_FILE_BYTES) {
+          const sizeMb = (f.size / (1024 * 1024)).toFixed(1);
+          errors.push(`"${f.name}" is ${sizeMb}MB — max ${MAX_FILE_MB}MB.`);
+          continue;
+        }
+        accepted.push(f);
+      }
+      if (errors.length > 0) setFileError(errors.join("\n"));
+      if (accepted.length > 0) onChange([...files, ...accepted]);
     },
     [files, onChange]
   );
@@ -108,10 +130,15 @@ export function GalleryUploadCard({
           id={id}
           accept={accept}
           primaryText="Drag & drop images or click to upload"
-          hintText="JPEG, PNG, WebP or GIF · max 5MB each"
+          hintText={`JPEG, PNG, WebP or GIF · max ${MAX_FILE_MB}MB each`}
           onFilesSelected={(list) => addFiles(Array.from(list))}
         />
       </div>
+      {fileError && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 whitespace-pre-line">
+          {fileError}
+        </div>
+      )}
       <p
         id={`${id}-hint`}
         className={`mb-3 text-xs ${statusColor}`}

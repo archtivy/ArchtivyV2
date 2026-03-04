@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 const BUCKET = "gallery";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 export type UploadResult =
   | { data: string; error: null }
