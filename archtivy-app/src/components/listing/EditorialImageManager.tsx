@@ -20,6 +20,7 @@ import {
   getSubcategoriesForCategory,
 } from "@/lib/taxonomy/productTaxonomy";
 import { UploadBox } from "@/components/add/UploadBox";
+import { ImageProductTagSidebar } from "@/components/admin/ImageProductTagSidebar";
 
 const ACCENT = "#002abf";
 const PULSE_THRESHOLD = 0.08;
@@ -650,20 +651,31 @@ export function EditorialImageManager({
                 {tagSaveStatus === "idle" && saveError && <span className="text-red-600">{saveError}</span>}
               </p>
 
-              {/* Tagging workflow */}
-              <TaggingWorkstation
+              {/* Alt-text product suggestions */}
+              <ImageProductTagSidebar
                 listingId={listingId}
                 selectedImage={selectedImage}
-                tagsForSelectedImage={tagsForSelectedImage}
+                existingTags={tagsForSelectedImage}
                 onTagAdded={handleTagAdded}
-                materialOptions={materialOptions}
-                lastClickXY={lastClickXY}
-                highlightedTagId={highlightedTagId}
-                selectedTagIdForEdit={selectedTagIdForEdit}
-                onSelectedTagIdForEditChange={setSelectedTagIdForEdit}
-                onTagSaveStatus={setTagSaveStatus}
                 onTagsChange={() => router.refresh()}
               />
+
+              {/* Legacy taxonomy tagging — hidden, kept for backward compatibility */}
+              {false && (
+                <TaggingWorkstation
+                  listingId={listingId}
+                  selectedImage={selectedImage}
+                  tagsForSelectedImage={tagsForSelectedImage}
+                  onTagAdded={handleTagAdded}
+                  materialOptions={materialOptions}
+                  lastClickXY={lastClickXY}
+                  highlightedTagId={highlightedTagId}
+                  selectedTagIdForEdit={selectedTagIdForEdit}
+                  onSelectedTagIdForEditChange={setSelectedTagIdForEdit}
+                  onTagSaveStatus={setTagSaveStatus}
+                  onTagsChange={() => router.refresh()}
+                />
+              )}
             </div>
           </div>
         </div>

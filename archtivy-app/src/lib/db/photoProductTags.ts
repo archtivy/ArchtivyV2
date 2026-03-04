@@ -709,3 +709,288 @@ export async function getSuggestedProductsForWorkstation(
   const allResults = withScore.slice(0, limit);
   return { data: { bestMatch, allResults }, error: null };
 }
+
+// ─── Alt-Text–based candidate retrieval ─────────────────────────────────────
+
+import type { CandidateProduct } from "@/lib/scoring/productAltScore";
+
+export interface AltTextCandidateFilters {
+  /** Postgres tsquery string (terms joined with " | "). */
+  ftsQuery: string;
+  /** Raw alt text for trigram / ILIKE fallback. */
+  altTextRaw: string;
+  /** Material names (lowercased) extracted from alt text. */
+  materials: string[];
+}
+
+/**
+ * 2-phase candidate retrieval for alt-text–based product suggestions.
+ *
+ * Phase 1 — Fetch up to ~80 candidates via parallel queries:
+ *   A) Full-text search on listings.search_vector
+ *   B) Material join on product_material_links
+ *   C) Trigram / ILIKE title match
+ *
+ * Phase 2 — Deduplicate and enrich with colors + materials + brand names.
+ *
+ * @param filters.ftsQuery  Postgres tsquery string.
+ * @param filters.altTextRaw  Raw alt text for trigram matching.
+ * @param filters.materials  Material names to match via product_material_links.
+ */
+export async function getAltTextCandidates(
+  filters: AltTextCandidateFilters
+): Promise<DbResult<CandidateProduct[]>> {
+  const supabase = getSupabaseServiceClient();
+
+  type RawRow = {
+    id: string;
+    title: string | null;
+    slug: string | null;
+    cover_image_url: string | null;
+    feature_highlight: string | null;
+    product_type: string | null;
+    product_category: string | null;
+    owner_profile_id: string | null;
+  };
+
+  const SELECT = "id, title, slug, cover_image_url, feature_highlight, product_type, product_category, owner_profile_id";
+
+  // ── Phase 1: Parallel candidate fetching ──────────────────────────────
+
+  const promises: Promise<RawRow[]>[] = [];
+
+  // A) Full-text search on search_vector (if ftsQuery is non-empty)
+  if (filters.ftsQuery) {
+    promises.push(
+      (async () => {
+        const { data, error } = await supabase
+          .from("listings")
+          .select(SELECT)
+          .eq("type", "product")
+          .is("deleted_at", null)
+          .textSearch("search_vector", filters.ftsQuery, { type: "websearch" })
+          .limit(50);
+        if (error) {
+          // Fallback: textSearch can fail if tsquery is malformed.
+          // Try plain websearch which is more forgiving.
+          console.warn("[getAltTextCandidates] FTS failed, trying websearch fallback:", error.message);
+          const { data: d2 } = await supabase
+            .from("listings")
+            .select(SELECT)
+            .eq("type", "product")
+            .is("deleted_at", null)
+            .textSearch("search_vector", filters.altTextRaw, { type: "websearch" })
+            .limit(50);
+          return (d2 ?? []) as RawRow[];
+        }
+        return (data ?? []) as RawRow[];
+      })()
+    );
+  }
+
+  // B) Material join — find products that share materials with the alt text
+  //
+  // ── VARIANT A (actual schema): product_material_links uses material_id → join materials table for name ──
+  if (filters.materials.length > 0) {
+    promises.push(
+      (async () => {
+        // Resolve material names to IDs first
+        const { data: matRows } = await supabase
+          .from("materials")
+          .select("id, name")
+          .in("name", filters.materials);
+
+        // Also try slug match in case names are stored as slugs
+        const { data: matRowsBySlug } = await supabase
+          .from("materials")
+          .select("id, name")
+          .in("slug", filters.materials);
+
+        const allMatRows = [...(matRows ?? []), ...(matRowsBySlug ?? [])];
+        const materialIds = [...new Set(allMatRows.map((r: { id: string }) => r.id))];
+
+        if (materialIds.length === 0) return [];
+
+        const { data: links } = await supabase
+          .from("product_material_links")
+          .select("product_id")
+          .in("material_id", materialIds);
+
+        const productIds = [...new Set((links ?? []).map((l: { product_id: string }) => l.product_id))];
+        if (productIds.length === 0) return [];
+
+        const { data } = await supabase
+          .from("listings")
+          .select(SELECT)
+          .in("id", productIds.slice(0, 30))
+          .eq("type", "product")
+          .is("deleted_at", null);
+        return (data ?? []) as RawRow[];
+      })()
+    );
+  }
+
+  // ── VARIANT B (alternative schema): product_material_links has material_name column directly ──
+  // Uncomment this block and comment out Variant A if your schema uses a denormalized material_name column.
+  /*
+  if (filters.materials.length > 0) {
+    promises.push(
+      (async () => {
+        const { data: links } = await supabase
+          .from("product_material_links")
+          .select("product_id")
+          .in("material_name", filters.materials);
+
+        const productIds = [...new Set((links ?? []).map((l: { product_id: string }) => l.product_id))];
+        if (productIds.length === 0) return [];
+
+        const { data } = await supabase
+          .from("listings")
+          .select(SELECT)
+          .in("id", productIds.slice(0, 30))
+          .eq("type", "product")
+          .is("deleted_at", null);
+        return (data ?? []) as RawRow[];
+      })()
+    );
+  }
+  */
+
+  // C) Trigram / ILIKE title match
+  //    Uses ILIKE with first few meaningful words from alt text for broad recall.
+  if (filters.altTextRaw) {
+    promises.push(
+      (async () => {
+        // Extract first 3 meaningful words (skip very short ones)
+        const words = filters.altTextRaw
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, " ")
+          .split(/\s+/)
+          .filter((w) => w.length >= 3)
+          .slice(0, 3);
+
+        if (words.length === 0) return [];
+
+        // Build OR filter: title.ilike.%word1%,title.ilike.%word2%,...
+        const escaped = words.map((w) => w.replace(/%/g, "\\%").replace(/_/g, "\\_"));
+        const orFilter = escaped.map((w) => `title.ilike.%${w}%`).join(",");
+
+        const { data } = await supabase
+          .from("listings")
+          .select(SELECT)
+          .eq("type", "product")
+          .is("deleted_at", null)
+          .or(orFilter)
+          .limit(20);
+        return (data ?? []) as RawRow[];
+      })()
+    );
+  }
+
+  // Wait for all parallel queries
+  const results = await Promise.all(promises);
+
+  // ── Deduplicate by product ID ─────────────────────────────────────────
+
+  const seen = new Set<string>();
+  const deduplicated: RawRow[] = [];
+  for (const batch of results) {
+    for (const row of batch) {
+      if (!seen.has(row.id)) {
+        seen.add(row.id);
+        deduplicated.push(row);
+      }
+    }
+  }
+
+  if (deduplicated.length === 0) {
+    return { data: [], error: null };
+  }
+
+  // ── Phase 2: Enrich with colors, materials, brand names ───────────────
+
+  const candidateIds = deduplicated.map((r) => r.id);
+
+  // Fetch colors from products table (products.id = listings.id for product listings)
+  const { data: productColorRows } = await supabase
+    .from("products")
+    .select("id, color_options")
+    .in("id", candidateIds);
+
+  const colorsByProductId: Record<string, string[]> = {};
+  for (const row of productColorRows ?? []) {
+    const r = row as { id: string; color_options?: string[] | null };
+    colorsByProductId[r.id] = Array.isArray(r.color_options)
+      ? r.color_options.map((c) => String(c).toLowerCase())
+      : [];
+  }
+
+  // Fetch materials via product_material_links → materials (Variant A)
+  const { data: materialLinks } = await supabase
+    .from("product_material_links")
+    .select("product_id, material_id")
+    .in("product_id", candidateIds);
+
+  const materialIdsByProduct: Record<string, string[]> = {};
+  for (const row of materialLinks ?? []) {
+    const r = row as { product_id: string; material_id: string };
+    if (!materialIdsByProduct[r.product_id]) materialIdsByProduct[r.product_id] = [];
+    materialIdsByProduct[r.product_id].push(r.material_id);
+  }
+
+  // Resolve material IDs to names
+  const allMaterialIds = [...new Set(Object.values(materialIdsByProduct).flat())];
+  let materialNameById: Record<string, string> = {};
+  if (allMaterialIds.length > 0) {
+    const { data: matRows } = await supabase
+      .from("materials")
+      .select("id, name")
+      .in("id", allMaterialIds);
+    for (const row of matRows ?? []) {
+      const r = row as { id: string; name: string };
+      materialNameById[r.id] = r.name.toLowerCase();
+    }
+  }
+
+  const materialsByProductId: Record<string, string[]> = {};
+  for (const [productId, matIds] of Object.entries(materialIdsByProduct)) {
+    materialsByProductId[productId] = matIds
+      .map((mid) => materialNameById[mid])
+      .filter(Boolean);
+  }
+
+  // Fetch brand names for owner profiles
+  const profileIds = [...new Set(
+    deduplicated.map((r) => r.owner_profile_id).filter(Boolean) as string[]
+  )];
+
+  let brandByProfileId: Record<string, string> = {};
+  if (profileIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, display_name, username")
+      .in("id", profileIds);
+    for (const p of profiles ?? []) {
+      const pr = p as { id: string; display_name: string | null; username: string | null };
+      brandByProfileId[pr.id] = (pr.display_name ?? pr.username ?? "").trim();
+    }
+  }
+
+  // ── Assemble enriched candidates ──────────────────────────────────────
+
+  const candidates: CandidateProduct[] = deduplicated.map((row) => ({
+    id: row.id,
+    title: row.title,
+    slug: row.slug,
+    cover_image_url: row.cover_image_url,
+    feature_highlight: row.feature_highlight,
+    product_type: row.product_type,
+    product_category: row.product_category,
+    owner_profile_id: row.owner_profile_id,
+    brandName: row.owner_profile_id ? (brandByProfileId[row.owner_profile_id] ?? null) : null,
+    materials: materialsByProductId[row.id] ?? [],
+    colors: colorsByProductId[row.id] ?? [],
+  }));
+
+  return { data: candidates, error: null };
+}
