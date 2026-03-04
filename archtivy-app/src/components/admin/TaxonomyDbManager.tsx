@@ -29,17 +29,17 @@ type Tab = "tree" | "facets" | "tools";
 
 function TreeNode({
   node,
-  children,
+  childNodes,
   count,
   onToggleActive,
 }: {
   node: TaxonomyNode;
-  children: TaxonomyNode[];
+  childNodes: TaxonomyNode[];
   count: number;
   onToggleActive: (id: string, active: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(node.depth === 0);
-  const hasChildren = children.length > 0;
+  const hasChildren = childNodes.length > 0;
   const indent = node.depth * 24;
 
   return (
@@ -79,11 +79,11 @@ function TreeNode({
           {node.is_active ? "Active" : "Inactive"}
         </button>
       </div>
-      {expanded && hasChildren && children.map((child) => (
+      {expanded && hasChildren && childNodes.map((child) => (
         <TreeNode
           key={child.id}
           node={child}
-          children={[]}
+          childNodes={[]}
           count={count}
           onToggleActive={onToggleActive}
         />
