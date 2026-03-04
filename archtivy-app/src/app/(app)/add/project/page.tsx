@@ -4,11 +4,12 @@ import { createProject } from "@/app/actions/createProject";
 import { AddProjectForm } from "./AddProjectForm";
 import { Button } from "@/components/ui/Button";
 import { getProfileByClerkId } from "@/lib/db/profiles";
-import { getProjectMaterialOptions } from "@/lib/db/materials";
 import { getListingsByOwner } from "@/lib/db/listings";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { OnboardingSteps } from "@/components/onboarding/OnboardingSteps";
 import type { MemberTitleRow } from "./TeamMembersField";
+import { getTaxonomyTree, getFacetsForDomain } from "@/lib/taxonomy/taxonomyDb";
+import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
 
 async function getActiveMemberTitles(): Promise<MemberTitleRow[]> {
   const supabase = getSupabaseServiceClient();
@@ -42,11 +43,23 @@ export default async function AddProjectPage() {
   const listingsCount = listings?.length ?? 0;
   const showOnboarding = listingsCount === 0;
 
-  const [materialOptions, memberTitles] = await Promise.all([
-    getProjectMaterialOptions(),
+  const [memberTitles, materialTaxRes, facetsRes] = await Promise.all([
     getActiveMemberTitles(),
+    getTaxonomyTree("material"),
+    getFacetsForDomain("project"),
   ]);
-  const materials = materialOptions ?? [];
+  const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
+    id: n.id,
+    parent_id: n.parent_id,
+    depth: n.depth,
+    label: n.label,
+  }));
+  const facets: FacetForForm[] = (facetsRes.data ?? []).map((f) => ({
+    id: f.id,
+    slug: f.slug,
+    label: f.label,
+    values: f.values.map((v) => ({ id: v.id, slug: v.slug, label: v.label })),
+  }));
 
   return (
     <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950/50">
@@ -68,7 +81,7 @@ export default async function AddProjectPage() {
           </Button>
         </p>
       </div>
-      <AddProjectForm materials={materials} memberTitles={memberTitles} />
+      <AddProjectForm memberTitles={memberTitles} materialNodes={materialNodes} facets={facets} />
         </div>
       </div>
     </div>

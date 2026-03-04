@@ -35,6 +35,7 @@ import type { TeamMember, BrandUsed } from "@/lib/types/listings";
 import type { ActionResult } from "./types";
 import { setProjectMaterials, setProductMaterials } from "@/lib/db/materials";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets } from "@/lib/taxonomy/taxonomyDb";
 import { processProductImages } from "@/lib/matches/pipeline";
 import { computeAndUpsertAllMatches } from "@/lib/matches/engine";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
@@ -474,11 +475,32 @@ export async function createProductCanonical(
     product_category: productCategory ?? null,
     product_subcategory: productSubcategory ?? null,
   };
-  console.log("[product taxonomy]", { listingId: productId, product_type: productType, product_category: productCategory, product_subcategory: productSubcategory });
+  const taxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
+  console.log("[product taxonomy]", { listingId: productId, product_type: productType, product_category: productCategory, product_subcategory: productSubcategory, taxonomy_node_id: taxonomyNodeId });
   const listingErr = await upsertListingForProduct(productId, listingPayload);
   if (listingErr.error) {
     await deleteProductRow(productId);
     return { error: `Failed to create listing: ${listingErr.error}` };
+  }
+
+  // Set taxonomy node (new DB taxonomy system)
+  if (taxonomyNodeId) {
+    const taxRes = await setListingTaxonomyNode(productId, taxonomyNodeId);
+    if (taxRes.error) {
+      console.warn("[createProduct] taxonomy node set error (non-fatal):", taxRes.error);
+    }
+  }
+
+  // Set material taxonomy nodes + facet values (advanced filters)
+  const taxonomyMaterialIds = parseMaterialIds(formData.get("taxonomy_material_ids"));
+  if (taxonomyMaterialIds.length > 0) {
+    const matRes = await setListingMaterialNodes(productId, taxonomyMaterialIds);
+    if (matRes.error) console.warn("[createProduct] material nodes set error (non-fatal):", matRes.error);
+  }
+  const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
+  if (facetValueIds.length > 0) {
+    const facetRes = await setListingFacets(productId, facetValueIds);
+    if (facetRes.error) console.warn("[createProduct] facet values set error (non-fatal):", facetRes.error);
   }
 
   if (imageFiles.length > 0) {

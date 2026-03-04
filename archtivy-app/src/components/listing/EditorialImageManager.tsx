@@ -114,6 +114,8 @@ export interface EditorialImage {
   listingImageId: string;
   imageUrl: string;
   imageAlt: string;
+  imageTitle: string;
+  imageCaption: string;
   sortOrder: number;
   existingTags: EditorialProductTag[];
 }
@@ -201,8 +203,8 @@ export function EditorialImageManager({
   useEffect(() => {
     if (selectedImage) {
       setAltDraft(selectedImage.imageAlt ?? "");
-      setImageTitleDraft("");
-      setCaptionDraft("");
+      setImageTitleDraft(selectedImage.imageTitle ?? "");
+      setCaptionDraft(selectedImage.imageCaption ?? "");
       setSaveError(null);
       setHighlightedTagId(null);
       setPulseTag(null);
@@ -343,6 +345,8 @@ export function EditorialImageManager({
       const res = await updateImageAltForListing({
         imageId: selectedImage.listingImageId,
         alt: altDraft.trim() || null,
+        title: imageTitleDraft.trim() || null,
+        caption: captionDraft.trim() || null,
         listingId,
       });
       if (!res.ok) setSaveError(res.error ?? "Failed to save");
@@ -352,7 +356,7 @@ export function EditorialImageManager({
     } finally {
       setSaving(false);
     }
-  }, [selectedImage, altDraft, listingId, router]);
+  }, [selectedImage, altDraft, imageTitleDraft, captionDraft, listingId, router]);
 
   const handleSaveAndContinue = useCallback(async () => {
     await handleSaveChanges();

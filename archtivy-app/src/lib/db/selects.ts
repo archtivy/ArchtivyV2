@@ -18,7 +18,7 @@ export const projectListingSelect =
  * Columns for product listings (listings.type = 'product').
  */
 export const productListingSelect =
-  "id, type, slug, title, description, created_at, updated_at, owner_clerk_user_id, owner_profile_id, cover_image_url, category, year, product_type, product_category, product_subcategory, feature_highlight, material_or_finish, dimensions, team_members, status";
+  "id, type, slug, title, description, created_at, updated_at, owner_clerk_user_id, owner_profile_id, cover_image_url, category, year, product_type, product_category, product_subcategory, feature_highlight, material_or_finish, dimensions, team_members, status, taxonomy_node_id";
 
 /**
  * When public.listings has views_count and saves_count columns, append to listingCardSelect:

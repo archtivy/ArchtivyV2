@@ -23,6 +23,8 @@ export interface ImageTaggingItem {
   listingImageId: string;
   imageUrl: string;
   imageAlt: string;
+  imageTitle: string;
+  imageCaption: string;
   existingTags: PhotoTagWithMeta[];
 }
 

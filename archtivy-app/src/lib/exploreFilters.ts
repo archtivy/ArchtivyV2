@@ -31,6 +31,7 @@ export type ProductSortOption = (typeof SORT_OPTIONS_PRODUCTS)[number]["value"];
 export interface ProjectFilters {
   /** Search query (title, description, location, designer, brand, material). */
   q?: string | null;
+  /** @deprecated Use taxonomy instead. Kept for unmapped-listings fallback. */
   category: string[];
   year: number | null;
   year_min: number | null;
@@ -40,17 +41,24 @@ export interface ProjectFilters {
   area_bucket: ProjectAreaBucket | null;
   /** Material slugs (URL param: `materials=slug1,slug2`) */
   materials: string[];
+  /** Material taxonomy node slug_paths (from listing_taxonomy_node, domain='material'). */
+  taxonomy_materials: string[];
   /** Owner clerk_user_ids (designers/studios). */
   designers?: string[];
   /** Brand names from brands_used (projects). */
   brands?: string[];
   /** @deprecated legacy key (merged into `materials`) */
   project_materials?: string[];
+  /** Taxonomy node slug path (e.g. "residential"). Resolved to node ID for filtering. */
+  taxonomy?: string | null;
+  /** Dynamic facet filters: { facetSlug: [valueSlug, ...] }. */
+  facets: Record<string, string[]>;
 }
 
 export interface ProductFilters {
   /** Search query (title, description, brand, material, color). */
   q?: string | null;
+  /** @deprecated Use taxonomy instead. Kept for unmapped-listings fallback. */
   category: string[];
   year: number | null;
   year_min: number | null;
@@ -60,12 +68,20 @@ export interface ProductFilters {
   brand: string | null;
   /** Material slugs (URL param: `materials=slug1,slug2`) */
   materials: string[];
+  /** Material taxonomy node slug_paths (from listing_taxonomy_node, domain='material'). */
+  taxonomy_materials: string[];
   /** @deprecated legacy key (merged into `materials`) */
   product_materials?: string[];
-  /** Taxonomy filters (?type=&product_category=&sub=). Filter values only; no static routes. */
+  /** @deprecated Legacy product taxonomy filters. Used for 301 redirect detection only. */
   product_type?: string | null;
+  /** @deprecated */
   product_category?: string | null;
+  /** @deprecated */
   product_subcategory?: string | null;
+  /** Taxonomy node slug path (e.g. "furniture/seating"). Resolved to node ID for filtering. */
+  taxonomy?: string | null;
+  /** Dynamic facet filters: { facetSlug: [valueSlug, ...] }. */
+  facets: Record<string, string[]>;
 }
 
 export const DEFAULT_PROJECT_FILTERS: ProjectFilters = {
@@ -77,6 +93,9 @@ export const DEFAULT_PROJECT_FILTERS: ProjectFilters = {
   city: null,
   area_bucket: null,
   materials: [],
+  taxonomy_materials: [],
+  taxonomy: null,
+  facets: {},
 };
 
 export const DEFAULT_PRODUCT_FILTERS: ProductFilters = {
@@ -88,9 +107,12 @@ export const DEFAULT_PRODUCT_FILTERS: ProductFilters = {
   color: [],
   brand: null,
   materials: [],
+  taxonomy_materials: [],
   product_type: null,
   product_category: null,
   product_subcategory: null,
+  taxonomy: null,
+  facets: {},
 };
 
 function parseNum(s: string | null | undefined): number | null {
@@ -147,6 +169,10 @@ export function parseProjectFilters(searchParams: Record<string, string | string
       ? (areaBucketRaw as ProjectAreaBucket)
       : null;
 
+  const taxonomy = parseStringOne(get("taxonomy"));
+
+  const taxonomy_materials = parseStringList(get("taxonomy_materials"));
+
   return {
     category,
     year,
@@ -156,7 +182,10 @@ export function parseProjectFilters(searchParams: Record<string, string | string
     city,
     area_bucket,
     materials,
+    taxonomy_materials,
     project_materials: materialsLegacy.length ? materialsLegacy : undefined,
+    taxonomy,
+    facets: {},
   };
 }
 
@@ -176,6 +205,9 @@ export function parseProductFilters(searchParams: Record<string, string | string
   const materialsLegacy = parseStringList(get("product_materials"));
   const materials = Array.from(new Set([...materialsFromParam, ...materialsLegacy]));
 
+  const taxonomy = parseStringOne(get("taxonomy"));
+  const taxonomy_materials = parseStringList(get("taxonomy_materials"));
+
   return {
     category,
     year,
@@ -185,7 +217,10 @@ export function parseProductFilters(searchParams: Record<string, string | string
     color,
     brand,
     materials,
+    taxonomy_materials,
     product_materials: materialsLegacy.length ? materialsLegacy : undefined,
+    taxonomy,
+    facets: {},
   };
 }
 
@@ -199,6 +234,11 @@ export function projectFiltersToSearchParams(f: ProjectFilters): Record<string, 
   if (f.city) params.city = f.city;
   if (f.area_bucket) params.area_bucket = f.area_bucket;
   if (f.materials.length) params.materials = f.materials.join(",");
+  if (f.taxonomy_materials.length) params.taxonomy_materials = f.taxonomy_materials.join(",");
+  if (f.taxonomy) params.taxonomy = f.taxonomy;
+  for (const [facetSlug, values] of Object.entries(f.facets)) {
+    if (values.length) params[facetSlug] = values.join(",");
+  }
   return params;
 }
 
@@ -212,6 +252,11 @@ export function productFiltersToSearchParams(f: ProductFilters): Record<string, 
   if (f.color.length) params.color = f.color.join(",");
   if (f.brand) params.brand = f.brand;
   if (f.materials.length) params.materials = f.materials.join(",");
+  if (f.taxonomy_materials.length) params.taxonomy_materials = f.taxonomy_materials.join(",");
+  if (f.taxonomy) params.taxonomy = f.taxonomy;
+  for (const [facetSlug, values] of Object.entries(f.facets)) {
+    if (values.length) params[facetSlug] = values.join(",");
+  }
   return params;
 }
 

@@ -6,7 +6,7 @@ import { duplicateProjectAction } from "../actions";
 import { approveListingFormActionVoid, updateProjectAction } from "../../_actions/listings";
 import { getProjectListingBySlugOrId } from "@/lib/db/explore";
 import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
-import { getMaterialsByProjectIds, getProductMaterialOptions, getProjectMaterialOptions } from "@/lib/db/materials";
+import { getProductMaterialOptions } from "@/lib/db/materials";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getListingImagesWithIds, sanitizeListingImageUrl } from "@/lib/db/listingImages";
 import { getPhotoProductTagsByImageIds } from "@/lib/db/photoProductTags";
@@ -15,6 +15,8 @@ import { ImageProductTaggingBlock, type ImageTaggingItem } from "@/components/li
 import { EditorialImageManager } from "@/components/listing/EditorialImageManager";
 import type { LocationValue } from "@/components/location/LocationPicker";
 import type { MemberTitleRow } from "@/app/(app)/add/project/TeamMembersField";
+import { getTaxonomyTree, getFacetsForDomain, getListingMaterialNodeIds, getListingFacets } from "@/lib/taxonomy/taxonomyDb";
+import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
 
 const toText = (v: unknown) => (v == null ? "" : String(v).trim());
 
@@ -45,18 +47,35 @@ export default async function AdminProjectEditPage({
   searchParams: SearchParams;
 }) {
   const { id } = await params;
-  const [listingRow, teamResult, materialsMap, materialOptions, memberTitles, imagesWithIdsResult, productMaterialOptions] =
+  const [listingRow, teamResult, memberTitles, imagesWithIdsResult, productMaterialOptions, materialTaxRes, facetsRes, existingMatNodeIdsRes, existingFacetValsRes] =
     await Promise.all([
       getProjectListingBySlugOrId(id),
       getListingTeamMembersWithProfiles(id),
-      getMaterialsByProjectIds([id]),
-      getProjectMaterialOptions(),
       getActiveMemberTitles(),
       getListingImagesWithIds(id),
       getProductMaterialOptions(),
+      getTaxonomyTree("material"),
+      getFacetsForDomain("project"),
+      getListingMaterialNodeIds(id),
+      getListingFacets(id),
     ]);
 
   if (!listingRow || (listingRow as { type?: string }).type !== "project") return notFound();
+
+  const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
+    id: n.id,
+    parent_id: n.parent_id,
+    depth: n.depth,
+    label: n.label,
+  }));
+  const facets: FacetForForm[] = (facetsRes.data ?? []).map((f) => ({
+    id: f.id,
+    slug: f.slug,
+    label: f.label,
+    values: f.values.map((v) => ({ id: v.id, slug: v.slug, label: v.label })),
+  }));
+  const existingMaterialNodeIds = existingMatNodeIdsRes.data ?? [];
+  const existingFacetValueIds = (existingFacetValsRes.data ?? []).map((f) => f.value_id);
 
   const imagesWithIds = imagesWithIdsResult.data ?? [];
   const productMaterialsList = productMaterialOptions ?? [];
@@ -96,6 +115,8 @@ export default async function AdminProjectEditPage({
       listingImageId: img.id,
       imageUrl: sanitizeListingImageUrl(img.image_url) ?? "",
       imageAlt: img.alt ?? "Image",
+      imageTitle: img.title ?? "",
+      imageCaption: img.caption ?? "",
       existingTags: (tagsByImageId[img.id] ?? []).map((t) => ({
         id: t.id,
         listing_image_id: t.listing_image_id,
@@ -133,8 +154,6 @@ export default async function AdminProjectEditPage({
   };
 
   const teamWithProfiles = teamResult.data ?? [];
-  const materials = materialsMap[id] ?? [];
-  const materialsList = materialOptions ?? [];
   const memberTitlesList = memberTitles;
 
   const locationValue: LocationValue | null =
@@ -163,7 +182,6 @@ export default async function AdminProjectEditPage({
           role: (m.title ?? "").trim(),
         }))
       : [{ name: "", role: "" }],
-    materialIds: materials.map((m) => m.id),
     mentionedRows: (listing.mentioned_products ?? []).length > 0
       ? (listing.mentioned_products ?? []).map((p) => ({
           brand_name_text: (p.brand_name_text ?? "").trim(),
@@ -171,6 +189,8 @@ export default async function AdminProjectEditPage({
         }))
       : [{ brand_name_text: "", product_name_text: "" }],
     existingImageCount: imagesWithIds.length,
+    materialNodeIds: existingMaterialNodeIds,
+    facetValueIds: existingFacetValueIds,
   };
 
   const saved = toText(searchParams.saved) === "1";
@@ -228,11 +248,12 @@ export default async function AdminProjectEditPage({
         </p>
       </div>
       <AddProjectForm
-        materials={materialsList}
         memberTitles={memberTitlesList}
         formMode="admin"
         initialData={initialData}
         updateAction={updateProjectAction}
+        materialNodes={materialNodes}
+        facets={facets}
       />
       <EditorialImageManager
         listingId={id}
@@ -240,6 +261,8 @@ export default async function AdminProjectEditPage({
           listingImageId: img.listingImageId,
           imageUrl: img.imageUrl,
           imageAlt: img.imageAlt,
+          imageTitle: img.imageTitle,
+          imageCaption: img.imageCaption,
           sortOrder: i,
           existingTags: img.existingTags.map((t) => ({
             id: t.id,

@@ -6,21 +6,16 @@ import { duplicateProductAction } from "../actions";
 import { approveListingFormActionVoid, updateProductAction } from "../../_actions/listings";
 import { getProductListingBySlugOrId } from "@/lib/db/explore";
 import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
-import { getMaterialsByProductIds, getProductMaterialOptions } from "@/lib/db/materials";
+import { getProductMaterialOptions } from "@/lib/db/materials";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getListingImagesWithIds, sanitizeListingImageUrl } from "@/lib/db/listingImages";
 import { getPhotoProductTagsByImageIds } from "@/lib/db/photoProductTags";
-import { AddProductForm, type ProductFormInitialData } from "@/app/(app)/add/product/AddProductForm";
+import { AddProductForm, type ProductFormInitialData, type TaxonomyNodeForForm } from "@/app/(app)/add/product/AddProductForm";
 import { EditorialImageManager } from "@/components/listing/EditorialImageManager";
 import type { ImageTaggingItem } from "@/components/listing/ImageProductTaggingBlock";
 import type { MemberTitleRow } from "@/app/(app)/add/project/TeamMembersField";
-
-async function getProductColorOptions(productId: string): Promise<string[]> {
-  const supabase = getSupabaseServiceClient();
-  const { data } = await supabase.from("products").select("color_options").eq("id", productId).maybeSingle();
-  const arr = (data as { color_options?: string[] | null } | null)?.color_options;
-  return Array.isArray(arr) ? arr : [];
-}
+import { getTaxonomyTree, getFacetsForDomain, getListingMaterialNodeIds, getListingFacets } from "@/lib/taxonomy/taxonomyDb";
+import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
 
 const toText = (v: unknown) => (v == null ? "" : String(v).trim());
 
@@ -51,17 +46,42 @@ export default async function AdminProductEditPage({
   searchParams: SearchParams;
 }) {
   const { id } = await params;
-  const [productRow, teamResult, materialsMap, materialOptions, memberTitles, colorOptions, imagesWithIdsResult, productMaterialOptions] =
+  const [productRow, teamResult, memberTitles, imagesWithIdsResult, productMaterialOptions, taxonomyRes, materialTaxRes, facetsRes, existingMatNodeIdsRes, existingFacetValsRes] =
     await Promise.all([
       getProductListingBySlugOrId(id),
       getListingTeamMembersWithProfiles(id),
-      getMaterialsByProductIds([id]),
-      getProductMaterialOptions(),
       getActiveBrandMemberTitles(),
-      getProductColorOptions(id),
       getListingImagesWithIds(id),
       getProductMaterialOptions(),
+      getTaxonomyTree("product"),
+      getTaxonomyTree("material"),
+      getFacetsForDomain("product"),
+      getListingMaterialNodeIds(id),
+      getListingFacets(id),
     ]);
+  const taxonomyNodes: TaxonomyNodeForForm[] = (taxonomyRes.data ?? []).map((n) => ({
+    id: n.id,
+    parent_id: n.parent_id,
+    depth: n.depth,
+    label: n.label,
+    legacy_product_type: n.legacy_product_type,
+    legacy_product_category: n.legacy_product_category,
+    legacy_product_subcategory: n.legacy_product_subcategory,
+  }));
+  const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
+    id: n.id,
+    parent_id: n.parent_id,
+    depth: n.depth,
+    label: n.label,
+  }));
+  const facets: FacetForForm[] = (facetsRes.data ?? []).map((f) => ({
+    id: f.id,
+    slug: f.slug,
+    label: f.label,
+    values: f.values.map((v) => ({ id: v.id, slug: v.slug, label: v.label })),
+  }));
+  const existingMaterialNodeIds = existingMatNodeIdsRes.data ?? [];
+  const existingFacetValueIds = (existingFacetValsRes.data ?? []).map((f) => f.value_id);
 
   if (!productRow || (productRow as { type?: string }).type !== "product") return notFound();
 
@@ -104,6 +124,8 @@ export default async function AdminProductEditPage({
       listingImageId: img.id,
       imageUrl: sanitizeListingImageUrl(img.image_url) ?? "",
       imageAlt: img.alt ?? "Image",
+      imageTitle: img.title ?? "",
+      imageCaption: img.caption ?? "",
       existingTags: (tagsByImageId[img.id] ?? []).map((t) => ({
         id: t.id,
         listing_image_id: t.listing_image_id,
@@ -129,14 +151,13 @@ export default async function AdminProductEditPage({
     product_type: string | null;
     product_category: string | null;
     product_subcategory: string | null;
+    taxonomy_node_id: string | null;
     dimensions: string | null;
     year: string | number | null;
     team_members: unknown;
   };
 
   const teamWithProfiles = teamResult.data ?? [];
-  const materials = materialsMap[id] ?? [];
-  const materialsList = materialOptions ?? [];
   const memberTitlesList = memberTitles;
 
   const initialData: ProductFormInitialData = {
@@ -146,15 +167,16 @@ export default async function AdminProductEditPage({
     productType: toText(listing.product_type),
     productCategory: toText(listing.product_category),
     productSubcategory: toText(listing.product_subcategory),
+    taxonomyNodeId: listing.taxonomy_node_id ?? undefined,
     dimensions: toText(listing.dimensions),
     year: listing.year != null ? String(listing.year) : "",
     teamRows: teamWithProfiles.map((m) => ({
       name: (m.display_name ?? "").trim(),
       role: (m.title ?? "").trim(),
     })),
-    materialIds: materials.map((m) => m.id),
-    colorOptions: colorOptions ?? [],
     existingImageCount: imagesWithIds.length,
+    materialNodeIds: existingMaterialNodeIds,
+    facetValueIds: existingFacetValueIds,
   };
 
   const saved = toText(searchParams.saved) === "1";
@@ -212,11 +234,13 @@ export default async function AdminProductEditPage({
         </p>
       </div>
       <AddProductForm
-        materials={materialsList}
         memberTitles={memberTitlesList}
         formMode="admin"
         initialData={initialData}
         updateAction={updateProductAction}
+        taxonomyNodes={taxonomyNodes}
+        materialNodes={materialNodes}
+        facets={facets}
       />
       <EditorialImageManager
         listingId={id}
@@ -224,6 +248,8 @@ export default async function AdminProductEditPage({
           listingImageId: img.listingImageId,
           imageUrl: img.imageUrl,
           imageAlt: img.imageAlt,
+          imageTitle: img.imageTitle,
+          imageCaption: img.imageCaption,
           sortOrder: i,
           existingTags: img.existingTags.map((t) => ({
             id: t.id,

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AddProductForm } from "@/app/(app)/add/product/AddProductForm";
 import { searchProfilesForOwner } from "@/lib/db/profiles";
-import { getProductMaterialOptions } from "@/lib/db/materials";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import type { MemberTitleRow } from "@/app/(app)/add/project/TeamMembersField";
 
@@ -19,13 +18,11 @@ async function getActiveBrandMemberTitles(): Promise<MemberTitleRow[]> {
 }
 
 export default async function AdminNewProductPage() {
-  const [{ data: profileOptions }, materialOptions, memberTitles] = await Promise.all([
+  const [{ data: profileOptions }, memberTitles] = await Promise.all([
     searchProfilesForOwner("", "product"),
-    getProductMaterialOptions(),
     getActiveBrandMemberTitles(),
   ]);
   const profiles = profileOptions ?? [];
-  const materials = materialOptions ?? [];
 
   return (
     <AdminPage
@@ -47,7 +44,6 @@ export default async function AdminNewProductPage() {
         <AddProductForm
           formMode="admin"
           ownerProfileOptions={profiles}
-          materials={materials}
           memberTitles={memberTitles}
         />
       </div>

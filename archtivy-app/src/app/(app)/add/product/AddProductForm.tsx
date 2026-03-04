@@ -18,11 +18,24 @@ import {
   getCategoriesForType,
   getSubcategoriesForCategory,
 } from "@/lib/taxonomy/productTaxonomy";
-import { COLOR_OPTIONS, getColorSwatch } from "@/lib/colors";
-import { MaterialsMultiSelect } from "@/components/materials/MaterialsMultiSelect";
-import type { MaterialRow } from "@/lib/db/materials";
+
+/** Minimal node shape the form needs from the DB taxonomy tree. */
+export interface TaxonomyNodeForForm {
+  id: string;
+  parent_id: string | null;
+  depth: number;
+  label: string;
+  legacy_product_type: string | null;
+  legacy_product_category: string | null;
+  legacy_product_subcategory: string | null;
+}
 import type { MemberTitleRow } from "../project/TeamMembersField";
 import { TeamMembersField } from "../project/TeamMembersField";
+import {
+  AdvancedFiltersSection,
+  type MaterialNodeForForm,
+  type FacetForForm,
+} from "@/components/add/AdvancedFiltersSection";
 
 const inputClass =
   "h-11 w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white px-3 py-2.5 text-zinc-900 placeholder-zinc-500 focus:border-[#002abf]/40 focus:outline-none focus:ring-1 focus:ring-[#002abf]/15 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-400";
@@ -51,40 +64,114 @@ export interface ProductFormInitialData {
   productType: string;
   productCategory: string;
   productSubcategory: string;
+  /** DB taxonomy node ID (new system). Used to pre-select the taxonomy hierarchy. */
+  taxonomyNodeId?: string | null;
   dimensions: string;
   year: string;
   teamRows: Array<{ name: string; role: string }>;
-  materialIds: string[];
-  /** Color options for filtering and tag suggestions. Default []. */
-  colorOptions?: string[];
   /** Number of images already saved in the DB. Passed to GalleryUploadCard. */
   existingImageCount?: number;
+  /** Pre-selected material taxonomy node IDs (for edit mode). */
+  materialNodeIds?: string[];
+  /** Pre-selected facet value IDs (for edit mode). */
+  facetValueIds?: string[];
+}
+
+/** Resolve initial family/category/subcategory node IDs from initialData + nodes. */
+function resolveInitialIds(
+  nodes: TaxonomyNodeForForm[],
+  init?: ProductFormInitialData
+): { familyId: string; categoryId: string; subcategoryId: string } {
+  const empty = { familyId: "", categoryId: "", subcategoryId: "" };
+  if (!init || !nodes.length) return empty;
+
+  // Helper: given a node, trace up parent chain to set all three IDs
+  const traceUp = (node: TaxonomyNodeForForm) => {
+    if (node.depth === 2) {
+      const parent = nodes.find((n) => n.id === node.parent_id);
+      const grandparent = parent ? nodes.find((n) => n.id === parent.parent_id) : null;
+      return { familyId: grandparent?.id ?? "", categoryId: parent?.id ?? "", subcategoryId: node.id };
+    }
+    if (node.depth === 1) {
+      const parent = nodes.find((n) => n.id === node.parent_id);
+      return { familyId: parent?.id ?? "", categoryId: node.id, subcategoryId: "" };
+    }
+    return { familyId: node.id, categoryId: "", subcategoryId: "" };
+  };
+
+  // 1. Try by taxonomyNodeId
+  if (init.taxonomyNodeId) {
+    const node = nodes.find((n) => n.id === init.taxonomyNodeId);
+    if (node) return traceUp(node);
+  }
+
+  // 2. Fall back to matching by legacy slugs
+  if (init.productSubcategory) {
+    const node = nodes.find(
+      (n) =>
+        n.legacy_product_type === init.productType &&
+        n.legacy_product_category === init.productCategory &&
+        n.legacy_product_subcategory === init.productSubcategory
+    );
+    if (node) return traceUp(node);
+  }
+  if (init.productCategory) {
+    const node = nodes.find(
+      (n) =>
+        n.legacy_product_type === init.productType &&
+        n.legacy_product_category === init.productCategory &&
+        !n.legacy_product_subcategory &&
+        n.depth === 1
+    );
+    if (node) return traceUp(node);
+  }
+  if (init.productType) {
+    const node = nodes.find(
+      (n) => n.legacy_product_type === init.productType && n.depth === 0
+    );
+    if (node) return { familyId: node.id, categoryId: "", subcategoryId: "" };
+  }
+  return empty;
 }
 
 export function AddProductForm({
-  materials,
   memberTitles,
   formMode = "user",
   ownerProfileOptions = [],
   initialData,
   updateAction,
+  taxonomyNodes = [],
+  materialNodes,
+  facets,
 }: {
-  materials: MaterialRow[];
   memberTitles: MemberTitleRow[];
   formMode?: "user" | "admin";
   ownerProfileOptions?: OwnerProfileOption[];
   initialData?: ProductFormInitialData;
   updateAction?: (prev: ActionResult, formData: FormData) => Promise<ActionResult>;
+  /** DB-backed taxonomy nodes. When provided, replaces the static PRODUCT_TAXONOMY. */
+  taxonomyNodes?: TaxonomyNodeForForm[];
+  /** Material taxonomy nodes for AdvancedFiltersSection. */
+  materialNodes?: MaterialNodeForForm[];
+  /** Facets with values for AdvancedFiltersSection. */
+  facets?: FacetForForm[];
 }) {
+  const useDbTaxonomy = taxonomyNodes.length > 0;
   const router = useRouter();
   const action = updateAction ?? (formMode === "admin" ? createAdminProductFull : createProductCanonical);
   const [state, formAction] = useFormState(action, null as ActionResult);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
+  // ── Legacy state (used when taxonomyNodes is empty) ──
   const [productType, setProductType] = useState(initialData?.productType ?? "");
   const [productCategory, setProductCategory] = useState(initialData?.productCategory ?? "");
   const [productSubcategory, setProductSubcategory] = useState(initialData?.productSubcategory ?? "");
+  // ── DB taxonomy state (used when taxonomyNodes is provided) ──
+  const [initIds] = useState(() => resolveInitialIds(taxonomyNodes, initialData));
+  const [familyNodeId, setFamilyNodeId] = useState(initIds.familyId);
+  const [categoryNodeId, setCategoryNodeId] = useState(initIds.categoryId);
+  const [subcategoryNodeId, setSubcategoryNodeId] = useState(initIds.subcategoryId);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
@@ -93,12 +180,12 @@ export function AddProductForm({
     return t && t.length > 0 ? t : [{ name: "", role: "" }];
   });
   const [teamMembersJson, setTeamMembersJson] = useState("[]");
-  const [materialIds, setMaterialIds] = useState<string[]>(initialData?.materialIds ?? []);
-  const [materialIdsJson, setMaterialIdsJson] = useState("[]");
-  const [colorOptions, setColorOptions] = useState<string[]>(initialData?.colorOptions ?? []);
-  const [colorOptionsJson, setColorOptionsJson] = useState("[]");
   const [dimensions, setDimensions] = useState(initialData?.dimensions ?? "");
   const [year, setYear] = useState(initialData?.year ?? "");
+  const [materialNodeIds, setMaterialNodeIds] = useState<string[]>(initialData?.materialNodeIds ?? []);
+  const [materialNodeIdsJson, setMaterialNodeIdsJson] = useState("[]");
+  const [facetValueIds, setFacetValueIds] = useState<string[]>(initialData?.facetValueIds ?? []);
+  const [facetValueIdsJson, setFacetValueIdsJson] = useState("[]");
 
   useEffect(() => {
     if (formMode === "admin" || updateAction) return;
@@ -115,11 +202,11 @@ export function AddProductForm({
   }, [teamRows]);
 
   useEffect(() => {
-    setMaterialIdsJson(JSON.stringify(materialIds));
-  }, [materialIds]);
+    setMaterialNodeIdsJson(JSON.stringify(materialNodeIds));
+  }, [materialNodeIds]);
   useEffect(() => {
-    setColorOptionsJson(JSON.stringify(colorOptions));
-  }, [colorOptions]);
+    setFacetValueIdsJson(JSON.stringify(facetValueIds));
+  }, [facetValueIds]);
 
   const wordCount = useMemo(() => countWords(description), [description]);
   const descValid = wordCount >= MIN_DESC_WORDS;
@@ -128,22 +215,24 @@ export function AddProductForm({
   const [primaryImagePreviewUrl, setPrimaryImagePreviewUrl] = useState<string | null>(null);
   const [categoryFadedIn, setCategoryFadedIn] = useState(false);
   const [subcategoryFadedIn, setSubcategoryFadedIn] = useState(false);
+  const hasFamily = useDbTaxonomy ? familyNodeId !== "" : productType !== "";
+  const hasCategory = useDbTaxonomy ? categoryNodeId !== "" : productCategory !== "";
   useEffect(() => {
-    if (!productType) {
+    if (!hasFamily) {
       setCategoryFadedIn(false);
       return;
     }
     const raf = requestAnimationFrame(() => setCategoryFadedIn(true));
     return () => cancelAnimationFrame(raf);
-  }, [productType]);
+  }, [hasFamily]);
   useEffect(() => {
-    if (!productCategory) {
+    if (!hasCategory) {
       setSubcategoryFadedIn(false);
       return;
     }
     const raf = requestAnimationFrame(() => setSubcategoryFadedIn(true));
     return () => cancelAnimationFrame(raf);
-  }, [productCategory]);
+  }, [hasCategory]);
   useEffect(() => {
     if (imageFiles.length === 0) {
       setPrimaryImagePreviewUrl((prev) => {
@@ -159,16 +248,29 @@ export function AddProductForm({
     });
     return () => URL.revokeObjectURL(url);
   }, [imageFiles]);
-  const subcategoryValid = productSubcategory.trim() !== "";
-  const galleryRequired = !initialData;
-  const canPublish =
-    title.trim() !== "" &&
-    descValid &&
-    productType.trim() !== "" &&
-    subcategoryValid &&
-    (galleryRequired ? galleryValid : true);
-  const canSave = title.trim() !== "" && productType.trim() !== "" && subcategoryValid;
+  // ── DB taxonomy derived lists ──
+  const dbFamilies = useMemo(
+    () => taxonomyNodes.filter((n) => n.depth === 0),
+    [taxonomyNodes]
+  );
+  const dbCategories = useMemo(
+    () => (familyNodeId ? taxonomyNodes.filter((n) => n.depth === 1 && n.parent_id === familyNodeId) : []),
+    [taxonomyNodes, familyNodeId]
+  );
+  const dbSubcategories = useMemo(
+    () => (categoryNodeId ? taxonomyNodes.filter((n) => n.depth === 2 && n.parent_id === categoryNodeId) : []),
+    [taxonomyNodes, categoryNodeId]
+  );
+  /** The deepest selected DB node — provides taxonomy_node_id + legacy field values. */
+  const selectedNode = useMemo(() => {
+    if (!useDbTaxonomy) return null;
+    if (subcategoryNodeId) return taxonomyNodes.find((n) => n.id === subcategoryNodeId) ?? null;
+    if (categoryNodeId) return taxonomyNodes.find((n) => n.id === categoryNodeId) ?? null;
+    if (familyNodeId) return taxonomyNodes.find((n) => n.id === familyNodeId) ?? null;
+    return null;
+  }, [useDbTaxonomy, taxonomyNodes, familyNodeId, categoryNodeId, subcategoryNodeId]);
 
+  // ── Legacy taxonomy derived lists (fallback) ──
   const categories = useMemo(
     () => (productType ? getCategoriesForType(productType) : []),
     [productType]
@@ -181,17 +283,26 @@ export function AddProductForm({
     [productType, productCategory]
   );
 
+  // ── Validation (works for both modes) ──
+  const hasSubcategory = useDbTaxonomy ? subcategoryNodeId !== "" : productSubcategory.trim() !== "";
+  const hasType = useDbTaxonomy ? familyNodeId !== "" : productType.trim() !== "";
+  const hasCategoryVal = useDbTaxonomy ? categoryNodeId !== "" : productCategory.trim() !== "";
+  const galleryRequired = !initialData;
+  const canPublish =
+    title.trim() !== "" && descValid && hasType && hasSubcategory && (galleryRequired ? galleryValid : true);
+  const canSave = title.trim() !== "" && hasType && hasSubcategory;
+
   const productProgressPercent = useMemo(() => {
     const done = [
       title.trim() !== "",
-      productType.trim() !== "",
-      productCategory.trim() !== "",
-      productSubcategory.trim() !== "",
+      hasType,
+      hasCategoryVal,
+      hasSubcategory,
       descValid,
       galleryRequired ? galleryValid : true,
     ].filter(Boolean).length;
     return Math.round((done / PRODUCT_REQUIRED_COUNT) * 100);
-  }, [title, productType, productCategory, productSubcategory, descValid, galleryRequired, galleryValid]);
+  }, [title, hasType, hasCategoryVal, hasSubcategory, descValid, galleryRequired, galleryValid]);
 
   const addTeamRow = () => setTeamRows((r) => [...r, { name: "", role: "" }]);
   const updateTeamRow = (i: number, field: "name" | "role", value: string) => {
@@ -241,7 +352,18 @@ export function AddProductForm({
       <SubmissionProgressBar percent={productProgressPercent} className="mb-6" />
       <input type="hidden" name="team_members" value={teamMembersJson} />
       <input type="hidden" name="draft" value="0" id="product-draft-value" />
-      <input type="hidden" name="product_material_ids" value={materialIdsJson} />
+      <input type="hidden" name="product_material_ids" value="[]" />
+      <input type="hidden" name="taxonomy_material_ids" value={materialNodeIdsJson} />
+      <input type="hidden" name="facet_value_ids" value={facetValueIdsJson} />
+      {/* Taxonomy: send node ID + legacy slugs derived from the selected node */}
+      {useDbTaxonomy && (
+        <>
+          <input type="hidden" name="taxonomy_node_id" value={selectedNode?.id ?? ""} />
+          <input type="hidden" name="product_type" value={selectedNode?.legacy_product_type ?? ""} />
+          <input type="hidden" name="product_category" value={selectedNode?.legacy_product_category ?? ""} />
+          <input type="hidden" name="product_subcategory" value={selectedNode?.legacy_product_subcategory ?? ""} />
+        </>
+      )}
       {initialData?.listingId && (
         <input type="hidden" name="_listingId" value={initialData.listingId} />
       )}
@@ -341,87 +463,152 @@ export function AddProductForm({
               placeholder="Product name"
             />
           </div>
-          <div>
-            <label htmlFor="product_type" className={labelClass}>
-              Product type <span className="text-archtivy-primary">*</span>
-            </label>
-            <select
-              id="product_type"
-              name="product_type"
-              required
-              value={productType}
-              onChange={(e) => {
-                setProductType(e.target.value);
-                setProductCategory("");
-                setProductSubcategory("");
-              }}
-              className={inputClass}
-            >
-              <option value="">Select type</option>
-              {PRODUCT_TAXONOMY.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {useDbTaxonomy ? (
+            <>
+              {/* ── DB-backed taxonomy: Family → Category → Subcategory ── */}
+              <div>
+                <label htmlFor="taxonomy_family" className={labelClass}>
+                  Product family <span className="text-archtivy-primary">*</span>
+                </label>
+                <select
+                  id="taxonomy_family"
+                  value={familyNodeId}
+                  onChange={(e) => {
+                    setFamilyNodeId(e.target.value);
+                    setCategoryNodeId("");
+                    setSubcategoryNodeId("");
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">Select family</option>
+                  {dbFamilies.map((n) => (
+                    <option key={n.id} value={n.id}>{n.label}</option>
+                  ))}
+                </select>
+              </div>
 
-          {productType && (
-            <div
-              className={`transition-opacity duration-200 ease-out ${categoryFadedIn ? "opacity-100" : "opacity-0"}`}
-            >
-              <label htmlFor="product_category" className={labelClass}>
-                Product category <span className="text-archtivy-primary">*</span>
-              </label>
-              <select
-                id="product_category"
-                name="product_category"
-                required
-                value={productCategory}
-                onChange={(e) => {
-                  setProductCategory(e.target.value);
-                  setProductSubcategory("");
-                }}
-                className={inputClass}
-              >
-                <option value="">Select category</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {productCategory && (
-            <div
-              className={`transition-opacity duration-200 ease-out ${subcategoryFadedIn ? "opacity-100" : "opacity-0"}`}
-            >
-              <label htmlFor="product_subcategory" className={labelClass}>
-                Product subcategory <span className="text-archtivy-primary">*</span>
-              </label>
-              <select
-                id="product_subcategory"
-                name="product_subcategory"
-                required
-                value={productSubcategory}
-                onChange={(e) => setProductSubcategory(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Select subcategory</option>
-                {subcategories.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-              {subcategoryValid && (
-                <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-                  Required to save or publish. Use &quot;Other / Not specified&quot; only if none fit.
-                </p>
+              {hasFamily && (
+                <div className={`transition-opacity duration-200 ease-out ${categoryFadedIn ? "opacity-100" : "opacity-0"}`}>
+                  <label htmlFor="taxonomy_category" className={labelClass}>
+                    Product category <span className="text-archtivy-primary">*</span>
+                  </label>
+                  <select
+                    id="taxonomy_category"
+                    value={categoryNodeId}
+                    onChange={(e) => {
+                      setCategoryNodeId(e.target.value);
+                      setSubcategoryNodeId("");
+                    }}
+                    className={inputClass}
+                  >
+                    <option value="">Select category</option>
+                    {dbCategories.map((n) => (
+                      <option key={n.id} value={n.id}>{n.label}</option>
+                    ))}
+                  </select>
+                </div>
               )}
-            </div>
+
+              {hasCategory && (
+                <div className={`transition-opacity duration-200 ease-out ${subcategoryFadedIn ? "opacity-100" : "opacity-0"}`}>
+                  <label htmlFor="taxonomy_subcategory" className={labelClass}>
+                    Product subcategory <span className="text-archtivy-primary">*</span>
+                  </label>
+                  <select
+                    id="taxonomy_subcategory"
+                    value={subcategoryNodeId}
+                    onChange={(e) => setSubcategoryNodeId(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Select subcategory</option>
+                    {dbSubcategories.map((n) => (
+                      <option key={n.id} value={n.id}>{n.label}</option>
+                    ))}
+                  </select>
+                  {hasSubcategory && (
+                    <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+                      Required to save or publish. Use &quot;Other / Not specified&quot; only if none fit.
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {/* ── Legacy static taxonomy fallback ── */}
+              <div>
+                <label htmlFor="product_type" className={labelClass}>
+                  Product type <span className="text-archtivy-primary">*</span>
+                </label>
+                <select
+                  id="product_type"
+                  name="product_type"
+                  required
+                  value={productType}
+                  onChange={(e) => {
+                    setProductType(e.target.value);
+                    setProductCategory("");
+                    setProductSubcategory("");
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">Select type</option>
+                  {PRODUCT_TAXONOMY.map((t) => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {productType && (
+                <div className={`transition-opacity duration-200 ease-out ${categoryFadedIn ? "opacity-100" : "opacity-0"}`}>
+                  <label htmlFor="product_category" className={labelClass}>
+                    Product category <span className="text-archtivy-primary">*</span>
+                  </label>
+                  <select
+                    id="product_category"
+                    name="product_category"
+                    required
+                    value={productCategory}
+                    onChange={(e) => {
+                      setProductCategory(e.target.value);
+                      setProductSubcategory("");
+                    }}
+                    className={inputClass}
+                  >
+                    <option value="">Select category</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {productCategory && (
+                <div className={`transition-opacity duration-200 ease-out ${subcategoryFadedIn ? "opacity-100" : "opacity-0"}`}>
+                  <label htmlFor="product_subcategory" className={labelClass}>
+                    Product subcategory <span className="text-archtivy-primary">*</span>
+                  </label>
+                  <select
+                    id="product_subcategory"
+                    name="product_subcategory"
+                    required
+                    value={productSubcategory}
+                    onChange={(e) => setProductSubcategory(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Select subcategory</option>
+                    {subcategories.map((s) => (
+                      <option key={s.id} value={s.id}>{s.label}</option>
+                    ))}
+                  </select>
+                  {hasSubcategory && (
+                    <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+                      Required to save or publish. Use &quot;Other / Not specified&quot; only if none fit.
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </section>
 
@@ -479,45 +666,17 @@ export function AddProductForm({
               placeholder="e.g. 2024"
             />
           </div>
-          <div>
-            <MaterialsMultiSelect
-              label="Materials"
-              placeholder="Search materials"
-              options={materials}
-              selectedIds={materialIds}
-              onChange={setMaterialIds}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Color options</label>
-            <p className="mb-1.5 text-xs text-zinc-500 dark:text-zinc-400">Select colors for filtering and tag suggestions.</p>
-            <input type="hidden" name="color_options" value={colorOptionsJson} />
-            <div className="flex flex-wrap gap-2">
-              {COLOR_OPTIONS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() =>
-                    setColorOptions((prev) =>
-                      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
-                    )
-                  }
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-archtivy-primary ${
-                    colorOptions.includes(c)
-                      ? "border-archtivy-primary bg-archtivy-primary/10 text-archtivy-primary"
-                      : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:hover:bg-zinc-800"
-                  }`}
-                >
-                  <span
-                    className="w-3.5 h-3.5 rounded-full shrink-0"
-                    style={{ backgroundColor: getColorSwatch(c) }}
-                  />
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
         </section>
+
+        {/* Section: Advanced Filters (material taxonomy + facets) */}
+        <AdvancedFiltersSection
+          materialNodes={materialNodes ?? []}
+          selectedMaterialNodeIds={materialNodeIds}
+          onMaterialNodeIdsChange={setMaterialNodeIds}
+          facets={facets ?? []}
+          selectedFacetValueIds={facetValueIds}
+          onFacetValueIdsChange={setFacetValueIds}
+        />
 
         {/* Section: Connections */}
         <section className={sectionClass}>

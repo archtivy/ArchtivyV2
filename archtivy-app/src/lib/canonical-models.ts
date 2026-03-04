@@ -72,6 +72,14 @@ export interface ProjectCanonical {
   mentioned_products: { brand_name_text: string; product_name_text: string }[];
   /** Brands credited on project (from raw.brands_used). Used for brands_count, not products_count. */
   brands_used?: { name: string; logo_url?: string | null }[];
+  /** Taxonomy node ID (nullable until backfill complete). */
+  taxonomy_node_id?: string | null;
+  /** Taxonomy slug path (e.g. "residential"). Null if taxonomy_node_id not set. */
+  taxonomy_slug_path?: string | null;
+  /** Taxonomy label (e.g. "Residential"). Falls back to category. */
+  taxonomy_label?: string | null;
+  /** Facet values assigned to this listing. */
+  facet_values?: { facet_slug: string; value_slug: string; value_label: string }[];
 }
 
 export interface ProductCanonical {
@@ -105,6 +113,14 @@ export interface ProductCanonical {
   material_tags: MaterialTag[];
   /** PENDING until admin approves; only APPROVED in public explore. */
   status: "PENDING" | "APPROVED";
+  /** Taxonomy node ID (nullable until backfill complete). */
+  taxonomy_node_id?: string | null;
+  /** Taxonomy slug path (e.g. "furniture/seating/dining-chair"). Null if taxonomy_node_id not set. */
+  taxonomy_slug_path?: string | null;
+  /** Taxonomy label (e.g. "Dining chair"). Falls back to category. */
+  taxonomy_label?: string | null;
+  /** Facet values assigned to this listing. */
+  facet_values?: { facet_slug: string; value_slug: string; value_label: string }[];
 }
 
 /** Single source of truth: project rows are listings with type = 'project'. Tolerant: type ?? listing_type. */

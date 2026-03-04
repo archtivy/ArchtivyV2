@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useTaxonomies, type TaxonomyEntry } from "@/lib/admin/hooks";
+import { TaxonomyDbManager } from "@/components/admin/TaxonomyDbManager";
 
+type TopTab = "legacy" | "db";
 type TaxSection = "categories" | "productTypes" | "materials" | "colors" | "cities" | "countries";
 
 const SECTION_LABELS: Record<TaxSection, string> = {
@@ -60,6 +62,7 @@ function TaxonomyList({ entries, label }: { entries: TaxonomyEntry[]; label: str
 export function TaxonomiesClient() {
   const { data, isLoading, error, refetch } = useTaxonomies();
   const [activeSection, setActiveSection] = useState<TaxSection>("categories");
+  const [topTab, setTopTab] = useState<TopTab>("db");
 
   return (
     <div className="px-6 py-6">
@@ -68,68 +71,102 @@ export function TaxonomiesClient() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-zinc-900">Taxonomies</h1>
           <p className="mt-0.5 text-xs text-zinc-500">
-            View and audit taxonomy values in use across the database. Product type tree is
-            frontend-controlled.
+            Manage taxonomy nodes, facets, and seed data. Legacy view shows current DB column values.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          className="rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-        >
-          Refresh
-        </button>
-      </div>
-
-      {error && (
-        <div className="mb-4 rounded border border-red-200 bg-white p-4 text-sm text-red-700">
-          {error.message}
-        </div>
-      )}
-
-      {/* Tab bar */}
-      <div className="mb-4 flex flex-wrap gap-1 border-b border-zinc-200">
-        {(Object.keys(SECTION_LABELS) as TaxSection[]).map((k) => (
+        <div className="flex gap-2">
           <button
-            key={k}
             type="button"
-            onClick={() => setActiveSection(k)}
-            className={[
-              "rounded-t px-4 py-2 text-sm font-medium transition-colors",
-              activeSection === k
-                ? "border-b-2 border-[#002abf] text-[#002abf]"
-                : "text-zinc-600 hover:text-zinc-900",
-            ].join(" ")}
+            onClick={() => setTopTab("db")}
+            className={`rounded px-3 py-2 text-sm font-medium ${
+              topTab === "db"
+                ? "bg-[#002abf] text-white"
+                : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
+            }`}
           >
-            {SECTION_LABELS[k]}
+            DB Taxonomy
           </button>
-        ))}
+          <button
+            type="button"
+            onClick={() => setTopTab("legacy")}
+            className={`rounded px-3 py-2 text-sm font-medium ${
+              topTab === "legacy"
+                ? "bg-[#002abf] text-white"
+                : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
+            }`}
+          >
+            Legacy Values
+          </button>
+        </div>
       </div>
 
-      {isLoading ? (
-        <div className="h-48 animate-pulse rounded border border-zinc-200 bg-white" />
-      ) : data ? (
-        <div className="space-y-6">
-          <TaxonomyList entries={data[activeSection]} label={SECTION_LABELS[activeSection]} />
+      {/* DB Taxonomy Manager */}
+      {topTab === "db" && <TaxonomyDbManager />}
 
-          {/* Product taxonomy tree (read-only) */}
-          {activeSection === "productTypes" && (
-            <div className="rounded border border-zinc-200 bg-white p-4">
-              <div className="mb-3 text-sm font-semibold text-zinc-900">
-                Frontend Taxonomy Tree (read-only — edit in productTaxonomy.ts)
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                {data.taxonomyTree.map((t) => (
-                  <div key={t.id} className="rounded border border-zinc-100 bg-zinc-50 px-3 py-2 text-xs">
-                    <div className="font-semibold text-zinc-800">{t.label}</div>
-                    <div className="text-zinc-500">{t.categoryCount} categories</div>
-                  </div>
-                ))}
-              </div>
+      {/* Legacy view */}
+      {topTab === "legacy" && (
+        <>
+          {error && (
+            <div className="mb-4 rounded border border-red-200 bg-white p-4 text-sm text-red-700">
+              {error.message}
             </div>
           )}
-        </div>
-      ) : null}
+
+          <div className="mb-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {/* Tab bar */}
+          <div className="mb-4 flex flex-wrap gap-1 border-b border-zinc-200">
+            {(Object.keys(SECTION_LABELS) as TaxSection[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setActiveSection(k)}
+                className={[
+                  "rounded-t px-4 py-2 text-sm font-medium transition-colors",
+                  activeSection === k
+                    ? "border-b-2 border-[#002abf] text-[#002abf]"
+                    : "text-zinc-600 hover:text-zinc-900",
+                ].join(" ")}
+              >
+                {SECTION_LABELS[k]}
+              </button>
+            ))}
+          </div>
+
+          {isLoading ? (
+            <div className="h-48 animate-pulse rounded border border-zinc-200 bg-white" />
+          ) : data ? (
+            <div className="space-y-6">
+              <TaxonomyList entries={data[activeSection]} label={SECTION_LABELS[activeSection]} />
+
+              {/* Product taxonomy tree (read-only) */}
+              {activeSection === "productTypes" && (
+                <div className="rounded border border-zinc-200 bg-white p-4">
+                  <div className="mb-3 text-sm font-semibold text-zinc-900">
+                    Frontend Taxonomy Tree (read-only — edit in productTaxonomy.ts)
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                    {data.taxonomyTree.map((t) => (
+                      <div key={t.id} className="rounded border border-zinc-100 bg-zinc-50 px-3 py-2 text-xs">
+                        <div className="font-semibold text-zinc-800">{t.label}</div>
+                        <div className="text-zinc-500">{t.categoryCount} categories</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

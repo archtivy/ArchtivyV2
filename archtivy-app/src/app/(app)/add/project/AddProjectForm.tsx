@@ -15,10 +15,13 @@ import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
 import { SubmissionProgressBar } from "@/components/add/SubmissionProgressBar";
 import { LocationPicker, type LocationValue } from "@/components/location/LocationPicker";
 import { PROJECT_CATEGORIES } from "@/lib/auth/config";
-import { MaterialsMultiSelect } from "@/components/materials/MaterialsMultiSelect";
-import type { MaterialRow } from "@/lib/db/materials";
 import type { MemberTitleRow } from "./TeamMembersField";
 import { TeamMembersField } from "./TeamMembersField";
+import {
+  AdvancedFiltersSection,
+  type MaterialNodeForForm,
+  type FacetForForm,
+} from "@/components/add/AdvancedFiltersSection";
 
 const inputClass =
   "h-11 w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white px-3 py-2.5 text-zinc-900 placeholder-zinc-500 focus:border-[#002abf]/40 focus:outline-none focus:ring-1 focus:ring-[#002abf]/15 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-400";
@@ -49,26 +52,33 @@ export interface ProjectFormInitialData {
   areaSqft: string;
   year: string;
   teamRows: Array<{ name: string; role: string }>;
-  materialIds: string[];
   mentionedRows: Array<{ brand_name_text: string; product_name_text: string }>;
   /** Number of images already saved in the DB. Passed to GalleryUploadCard. */
   existingImageCount?: number;
+  /** Pre-selected material taxonomy node IDs (for edit mode). */
+  materialNodeIds?: string[];
+  /** Pre-selected facet value IDs (for edit mode). */
+  facetValueIds?: string[];
 }
 
 export function AddProjectForm({
-  materials,
   memberTitles,
   formMode = "user",
   ownerProfileOptions = [],
   initialData,
   updateAction,
+  materialNodes,
+  facets,
 }: {
-  materials: MaterialRow[];
   memberTitles: MemberTitleRow[];
   formMode?: "user" | "admin";
   ownerProfileOptions?: OwnerProfileOption[];
   initialData?: ProjectFormInitialData;
   updateAction?: (prev: ActionResult, formData: FormData) => Promise<ActionResult>;
+  /** Material taxonomy nodes for AdvancedFiltersSection. */
+  materialNodes?: MaterialNodeForForm[];
+  /** Facets with values for AdvancedFiltersSection. */
+  facets?: FacetForForm[];
 }) {
   const router = useRouter();
   const action = updateAction ?? (formMode === "admin" ? createAdminProjectFull : createProject);
@@ -87,8 +97,6 @@ export function AddProjectForm({
     return t && t.length > 0 ? t : [{ name: "", role: "" }];
   });
   const [teamMembersJson, setTeamMembersJson] = useState("[]");
-  const [materialIds, setMaterialIds] = useState<string[]>(initialData?.materialIds ?? []);
-  const [materialIdsJson, setMaterialIdsJson] = useState("[]");
   const [mentionedRows, setMentionedRows] = useState<
     Array<{ brand_name_text: string; product_name_text: string }>
   >(() => {
@@ -96,6 +104,10 @@ export function AddProjectForm({
     return m && m.length > 0 ? m : [{ brand_name_text: "", product_name_text: "" }];
   });
   const [mentionedProductsJson, setMentionedProductsJson] = useState("[]");
+  const [materialNodeIds, setMaterialNodeIds] = useState<string[]>(initialData?.materialNodeIds ?? []);
+  const [materialNodeIdsJson, setMaterialNodeIdsJson] = useState("[]");
+  const [facetValueIds, setFacetValueIds] = useState<string[]>(initialData?.facetValueIds ?? []);
+  const [facetValueIdsJson, setFacetValueIdsJson] = useState("[]");
 
   useEffect(() => {
     if (formMode === "admin" || updateAction) return;
@@ -110,10 +122,6 @@ export function AddProjectForm({
   }, [teamRows]);
 
   useEffect(() => {
-    setMaterialIdsJson(JSON.stringify(materialIds));
-  }, [materialIds]);
-
-  useEffect(() => {
     setMentionedProductsJson(
       JSON.stringify(
         mentionedRows.filter(
@@ -122,6 +130,12 @@ export function AddProjectForm({
       )
     );
   }, [mentionedRows]);
+  useEffect(() => {
+    setMaterialNodeIdsJson(JSON.stringify(materialNodeIds));
+  }, [materialNodeIds]);
+  useEffect(() => {
+    setFacetValueIdsJson(JSON.stringify(facetValueIds));
+  }, [facetValueIds]);
 
   const wordCount = useMemo(() => countWords(description), [description]);
   const descValid = wordCount >= MIN_DESC_WORDS && wordCount <= MAX_DESC_WORDS;
@@ -225,8 +239,10 @@ export function AddProjectForm({
       <SubmissionProgressBar percent={projectProgressPercent} className="mb-6" />
       <input type="hidden" name="team_members" value={teamMembersJson} />
       <input type="hidden" name="draft" value="0" id="draft-value" />
-      <input type="hidden" name="project_material_ids" value={materialIdsJson} />
+      <input type="hidden" name="project_material_ids" value="[]" />
       <input type="hidden" name="mentioned_products" value={mentionedProductsJson} />
+      <input type="hidden" name="taxonomy_material_ids" value={materialNodeIdsJson} />
+      <input type="hidden" name="facet_value_ids" value={facetValueIdsJson} />
       {initialData?.listingId && (
         <input type="hidden" name="_listingId" value={initialData.listingId} />
       )}
@@ -419,16 +435,17 @@ export function AddProjectForm({
               />
             </div>
           </div>
-          <div>
-            <MaterialsMultiSelect
-              label="Materials"
-              placeholder="Search materials"
-              options={materials}
-              selectedIds={materialIds}
-              onChange={setMaterialIds}
-            />
-          </div>
         </section>
+
+        {/* Section: Advanced Filters (material taxonomy + facets) */}
+        <AdvancedFiltersSection
+          materialNodes={materialNodes ?? []}
+          selectedMaterialNodeIds={materialNodeIds}
+          onMaterialNodeIdsChange={setMaterialNodeIds}
+          facets={facets ?? []}
+          selectedFacetValueIds={facetValueIds}
+          onFacetValueIdsChange={setFacetValueIds}
+        />
 
         {/* Section: Mentioned products (optional) */}
         <section className={sectionClass}>

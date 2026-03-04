@@ -1,17 +1,21 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCallback, useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { FilterPillDropdown } from "@/components/explore/filters/FilterPillDropdown";
-import type { ExploreFilters, ExploreType } from "@/lib/explore/filters/schema";
-import { DEFAULT_EXPLORE_FILTERS } from "@/lib/explore/filters/schema";
-import { filtersToQueryString, countActiveFilters } from "@/lib/explore/filters/query";
+import { TaxonomyBreadcrumbPill } from "@/components/explore/filters/TaxonomyBreadcrumbPill";
+import { FacetFilterPills } from "@/components/explore/filters/FacetFilterPills";
+import type { ExploreFilters } from "@/lib/explore/filters/schema";
+import { filtersToQueryString, countActiveFilters, buildExploreUrl } from "@/lib/explore/filters/query";
 import type { ExploreFilterOptions } from "@/lib/explore/filters/options";
 import { EXPLORE_SORT_PROJECTS, EXPLORE_SORT_PRODUCTS } from "@/lib/explore/filters/schema";
 
 const FILTERS_PANEL_Z = 1000;
 const FILTERS_BACKDROP_Z = 999;
+
+/** Facet slugs shown as inline pills alongside other primary filters. */
+const PRIMARY_FACET_SLUGS = new Set(["design-style"]);
 
 export interface ExploreFilterBarProps {
   type: "projects" | "products";
@@ -30,7 +34,6 @@ export function ExploreFilterBar({
   hideSort = false,
 }: ExploreFilterBarProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filtersPanelPos, setFiltersPanelPos] = useState({ top: 0, left: 0, right: 0 });
   const filtersTriggerRef = useRef<HTMLButtonElement>(null);
@@ -43,14 +46,14 @@ export function ExploreFilterBar({
     setFiltersPanelPos({ top: rect.bottom + 4, left: rect.left, right: window.innerWidth - rect.right });
   }, []);
 
+  /** Navigate preserving taxonomy in route path and filters as query params. */
   const navigate = useCallback(
     (filters: ExploreFilters, newSort?: string) => {
-      const qs = filtersToQueryString(filters, type);
-      if (newSort && newSort !== "newest") qs.set("sort", newSort);
-      const search = qs.toString();
-      router.push(search ? `${pathname}?${search}` : pathname);
+      const filtersWithSort = newSort ? { ...filters, sort: newSort } : filters;
+      const url = buildExploreUrl(type, filtersWithSort.taxonomy, filtersWithSort);
+      router.push(url);
     },
-    [type, pathname, router]
+    [type, router]
   );
 
   const update = useCallback(
@@ -62,8 +65,9 @@ export function ExploreFilterBar({
 
   const clearAll = useCallback(() => {
     setFiltersOpen(false);
-    navigate(DEFAULT_EXPLORE_FILTERS, "newest");
-  }, [navigate]);
+    const basePath = type === "products" ? "/explore/products" : "/explore/projects";
+    router.push(basePath);
+  }, [type, router]);
 
   useEffect(() => {
     if (!filtersOpen) return;
@@ -106,6 +110,13 @@ export function ExploreFilterBar({
   const activeCount = countActiveFilters(currentFilters, type);
   const sortOptions = type === "projects" ? EXPLORE_SORT_PROJECTS : EXPLORE_SORT_PRODUCTS;
 
+  // Split facets into primary (inline pills) and advanced (inside Filters panel)
+  const primaryFacets = options.facets.filter((f) => PRIMARY_FACET_SLUGS.has(f.slug));
+  const advancedFacets = options.facets.filter((f) => !PRIMARY_FACET_SLUGS.has(f.slug));
+
+  // Build query string for the taxonomy pill (filters minus taxonomy)
+  const taxonomyPillQs = filtersToQueryString(currentFilters, type).toString();
+
   const filtersPanelContent =
     filtersOpen && typeof document !== "undefined" ? (
       <>
@@ -117,7 +128,7 @@ export function ExploreFilterBar({
         />
         <div
           ref={filtersPanelRef}
-          className="w-56 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-60 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
           style={{
             position: "fixed",
             top: filtersPanelPos.top,
@@ -138,8 +149,43 @@ export function ExploreFilterBar({
               </button>
             )}
           </div>
-          {activeCount === 0 && (
+          {activeCount === 0 && advancedFacets.length === 0 && (
             <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">No filters applied</p>
+          )}
+          {/* Advanced facet filters inside the panel */}
+          {advancedFacets.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {advancedFacets.map((facet) => {
+                const selected = currentFilters.facets[facet.slug] ?? [];
+                return (
+                  <div key={facet.slug}>
+                    <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                      {facet.label}
+                    </label>
+                    <select
+                      value={selected[0] ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        update({
+                          facets: {
+                            ...currentFilters.facets,
+                            [facet.slug]: val ? [val] : [],
+                          },
+                        });
+                      }}
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                    >
+                      <option value="">All</option>
+                      {facet.values.map((v) => (
+                        <option key={v.slug} value={v.slug}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })}
+            </div>
           )}
           {!hideSort && sortOptions.length > 1 && (
             <div className="mt-3 pt-2 border-t border-zinc-100 dark:border-zinc-700">
@@ -175,7 +221,15 @@ export function ExploreFilterBar({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-nowrap items-center gap-2 overflow-x-auto overflow-y-visible pb-2 scrollbar-thin md:flex-wrap">
-        {options.categories.length > 0 && (
+        {/* Taxonomy breadcrumb pill — replaces flat categories when tree exists */}
+        {options.taxonomyTree.length > 0 ? (
+          <TaxonomyBreadcrumbPill
+            type={type}
+            tree={options.taxonomyTree}
+            currentSlugPath={currentFilters.taxonomy}
+            queryString={taxonomyPillQs}
+          />
+        ) : options.categories.length > 0 ? (
           <FilterPillDropdown
             label="Categories"
             options={options.categories}
@@ -183,7 +237,7 @@ export function ExploreFilterBar({
             onChange={(values) => update({ category: values })}
             data-testid="filter-categories"
           />
-        )}
+        ) : null}
         {options.locations.length > 0 && (
           <FilterPillDropdown
             label="Location"
@@ -291,6 +345,17 @@ export function ExploreFilterBar({
             data-testid="filter-material-type"
           />
         )}
+
+        {/* Primary facet pills (e.g. Style) — shown inline */}
+        <FacetFilterPills
+          facets={primaryFacets}
+          currentFacets={currentFilters.facets}
+          onFacetChange={(facetSlug, values) => {
+            update({
+              facets: { ...currentFilters.facets, [facetSlug]: values },
+            });
+          }}
+        />
 
         <div className="relative shrink-0">
           <button

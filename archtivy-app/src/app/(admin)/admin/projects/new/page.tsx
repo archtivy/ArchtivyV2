@@ -2,7 +2,6 @@ import Link from "next/link";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AddProjectForm } from "@/app/(app)/add/project/AddProjectForm";
 import { searchProfilesForOwner, getProfilesByRole } from "@/lib/db/profiles";
-import { getProjectMaterialOptions } from "@/lib/db/materials";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import type { MemberTitleRow } from "@/app/(app)/add/project/TeamMembersField";
 
@@ -19,13 +18,11 @@ async function getActiveMemberTitles(): Promise<MemberTitleRow[]> {
 }
 
 export default async function AdminNewProjectPage() {
-  const [profileOptions, materialOptions, memberTitles] = await Promise.all([
+  const [profileOptions, memberTitles] = await Promise.all([
     searchProfilesForOwner("", "project"),
-    getProjectMaterialOptions(),
     getActiveMemberTitles(),
   ]);
   const profiles = profileOptions?.data ?? [];
-  const materials = materialOptions ?? [];
 
   return (
     <AdminPage
@@ -47,7 +44,6 @@ export default async function AdminNewProjectPage() {
         <AddProjectForm
           formMode="admin"
           ownerProfileOptions={profiles}
-          materials={materials}
           memberTitles={memberTitles}
         />
       </div>

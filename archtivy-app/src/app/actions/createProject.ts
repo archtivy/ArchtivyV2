@@ -11,6 +11,7 @@ import type { ActionResult } from "@/app/actions/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TeamMember, BrandUsed } from "@/lib/types/listings";
 import { setProjectMaterials } from "@/lib/db/materials";
+import { setListingMaterialNodes, setListingFacets } from "@/lib/taxonomy/taxonomyDb";
 import { processProjectImages } from "@/lib/matches/pipeline";
 import { computeAndUpsertMatchesForProject } from "@/lib/matches/engine";
 
@@ -347,6 +348,18 @@ export async function createProject(
     if (materialErr) {
       return { error: `Failed to save materials: ${materialErr}` };
     }
+  }
+
+  // Set material taxonomy nodes + facet values (advanced filters)
+  const taxonomyMaterialIds = parseMaterialIds(formData.get("taxonomy_material_ids"));
+  if (taxonomyMaterialIds.length > 0) {
+    const matRes = await setListingMaterialNodes(listingId, taxonomyMaterialIds);
+    if (matRes.error) console.warn("[createProject] material nodes error (non-fatal):", matRes.error);
+  }
+  const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
+  if (facetValueIds.length > 0) {
+    const facetRes = await setListingFacets(listingId, facetValueIds);
+    if (facetRes.error) console.warn("[createProject] facet values error (non-fatal):", facetRes.error);
   }
 
   revalidatePath("/explore");

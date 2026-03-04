@@ -191,12 +191,23 @@ export async function setPrimaryListingImage(listingId: string, imageId: string)
 
 // ─── Update alt text (generic for any listing) ──────────────────────────────
 
-export async function updateImageAlt(input: { imageId: string; alt: string | null }) {
+export async function updateImageAlt(input: {
+  imageId: string;
+  alt: string | null;
+  title?: string | null;
+  caption?: string | null;
+}) {
   const supabase = getSupabaseServiceClient();
   const alt = toText(input.alt);
+  const title = toText(input.title);
+  const caption = toText(input.caption);
   const { error } = await supabase
     .from("listing_images")
-    .update({ alt: alt.length ? alt : null })
+    .update({
+      alt: alt.length ? alt : null,
+      title: title.length ? title : null,
+      caption: caption.length ? caption : null,
+    })
     .eq("id", input.imageId);
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/admin/media");
@@ -216,13 +227,20 @@ export async function updateImageAltForProject(input: {
   return { ok: true as const };
 }
 
-/** Update listing image alt for any listing type (projects or products). */
+/** Update listing image alt, title, and caption for any listing type (projects or products). */
 export async function updateImageAltForListing(input: {
   imageId: string;
   alt: string | null;
+  title?: string | null;
+  caption?: string | null;
   listingId: string;
 }) {
-  const res = await updateImageAlt({ imageId: input.imageId, alt: input.alt });
+  const res = await updateImageAlt({
+    imageId: input.imageId,
+    alt: input.alt,
+    title: input.title,
+    caption: input.caption,
+  });
   if (!res.ok) return res;
   revalidateListingPaths(input.listingId);
   return { ok: true as const };

@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { ExploreSearchBar } from "@/components/search/ExploreSearchBar";
 import { ExploreFilterBar } from "@/components/explore/ExploreFilterBar";
 import { Container } from "@/components/layout/Container";
 import type { ExploreFilters, ExploreType } from "@/lib/explore/filters/schema";
 import { EXPLORE_SORT_PROJECTS, EXPLORE_SORT_PRODUCTS } from "@/lib/explore/filters/schema";
-import { filtersToQueryString } from "@/lib/explore/filters/query";
+import { buildExploreUrl } from "@/lib/explore/filters/query";
 import type { ExploreFilterOptions } from "@/lib/explore/filters/options";
 import type { ExploreNetworkCounts } from "@/lib/db/explore";
 import type { PlatformStats } from "@/lib/db/platformActivity";
@@ -41,7 +41,6 @@ export function ExploreEditorialHeader({
   platformStats,
 }: ExploreEditorialHeaderProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const sort = currentFilters.sort;
   const sortOptions = type === "projects" ? EXPLORE_SORT_PROJECTS : EXPLORE_SORT_PRODUCTS;
 
@@ -60,13 +59,10 @@ export function ExploreEditorialHeader({
   const handleSortChange = useCallback(
     (value: string) => {
       setSortOpen(false);
-      const qs = filtersToQueryString(currentFilters, type);
-      if (value && value !== "newest") qs.set("sort", value);
-      else qs.delete("sort");
-      const search = qs.toString();
-      router.push(search ? `${pathname}?${search}` : pathname);
+      const filtersWithSort = { ...currentFilters, sort: value };
+      router.push(buildExploreUrl(type, currentFilters.taxonomy, filtersWithSort));
     },
-    [currentFilters, type, pathname, router]
+    [currentFilters, type, router]
   );
 
   // Primary dominant metric

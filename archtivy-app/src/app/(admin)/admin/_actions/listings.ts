@@ -17,6 +17,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
 import { processProjectImages, processProductImages } from "@/lib/matches/pipeline";
 import { computeAndUpsertMatchesForProject, computeAndUpsertAllMatches } from "@/lib/matches/engine";
+import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets } from "@/lib/taxonomy/taxonomyDb";
 
 const MIN_GALLERY_IMAGES = 3;
 
@@ -297,6 +298,18 @@ export async function createAdminProjectFull(
     if (materialErr) return { error: `Failed to save materials: ${materialErr}` };
   }
 
+  // Set material taxonomy nodes + facet values (advanced filters)
+  const taxonomyMaterialIds = parseMaterialIds(formData.get("taxonomy_material_ids"));
+  if (taxonomyMaterialIds.length > 0) {
+    const matRes = await setListingMaterialNodes(listingId, taxonomyMaterialIds);
+    if (matRes.error) console.warn("[admin createProject] material nodes error (non-fatal):", matRes.error);
+  }
+  const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
+  if (facetValueIds.length > 0) {
+    const facetRes = await setListingFacets(listingId, facetValueIds);
+    if (facetRes.error) console.warn("[admin createProject] facet values error (non-fatal):", facetRes.error);
+  }
+
   if (admin.ok) {
     await createAuditLog({
       adminUserId: admin.adminUserId,
@@ -385,7 +398,8 @@ export async function createAdminProductFull(
   if (insertError) return { error: insertError.message };
   if (!listing?.id) return { error: "Failed to create product." };
   const listingId = listing.id as string;
-  console.log("[product taxonomy]", { listingId, product_type: product_type, product_category: product_category, product_subcategory: product_subcategory });
+  const taxonomy_node_id = (formData.get("taxonomy_node_id") as string)?.trim() || null;
+  console.log("[product taxonomy]", { listingId, product_type, product_category, product_subcategory, taxonomy_node_id });
   const { data: check } = await supabase.from("listings").select("type").eq("id", listingId).maybeSingle();
   if (!check?.type) return { error: "Listing created but type is missing (data integrity)." };
 
@@ -399,6 +413,26 @@ export async function createAdminProductFull(
   if (productRowError) {
     await supabase.from("listings").delete().eq("id", listingId);
     return { error: `Failed to create product record: ${productRowError.message}` };
+  }
+
+  // Set taxonomy node (new DB taxonomy system)
+  if (taxonomy_node_id) {
+    const taxRes = await setListingTaxonomyNode(listingId, taxonomy_node_id);
+    if (taxRes.error) {
+      console.warn("[admin createProduct] taxonomy node set error (non-fatal):", taxRes.error);
+    }
+  }
+
+  // Set material taxonomy nodes + facet values (advanced filters)
+  const taxonomyMaterialIds = parseMaterialIds(formData.get("taxonomy_material_ids"));
+  if (taxonomyMaterialIds.length > 0) {
+    const matRes = await setListingMaterialNodes(listingId, taxonomyMaterialIds);
+    if (matRes.error) console.warn("[admin createProduct] material nodes error (non-fatal):", matRes.error);
+  }
+  const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
+  if (facetValueIds.length > 0) {
+    const facetRes = await setListingFacets(listingId, facetValueIds);
+    if (facetRes.error) console.warn("[admin createProduct] facet values error (non-fatal):", facetRes.error);
   }
 
   if (team_members.length > 0) {
@@ -824,6 +858,14 @@ export async function updateProjectAction(
     if (materialErr) return { error: `Failed to save materials: ${materialErr}` };
   }
 
+  // Update material taxonomy nodes + facet values (advanced filters)
+  const taxonomyMaterialIds = parseMaterialIds(formData.get("taxonomy_material_ids"));
+  const matRes = await setListingMaterialNodes(listingId, taxonomyMaterialIds);
+  if (matRes.error) console.warn("[updateProject] material nodes error (non-fatal):", matRes.error);
+  const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
+  const facetRes = await setListingFacets(listingId, facetValueIds);
+  if (facetRes.error) console.warn("[updateProject] facet values error (non-fatal):", facetRes.error);
+
   if (admin.ok) {
     await createAuditLog({
       adminUserId: admin.adminUserId,
@@ -872,7 +914,8 @@ export async function updateProductAction(
   if (!product_type?.trim()) return { error: "Product type is required." };
   if (!product_subcategory?.trim()) return { error: "Product subcategory is required." };
 
-  console.log("[product taxonomy]", { listingId, product_type, product_category, product_subcategory });
+  const taxonomy_node_id = (formData.get("taxonomy_node_id") as string)?.trim() || null;
+  console.log("[product taxonomy]", { listingId, product_type, product_category, product_subcategory, taxonomy_node_id });
   const supabase = getSupabaseServiceClient();
   const { error: updateError } = await supabase
     .from("listings")
@@ -890,6 +933,22 @@ export async function updateProductAction(
     .eq("id", listingId);
 
   if (updateError) return { error: updateError.message };
+
+  // Update taxonomy node (new DB taxonomy system)
+  if (taxonomy_node_id) {
+    const taxRes = await setListingTaxonomyNode(listingId, taxonomy_node_id);
+    if (taxRes.error) {
+      console.warn("[updateProduct] taxonomy node set error (non-fatal):", taxRes.error);
+    }
+  }
+
+  // Update material taxonomy nodes + facet values (advanced filters)
+  const taxonomyMaterialIds = parseMaterialIds(formData.get("taxonomy_material_ids"));
+  const matRes = await setListingMaterialNodes(listingId, taxonomyMaterialIds);
+  if (matRes.error) console.warn("[updateProduct] material nodes error (non-fatal):", matRes.error);
+  const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
+  const facetRes = await setListingFacets(listingId, facetValueIds);
+  if (facetRes.error) console.warn("[updateProduct] facet values error (non-fatal):", facetRes.error);
 
   await supabase
     .from("products")

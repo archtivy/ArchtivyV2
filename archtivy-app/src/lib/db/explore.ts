@@ -23,6 +23,8 @@ import { areaBucketToRange } from "@/lib/exploreFilters";
 import type { ProjectSortOption, ProductSortOption } from "@/lib/exploreFilters";
 import { getMaterialsByProjectIds, getMaterialsByProductIds } from "@/lib/db/materials";
 
+import { getTaxonomyNodeBySlugPath, getTaxonomyRedirect } from "@/lib/taxonomy/taxonomyDb";
+
 const supabase = () => getSupabaseServiceClient();
 
 /** Map listing_images rows to ProductImageRow shape for normalizeProduct (listing_id = product_id, image_url = src). */
@@ -277,6 +279,204 @@ async function getProductIdsByMaterialSlugs(selectedSlugs: string[]): Promise<st
   return matchedIds;
 }
 
+/**
+ * Get listing IDs that match a taxonomy slug path.
+ * Resolves the slug_path to a node, then finds all listings linked to that node
+ * or any descendant node (prefix match on slug_path).
+ */
+async function getListingIdsByTaxonomy(
+  domain: "product" | "project",
+  taxonomySlugPath: string
+): Promise<string[]> {
+  let resolvedSlug = taxonomySlugPath;
+  const nodeRes = await getTaxonomyNodeBySlugPath(domain, resolvedSlug);
+
+  // If not found, check taxonomy_redirects for a moved slug
+  if (!nodeRes.data) {
+    const redirectRes = await getTaxonomyRedirect(domain, resolvedSlug);
+    if (redirectRes.data?.new_slug_path) {
+      resolvedSlug = redirectRes.data.new_slug_path;
+      const retryRes = await getTaxonomyNodeBySlugPath(domain, resolvedSlug);
+      if (!retryRes.data) return [];
+    } else {
+      return [];
+    }
+  }
+
+  // Find this node and all descendant nodes
+  const { data: descendantNodes, error: descErr } = await supabase()
+    .from("taxonomy_nodes")
+    .select("id")
+    .eq("domain", domain)
+    .or(`slug_path.eq.${resolvedSlug},slug_path.like.${resolvedSlug}/%`);
+  if (descErr || !descendantNodes?.length) return [];
+
+  const nodeIds = (descendantNodes as { id: string }[]).map((n) => n.id);
+
+  // Find listings linked to any of these nodes
+  const { data: links, error: linkErr } = await supabase()
+    .from("listing_taxonomy_node")
+    .select("listing_id")
+    .in("taxonomy_node_id", nodeIds);
+  if (linkErr) return [];
+
+  return Array.from(new Set((links ?? []).map((r: { listing_id: string }) => r.listing_id)));
+}
+
+/**
+ * Get listing IDs matching a taxonomy slug path, including unmapped listings via legacy columns.
+ * Ensures backward compat: listings without taxonomy_node_id still appear if their legacy text
+ * columns match the selected taxonomy node's legacy_* columns.
+ */
+async function getListingIdsByTaxonomyWithLegacy(
+  domain: "product" | "project",
+  taxonomySlugPath: string
+): Promise<string[]> {
+  // 1. Get new-system IDs (via listing_taxonomy_node junction)
+  const newIds = await getListingIdsByTaxonomy(domain, taxonomySlugPath);
+
+  // 2. Get the taxonomy node + descendants, extract legacy columns
+  const { data: descendants } = await supabase()
+    .from("taxonomy_nodes")
+    .select("legacy_product_type, legacy_product_category, legacy_product_subcategory, legacy_project_category")
+    .eq("domain", domain)
+    .eq("is_active", true)
+    .or(`slug_path.eq.${taxonomySlugPath},slug_path.like.${taxonomySlugPath}/%`);
+  if (!descendants?.length) return newIds;
+
+  // 3. Query unmapped listings (taxonomy_node_id IS NULL) matching legacy columns
+  const sup = supabase();
+  const legacyIds = new Set<string>();
+
+  if (domain === "project") {
+    const legacyCategories = Array.from(
+      new Set(
+        (descendants as { legacy_project_category: string | null }[])
+          .map((d) => d.legacy_project_category)
+          .filter(Boolean) as string[]
+      )
+    );
+    if (legacyCategories.length > 0) {
+      const { data } = await sup
+        .from("listings")
+        .select("id")
+        .eq("type", "project")
+        .eq("status", "APPROVED")
+        .is("deleted_at", null)
+        .is("taxonomy_node_id", null)
+        .in("category", legacyCategories)
+        .limit(2000);
+      for (const r of data ?? []) legacyIds.add((r as { id: string }).id);
+    }
+  } else {
+    // Products: match by legacy_product_type (and optionally category/subcategory)
+    const legacyTypes = Array.from(
+      new Set(
+        (descendants as { legacy_product_type: string | null }[])
+          .map((d) => d.legacy_product_type)
+          .filter(Boolean) as string[]
+      )
+    );
+    if (legacyTypes.length > 0) {
+      const { data } = await sup
+        .from("listings")
+        .select("id")
+        .eq("type", "product")
+        .eq("status", "APPROVED")
+        .is("deleted_at", null)
+        .is("taxonomy_node_id", null)
+        .in("product_type", legacyTypes)
+        .limit(2000);
+      for (const r of data ?? []) legacyIds.add((r as { id: string }).id);
+    }
+  }
+
+  return Array.from(new Set([...newIds, ...legacyIds]));
+}
+
+/**
+ * Get listing IDs that match material taxonomy node slug paths.
+ * Resolves slug_paths → node IDs (with descendants) → listing IDs via listing_taxonomy_node.
+ */
+async function getListingIdsByMaterialTaxonomy(
+  materialSlugPaths: string[]
+): Promise<string[]> {
+  if (materialSlugPaths.length === 0) return [];
+
+  const sup = supabase();
+  const allNodeIds: string[] = [];
+
+  for (const slugPath of materialSlugPaths) {
+    const { data: nodes } = await sup
+      .from("taxonomy_nodes")
+      .select("id")
+      .eq("domain", "material")
+      .eq("is_active", true)
+      .or(`slug_path.eq.${slugPath},slug_path.like.${slugPath}/%`);
+    if (nodes) allNodeIds.push(...(nodes as { id: string }[]).map((n) => n.id));
+  }
+  if (allNodeIds.length === 0) return [];
+
+  const { data: links } = await sup
+    .from("listing_taxonomy_node")
+    .select("listing_id")
+    .in("taxonomy_node_id", allNodeIds);
+
+  return Array.from(new Set((links ?? []).map((r: { listing_id: string }) => r.listing_id)));
+}
+
+/**
+ * Get listing IDs that match facet filters.
+ * OR within a facet group (any value), AND across groups (all facets must match).
+ */
+async function getListingIdsByFacets(
+  facetFilters: Record<string, string[]>
+): Promise<string[]> {
+  const entries = Object.entries(facetFilters).filter(([, vals]) => vals.length > 0);
+  if (entries.length === 0) return [];
+
+  const sup = supabase();
+  let constrainedIds: string[] | null = null;
+
+  for (const [facetSlug, valueSlugs] of entries) {
+    // Get facet ID
+    const { data: facetRow } = await sup
+      .from("facets")
+      .select("id")
+      .eq("slug", facetSlug)
+      .maybeSingle();
+    if (!facetRow) continue;
+
+    // Get facet_value IDs matching the selected value slugs
+    const { data: values } = await sup
+      .from("facet_values")
+      .select("id")
+      .eq("facet_id", (facetRow as { id: string }).id)
+      .in("slug", valueSlugs);
+    if (!values?.length) return []; // No valid values = impossible match
+
+    const valueIds = (values as { id: string }[]).map((v) => v.id);
+
+    // OR within group: listing has at least one of these values
+    const { data: links } = await sup
+      .from("listing_facets")
+      .select("listing_id")
+      .in("facet_value_id", valueIds);
+
+    const ids = Array.from(new Set((links ?? []).map((r: { listing_id: string }) => r.listing_id)));
+
+    // AND across groups
+    if (constrainedIds === null) {
+      constrainedIds = ids;
+    } else {
+      constrainedIds = constrainedIds.filter((id) => ids.includes(id));
+    }
+    if (constrainedIds.length === 0) return [];
+  }
+
+  return constrainedIds ?? [];
+}
+
 /** Fetch project listing rows with filters, sort, limit, offset. Returns rows and total count. */
 async function getProjectListingRowsFiltered(
   filters: ProjectFilters,
@@ -336,6 +536,36 @@ async function getProjectListingRowsFiltered(
     if (projectIdConstraint.length === 0) return { rows: [], total: 0 };
   }
 
+  // Taxonomy filter (DB-backed system with legacy fallback)
+  if (filters.taxonomy?.trim()) {
+    const taxonomyIds = await getListingIdsByTaxonomyWithLegacy("project", filters.taxonomy.trim());
+    if (taxonomyIds.length === 0) return { rows: [], total: 0 };
+    projectIdConstraint = projectIdConstraint
+      ? projectIdConstraint.filter((id) => taxonomyIds.includes(id))
+      : taxonomyIds;
+    if (projectIdConstraint.length === 0) return { rows: [], total: 0 };
+  }
+
+  // Material taxonomy filter
+  if (filters.taxonomy_materials.length > 0) {
+    const matTaxIds = await getListingIdsByMaterialTaxonomy(filters.taxonomy_materials);
+    if (matTaxIds.length === 0) return { rows: [], total: 0 };
+    projectIdConstraint = projectIdConstraint
+      ? projectIdConstraint.filter((id) => matTaxIds.includes(id))
+      : matTaxIds;
+    if (projectIdConstraint.length === 0) return { rows: [], total: 0 };
+  }
+
+  // Facet filters
+  if (Object.keys(filters.facets).length > 0) {
+    const facetIds = await getListingIdsByFacets(filters.facets);
+    if (facetIds.length === 0) return { rows: [], total: 0 };
+    projectIdConstraint = projectIdConstraint
+      ? projectIdConstraint.filter((id) => facetIds.includes(id))
+      : facetIds;
+    if (projectIdConstraint.length === 0) return { rows: [], total: 0 };
+  }
+
   let query = supabase()
     .from("listings")
     .select(projectListingSelect, { count: "exact" })
@@ -349,7 +579,8 @@ async function getProjectListingRowsFiltered(
   if (filters.designers && filters.designers.length > 0) {
     query = query.in("owner_clerk_user_id", filters.designers);
   }
-  if (filters.category.length > 0) {
+  // Legacy category filter (only when no taxonomy filter is active)
+  if (!filters.taxonomy?.trim() && filters.category.length > 0) {
     query = query.in("category", filters.category);
   }
   if (filters.year != null) {
@@ -425,6 +656,36 @@ async function getProductRowsFiltered(
     if (productIdConstraint.length === 0) return { rows: [], total: 0 };
   }
 
+  // Taxonomy filter (DB-backed system with legacy fallback)
+  if (filters.taxonomy?.trim()) {
+    const taxonomyIds = await getListingIdsByTaxonomyWithLegacy("product", filters.taxonomy.trim());
+    if (taxonomyIds.length === 0) return { rows: [], total: 0 };
+    productIdConstraint = productIdConstraint
+      ? productIdConstraint.filter((id) => taxonomyIds.includes(id))
+      : taxonomyIds;
+    if (productIdConstraint.length === 0) return { rows: [], total: 0 };
+  }
+
+  // Material taxonomy filter
+  if (filters.taxonomy_materials.length > 0) {
+    const matTaxIds = await getListingIdsByMaterialTaxonomy(filters.taxonomy_materials);
+    if (matTaxIds.length === 0) return { rows: [], total: 0 };
+    productIdConstraint = productIdConstraint
+      ? productIdConstraint.filter((id) => matTaxIds.includes(id))
+      : matTaxIds;
+    if (productIdConstraint.length === 0) return { rows: [], total: 0 };
+  }
+
+  // Facet filters
+  if (Object.keys(filters.facets).length > 0) {
+    const facetIds = await getListingIdsByFacets(filters.facets);
+    if (facetIds.length === 0) return { rows: [], total: 0 };
+    productIdConstraint = productIdConstraint
+      ? productIdConstraint.filter((id) => facetIds.includes(id))
+      : facetIds;
+    if (productIdConstraint.length === 0) return { rows: [], total: 0 };
+  }
+
   let query = supabase()
     .from("listings")
     .select(productListingSelect, { count: "exact" })
@@ -436,17 +697,21 @@ async function getProductRowsFiltered(
     query = query.in("id", productIdConstraint);
   }
 
-  if (filters.category.length > 0) {
+  // Legacy category filter (only when no taxonomy filter is active)
+  if (!filters.taxonomy?.trim() && filters.category.length > 0) {
     query = query.in("category", filters.category);
   }
-  if (filters.product_type?.trim()) {
-    query = query.eq("product_type", filters.product_type.trim());
-  }
-  if (filters.product_category?.trim()) {
-    query = query.eq("product_category", filters.product_category.trim());
-  }
-  if (filters.product_subcategory?.trim()) {
-    query = query.eq("product_subcategory", filters.product_subcategory.trim());
+  // Legacy product taxonomy filters (only when no taxonomy filter is active)
+  if (!filters.taxonomy?.trim()) {
+    if (filters.product_type?.trim()) {
+      query = query.eq("product_type", filters.product_type.trim());
+    }
+    if (filters.product_category?.trim()) {
+      query = query.eq("product_category", filters.product_category.trim());
+    }
+    if (filters.product_subcategory?.trim()) {
+      query = query.eq("product_subcategory", filters.product_subcategory.trim());
+    }
   }
   if (filters.year != null) {
     query = query.eq("year", filters.year);

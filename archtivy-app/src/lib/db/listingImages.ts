@@ -27,6 +27,8 @@ export interface ListingImage {
   listing_id: string;
   image_url: string;
   alt: string | null;
+  title: string | null;
+  caption: string | null;
   sort_order: number;
   created_at: string;
 }
@@ -97,7 +99,7 @@ export async function getImages(
 ): Promise<DbResult<ListingImage[]>> {
   const { data, error } = await supa()
     .from(TABLE)
-    .select("id, listing_id, image_url, alt, sort_order, created_at")
+    .select("id, listing_id, image_url, alt, title, caption, sort_order, created_at")
     .eq("listing_id", listingId)
     .order("sort_order", { ascending: true });
 
@@ -148,12 +150,12 @@ export async function getListingImagesWithIds(
   listingId: string
 ): Promise<
   DbResult<
-    { id: string; listing_id: string; image_url: string; alt: string | null; sort_order: number }[]
+    { id: string; listing_id: string; image_url: string; alt: string | null; title: string | null; caption: string | null; sort_order: number }[]
   >
 > {
   const { data, error } = await supa()
     .from(TABLE)
-    .select("id, listing_id, image_url, alt, sort_order")
+    .select("id, listing_id, image_url, alt, title, caption, sort_order")
     .eq("listing_id", listingId)
     .order("sort_order", { ascending: true });
 

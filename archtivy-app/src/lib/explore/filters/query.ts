@@ -9,6 +9,7 @@ import type { ProjectAreaBucket } from "@/lib/exploreFilters";
 
 /**
  * Build URLSearchParams from ExploreFilters (only non-empty values).
+ * NOTE: `taxonomy` is NOT serialized here — it lives in the route path.
  */
 export function filtersToQueryString(filters: ExploreFilters, type: ExploreType): URLSearchParams {
   const p = new URLSearchParams();
@@ -22,16 +23,31 @@ export function filtersToQueryString(filters: ExploreFilters, type: ExploreType)
   if (filters.year_min != null) p.set("year_min", String(filters.year_min));
   if (filters.year_max != null) p.set("year_max", String(filters.year_max));
   if (filters.materials.length) p.set("materials", filters.materials.join(","));
+  if (filters.taxonomy_materials.length) p.set("taxonomy_materials", filters.taxonomy_materials.join(","));
   if (filters.material_type.length) p.set("material_type", filters.material_type.join(","));
   if (filters.area_bucket) p.set("area_bucket", filters.area_bucket);
   if (filters.color.length) p.set("color", filters.color.join(","));
   if (filters.sort && filters.sort !== "newest") p.set("sort", filters.sort);
-  if (type === "products") {
-    if (filters.product_type?.trim()) p.set("type", filters.product_type.trim());
-    if (filters.product_category?.trim()) p.set("product_category", filters.product_category.trim());
-    if (filters.product_subcategory?.trim()) p.set("sub", filters.product_subcategory.trim());
+  // Serialize each facet group as individual query param
+  for (const [facetSlug, values] of Object.entries(filters.facets)) {
+    if (values.length > 0) p.set(facetSlug, values.join(","));
   }
   return p;
+}
+
+/**
+ * Build a full explore URL with taxonomy in the route path and filters as query params.
+ */
+export function buildExploreUrl(
+  type: ExploreType,
+  taxonomy: string | null,
+  filters: ExploreFilters
+): string {
+  const base = type === "products" ? "/explore/products" : "/explore/projects";
+  const path = taxonomy ? `${base}/${taxonomy}` : base;
+  const qs = filtersToQueryString(filters, type);
+  const search = qs.toString();
+  return search ? `${path}?${search}` : path;
 }
 
 /**
@@ -40,19 +56,20 @@ export function filtersToQueryString(filters: ExploreFilters, type: ExploreType)
 export function countActiveFilters(filters: ExploreFilters, type: ExploreType): number {
   let n = 0;
   if (filters.q?.trim()) n += 1;
+  if (filters.taxonomy) n += 1;
   if (filters.category.length) n += filters.category.length;
   if (filters.city || filters.country) n += 1;
   if (filters.designers.length && type === "projects") n += filters.designers.length;
   if (filters.brands.length) n += filters.brands.length;
   if (filters.year != null || filters.year_min != null || filters.year_max != null) n += 1;
   if (filters.materials.length) n += filters.materials.length;
+  if (filters.taxonomy_materials.length) n += filters.taxonomy_materials.length;
   if (filters.material_type.length && type === "products") n += filters.material_type.length;
   if (filters.area_bucket && type === "projects") n += 1;
   if (filters.color.length && type === "products") n += filters.color.length;
-  if (type === "products") {
-    if (filters.product_type?.trim()) n += 1;
-    if (filters.product_category?.trim()) n += 1;
-    if (filters.product_subcategory?.trim()) n += 1;
+  // Count individual facet values
+  for (const values of Object.values(filters.facets)) {
+    n += values.length;
   }
   return n;
 }
@@ -68,6 +85,7 @@ export function exploreFiltersToProjectFilters(f: ExploreFilters): ProjectFilter
   return {
     q: f.q?.trim() || undefined,
     category: f.category,
+    taxonomy: f.taxonomy || undefined,
     year: f.year,
     year_min: f.year_min,
     year_max: f.year_max,
@@ -75,8 +93,10 @@ export function exploreFiltersToProjectFilters(f: ExploreFilters): ProjectFilter
     city: f.city,
     area_bucket,
     materials: f.materials,
+    taxonomy_materials: f.taxonomy_materials,
     designers: f.designers.length ? f.designers : undefined,
     brands: f.brands.length ? f.brands : undefined,
+    facets: f.facets,
   };
 }
 
@@ -87,6 +107,7 @@ export function exploreFiltersToProductFilters(f: ExploreFilters): ProductFilter
   return {
     q: f.q?.trim() || undefined,
     category: f.category,
+    taxonomy: f.taxonomy || undefined,
     year: f.year,
     year_min: f.year_min,
     year_max: f.year_max,
@@ -94,8 +115,10 @@ export function exploreFiltersToProductFilters(f: ExploreFilters): ProductFilter
     color: f.color,
     brand: f.brands.length > 0 ? f.brands[0] : null,
     materials: f.materials,
+    taxonomy_materials: f.taxonomy_materials,
     product_type: f.product_type?.trim() || null,
     product_category: f.product_category?.trim() || null,
     product_subcategory: f.product_subcategory?.trim() || null,
+    facets: f.facets,
   };
 }
