@@ -800,33 +800,8 @@ export async function updateProjectAction(
     return { error: err instanceof Error ? err.message : "Failed to save team members." };
   }
 
-  const imageFiles = getImageFiles(formData);
-  if (imageFiles.length > 0 && imageFiles.length < MIN_GALLERY_IMAGES) {
-    return { error: `Upload at least ${MIN_GALLERY_IMAGES} images to replace the gallery, or leave the uploader empty to keep the existing images.` };
-  }
-  if (imageFiles.length >= MIN_GALLERY_IMAGES) {
-    await supabase.from("listing_images").delete().eq("listing_id", listingId);
-    const uploadResult = await uploadGalleryImagesServer(listingId, imageFiles);
-    if (uploadResult.error || !uploadResult.data?.length) {
-      return { error: uploadResult.error ?? "Image upload failed." };
-    }
-    const imageRows = uploadResult.data.map((image_url, i) => ({
-      listing_id: listingId,
-      image_url,
-      alt: null as string | null,
-      sort_order: i,
-    }));
-    const { error: imgErr } = await supabase.from("listing_images").insert(imageRows);
-    if (imgErr) return { error: `Failed to save gallery: ${imgErr.message}` };
-    const coverImageUrl = uploadResult.data[0];
-    await supabase.from("listings").update({ cover_image_url: coverImageUrl }).eq("id", listingId);
-    try {
-      await processProjectImages(listingId);
-      await computeAndUpsertMatchesForProject(listingId);
-    } catch {
-      // non-fatal
-    }
-  }
+  // Gallery images are managed separately via EditorialImageManager (media.ts actions).
+  // No image upload/replace logic here.
 
   const docFiles = getDocumentFiles(formData);
   if (docFiles.length > 0) {
@@ -930,32 +905,8 @@ export async function updateProductAction(
     return { error: err instanceof Error ? err.message : "Failed to save team members." };
   }
 
-  const imageFiles = getImageFiles(formData);
-  if (imageFiles.length > 0 && imageFiles.length < MIN_GALLERY_IMAGES) {
-    return { error: `Upload at least ${MIN_GALLERY_IMAGES} images to replace the gallery, or leave the uploader empty to keep the existing images.` };
-  }
-  if (imageFiles.length >= MIN_GALLERY_IMAGES) {
-    await supabase.from("listing_images").delete().eq("listing_id", listingId);
-    const uploadResult = await uploadGalleryImagesServer(listingId, imageFiles);
-    if (uploadResult.error || !uploadResult.data?.length) {
-      return { error: uploadResult.error ?? "Image upload failed." };
-    }
-    const imageRows = uploadResult.data.map((image_url, i) => ({
-      listing_id: listingId,
-      image_url,
-      alt: null as string | null,
-      sort_order: i,
-    }));
-    const { error: imgErr } = await supabase.from("listing_images").insert(imageRows);
-    if (imgErr) return { error: `Failed to save gallery: ${imgErr.message}` };
-    await supabase.from("listings").update({ cover_image_url: uploadResult.data[0] }).eq("id", listingId);
-    try {
-      await processProductImages(listingId);
-      await computeAndUpsertAllMatches();
-    } catch {
-      // non-fatal
-    }
-  }
+  // Gallery images are managed separately via EditorialImageManager (media.ts actions).
+  // No image upload/replace logic here.
 
   const docFiles = getDocumentFiles(formData);
   if (docFiles.length > 0) {

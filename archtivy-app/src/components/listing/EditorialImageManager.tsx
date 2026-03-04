@@ -1,9 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { updateImageAltForProject } from "@/app/(admin)/admin/_actions/media";
+import {
+  uploadListingImages,
+  deleteListingImage,
+  reorderListingImages,
+  setPrimaryListingImage,
+  updateImageAltForListing,
+} from "@/app/(admin)/admin/_actions/media";
 import { updateTag, deleteTag, getSuggestedProductsForWorkstation } from "@/app/actions/smartProductTagging";
 import type { WorkstationSuggestedProduct } from "@/app/actions/smartProductTagging";
 import { addPhotoProductTagAction } from "@/app/actions/projectBrandsProducts";
@@ -13,6 +19,7 @@ import {
   getCategoriesForType,
   getSubcategoriesForCategory,
 } from "@/lib/taxonomy/productTaxonomy";
+import { UploadBox } from "@/components/add/UploadBox";
 
 const ACCENT = "#002abf";
 const PULSE_THRESHOLD = 0.08;
@@ -74,7 +81,7 @@ export function EditorialImageManager({
   materialOptions,
 }: EditorialImageManagerProps) {
   const router = useRouter();
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(0);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(images.length > 0 ? 0 : null);
   const [altDraft, setAltDraft] = useState("");
   const [imageTitleDraft, setImageTitleDraft] = useState("");
   const [captionDraft, setCaptionDraft] = useState("");
@@ -87,10 +94,15 @@ export function EditorialImageManager({
   const tagSaveStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
 
-  const selectedImage = selectedIndex !== null ? images[selectedIndex] : null;
+  // Gallery management transitions
+  const [uploadPending, startUploadTransition] = useTransition();
+  const [deletePending, startDeleteTransition] = useTransition();
+  const [reorderPending, startReorderTransition] = useTransition();
+  const [primaryPending, startPrimaryTransition] = useTransition();
+
+  const selectedImage = selectedIndex !== null && selectedIndex < images.length ? images[selectedIndex] : null;
 
   const [selectedTagIdForEdit, setSelectedTagIdForEdit] = useState<string | null>(null);
-  /** Optimistic tags per image (keyed by listingImageId); merged with server existingTags for display. */
   const [optimisticTagsByImageId, setOptimisticTagsByImageId] = useState<Record<string, EditorialProductTag[]>>({});
 
   const tagsForSelectedImage = useMemo(() => {
@@ -137,14 +149,86 @@ export function EditorialImageManager({
     });
   }, [selectedImage?.listingImageId, existingTagIds]);
 
+  // ─── Gallery management handlers ──────────────────────────────────────────
+
+  const handleUploadFiles = useCallback(
+    (files: File[]) => {
+      const imageFiles = files.filter((f) => f.type.startsWith("image/") && f.size > 0);
+      if (imageFiles.length === 0) return;
+      startUploadTransition(async () => {
+        const fd = new FormData();
+        fd.set("listingId", listingId);
+        for (const f of imageFiles) fd.append("files", f);
+        const res = await uploadListingImages(fd);
+        if (!res.ok) {
+          setSaveError(res.error ?? "Upload failed");
+        }
+        router.refresh();
+      });
+    },
+    [listingId, router]
+  );
+
+  const handleDeleteImage = useCallback(
+    (imageId: string) => {
+      if (!confirm("Delete this image? This cannot be undone.")) return;
+      startDeleteTransition(async () => {
+        const res = await deleteListingImage(imageId, listingId);
+        if (!res.ok) {
+          setSaveError(res.error ?? "Delete failed");
+        } else {
+          // Adjust selected index
+          if (selectedIndex !== null) {
+            const delIdx = images.findIndex((img) => img.listingImageId === imageId);
+            if (delIdx !== -1 && delIdx <= selectedIndex) {
+              setSelectedIndex(Math.max(0, selectedIndex - 1));
+            }
+          }
+        }
+        router.refresh();
+      });
+    },
+    [listingId, selectedIndex, images, router]
+  );
+
+  const handleMoveImage = useCallback(
+    (direction: "left" | "right") => {
+      if (selectedIndex === null) return;
+      const newIdx = direction === "left" ? selectedIndex - 1 : selectedIndex + 1;
+      if (newIdx < 0 || newIdx >= images.length) return;
+      const ids = images.map((img) => img.listingImageId);
+      [ids[selectedIndex], ids[newIdx]] = [ids[newIdx], ids[selectedIndex]];
+      startReorderTransition(async () => {
+        const res = await reorderListingImages(listingId, ids);
+        if (!res.ok) setSaveError(res.error ?? "Reorder failed");
+        setSelectedIndex(newIdx);
+        router.refresh();
+      });
+    },
+    [selectedIndex, images, listingId, router]
+  );
+
+  const handleSetPrimary = useCallback(() => {
+    if (selectedIndex === null || selectedIndex === 0) return;
+    const imageId = images[selectedIndex].listingImageId;
+    startPrimaryTransition(async () => {
+      const res = await setPrimaryListingImage(listingId, imageId);
+      if (!res.ok) setSaveError(res.error ?? "Set primary failed");
+      setSelectedIndex(0);
+      router.refresh();
+    });
+  }, [selectedIndex, images, listingId, router]);
+
+  // ─── Save alt text ────────────────────────────────────────────────────────
+
   const handleSaveChanges = useCallback(async () => {
     if (!selectedImage) return;
     setSaving(true);
     setSaveError(null);
-    const res = await updateImageAltForProject({
+    const res = await updateImageAltForListing({
       imageId: selectedImage.listingImageId,
       alt: altDraft.trim() || null,
-      projectId: listingId,
+      listingId,
     });
     setSaving(false);
     if (!res.ok) setSaveError(res.error ?? "Failed to save");
@@ -177,15 +261,6 @@ export function EditorialImageManager({
       const relY = (e.clientY - rect.top) / rect.height;
       const clampedX = Math.max(0, Math.min(1, relX));
       const clampedY = Math.max(0, Math.min(1, relY));
-      console.log("[EditorialImageManager] onLargeImageClick", {
-        boundingRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-        clientX: e.clientX,
-        clientY: e.clientY,
-        relX,
-        relY,
-        clampedX,
-        clampedY,
-      });
       setLastClickXY({ x: clampedX, y: clampedY });
       const nearest = findNearestTag(tagsForSelectedImage, clampedX, clampedY);
       if (nearest) {
@@ -199,19 +274,40 @@ export function EditorialImageManager({
     [selectedImage, tagsForSelectedImage]
   );
 
-  useEffect(() => {
-    if (lastClickXY !== null) {
-      console.log("[EditorialImageManager] lastClickXY (after click)", lastClickXY);
-    }
-  }, [lastClickXY]);
+  const anyPending = uploadPending || deletePending || reorderPending || primaryPending;
+
+  // ─── Empty state ──────────────────────────────────────────────────────────
 
   if (images.length === 0) {
     return (
       <section className="border-t border-zinc-100 pt-16">
-        <p className="text-center text-zinc-500 text-sm">Add images to this project to use the Editorial Image Manager.</p>
+        <header className="text-center mb-8">
+          <h2
+            className="text-[2rem] font-normal tracking-tight text-zinc-900 mb-1"
+            style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+          >
+            ARCHTIVY
+          </h2>
+          <p className="text-xs text-zinc-500 uppercase tracking-widest">Editorial Image Manager</p>
+        </header>
+        <div className="max-w-md mx-auto">
+          <UploadBox
+            id="gallery-upload-empty"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            primaryText="Add images to get started"
+            hintText="Minimum 3 for publishing · JPEG, PNG, WebP or GIF · max 5MB each"
+            onFilesSelected={handleUploadFiles}
+            disabled={uploadPending}
+          />
+          {uploadPending && (
+            <p className="text-center text-sm text-zinc-500 mt-3">Uploading...</p>
+          )}
+        </div>
       </section>
     );
   }
+
+  // ─── Main render ──────────────────────────────────────────────────────────
 
   return (
     <section className="border-t border-zinc-100 pt-16 pb-24">
@@ -226,9 +322,9 @@ export function EditorialImageManager({
         <p className="text-xs text-zinc-500 uppercase tracking-widest">Editorial Image Manager</p>
       </header>
 
-      {selectedIndex !== null && (
+      {selectedIndex !== null && selectedImage && (
         <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-8">
-          {/* LEFT: big image + thumb strip */}
+          {/* LEFT: big image + upload + thumb strip */}
           <div className="flex-1 min-w-0">
             <div
               className="relative rounded-[10px] overflow-hidden bg-zinc-100 shadow-md"
@@ -266,33 +362,58 @@ export function EditorialImageManager({
                 )}
               </div>
             </div>
+
+            {/* Upload zone (compact) */}
+            <div className="mt-4">
+              <UploadBox
+                id="gallery-upload-add"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                primaryText={uploadPending ? "Uploading..." : "Add more images"}
+                hintText="JPEG, PNG, WebP or GIF · max 5MB each"
+                onFilesSelected={handleUploadFiles}
+                disabled={uploadPending}
+              />
+            </div>
+
+            {/* Thumbnail strip */}
             <div className="mt-3 flex gap-2 overflow-x-auto pb-1" style={{ minHeight: 80 }}>
               {images.map((img, idx) => (
-                <button
-                  key={img.listingImageId}
-                  type="button"
-                  onClick={() => setSelectedIndex(idx)}
-                  className={`relative shrink-0 w-20 h-[80px] rounded overflow-hidden bg-zinc-100 flex items-center justify-center focus:outline-none ${
-                    selectedIndex === idx ? "ring-1 ring-[#002abf]" : ""
-                  }`}
-                >
-                  <Image
-                    src={img.imageUrl}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    sizes="80px"
-                    unoptimized={img.imageUrl.startsWith("http")}
-                  />
-                  {idx === 0 && (
-                    <span
-                      className="absolute top-0.5 left-0.5 px-1.5 py-0.5 text-[9px] font-medium uppercase text-white rounded"
-                      style={{ backgroundColor: ACCENT }}
-                    >
-                      Primary
-                    </span>
-                  )}
-                </button>
+                <div key={img.listingImageId} className="group relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIndex(idx)}
+                    className={`relative w-20 h-[80px] rounded overflow-hidden bg-zinc-100 flex items-center justify-center focus:outline-none ${
+                      selectedIndex === idx ? "ring-1 ring-[#002abf]" : ""
+                    }`}
+                  >
+                    <Image
+                      src={img.imageUrl}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      sizes="80px"
+                      unoptimized={img.imageUrl.startsWith("http")}
+                    />
+                    {idx === 0 && (
+                      <span
+                        className="absolute top-0.5 left-0.5 px-1.5 py-0.5 text-[9px] font-medium uppercase text-white rounded"
+                        style={{ backgroundColor: ACCENT }}
+                      >
+                        Primary
+                      </span>
+                    )}
+                  </button>
+                  {/* Delete overlay */}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteImage(img.listingImageId)}
+                    disabled={deletePending}
+                    className="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-xs hover:bg-red-600 shadow-sm"
+                    aria-label="Delete image"
+                  >
+                    &times;
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -300,6 +421,56 @@ export function EditorialImageManager({
           {/* RIGHT: sticky panel */}
           <div className="w-full lg:w-[400px] shrink-0">
             <div className="lg:sticky lg:top-4 space-y-6">
+              {/* Gallery controls */}
+              <div className="rounded-lg border border-zinc-100 bg-white p-4">
+                <h3
+                  className="text-sm font-medium text-zinc-900 border-b border-zinc-100 pb-2 mb-3"
+                  style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+                >
+                  Gallery
+                </h3>
+                <div className="flex items-center gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => handleMoveImage("left")}
+                    disabled={selectedIndex === 0 || reorderPending}
+                    className="flex-1 px-3 py-2 text-sm font-medium border border-zinc-200 rounded hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {reorderPending ? "..." : "Move left"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMoveImage("right")}
+                    disabled={selectedIndex === images.length - 1 || reorderPending}
+                    className="flex-1 px-3 py-2 text-sm font-medium border border-zinc-200 rounded hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {reorderPending ? "..." : "Move right"}
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSetPrimary}
+                    disabled={selectedIndex === 0 || primaryPending}
+                    className="flex-1 px-3 py-2 text-sm font-medium text-white rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: ACCENT }}
+                  >
+                    {primaryPending ? "..." : "Set as cover"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectedImage && handleDeleteImage(selectedImage.listingImageId)}
+                    disabled={deletePending}
+                    className="flex-1 px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {deletePending ? "..." : "Delete image"}
+                  </button>
+                </div>
+                <p className={`mt-3 text-xs ${images.length < 3 ? "text-amber-600" : "text-zinc-500"}`}>
+                  {images.length} image{images.length !== 1 ? "s" : ""}{images.length < 3 ? " — minimum 3 for publishing" : ""}
+                </p>
+              </div>
+
               {/* SEO */}
               <div className="rounded-lg border border-zinc-100 bg-white p-4">
                 <h3
@@ -346,7 +517,7 @@ export function EditorialImageManager({
 
               {/* Status */}
               <p className="text-xs text-zinc-500">
-                {tagSaveStatus === "saving" && "Saving…"}
+                {tagSaveStatus === "saving" && "Saving\u2026"}
                 {tagSaveStatus === "saved" && "Saved"}
                 {tagSaveStatus === "idle" && saveError && <span className="text-red-600">{saveError}</span>}
               </p>
@@ -382,16 +553,16 @@ export function EditorialImageManager({
               <button
                 type="button"
                 onClick={handleSaveChanges}
-                disabled={saving}
+                disabled={saving || anyPending}
                 className="px-5 py-2.5 text-sm font-medium text-white rounded opacity-100 disabled:opacity-60"
                 style={{ backgroundColor: ACCENT }}
               >
-                {saving ? "Saving…" : "Save changes"}
+                {saving ? "Saving\u2026" : "Save changes"}
               </button>
               <button
                 type="button"
                 onClick={handleSaveAndContinue}
-                disabled={saving}
+                disabled={saving || anyPending}
                 className="px-5 py-2.5 text-sm font-medium text-zinc-600 border border-zinc-200 rounded hover:bg-zinc-50 disabled:opacity-60"
               >
                 Save & continue
@@ -483,12 +654,6 @@ function TaggingWorkstation({
     const y = lastClickXY?.y ?? 0.5;
     const listingImageId = selectedImage.listingImageId;
     const productListingId = selectedCandidate.listing_id ?? selectedCandidate.id;
-    console.log("[AddTag] payload", {
-      listingImageId,
-      selectedCandidateProduct: selectedCandidate,
-      productListingId,
-      lastClickXY: lastClickXY ?? { x, y },
-    });
     setAddTagError(null);
     setAddingTag(true);
     onTagSaveStatus("saving");
@@ -500,10 +665,8 @@ function TaggingWorkstation({
       onTagSaveStatus("idle");
       const msg = err instanceof Error ? err.message : "Add tag failed";
       setAddTagError(msg);
-      console.log("[AddTag] result (throw)", err);
       return;
     }
-    console.log("[AddTag] result", res);
     setAddingTag(false);
     if (res.error) {
       onTagSaveStatus("idle");
@@ -650,7 +813,7 @@ function TaggingWorkstation({
       {/* Suggested: Best match + All results */}
       <div className="space-y-3" ref={suggestionsListRef} tabIndex={-1} aria-label="Suggested products list">
         <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Suggested products</h4>
-        {suggestionsLoading && <p className="text-sm text-zinc-500">Loading…</p>}
+        {suggestionsLoading && <p className="text-sm text-zinc-500">Loading\u2026</p>}
         {!suggestionsLoading && (
           <>
             {suggestions.bestMatch.length > 0 && (
@@ -709,7 +872,7 @@ function TaggingWorkstation({
               className="px-3 py-2 text-sm font-medium text-white rounded opacity-100 disabled:opacity-60"
               style={{ backgroundColor: ACCENT }}
             >
-              {addingTag ? "Adding…" : "Add tag"}
+              {addingTag ? "Adding\u2026" : "Add tag"}
             </button>
             <button
               type="button"
@@ -805,7 +968,7 @@ function SuggestedProductCard({
         {product.cover_image_url ? (
           <Image src={product.cover_image_url} alt="" fill className="object-cover" sizes="48px" unoptimized={product.cover_image_url.startsWith("http")} />
         ) : (
-          <span className="flex h-full w-full items-center justify-center text-xs text-zinc-400">—</span>
+          <span className="flex h-full w-full items-center justify-center text-xs text-zinc-400">&mdash;</span>
         )}
       </div>
       <div className="min-w-0 flex-1">
@@ -901,8 +1064,8 @@ function ExistingTagEditPanel({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-zinc-900 truncate">{tag.product_title ?? "—"}</p>
-          <p className="text-xs text-zinc-500 truncate">{materialLabel || tag.color_text || "—"}</p>
+          <p className="font-medium text-zinc-900 truncate">{tag.product_title ?? "\u2014"}</p>
+          <p className="text-xs text-zinc-500 truncate">{materialLabel || tag.color_text || "\u2014"}</p>
           <div className="mt-2 space-y-1.5">
             <input
               type="text"
@@ -937,7 +1100,7 @@ function ExistingTagEditPanel({
           </div>
         </div>
         <button type="button" onClick={handleRemove} disabled={removing} className="text-xs text-zinc-400 hover:text-red-600 shrink-0">
-          {removing ? "…" : "Remove"}
+          {removing ? "\u2026" : "Remove"}
         </button>
       </div>
     </div>

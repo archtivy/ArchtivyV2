@@ -163,6 +163,41 @@ export async function getListingImagesWithIds(
 }
 
 /**
+ * Append images to a listing, starting sort_order AFTER the current maximum.
+ * Returns inserted rows with id, image_url, sort_order.
+ */
+export async function appendImages(
+  listingId: string,
+  uploadedUrls: string[]
+): Promise<DbResult<{ id: string; image_url: string; sort_order: number }[]>> {
+  if (uploadedUrls.length === 0) {
+    return { data: [], error: null };
+  }
+  // Find current max sort_order
+  const { data: existing, error: fetchErr } = await supa()
+    .from(TABLE)
+    .select("sort_order")
+    .eq("listing_id", listingId)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  if (fetchErr) return { data: null, error: fetchErr.message };
+  const maxSort = existing && existing.length > 0 ? (existing[0] as { sort_order: number }).sort_order : -1;
+
+  const rows = uploadedUrls.map((image_url, i) => ({
+    listing_id: listingId,
+    image_url,
+    alt: null as string | null,
+    sort_order: maxSort + 1 + i,
+  }));
+  const { data, error } = await supa()
+    .from(TABLE)
+    .insert(rows)
+    .select("id, image_url, sort_order");
+  if (error) return { data: null, error: error.message };
+  return { data: (data ?? []) as { id: string; image_url: string; sort_order: number }[], error: null };
+}
+
+/**
  * Delete a single listing image by id.
  */
 export async function deleteImage(

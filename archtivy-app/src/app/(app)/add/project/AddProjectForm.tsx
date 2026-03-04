@@ -259,13 +259,14 @@ export function AddProjectForm({
       <AddListingLayout
         sidebar={
           <>
-            <GalleryUploadCard
-              files={imageFiles}
-              onChange={setImageFiles}
-              minCount={MIN_GALLERY}
-              inputName=""
-              existingCount={initialData?.existingImageCount ?? 0}
-            />
+            {!initialData && (
+              <GalleryUploadCard
+                files={imageFiles}
+                onChange={setImageFiles}
+                minCount={MIN_GALLERY}
+                inputName=""
+              />
+            )}
             <ListingPreviewCard
               title={title}
               subtitle={locationDisplay}
