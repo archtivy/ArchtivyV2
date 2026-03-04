@@ -35,7 +35,7 @@ import type { TeamMember, BrandUsed } from "@/lib/types/listings";
 import type { ActionResult } from "./types";
 import { setProjectMaterials, setProductMaterials } from "@/lib/db/materials";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
-import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets } from "@/lib/taxonomy/taxonomyDb";
+import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets, getTaxonomyNodeById } from "@/lib/taxonomy/taxonomyDb";
 import { processProductImages } from "@/lib/matches/pipeline";
 import { computeAndUpsertAllMatches } from "@/lib/matches/engine";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
@@ -228,12 +228,26 @@ export async function createProduct(
   const year = (formData.get("year") as string)?.trim() ?? null;
   const teamMembers = parseTeamMembers(formData.get("team_members"));
   const docFiles = getDocumentFiles(formData);
+  const taxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
 
   if (!title) return { error: "Product title is required." };
   if (!description?.trim()) return { error: "Product description is required." };
-  if (!productType?.trim()) return { error: "Product type is required." };
-  if (!productSubcategory?.trim()) {
+  if (!taxonomyNodeId && !productType?.trim()) return { error: "Product type is required." };
+  if (!taxonomyNodeId && !productSubcategory?.trim()) {
     return { error: "Product subcategory is required. Please select a subcategory (or \"Other / Not specified\" if none fit)." };
+  }
+
+  // Derive legacy fields from taxonomy node when taxonomy is selected but legacy fields are empty
+  let resolvedProductType: string | null = productType;
+  let resolvedProductCategory: string | null = productCategory;
+  let resolvedProductSubcategory: string | null = productSubcategory;
+  if (taxonomyNodeId && !productType?.trim()) {
+    const nodeRes = await getTaxonomyNodeById(taxonomyNodeId);
+    if (nodeRes.data) {
+      resolvedProductType = nodeRes.data.legacy_product_type || null;
+      resolvedProductCategory = nodeRes.data.legacy_product_category || productCategory;
+      resolvedProductSubcategory = nodeRes.data.legacy_product_subcategory || productSubcategory;
+    }
   }
 
   const imageFiles = getImageFiles(formData);
@@ -262,9 +276,9 @@ export async function createProduct(
     description: description.trim(),
     owner_clerk_user_id: userId,
     slug,
-    product_type: productType.trim() || null,
-    product_category: productCategory || null,
-    product_subcategory: productSubcategory.trim() || null,
+    product_type: resolvedProductType?.trim() || null,
+    product_category: resolvedProductCategory || null,
+    product_subcategory: resolvedProductSubcategory?.trim() || null,
     material_or_finish: materialOrFinish || null,
     dimensions: dimensions || null,
     year: year || null,
@@ -425,6 +439,7 @@ export async function createProductCanonical(
   const productCategory = (formData.get("product_category") as string)?.trim() ?? null;
   const productSubcategory = (formData.get("product_subcategory") as string)?.trim() ?? null;
   const materialIds = parseMaterialIds(formData.get("product_material_ids"));
+  const taxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
 
   if (!title) return { error: "Product title is required." };
 
@@ -464,6 +479,19 @@ export async function createProductCanonical(
     })
     .eq("id", productId);
 
+  // Derive legacy fields from taxonomy node when taxonomy is selected but legacy fields are empty
+  let resolvedProductType2: string | null = productType;
+  let resolvedProductCategory2: string | null = productCategory;
+  let resolvedProductSubcategory2: string | null = productSubcategory;
+  if (taxonomyNodeId && !productType?.trim()) {
+    const nodeRes = await getTaxonomyNodeById(taxonomyNodeId);
+    if (nodeRes.data) {
+      resolvedProductType2 = nodeRes.data.legacy_product_type || null;
+      resolvedProductCategory2 = nodeRes.data.legacy_product_category || productCategory;
+      resolvedProductSubcategory2 = nodeRes.data.legacy_product_subcategory || productSubcategory;
+    }
+  }
+
   const listingPayload = {
     slug,
     title,
@@ -471,12 +499,10 @@ export async function createProductCanonical(
     owner_clerk_user_id: userId,
     owner_profile_id: profile.id ?? null,
     status: "PENDING" as const,
-    product_type: productType ?? null,
-    product_category: productCategory ?? null,
-    product_subcategory: productSubcategory ?? null,
+    product_type: resolvedProductType2 ?? null,
+    product_category: resolvedProductCategory2 ?? null,
+    product_subcategory: resolvedProductSubcategory2 ?? null,
   };
-  const taxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
-  console.log("[product taxonomy]", { listingId: productId, product_type: productType, product_category: productCategory, product_subcategory: productSubcategory, taxonomy_node_id: taxonomyNodeId });
   const listingErr = await upsertListingForProduct(productId, listingPayload);
   if (listingErr.error) {
     await deleteProductRow(productId);

@@ -17,7 +17,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
 import { processProjectImages, processProductImages } from "@/lib/matches/pipeline";
 import { computeAndUpsertMatchesForProject, computeAndUpsertAllMatches } from "@/lib/matches/engine";
-import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets } from "@/lib/taxonomy/taxonomyDb";
+import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets, getTaxonomyNodeById } from "@/lib/taxonomy/taxonomyDb";
 
 const MIN_GALLERY_IMAGES = 3;
 
@@ -350,11 +350,25 @@ export async function createAdminProductFull(
   const team_members = parseTeamMembers(formData.get("team_members"));
   const material_ids = parseMaterialIds(formData.get("product_material_ids"));
   const color_options = parseColorOptions(formData.get("color_options"));
+  const taxonomy_node_id = (formData.get("taxonomy_node_id") as string)?.trim() || null;
 
   if (!title) return { error: "Product title is required." };
   if (!description?.trim()) return { error: "Product description is required." };
-  if (!product_type?.trim()) return { error: "Product type is required." };
-  if (!product_subcategory?.trim()) return { error: "Product subcategory is required." };
+  if (!taxonomy_node_id && !product_type?.trim()) return { error: "Product type is required." };
+  if (!taxonomy_node_id && !product_subcategory?.trim()) return { error: "Product subcategory is required." };
+
+  // Derive legacy fields from taxonomy node when taxonomy is selected but legacy fields are empty
+  let resolvedProductType: string | null = product_type;
+  let resolvedProductCategory: string | null = product_category;
+  let resolvedProductSubcategory: string | null = product_subcategory;
+  if (taxonomy_node_id && !product_type?.trim()) {
+    const nodeRes = await getTaxonomyNodeById(taxonomy_node_id);
+    if (nodeRes.data) {
+      resolvedProductType = nodeRes.data.legacy_product_type || null;
+      resolvedProductCategory = nodeRes.data.legacy_product_category || product_category;
+      resolvedProductSubcategory = nodeRes.data.legacy_product_subcategory || product_subcategory;
+    }
+  }
 
   const descWords = (description ?? "").trim().split(/\s+/).filter(Boolean).length;
   if (descWords < 200) return { error: "Description must be at least 200 words." };
@@ -377,9 +391,9 @@ export async function createAdminProductFull(
       title,
       description: description || null,
       slug,
-      product_type: product_type || null,
-      product_category: product_category || null,
-      product_subcategory: product_subcategory || null,
+      product_type: resolvedProductType || null,
+      product_category: resolvedProductCategory || null,
+      product_subcategory: resolvedProductSubcategory || null,
       material_or_finish: material_or_finish || null,
       dimensions: dimensions || null,
       year: year || null,
@@ -398,8 +412,6 @@ export async function createAdminProductFull(
   if (insertError) return { error: insertError.message };
   if (!listing?.id) return { error: "Failed to create product." };
   const listingId = listing.id as string;
-  const taxonomy_node_id = (formData.get("taxonomy_node_id") as string)?.trim() || null;
-  console.log("[product taxonomy]", { listingId, product_type, product_category, product_subcategory, taxonomy_node_id });
   const { data: check } = await supabase.from("listings").select("type").eq("id", listingId).maybeSingle();
   if (!check?.type) return { error: "Listing created but type is missing (data integrity)." };
 
@@ -909,22 +921,35 @@ export async function updateProductAction(
   const material_ids = parseMaterialIds(formData.get("product_material_ids"));
   const color_options = parseColorOptions(formData.get("color_options"));
 
+  const taxonomy_node_id = (formData.get("taxonomy_node_id") as string)?.trim() || null;
+
   if (!title) return { error: "Product title is required." };
   if (!description?.trim()) return { error: "Description is required." };
-  if (!product_type?.trim()) return { error: "Product type is required." };
-  if (!product_subcategory?.trim()) return { error: "Product subcategory is required." };
+  if (!taxonomy_node_id && !product_type?.trim()) return { error: "Product type is required." };
+  if (!taxonomy_node_id && !product_subcategory?.trim()) return { error: "Product subcategory is required." };
 
-  const taxonomy_node_id = (formData.get("taxonomy_node_id") as string)?.trim() || null;
-  console.log("[product taxonomy]", { listingId, product_type, product_category, product_subcategory, taxonomy_node_id });
+  // Derive legacy fields from taxonomy node when taxonomy is selected but legacy fields are empty
+  let resolvedProductType: string | null = product_type;
+  let resolvedProductCategory: string | null = product_category;
+  let resolvedProductSubcategory: string | null = product_subcategory;
+  if (taxonomy_node_id && !product_type?.trim()) {
+    const nodeRes = await getTaxonomyNodeById(taxonomy_node_id);
+    if (nodeRes.data) {
+      resolvedProductType = nodeRes.data.legacy_product_type || null;
+      resolvedProductCategory = nodeRes.data.legacy_product_category || product_category;
+      resolvedProductSubcategory = nodeRes.data.legacy_product_subcategory || product_subcategory;
+    }
+  }
+
   const supabase = getSupabaseServiceClient();
   const { error: updateError } = await supabase
     .from("listings")
     .update({
       title,
       description: description || null,
-      product_type: product_type || null,
-      product_category: product_category || null,
-      product_subcategory: product_subcategory || null,
+      product_type: resolvedProductType || null,
+      product_category: resolvedProductCategory || null,
+      product_subcategory: resolvedProductSubcategory || null,
       material_or_finish: material_or_finish || null,
       dimensions: dimensions || null,
       year: year || null,
