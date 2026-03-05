@@ -308,16 +308,13 @@ export async function createAdminProjectFull(
   }
 
   // Set material taxonomy nodes + facet values (advanced filters)
+  // Always call even for empty arrays so cleared selections are persisted.
   const taxonomyMaterialIds = parseMaterialIds(formData.get("taxonomy_material_ids"));
-  if (taxonomyMaterialIds.length > 0) {
-    const matRes = await setListingMaterialNodes(listingId, taxonomyMaterialIds);
-    if (matRes.error) console.warn("[admin createProject] material nodes error (non-fatal):", matRes.error);
-  }
+  const matRes = await setListingMaterialNodes(listingId, taxonomyMaterialIds);
+  if (matRes.error) console.warn("[admin createProject] material nodes error (non-fatal):", matRes.error);
   const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
-  if (facetValueIds.length > 0) {
-    const facetRes = await setListingFacets(listingId, facetValueIds);
-    if (facetRes.error) console.warn("[admin createProject] facet values error (non-fatal):", facetRes.error);
-  }
+  const facetRes = await setListingFacets(listingId, facetValueIds);
+  if (facetRes.error) console.warn("[admin createProject] facet values error (non-fatal):", facetRes.error);
 
   if (admin.ok) {
     await createAuditLog({
@@ -445,16 +442,13 @@ export async function createAdminProductFull(
   }
 
   // Set material taxonomy nodes + facet values (advanced filters)
+  // Always call even for empty arrays so cleared selections are persisted.
   const taxonomyMaterialIds = parseMaterialIds(formData.get("taxonomy_material_ids"));
-  if (taxonomyMaterialIds.length > 0) {
-    const matRes = await setListingMaterialNodes(listingId, taxonomyMaterialIds);
-    if (matRes.error) console.warn("[admin createProduct] material nodes error (non-fatal):", matRes.error);
-  }
+  const matRes2 = await setListingMaterialNodes(listingId, taxonomyMaterialIds);
+  if (matRes2.error) console.warn("[admin createProduct] material nodes error (non-fatal):", matRes2.error);
   const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
-  if (facetValueIds.length > 0) {
-    const facetRes = await setListingFacets(listingId, facetValueIds);
-    if (facetRes.error) console.warn("[admin createProduct] facet values error (non-fatal):", facetRes.error);
-  }
+  const facetRes2 = await setListingFacets(listingId, facetValueIds);
+  if (facetRes2.error) console.warn("[admin createProduct] facet values error (non-fatal):", facetRes2.error);
 
   if (team_members.length > 0) {
     try {

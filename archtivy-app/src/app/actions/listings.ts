@@ -518,16 +518,13 @@ export async function createProductCanonical(
   }
 
   // Set material taxonomy nodes + facet values (advanced filters)
+  // Always call even for empty arrays so cleared selections are persisted.
   const taxonomyMaterialIds = parseMaterialIds(formData.get("taxonomy_material_ids"));
-  if (taxonomyMaterialIds.length > 0) {
-    const matRes = await setListingMaterialNodes(productId, taxonomyMaterialIds);
-    if (matRes.error) console.warn("[createProduct] material nodes set error (non-fatal):", matRes.error);
-  }
+  const matRes = await setListingMaterialNodes(productId, taxonomyMaterialIds);
+  if (matRes.error) console.warn("[createProduct] material nodes set error (non-fatal):", matRes.error);
   const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
-  if (facetValueIds.length > 0) {
-    const facetRes = await setListingFacets(productId, facetValueIds);
-    if (facetRes.error) console.warn("[createProduct] facet values set error (non-fatal):", facetRes.error);
-  }
+  const facetRes = await setListingFacets(productId, facetValueIds);
+  if (facetRes.error) console.warn("[createProduct] facet values set error (non-fatal):", facetRes.error);
 
   if (imageFiles.length > 0) {
     const uploadResult = await uploadGalleryImagesForProduct(productId, imageFiles);

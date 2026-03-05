@@ -360,16 +360,13 @@ export async function createProject(
   }
 
   // Set material taxonomy nodes + facet values (advanced filters)
+  // Always call even for empty arrays so cleared selections are persisted.
   const taxonomyMaterialIds = parseMaterialIds(formData.get("taxonomy_material_ids"));
-  if (taxonomyMaterialIds.length > 0) {
-    const matRes = await setListingMaterialNodes(listingId, taxonomyMaterialIds);
-    if (matRes.error) console.warn("[createProject] material nodes error (non-fatal):", matRes.error);
-  }
+  const matRes = await setListingMaterialNodes(listingId, taxonomyMaterialIds);
+  if (matRes.error) console.warn("[createProject] material nodes error (non-fatal):", matRes.error);
   const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
-  if (facetValueIds.length > 0) {
-    const facetRes = await setListingFacets(listingId, facetValueIds);
-    if (facetRes.error) console.warn("[createProject] facet values error (non-fatal):", facetRes.error);
-  }
+  const facetRes = await setListingFacets(listingId, facetValueIds);
+  if (facetRes.error) console.warn("[createProject] facet values error (non-fatal):", facetRes.error);
 
   revalidatePath("/explore");
   revalidatePath("/explore/projects");
