@@ -51,6 +51,8 @@ import {
   type ProjectSeoInput,
 } from "@/lib/seo/seo-templates";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { getListingTaxonomyNodes, getListingFacets, getTaxonomyAncestors } from "@/lib/taxonomy/taxonomyDb";
+import type { TaxonomyCrumb, TaxonomyMaterialTag, TaxonomyFacetGroup } from "@/components/listing/TaxonomyTags";
 
 /** Per-slug cached project fetch; busted by revalidateTag(CACHE_TAGS.listings). */
 function getCachedProject(slug: string) {
@@ -156,13 +158,15 @@ export default async function ProjectPage({
     if (!isOwner && !isAdmin) notFound();
   }
 
-  const [usedResult, isSaved, teamResult, docsResult] = await Promise.all([
+  const [usedResult, isSaved, teamResult, docsResult, taxNodesResult, facetsResult] = await Promise.all([
     getProductsForProject(project.id, { sources: ["manual", "photo_tag"] }).catch(() =>
       getProductsForProject(project.id)
     ),
     getGalleryBookmarkState("project", project.id),
     getListingTeamMembersWithProfiles(project.id),
     getListingDocumentsServer(project.id),
+    getListingTaxonomyNodes(project.id),
+    getListingFacets(project.id),
   ]);
   const usedListingsRaw = usedResult.data ?? [];
   const usedListings = Array.from(
@@ -191,6 +195,29 @@ export default async function ProjectPage({
       thumbnail: thumbnailMap[row.id] ?? null,
     };
   });
+
+  // Process taxonomy data for sidebar tags
+  const taxNodes = taxNodesResult.data ?? [];
+  const primaryNode = taxNodes.find((n) => n.is_primary) ?? null;
+  const materialTaxNodes: TaxonomyMaterialTag[] = taxNodes
+    .filter((n) => !n.is_primary && n.domain === "material")
+    .map((n) => ({ label: n.label, slug_path: n.slug_path }));
+  const facetValues = facetsResult.data ?? [];
+  const facetGroupMap = new Map<string, TaxonomyFacetGroup>();
+  for (const fv of facetValues) {
+    let group = facetGroupMap.get(fv.facet_slug);
+    if (!group) {
+      group = { facet_label: fv.facet_label, facet_slug: fv.facet_slug, values: [] };
+      facetGroupMap.set(fv.facet_slug, group);
+    }
+    group.values.push({ label: fv.value_label, slug: fv.value_slug });
+  }
+  const taxonomyFacetGroups = Array.from(facetGroupMap.values());
+  let categoryCrumbs: TaxonomyCrumb[] = [];
+  if (primaryNode) {
+    const ancestorsRes = await getTaxonomyAncestors(primaryNode.domain, primaryNode.slug_path);
+    categoryCrumbs = (ancestorsRes.data ?? []).map((n) => ({ label: n.label, slug_path: n.slug_path }));
+  }
 
   const documents = (docsResult.data ?? []).map((d) => ({
     id: d.id,
@@ -368,6 +395,11 @@ export default async function ProjectPage({
         connectionLine={connectionLine}
         mapHref={mapHref}
         moreInCategory={moreInCategory}
+        taxonomyTags={{
+          categoryCrumbs,
+          materialNodes: materialTaxNodes,
+          facetGroups: taxonomyFacetGroups,
+        }}
       />
     </div>
   );

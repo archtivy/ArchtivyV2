@@ -22,6 +22,7 @@ import type { GalleryImage } from "@/lib/db/gallery";
 import type { ProductCanonical } from "@/lib/canonical-models";
 import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
 import type { ListingDocument } from "@/lib/types/listings";
+import { TaxonomyTags, type TaxonomyCrumb, type TaxonomyMaterialTag, type TaxonomyFacetGroup } from "./TaxonomyTags";
 
 function ShareIcon({ className }: { className?: string }) {
   return (
@@ -79,6 +80,12 @@ export interface ProductDetailLayoutProps {
   /** More in this category (for RelatedSection). Excludes current product. */
   moreInCategory?: RelatedSectionItem[];
   categoryTotalCount?: number;
+  /** Taxonomy data for sidebar tags */
+  taxonomyTags?: {
+    categoryCrumbs: TaxonomyCrumb[];
+    materialNodes: TaxonomyMaterialTag[];
+    facetGroups: TaxonomyFacetGroup[];
+  };
 }
 
 export function ProductDetailLayout({
@@ -101,6 +108,7 @@ export function ProductDetailLayout({
   usedInProjectsTotalCount,
   moreInCategory = [],
   categoryTotalCount,
+  taxonomyTags,
 }: ProductDetailLayoutProps) {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
@@ -211,6 +219,17 @@ export function ProductDetailLayout({
                   id="product-description"
                   className="border-t border-zinc-100 pt-6 dark:border-zinc-800"
                 />
+              )}
+              {/* Taxonomy Tags */}
+              {taxonomyTags && (taxonomyTags.categoryCrumbs.length > 0 || taxonomyTags.materialNodes.length > 0 || taxonomyTags.facetGroups.some((g) => g.values.length > 0)) && (
+                <div className="border-t border-zinc-100 pt-6 dark:border-zinc-800">
+                  <TaxonomyTags
+                    listingType="product"
+                    categoryCrumbs={taxonomyTags.categoryCrumbs}
+                    materialNodes={taxonomyTags.materialNodes}
+                    facetGroups={taxonomyTags.facetGroups}
+                  />
+                </div>
               )}
               {/* Materials */}
               {materials.length > 0 && (

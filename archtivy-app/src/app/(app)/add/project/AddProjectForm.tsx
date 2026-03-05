@@ -16,6 +16,15 @@ import { SubmissionProgressBar } from "@/components/add/SubmissionProgressBar";
 import { LocationPicker, type LocationValue } from "@/components/location/LocationPicker";
 import { PROJECT_CATEGORIES } from "@/lib/auth/config";
 import type { MemberTitleRow } from "./TeamMembersField";
+
+/** Minimal node shape the form needs from the DB project taxonomy tree. */
+export interface ProjectTaxonomyNodeForForm {
+  id: string;
+  parent_id: string | null;
+  depth: number;
+  label: string;
+  legacy_project_category: string | null;
+}
 import { TeamMembersField } from "./TeamMembersField";
 import {
   AdvancedFiltersSection,
@@ -55,10 +64,44 @@ export interface ProjectFormInitialData {
   mentionedRows: Array<{ brand_name_text: string; product_name_text: string }>;
   /** Number of images already saved in the DB. Passed to GalleryUploadCard. */
   existingImageCount?: number;
+  /** DB taxonomy node ID (new system). Used to pre-select the taxonomy hierarchy. */
+  taxonomyNodeId?: string | null;
   /** Pre-selected material taxonomy node IDs (for edit mode). */
   materialNodeIds?: string[];
   /** Pre-selected facet value IDs (for edit mode). */
   facetValueIds?: string[];
+}
+
+/** Resolve initial building-type / subcategory node IDs from initialData + nodes. */
+function resolveInitialProjectIds(
+  nodes: ProjectTaxonomyNodeForForm[],
+  init?: ProjectFormInitialData
+): { buildingTypeId: string; subcategoryId: string } {
+  const empty = { buildingTypeId: "", subcategoryId: "" };
+  if (!init || !nodes.length) return empty;
+
+  const traceUp = (node: ProjectTaxonomyNodeForForm) => {
+    if (node.depth === 1) {
+      const parent = nodes.find((n) => n.id === node.parent_id);
+      return { buildingTypeId: parent?.id ?? "", subcategoryId: node.id };
+    }
+    return { buildingTypeId: node.id, subcategoryId: "" };
+  };
+
+  // 1. Try by taxonomyNodeId
+  if (init.taxonomyNodeId) {
+    const node = nodes.find((n) => n.id === init.taxonomyNodeId);
+    if (node) return traceUp(node);
+  }
+
+  // 2. Fall back to matching by legacy_project_category
+  if (init.category) {
+    const node = nodes.find(
+      (n) => n.legacy_project_category === init.category && n.depth === 0
+    );
+    if (node) return { buildingTypeId: node.id, subcategoryId: "" };
+  }
+  return empty;
 }
 
 export function AddProjectForm({
@@ -69,6 +112,7 @@ export function AddProjectForm({
   updateAction,
   materialNodes,
   facets,
+  projectTaxonomyNodes = [],
 }: {
   memberTitles: MemberTitleRow[];
   formMode?: "user" | "admin";
@@ -79,7 +123,10 @@ export function AddProjectForm({
   materialNodes?: MaterialNodeForForm[];
   /** Facets with values for AdvancedFiltersSection. */
   facets?: FacetForForm[];
+  /** DB-backed project taxonomy nodes. When provided, replaces static PROJECT_CATEGORIES. */
+  projectTaxonomyNodes?: ProjectTaxonomyNodeForForm[];
 }) {
+  const useDbProjectTaxonomy = projectTaxonomyNodes.length > 0;
   const router = useRouter();
   const action = updateAction ?? (formMode === "admin" ? createAdminProjectFull : createProject);
   const [state, formAction] = useFormState(action, null as ActionResult);
@@ -87,6 +134,10 @@ export function AddProjectForm({
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [locationValue, setLocationValue] = useState<LocationValue | null>(initialData?.locationValue ?? null);
   const [category, setCategory] = useState(initialData?.category ?? "");
+  // ── DB project taxonomy state ──
+  const [projInitIds] = useState(() => resolveInitialProjectIds(projectTaxonomyNodes, initialData));
+  const [buildingTypeNodeId, setBuildingTypeNodeId] = useState(projInitIds.buildingTypeId);
+  const [projSubcategoryNodeId, setProjSubcategoryNodeId] = useState(projInitIds.subcategoryId);
   const [areaSqft, setAreaSqft] = useState(initialData?.areaSqft ?? "");
   const [year, setYear] = useState(initialData?.year ?? "");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -157,20 +208,38 @@ export function AddProjectForm({
     });
     return () => URL.revokeObjectURL(url);
   }, [imageFiles]);
+  // ── DB project taxonomy derived lists ──
+  const dbBuildingTypes = useMemo(
+    () => projectTaxonomyNodes.filter((n) => n.depth === 0),
+    [projectTaxonomyNodes]
+  );
+  const dbProjectSubcategories = useMemo(
+    () => (buildingTypeNodeId ? projectTaxonomyNodes.filter((n) => n.depth === 1 && n.parent_id === buildingTypeNodeId) : []),
+    [projectTaxonomyNodes, buildingTypeNodeId]
+  );
+  /** The deepest selected DB project node — provides taxonomy_node_id + legacy category. */
+  const selectedProjectNode = useMemo(() => {
+    if (!useDbProjectTaxonomy) return null;
+    if (projSubcategoryNodeId) return projectTaxonomyNodes.find((n) => n.id === projSubcategoryNodeId) ?? null;
+    if (buildingTypeNodeId) return projectTaxonomyNodes.find((n) => n.id === buildingTypeNodeId) ?? null;
+    return null;
+  }, [useDbProjectTaxonomy, projectTaxonomyNodes, buildingTypeNodeId, projSubcategoryNodeId]);
+
   const hasLocation = Boolean(locationValue?.location_text?.trim());
   const galleryRequired = !initialData;
+  const hasCategorySelection = useDbProjectTaxonomy ? buildingTypeNodeId !== "" : category.trim() !== "";
   const canPublish =
     title.trim() !== "" &&
     descValid &&
     hasLocation &&
-    category.trim() !== "" &&
+    hasCategorySelection &&
     year.trim() !== "" &&
     (galleryRequired ? galleryValid : true);
 
   const projectProgressPercent = useMemo(() => {
     const done = [
       title.trim() !== "",
-      category.trim() !== "",
+      hasCategorySelection,
       hasLocation,
       year.trim() !== "",
       areaSqft.trim() !== "" && !Number.isNaN(Number(areaSqft)) && Number(areaSqft) > 0,
@@ -178,7 +247,7 @@ export function AddProjectForm({
       galleryRequired ? galleryValid : true,
     ].filter(Boolean).length;
     return Math.round((done / PROJECT_REQUIRED_COUNT) * 100);
-  }, [title, category, hasLocation, year, areaSqft, descValid, galleryRequired, galleryValid]);
+  }, [title, hasCategorySelection, hasLocation, year, areaSqft, descValid, galleryRequired, galleryValid]);
 
   const addTeamRow = () => setTeamRows((r) => [...r, { name: "", role: "" }]);
   const updateTeamRow = (i: number, field: "name" | "role", value: string) => {
@@ -240,6 +309,12 @@ export function AddProjectForm({
       <input type="hidden" name="team_members" value={teamMembersJson} />
       <input type="hidden" name="draft" value="0" id="draft-value" />
       <input type="hidden" name="project_material_ids" value="[]" />
+      {useDbProjectTaxonomy && (
+        <>
+          <input type="hidden" name="taxonomy_node_id" value={selectedProjectNode?.id ?? ""} />
+          <input type="hidden" name="category" value={selectedProjectNode?.legacy_project_category ?? ""} />
+        </>
+      )}
       <input type="hidden" name="mentioned_products" value={mentionedProductsJson} />
       <input type="hidden" name="taxonomy_material_ids" value={materialNodeIdsJson} />
       <input type="hidden" name="facet_value_ids" value={facetValueIdsJson} />
@@ -342,26 +417,68 @@ export function AddProjectForm({
               placeholder="Project name"
             />
           </div>
-          <div>
-            <label htmlFor="category" className={labelClass}>
-              Category <span className="text-archtivy-primary">*</span>
-            </label>
-            <select
-              id="category"
-              name="category"
-              required
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Select category</option>
-              {PROJECT_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
+          {useDbProjectTaxonomy ? (
+            <>
+              <div>
+                <label htmlFor="building_type" className={labelClass}>
+                  Building type <span className="text-archtivy-primary">*</span>
+                </label>
+                <select
+                  id="building_type"
+                  value={buildingTypeNodeId}
+                  onChange={(e) => {
+                    setBuildingTypeNodeId(e.target.value);
+                    setProjSubcategoryNodeId("");
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">Select building type</option>
+                  {dbBuildingTypes.map((n) => (
+                    <option key={n.id} value={n.id}>{n.label}</option>
+                  ))}
+                </select>
+              </div>
+              {buildingTypeNodeId && dbProjectSubcategories.length > 0 && (
+                <div>
+                  <label htmlFor="project_subcategory" className={labelClass}>
+                    Subcategory
+                  </label>
+                  <select
+                    id="project_subcategory"
+                    value={projSubcategoryNodeId}
+                    onChange={(e) => setProjSubcategoryNodeId(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Select subcategory (optional)</option>
+                    {dbProjectSubcategories.map((n) => (
+                      <option key={n.id} value={n.id}>{n.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
+          ) : (
+            <div>
+              <label htmlFor="category" className={labelClass}>
+                Category <span className="text-archtivy-primary">*</span>
+              </label>
+              <select
+                id="category"
+                name="category"
+                required
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">Select category</option>
+                {PROJECT_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </section>
 
         {/* Section: Location */}

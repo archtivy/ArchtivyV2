@@ -11,7 +11,7 @@ import type { ActionResult } from "@/app/actions/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TeamMember, BrandUsed } from "@/lib/types/listings";
 import { setProjectMaterials } from "@/lib/db/materials";
-import { setListingMaterialNodes, setListingFacets } from "@/lib/taxonomy/taxonomyDb";
+import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets } from "@/lib/taxonomy/taxonomyDb";
 import { processProjectImages } from "@/lib/matches/pipeline";
 import { computeAndUpsertMatchesForProject } from "@/lib/matches/engine";
 
@@ -264,6 +264,15 @@ export async function createProject(
   if (insertError) return { error: insertError.message };
   if (!listing?.id) return { error: "Failed to create project." };
   const listingId = listing.id;
+
+  // Set taxonomy node (new DB taxonomy system)
+  const taxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
+  if (taxonomyNodeId) {
+    const taxRes = await setListingTaxonomyNode(listingId, taxonomyNodeId);
+    if (taxRes.error) {
+      console.warn("[createProject] taxonomy node set error (non-fatal):", taxRes.error);
+    }
+  }
 
   if (team_members.length > 0) {
     try {

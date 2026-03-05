@@ -225,6 +225,15 @@ export async function createAdminProjectFull(
   const { data: check } = await supabase.from("listings").select("type").eq("id", listingId).maybeSingle();
   if (!check?.type) return { error: "Listing created but type is missing (data integrity)." };
 
+  // Set taxonomy node (new DB taxonomy system)
+  const projectTaxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
+  if (projectTaxonomyNodeId) {
+    const taxRes = await setListingTaxonomyNode(listingId, projectTaxonomyNodeId);
+    if (taxRes.error) {
+      console.warn("[admin createProject] taxonomy node set error (non-fatal):", taxRes.error);
+    }
+  }
+
   if (team_members.length > 0) {
     try {
       await persistListingTeamMembers(supabase, listingId, team_members);
@@ -868,6 +877,15 @@ export async function updateProjectAction(
   if (material_ids.length >= 0) {
     const { error: materialErr } = await setProjectMaterials(listingId, material_ids);
     if (materialErr) return { error: `Failed to save materials: ${materialErr}` };
+  }
+
+  // Update taxonomy node (new DB taxonomy system)
+  const projectTaxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
+  if (projectTaxonomyNodeId) {
+    const taxRes = await setListingTaxonomyNode(listingId, projectTaxonomyNodeId);
+    if (taxRes.error) {
+      console.warn("[updateProject] taxonomy node set error (non-fatal):", taxRes.error);
+    }
   }
 
   // Update material taxonomy nodes + facet values (advanced filters)

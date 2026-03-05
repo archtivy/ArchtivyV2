@@ -43,10 +43,11 @@ export default async function AddProjectPage() {
   const listingsCount = listings?.length ?? 0;
   const showOnboarding = listingsCount === 0;
 
-  const [memberTitles, materialTaxRes, facetsRes] = await Promise.all([
+  const [memberTitles, materialTaxRes, facetsRes, projectTaxRes] = await Promise.all([
     getActiveMemberTitles(),
     getTaxonomyTree("material"),
     getFacetsForDomain("project"),
+    getTaxonomyTree("project"),
   ]);
   const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
     id: n.id,
@@ -59,6 +60,13 @@ export default async function AddProjectPage() {
     slug: f.slug,
     label: f.label,
     values: f.values.map((v) => ({ id: v.id, slug: v.slug, label: v.label })),
+  }));
+  const projectTaxonomyNodes = (projectTaxRes.data ?? []).map((n) => ({
+    id: n.id,
+    parent_id: n.parent_id,
+    depth: n.depth,
+    label: n.label,
+    legacy_project_category: n.legacy_project_category,
   }));
 
   return (
@@ -81,7 +89,7 @@ export default async function AddProjectPage() {
           </Button>
         </p>
       </div>
-      <AddProjectForm memberTitles={memberTitles} materialNodes={materialNodes} facets={facets} />
+      <AddProjectForm memberTitles={memberTitles} materialNodes={materialNodes} facets={facets} projectTaxonomyNodes={projectTaxonomyNodes} />
         </div>
       </div>
     </div>

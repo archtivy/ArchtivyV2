@@ -17,6 +17,7 @@ import { MoreInCategoryBlock } from "./MoreInCategoryBlock";
 import { FilesSection } from "@/components/files/FilesSection";
 import { areaSqftToBucket } from "@/lib/exploreFilters";
 import { getCityLabel, getOwnerProfileHref } from "@/lib/cardUtils";
+import type { TaxonomyCrumb, TaxonomyMaterialTag, TaxonomyFacetGroup } from "./TaxonomyTags";
 
 export interface ProjectDetailLayoutProps {
   images: GalleryImage[];
@@ -35,6 +36,12 @@ export interface ProjectDetailLayoutProps {
   mapHref?: string | null;
   /** More in this category items. */
   moreInCategory?: { id: string; slug: string | null; title: string; thumbnail?: string | null; location?: string | null }[];
+  /** Taxonomy data for sidebar tags */
+  taxonomyTags?: {
+    categoryCrumbs: TaxonomyCrumb[];
+    materialNodes: TaxonomyMaterialTag[];
+    facetGroups: TaxonomyFacetGroup[];
+  };
 }
 
 export function ProjectDetailLayout({
@@ -50,6 +57,7 @@ export function ProjectDetailLayout({
   connectionLine,
   mapHref,
   moreInCategory = [],
+  taxonomyTags,
 }: ProjectDetailLayoutProps) {
   const [lightboxOpen, setLightboxOpen] = React.useState(false);
   const [lightboxIndex, setLightboxIndex] = React.useState(0);
@@ -154,6 +162,7 @@ export function ProjectDetailLayout({
                 sharedByDisplayName={project.owner?.displayName?.trim() ?? null}
                 sharedByHref={getOwnerProfileHref(project.owner) ?? null}
                 mapHref={mapHref}
+                taxonomyTags={taxonomyTags}
               />
               <div className="mt-6">
                 <FilesSection

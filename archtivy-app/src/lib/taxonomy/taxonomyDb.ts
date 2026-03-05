@@ -276,6 +276,29 @@ export async function getListingTaxonomyNodes(
   return { data: result, error: null };
 }
 
+/**
+ * Get all ancestor nodes for a slug_path (including the node itself).
+ * E.g., "furniture/seating/dining-chair" → nodes for "furniture", "furniture/seating", "furniture/seating/dining-chair".
+ */
+export async function getTaxonomyAncestors(
+  domain: string,
+  slugPath: string
+): Promise<DbResult<TaxonomyNode[]>> {
+  const segments = slugPath.split("/");
+  const prefixes: string[] = [];
+  for (let i = 0; i < segments.length; i++) {
+    prefixes.push(segments.slice(0, i + 1).join("/"));
+  }
+  const { data, error } = await supa()
+    .from("taxonomy_nodes")
+    .select(NODE_SELECT)
+    .eq("domain", domain)
+    .in("slug_path", prefixes)
+    .order("depth", { ascending: true });
+  if (error) return { data: null, error: error.message };
+  return { data: (data ?? []) as TaxonomyNode[], error: null };
+}
+
 // ─── Listing ↔ Material Taxonomy Nodes ──────────────────────────────────────
 
 /** Get material taxonomy node IDs linked to a listing (domain='material', is_primary=false). */

@@ -47,7 +47,7 @@ export default async function AdminProjectEditPage({
   searchParams: SearchParams;
 }) {
   const { id } = await params;
-  const [listingRow, teamResult, memberTitles, imagesWithIdsResult, productMaterialOptions, materialTaxRes, facetsRes, existingMatNodeIdsRes, existingFacetValsRes] =
+  const [listingRow, teamResult, memberTitles, imagesWithIdsResult, productMaterialOptions, materialTaxRes, facetsRes, existingMatNodeIdsRes, existingFacetValsRes, projectTaxRes] =
     await Promise.all([
       getProjectListingBySlugOrId(id),
       getListingTeamMembersWithProfiles(id),
@@ -58,6 +58,7 @@ export default async function AdminProjectEditPage({
       getFacetsForDomain("project"),
       getListingMaterialNodeIds(id),
       getListingFacets(id),
+      getTaxonomyTree("project"),
     ]);
 
   if (!listingRow || (listingRow as { type?: string }).type !== "project") return notFound();
@@ -75,6 +76,13 @@ export default async function AdminProjectEditPage({
     values: f.values.map((v) => ({ id: v.id, slug: v.slug, label: v.label })),
   }));
   const existingMaterialNodeIds = existingMatNodeIdsRes.data ?? [];
+  const projectTaxonomyNodes = (projectTaxRes.data ?? []).map((n) => ({
+    id: n.id,
+    parent_id: n.parent_id,
+    depth: n.depth,
+    label: n.label,
+    legacy_project_category: n.legacy_project_category,
+  }));
   const existingFacetValueIds = (existingFacetValsRes.data ?? []).map((f) => f.value_id);
 
   const imagesWithIds = imagesWithIdsResult.data ?? [];
@@ -151,6 +159,7 @@ export default async function AdminProjectEditPage({
     team_members: unknown;
     brands_used: { name?: string }[] | null;
     mentioned_products: { brand_name_text: string; product_name_text: string }[] | null;
+    taxonomy_node_id: string | null;
   };
 
   const teamWithProfiles = teamResult.data ?? [];
@@ -191,6 +200,7 @@ export default async function AdminProjectEditPage({
     existingImageCount: imagesWithIds.length,
     materialNodeIds: existingMaterialNodeIds,
     facetValueIds: existingFacetValueIds,
+    taxonomyNodeId: listing.taxonomy_node_id ?? null,
   };
 
   const saved = toText(searchParams.saved) === "1";
@@ -254,6 +264,7 @@ export default async function AdminProjectEditPage({
         updateAction={updateProjectAction}
         materialNodes={materialNodes}
         facets={facets}
+        projectTaxonomyNodes={projectTaxonomyNodes}
       />
       <EditorialImageManager
         listingId={id}

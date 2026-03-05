@@ -4,6 +4,8 @@ import { AddProjectForm } from "@/app/(app)/add/project/AddProjectForm";
 import { searchProfilesForOwner, getProfilesByRole } from "@/lib/db/profiles";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import type { MemberTitleRow } from "@/app/(app)/add/project/TeamMembersField";
+import { getTaxonomyTree, getFacetsForDomain } from "@/lib/taxonomy/taxonomyDb";
+import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
 
 async function getActiveMemberTitles(): Promise<MemberTitleRow[]> {
   const supabase = getSupabaseServiceClient();
@@ -18,11 +20,33 @@ async function getActiveMemberTitles(): Promise<MemberTitleRow[]> {
 }
 
 export default async function AdminNewProjectPage() {
-  const [profileOptions, memberTitles] = await Promise.all([
+  const [profileOptions, memberTitles, materialTaxRes, facetsRes, projectTaxRes] = await Promise.all([
     searchProfilesForOwner("", "project"),
     getActiveMemberTitles(),
+    getTaxonomyTree("material"),
+    getFacetsForDomain("project"),
+    getTaxonomyTree("project"),
   ]);
   const profiles = profileOptions?.data ?? [];
+  const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
+    id: n.id,
+    parent_id: n.parent_id,
+    depth: n.depth,
+    label: n.label,
+  }));
+  const facets: FacetForForm[] = (facetsRes.data ?? []).map((f) => ({
+    id: f.id,
+    slug: f.slug,
+    label: f.label,
+    values: f.values.map((v) => ({ id: v.id, slug: v.slug, label: v.label })),
+  }));
+  const projectTaxonomyNodes = (projectTaxRes.data ?? []).map((n) => ({
+    id: n.id,
+    parent_id: n.parent_id,
+    depth: n.depth,
+    label: n.label,
+    legacy_project_category: n.legacy_project_category,
+  }));
 
   return (
     <AdminPage
@@ -45,6 +69,9 @@ export default async function AdminNewProjectPage() {
           formMode="admin"
           ownerProfileOptions={profiles}
           memberTitles={memberTitles}
+          materialNodes={materialNodes}
+          facets={facets}
+          projectTaxonomyNodes={projectTaxonomyNodes}
         />
       </div>
     </AdminPage>

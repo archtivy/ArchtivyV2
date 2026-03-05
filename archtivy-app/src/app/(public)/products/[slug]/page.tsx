@@ -39,6 +39,8 @@ import {
   type ProductSeoInput,
 } from "@/lib/seo/seo-templates";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { getListingTaxonomyNodes, getListingFacets, getTaxonomyAncestors } from "@/lib/taxonomy/taxonomyDb";
+import type { TaxonomyCrumb, TaxonomyMaterialTag, TaxonomyFacetGroup } from "@/components/listing/TaxonomyTags";
 
 /** Per-slug cached product fetch; busted by revalidateTag(CACHE_TAGS.listings). */
 function getCachedProduct(slug: string) {
@@ -156,13 +158,38 @@ export default async function ProductPage({
     if (!isOwner && !isAdmin) notFound();
   }
 
-  const [relatedResult, isSaved, brandResult, teamResult, docsResult] = await Promise.all([
+  const [relatedResult, isSaved, brandResult, teamResult, docsResult, taxNodesResult, facetsResult] = await Promise.all([
     getProjectsForProduct(product.id),
     getGalleryBookmarkState("product", product.id),
     product.brand_profile_id ? getProfileById(product.brand_profile_id) : Promise.resolve({ data: null, error: null }),
     getListingTeamMembersWithProfiles(product.id),
     getListingDocumentsServer(product.id),
+    getListingTaxonomyNodes(product.id),
+    getListingFacets(product.id),
   ]);
+
+  // Process taxonomy data for sidebar tags
+  const taxNodes = taxNodesResult.data ?? [];
+  const primaryNode = taxNodes.find((n) => n.is_primary) ?? null;
+  const materialTaxNodes: TaxonomyMaterialTag[] = taxNodes
+    .filter((n) => !n.is_primary && n.domain === "material")
+    .map((n) => ({ label: n.label, slug_path: n.slug_path }));
+  const facetValues = facetsResult.data ?? [];
+  const facetGroupMap = new Map<string, TaxonomyFacetGroup>();
+  for (const fv of facetValues) {
+    let group = facetGroupMap.get(fv.facet_slug);
+    if (!group) {
+      group = { facet_label: fv.facet_label, facet_slug: fv.facet_slug, values: [] };
+      facetGroupMap.set(fv.facet_slug, group);
+    }
+    group.values.push({ label: fv.value_label, slug: fv.value_slug });
+  }
+  const taxonomyFacetGroups = Array.from(facetGroupMap.values());
+  let categoryCrumbs: TaxonomyCrumb[] = [];
+  if (primaryNode) {
+    const ancestorsRes = await getTaxonomyAncestors(primaryNode.domain, primaryNode.slug_path);
+    categoryCrumbs = (ancestorsRes.data ?? []).map((n) => ({ label: n.label, slug_path: n.slug_path }));
+  }
 
   const relatedListings = relatedResult.data ?? [];
   const projectIds = relatedListings.map((p) => p.id);
@@ -297,6 +324,11 @@ export default async function ProductPage({
         relatedProducts={relatedProducts}
         mapHref={null}
         moreInCategory={moreInCategory}
+        taxonomyTags={{
+          categoryCrumbs,
+          materialNodes: materialTaxNodes,
+          facetGroups: taxonomyFacetGroups,
+        }}
       />
       </div>
     </div>

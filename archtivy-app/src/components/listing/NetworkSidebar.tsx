@@ -5,6 +5,7 @@ import { TeamList, type TeamListMember } from "./TeamList";
 import { ProductList, type ProductListItem } from "./ProductList";
 import { MaterialsList, type MaterialItem } from "./MaterialsList";
 import { projectExploreUrl } from "@/lib/exploreUrls";
+import { TaxonomyTags, type TaxonomyCrumb, type TaxonomyMaterialTag, type TaxonomyFacetGroup } from "./TaxonomyTags";
 
 export interface NetworkSidebarProps {
   teamMembers: TeamListMember[];
@@ -16,6 +17,12 @@ export interface NetworkSidebarProps {
   sharedByHref?: string | null;
   mapHref?: string | null;
   className?: string;
+  /** Taxonomy data for sidebar tags */
+  taxonomyTags?: {
+    categoryCrumbs: TaxonomyCrumb[];
+    materialNodes: TaxonomyMaterialTag[];
+    facetGroups: TaxonomyFacetGroup[];
+  };
 }
 
 /**
@@ -30,11 +37,17 @@ export function NetworkSidebar({
   sharedByHref,
   mapHref,
   className = "",
+  taxonomyTags,
 }: NetworkSidebarProps) {
   const hasTeam = teamMembers.length > 0;
   const hasProducts = usedProducts.length > 0;
   const hasMaterials = materials.length > 0;
-  const hasAny = hasTeam || hasProducts || hasMaterials;
+  const hasTaxonomy = taxonomyTags && (
+    taxonomyTags.categoryCrumbs.length > 0 ||
+    taxonomyTags.materialNodes.length > 0 ||
+    taxonomyTags.facetGroups.some((g) => g.values.length > 0)
+  );
+  const hasAny = hasTeam || hasProducts || hasMaterials || hasTaxonomy;
 
   if (!hasAny && !mapHref?.trim()) return null;
 
@@ -45,8 +58,18 @@ export function NetworkSidebar({
       className={"sticky top-6 self-start rounded border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900/50 " + className}
       aria-label="Network"
     >
+      {hasTaxonomy && taxonomyTags && (
+        <section className="border-b border-zinc-100 pb-5 dark:border-zinc-800">
+          <TaxonomyTags
+            listingType="project"
+            categoryCrumbs={taxonomyTags.categoryCrumbs}
+            materialNodes={taxonomyTags.materialNodes}
+            facetGroups={taxonomyTags.facetGroups}
+          />
+        </section>
+      )}
       {hasTeam && (
-        <section className="border-b border-zinc-100 pb-5 dark:border-zinc-800" aria-labelledby="network-team-heading">
+        <section className={`border-b border-zinc-100 pb-5 dark:border-zinc-800${hasTaxonomy ? " pt-5" : ""}`} aria-labelledby="network-team-heading">
           {sharedByDisplayName?.trim() && (
             <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
               Shared by{" "}
