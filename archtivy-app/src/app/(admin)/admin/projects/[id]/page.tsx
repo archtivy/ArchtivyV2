@@ -15,7 +15,7 @@ import { ImageProductTaggingBlock, type ImageTaggingItem } from "@/components/li
 import { EditorialImageManager } from "@/components/listing/EditorialImageManager";
 import type { LocationValue } from "@/components/location/LocationPicker";
 import type { MemberTitleRow } from "@/app/(app)/add/project/TeamMembersField";
-import { getTaxonomyTree, getFacetsForDomain, getListingMaterialNodeIds, getListingFacets } from "@/lib/taxonomy/taxonomyDb";
+import { getTaxonomyTree, getFacetsForDomain, getListingMaterialNodeIds, getListingFacetValueIds } from "@/lib/taxonomy/taxonomyDb";
 import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
 
 const toText = (v: unknown) => (v == null ? "" : String(v).trim());
@@ -57,7 +57,7 @@ export default async function AdminProjectEditPage({
       getTaxonomyTree("material"),
       getFacetsForDomain("project"),
       getListingMaterialNodeIds(id),
-      getListingFacets(id),
+      getListingFacetValueIds(id),
       getTaxonomyTree("project"),
     ]);
 
@@ -83,7 +83,7 @@ export default async function AdminProjectEditPage({
     label: n.label,
     legacy_project_category: n.legacy_project_category,
   }));
-  const existingFacetValueIds = (existingFacetValsRes.data ?? []).map((f) => f.value_id);
+  const existingFacetValueIds = existingFacetValsRes.data ?? [];
 
   const imagesWithIds = imagesWithIdsResult.data ?? [];
   const productMaterialsList = productMaterialOptions ?? [];

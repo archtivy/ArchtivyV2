@@ -14,7 +14,7 @@ import { AddProductForm, type ProductFormInitialData, type TaxonomyNodeForForm }
 import { EditorialImageManager } from "@/components/listing/EditorialImageManager";
 import type { ImageTaggingItem } from "@/components/listing/ImageProductTaggingBlock";
 import type { MemberTitleRow } from "@/app/(app)/add/project/TeamMembersField";
-import { getTaxonomyTree, getFacetsForDomain, getListingMaterialNodeIds, getListingFacets } from "@/lib/taxonomy/taxonomyDb";
+import { getTaxonomyTree, getFacetsForDomain, getListingMaterialNodeIds, getListingFacetValueIds } from "@/lib/taxonomy/taxonomyDb";
 import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
 
 const toText = (v: unknown) => (v == null ? "" : String(v).trim());
@@ -57,7 +57,7 @@ export default async function AdminProductEditPage({
       getTaxonomyTree("material"),
       getFacetsForDomain("product"),
       getListingMaterialNodeIds(id),
-      getListingFacets(id),
+      getListingFacetValueIds(id),
     ]);
   const taxonomyNodes: TaxonomyNodeForForm[] = (taxonomyRes.data ?? []).map((n) => ({
     id: n.id,
@@ -81,7 +81,7 @@ export default async function AdminProductEditPage({
     values: f.values.map((v) => ({ id: v.id, slug: v.slug, label: v.label })),
   }));
   const existingMaterialNodeIds = existingMatNodeIdsRes.data ?? [];
-  const existingFacetValueIds = (existingFacetValsRes.data ?? []).map((f) => f.value_id);
+  const existingFacetValueIds = existingFacetValsRes.data ?? [];
 
   if (!productRow || (productRow as { type?: string }).type !== "product") return notFound();
 

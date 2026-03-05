@@ -448,6 +448,19 @@ export async function getAllFacets(): Promise<DbResult<FacetWithValues[]>> {
 
 // ─── Listing ↔ Facet Values ─────────────────────────────────────────────────
 
+/** Get raw facet_value_ids for a listing (no joins — reliable for edit forms). */
+export async function getListingFacetValueIds(
+  listingId: string
+): Promise<DbResult<string[]>> {
+  const { data, error } = await supa()
+    .from("listing_facets")
+    .select("facet_value_id")
+    .eq("listing_id", listingId);
+  if (error) return { data: null, error: error.message };
+  const ids = (data ?? []).map((r: { facet_value_id: string }) => r.facet_value_id);
+  return { data: ids, error: null };
+}
+
 /** Get facet values assigned to a listing (with facet metadata). */
 export async function getListingFacets(
   listingId: string
