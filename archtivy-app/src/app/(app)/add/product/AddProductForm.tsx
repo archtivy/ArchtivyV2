@@ -183,9 +183,9 @@ export function AddProductForm({
   const [dimensions, setDimensions] = useState(initialData?.dimensions ?? "");
   const [year, setYear] = useState(initialData?.year ?? "");
   const [materialNodeIds, setMaterialNodeIds] = useState<string[]>(initialData?.materialNodeIds ?? []);
-  const [materialNodeIdsJson, setMaterialNodeIdsJson] = useState("[]");
+  const [materialNodeIdsJson, setMaterialNodeIdsJson] = useState(() => JSON.stringify(initialData?.materialNodeIds ?? []));
   const [facetValueIds, setFacetValueIds] = useState<string[]>(initialData?.facetValueIds ?? []);
-  const [facetValueIdsJson, setFacetValueIdsJson] = useState("[]");
+  const [facetValueIdsJson, setFacetValueIdsJson] = useState(() => JSON.stringify(initialData?.facetValueIds ?? []));
 
   useEffect(() => {
     if (formMode === "admin" || updateAction) return;

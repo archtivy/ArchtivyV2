@@ -158,6 +158,7 @@ export async function createAdminProjectFull(
       ? Number(String(location_lngRaw).trim())
       : null;
   const category = (formData.get("category") as string)?.trim() ?? null;
+  const projectTaxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
   const areaSqftRaw = formData.get("area_sqft");
   const area_sqft =
     areaSqftRaw !== null && areaSqftRaw !== ""
@@ -172,7 +173,7 @@ export async function createAdminProjectFull(
   if (!title) return { error: "Title is required." };
   if (!description?.trim()) return { error: "Description is required." };
   if (!location?.trim()) return { error: "Project location is required." };
-  if (!category?.trim()) return { error: "Project category is required." };
+  if (!projectTaxonomyNodeId && !category?.trim()) return { error: "Project category is required." };
   if (!year?.trim()) return { error: "Year is required." };
 
   const imageFiles = getImageFiles(formData);
@@ -226,7 +227,6 @@ export async function createAdminProjectFull(
   if (!check?.type) return { error: "Listing created but type is missing (data integrity)." };
 
   // Set taxonomy node (new DB taxonomy system)
-  const projectTaxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
   if (projectTaxonomyNodeId) {
     const taxRes = await setListingTaxonomyNode(listingId, projectTaxonomyNodeId);
     if (taxRes.error) {
@@ -805,6 +805,7 @@ export async function updateProjectAction(
   const location_lat = location_latRaw != null && String(location_latRaw).trim() !== "" ? Number(String(location_latRaw).trim()) : null;
   const location_lng = location_lngRaw != null && String(location_lngRaw).trim() !== "" ? Number(String(location_lngRaw).trim()) : null;
   const category = (formData.get("category") as string)?.trim() ?? null;
+  const projectTaxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
   const areaSqftRaw = formData.get("area_sqft");
   const area_sqft = areaSqftRaw !== null && areaSqftRaw !== "" ? Number(String(areaSqftRaw).trim()) : null;
   const year = (formData.get("year") as string)?.trim() ?? null;
@@ -816,7 +817,7 @@ export async function updateProjectAction(
   if (!title) return { error: "Title is required." };
   if (!description?.trim()) return { error: "Description is required." };
   if (!location_text?.trim()) return { error: "Project location is required." };
-  if (!category?.trim()) return { error: "Project category is required." };
+  if (!projectTaxonomyNodeId && !category?.trim()) return { error: "Project category is required." };
   if (!year?.trim()) return { error: "Year is required." };
 
   const supabase = getSupabaseServiceClient();
@@ -874,7 +875,6 @@ export async function updateProjectAction(
   }
 
   // Update taxonomy node (new DB taxonomy system)
-  const projectTaxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
   if (projectTaxonomyNodeId) {
     const taxRes = await setListingTaxonomyNode(listingId, projectTaxonomyNodeId);
     if (taxRes.error) {

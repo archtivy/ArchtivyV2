@@ -156,9 +156,9 @@ export function AddProjectForm({
   });
   const [mentionedProductsJson, setMentionedProductsJson] = useState("[]");
   const [materialNodeIds, setMaterialNodeIds] = useState<string[]>(initialData?.materialNodeIds ?? []);
-  const [materialNodeIdsJson, setMaterialNodeIdsJson] = useState("[]");
+  const [materialNodeIdsJson, setMaterialNodeIdsJson] = useState(() => JSON.stringify(initialData?.materialNodeIds ?? []));
   const [facetValueIds, setFacetValueIds] = useState<string[]>(initialData?.facetValueIds ?? []);
-  const [facetValueIdsJson, setFacetValueIdsJson] = useState("[]");
+  const [facetValueIdsJson, setFacetValueIdsJson] = useState(() => JSON.stringify(initialData?.facetValueIds ?? []));
 
   useEffect(() => {
     if (formMode === "admin" || updateAction) return;

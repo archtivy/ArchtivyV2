@@ -190,6 +190,7 @@ export async function createProject(
       ? Number(String(location_lngRaw).trim())
       : null;
   const category = (formData.get("category") as string)?.trim() ?? null;
+  const taxonomy_node_id = (formData.get("taxonomy_node_id") as string)?.trim() || null;
   const areaSqftRaw = formData.get("area_sqft");
   const area_sqft =
     areaSqftRaw !== null && areaSqftRaw !== ""
@@ -207,7 +208,7 @@ export async function createProject(
   if (!isDraft) {
     if (!description) return { error: "Description is required." };
     if (!location) return { error: "Project location is required." };
-    if (!category) return { error: "Project category is required." };
+    if (!taxonomy_node_id && !category) return { error: "Project category is required." };
     if (!year) return { error: "Year is required." };
     if (location_lat == null || location_lng == null || Number.isNaN(location_lat) || Number.isNaN(location_lng)) {
       return { error: "Please select a place from the location search so the project can appear on Explore." };
@@ -266,9 +267,8 @@ export async function createProject(
   const listingId = listing.id;
 
   // Set taxonomy node (new DB taxonomy system)
-  const taxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
-  if (taxonomyNodeId) {
-    const taxRes = await setListingTaxonomyNode(listingId, taxonomyNodeId);
+  if (taxonomy_node_id) {
+    const taxRes = await setListingTaxonomyNode(listingId, taxonomy_node_id);
     if (taxRes.error) {
       console.warn("[createProject] taxonomy node set error (non-fatal):", taxRes.error);
     }
