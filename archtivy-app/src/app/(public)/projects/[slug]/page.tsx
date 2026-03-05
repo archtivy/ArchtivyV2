@@ -26,6 +26,7 @@ import {
   sanitizeListingImageUrl,
 } from "@/lib/db/listingImages";
 import { getPhotoProductTagsByImageIds } from "@/lib/db/photoProductTags";
+import { getSelectedPhotoMatchesByImageIds } from "@/lib/db/photoMatches";
 import { getListingDocumentsServer } from "@/lib/db/listingDocuments";
 import { resolveMentionedProducts } from "@/lib/db/mentionedProducts";
 import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
@@ -267,7 +268,10 @@ export default async function ProjectPage({
   let images: GalleryImage[];
   if (imagesWithIds.length > 0) {
     const imageIds = imagesWithIds.map((i) => i.id);
-    const tagsResult = await getPhotoProductTagsByImageIds(imageIds);
+    const [tagsResult, photoMatchesResult] = await Promise.all([
+      getPhotoProductTagsByImageIds(imageIds),
+      getSelectedPhotoMatchesByImageIds(imageIds),
+    ]);
     const tags = tagsResult.data ?? [];
     const tagsByImageId: Record<string, { id: string; x: number; y: number; product_id: string; product_title?: string; product_slug?: string; product_thumbnail?: string; product_owner_name?: string }[]> = {};
     for (const t of tags) {
@@ -290,6 +294,21 @@ export default async function ProjectPage({
         product_owner_name: product?.brand ?? undefined,
       });
     }
+    // Group photo matches by image ID
+    const photoMatches = photoMatchesResult.data ?? [];
+    const matchesByImageId: Record<string, GalleryImage["matchedProducts"]> = {};
+    for (const m of photoMatches) {
+      (matchesByImageId[m.listing_image_id] ||= []).push({
+        id: m.id,
+        product_id: m.product_id,
+        product_title: m.product_title ?? undefined,
+        product_slug: m.product_slug ?? undefined,
+        product_thumbnail: m.product_thumbnail ?? undefined,
+        product_owner_name: m.product_owner_name ?? undefined,
+        score: m.score,
+        selected_mode: m.selected_mode,
+      });
+    }
     images = imagesWithIds
       .filter((img) => sanitizeListingImageUrl(img.image_url) !== null)
       .map((img) => ({
@@ -298,8 +317,9 @@ export default async function ProjectPage({
         alt: img.alt ?? "Image",
         sort_order: img.sort_order,
         photoTags: tagsByImageId[img.id] ?? [],
+        matchedProducts: matchesByImageId[img.id] ?? [],
       }));
-    // Each image: id = listing_images.id, photoTags = tags for that image only (for Lightbox per-image sidebar).
+    // Each image: id = listing_images.id, photoTags = manual tags, matchedProducts = AI matches.
   } else {
     images = canonicalGalleryToGalleryImages(project.gallery);
   }

@@ -11,6 +11,19 @@ export type PhotoTagMarker = {
   /** Display name of the user who shared the product. */
   product_owner_name?: string;
 };
+
+/** AI-matched product for a specific gallery image (from photo_matches). */
+export type MatchedProductMarker = {
+  id: string;
+  product_id: string;
+  product_title?: string;
+  product_slug?: string;
+  product_thumbnail?: string;
+  product_owner_name?: string;
+  score: number;
+  selected_mode: "manual" | "auto";
+};
+
 export type GalleryImage = {
   id: string;
   src: string;
@@ -18,6 +31,8 @@ export type GalleryImage = {
   sort_order: number;
   /** Optional photo-level product tags for project gallery (0–1 normalized x/y). */
   photoTags?: PhotoTagMarker[];
+  /** Optional AI-matched products for this image (from photo_matches, is_selected=true). */
+  matchedProducts?: MatchedProductMarker[];
 };
 export type ProjectRecord = { id: string; slug: string; title: string; description: string | null; created_at: string };
 export type ProductRecord = { id: string; slug: string; title: string; subtitle: string | null; created_at: string };

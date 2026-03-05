@@ -176,6 +176,18 @@ export function LightboxGallery({
     []
   ) as Array<{ product_id?: string; product_slug?: string; product_title?: string; product_thumbnail?: string; product_owner_name?: string }>;
 
+  /** AI-matched products for the active image (from photo_matches). */
+  const activeMatches = (activeImageWithTags?.matchedProducts ?? []) as Array<{
+    id: string;
+    product_id: string;
+    product_title?: string;
+    product_slug?: string;
+    product_thumbnail?: string;
+    product_owner_name?: string;
+    score: number;
+    selected_mode: "manual" | "auto";
+  }>;
+
   /** Sanitize owner name: strip leading "by " to avoid "by by Studio" */
   const sanitizeOwner = (name: string | null | undefined): string => {
     const s = (name ?? "").trim();
@@ -185,28 +197,51 @@ export function LightboxGallery({
     return s;
   };
 
-  /** Sidebar list: project = tags for the active image only; product = global relatedItems. */
+  /**
+   * Sidebar list: project = manual tags + AI matches (deduplicated); product = global relatedItems.
+   * Manual tags come first, then AI matches not already in manual tags.
+   */
   const productsForCurrentImage: RelatedItem[] = React.useMemo(() => {
     if (context === "product") return relatedItems;
     const seen = new Set<string>();
-    return activeTags
-      .filter((t) => t.product_id && !seen.has(t.product_id) && seen.add(t.product_id))
-      .map((t) => {
-        const pid = t.product_id!;
-        return {
-          id: pid,
-          slug: t.product_slug ?? pid,
-          title: t.product_title ?? pid,
-          subtitle: t.product_owner_name ?? null,
-          thumbnail: t.product_thumbnail ?? undefined,
-        };
+    const result: RelatedItem[] = [];
+
+    // 1. Manual photo tags first
+    for (const t of activeTags) {
+      if (!t.product_id || seen.has(t.product_id)) continue;
+      seen.add(t.product_id);
+      result.push({
+        id: t.product_id,
+        slug: t.product_slug ?? t.product_id,
+        title: t.product_title ?? t.product_id,
+        subtitle: t.product_owner_name ?? null,
+        thumbnail: t.product_thumbnail ?? undefined,
       });
-  }, [context, activeTags, relatedItems]);
+    }
+
+    // 2. AI matched products (deduplicated against manual tags)
+    for (const m of activeMatches) {
+      if (seen.has(m.product_id)) continue;
+      seen.add(m.product_id);
+      result.push({
+        id: m.product_id,
+        slug: m.product_slug ?? m.product_id,
+        title: m.product_title ?? m.product_id,
+        subtitle: m.product_owner_name ?? null,
+        thumbnail: m.product_thumbnail ?? undefined,
+      });
+    }
+
+    return result;
+  }, [context, activeTags, activeMatches, relatedItems]);
 
   if (!open) return null;
 
   const currentImage = images[index];
-  const relatedTitle = context === "project" ? "Products in this image" : "Used in projects";
+  const hasMatchedProducts = activeMatches.length > 0;
+  const relatedTitle = context === "project"
+    ? (productsForCurrentImage.length > 0 ? "Products in this image" : "Product matches")
+    : "Used in projects";
   const baseHref = context === "project" ? "/products" : "/projects";
   const ownerName = sanitizeOwner(headerOverlay?.studioName);
   const metaLine = headerOverlay?.metaLine?.trim();
@@ -392,10 +427,20 @@ export function LightboxGallery({
                 );
               })}
             </ul>
+            ) : context === "project" ? (
+              <div className="flex flex-col items-center py-8 text-center">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-zinc-700/60 bg-zinc-800/60">
+                  <svg className="h-6 w-6 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-zinc-400">No product matches yet</p>
+                <p className="mt-1 max-w-[200px] text-xs leading-relaxed text-zinc-600">
+                  Matched products will appear here as the platform discovers similar items.
+                </p>
+              </div>
             ) : (
-              <p className="text-sm text-zinc-500">
-                {context === "project" ? "No tagged products for this image." : "No related items."}
-              </p>
+              <p className="text-sm text-zinc-500">No related items.</p>
             )}
           {teamMembers && teamMembers.length > 0 && (
             <div className="mt-6 border-t border-zinc-800/80 pt-4">
@@ -499,7 +544,7 @@ export function LightboxGallery({
               ))
             ) : (
               <li className="py-2 text-sm text-zinc-500">
-                {context === "project" ? "No tagged products for this image." : "No related items."}
+                {context === "project" ? "No product matches yet." : "No related items."}
               </li>
             )}
           </ul>

@@ -11,6 +11,7 @@ import { getProjectImageRefs } from "@/lib/db/matches";
 import { getImageAiBatch, matchProductImagesByEmbedding } from "@/lib/db/imageAi";
 import type { MatchReason } from "@/lib/matches/types";
 import { taxonomyMatchScore, type ProductTaxonomyFields } from "@/lib/matches/taxonomyScore";
+import { upsertPhotoMatchesBatch, deleteStalePhotoMatches, type PhotoMatchUpsert } from "@/lib/db/photoMatches";
 
 const SCORE_VERIFIED_HIGH = 80;
 const SCORE_VERIFIED_LOW = 70;
@@ -22,6 +23,12 @@ const EMBEDDING_WEIGHT = 0.7;
 const ATTRIBUTE_WEIGHT = 0.3;
 const FREQUENCY_BONUS_CAP = 10;
 const FREQUENCY_BONUS_PER_HIT = 2;
+
+/* ── Photo-level auto-selection thresholds ── */
+const PHOTO_AUTO_SELECT_SCORE = 85;
+const PHOTO_AUTO_SELECT_GAP = 10;
+const PHOTO_AUTO_SELECT_KEYWORDS = 5;
+const PHOTO_AUTO_SELECT_MAX = 6;
 
 /** Cosine distance (0..2 for normalized vectors) → similarity 0..100. */
 function distanceToScore(distance: number): number {
@@ -55,6 +62,24 @@ export interface PairScore {
   combined: number;
   projectImageId: string;
   productImageId: string;
+  /** Count of individual shared keywords across all attribute arrays. */
+  sharedKeywordCount: number;
+}
+
+/** Count individual shared keywords across category/material/color/context. */
+function countSharedKeywords(attrsA: Record<string, unknown>, attrsB: Record<string, unknown>): number {
+  const keys = ["category", "material", "color", "context"] as const;
+  let count = 0;
+  for (const k of keys) {
+    const arrA = attrsA[k] as unknown;
+    const arrB = attrsB[k] as unknown;
+    if (!Array.isArray(arrA) || !Array.isArray(arrB)) continue;
+    const setB = new Set((arrB as string[]).map((x) => String(x).toLowerCase()));
+    for (const v of arrA as string[]) {
+      if (setB.has(String(v).toLowerCase())) count++;
+    }
+  }
+  return count;
 }
 
 function scorePair(
@@ -67,12 +92,14 @@ function scorePair(
   const emb = distanceToScore(distance);
   const attr = attributeOverlap(projAttrs, prodAttrs);
   const combined = Math.round(emb * EMBEDDING_WEIGHT + attr * ATTRIBUTE_WEIGHT);
+  const sharedKeywordCount = countSharedKeywords(projAttrs, prodAttrs);
   return {
     embeddingScore: emb,
     attributeScore: attr,
     combined: Math.min(100, combined),
     projectImageId,
     productImageId,
+    sharedKeywordCount,
   };
 }
 
@@ -226,12 +253,13 @@ function evidenceProjectImageIds(scores: PairScore[]): string[] {
 
 /**
  * Compute matches for one project (NN-based), then upsert with run_id and safe-delete old rows.
+ * Also computes photo-level matches with auto-selection for lightbox sidebar.
  * Generates one run_id per run; after upsert, deletes only matches for this project where run_id != current.
  */
 export async function computeAndUpsertMatchesForProject(
   projectId: string,
   productIds?: string[]
-): Promise<{ upserted: number; errors: string[] }> {
+): Promise<{ upserted: number; errors: string[]; photoMatchesUpserted?: number }> {
   const sup = getSupabaseServiceClient();
   const runId = crypto.randomUUID();
   const candidates = await computeCandidatesForProject(projectId, productIds);
@@ -270,7 +298,19 @@ export async function computeAndUpsertMatchesForProject(
     .neq("run_id", runId);
   if (deleteError) errors.push(`delete old runs: ${deleteError.message}`);
 
-  return { upserted, errors };
+  // Photo-level matches with auto-selection
+  let photoMatchesUpserted = 0;
+  try {
+    const photoResult = await computeAndUpsertPhotoMatches(projectId, candidates, runId);
+    photoMatchesUpserted = photoResult.upserted;
+    if (photoResult.errors.length > 0) {
+      errors.push(...photoResult.errors.map((e) => `photo_matches: ${e}`));
+    }
+  } catch (e) {
+    errors.push(`photo_matches: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  return { upserted, errors, photoMatchesUpserted };
 }
 
 /**
@@ -291,4 +331,258 @@ export async function computeAndUpsertAllMatches(): Promise<{
     errors.push(...e);
   }
   return { projectsProcessed: projectIds.length, totalUpserted, errors };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Photo-level matches: per-image product match computation + auto-selection
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Per-image candidate: best score for a product against one project image. */
+interface PhotoCandidate {
+  listingImageId: string;
+  productId: string;
+  score: number;
+  embeddingScore: number;
+  attributeScore: number;
+  sharedKeywordCount: number;
+}
+
+/**
+ * Extract per-photo candidates from project-level MatchCandidates.
+ * Groups PairScores by projectImageId, takes best score per product per image.
+ */
+function extractPhotoCandidates(candidates: MatchCandidate[]): PhotoCandidate[] {
+  // Map: projectImageId -> productId -> best PairScore
+  const byImage = new Map<string, Map<string, PairScore>>();
+
+  for (const c of candidates) {
+    for (const pair of c.scores) {
+      let imgMap = byImage.get(pair.projectImageId);
+      if (!imgMap) {
+        imgMap = new Map();
+        byImage.set(pair.projectImageId, imgMap);
+      }
+      const existing = imgMap.get(c.productId);
+      if (!existing || pair.combined > existing.combined) {
+        imgMap.set(c.productId, pair);
+      }
+    }
+  }
+
+  const result: PhotoCandidate[] = [];
+  for (const [imageId, productMap] of byImage) {
+    for (const [productId, pair] of productMap) {
+      result.push({
+        listingImageId: imageId,
+        productId,
+        score: pair.combined,
+        embeddingScore: pair.embeddingScore,
+        attributeScore: pair.attributeScore,
+        sharedKeywordCount: pair.sharedKeywordCount,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Apply auto-selection rules to photo candidates for one image.
+ *
+ * Rules:
+ * 1. Score >= PHOTO_AUTO_SELECT_SCORE (85)
+ * 2. At least one confidence rule passes:
+ *    - Gap between #1 and #2 score >= PHOTO_AUTO_SELECT_GAP (10)
+ *    - sharedKeywordCount >= PHOTO_AUTO_SELECT_KEYWORDS (5)
+ *    - brandMatch == true (product brand matches project brand)
+ * 3. Max PHOTO_AUTO_SELECT_MAX (6) per photo
+ * 4. If ANY manual selection exists for this image, skip autos entirely
+ */
+function applyAutoSelection(
+  candidates: PhotoCandidate[],
+  brandMatchSet: Set<string>
+): PhotoCandidate[] {
+  if (candidates.length === 0) return [];
+
+  // Sort by score descending
+  const sorted = [...candidates].sort((a, b) => b.score - a.score);
+
+  // Gap between top-1 and top-2 scores
+  const globalGap =
+    sorted.length >= 2 ? sorted[0].score - sorted[1].score : Infinity;
+
+  const selected: PhotoCandidate[] = [];
+  for (const c of sorted) {
+    if (selected.length >= PHOTO_AUTO_SELECT_MAX) break;
+    if (c.score < PHOTO_AUTO_SELECT_SCORE) break;
+
+    // At least one confidence rule must pass
+    const passesConfidence =
+      globalGap >= PHOTO_AUTO_SELECT_GAP ||
+      c.sharedKeywordCount >= PHOTO_AUTO_SELECT_KEYWORDS ||
+      brandMatchSet.has(c.productId);
+
+    if (passesConfidence) {
+      selected.push(c);
+    }
+  }
+
+  return selected;
+}
+
+/**
+ * Fetch brand match data: set of product IDs whose owner brand name
+ * matches any brand name in the project's brands_used.
+ */
+async function getBrandMatchSet(
+  projectId: string,
+  productIds: string[]
+): Promise<Set<string>> {
+  if (productIds.length === 0) return new Set();
+  const sup = getSupabaseServiceClient();
+
+  // Get project brands_used
+  const { data: projectRow } = await sup
+    .from("listings")
+    .select("brands_used")
+    .eq("id", projectId)
+    .single();
+  const brandsUsed = (projectRow?.brands_used ?? []) as { name?: string }[];
+  const projectBrandNames = new Set(
+    brandsUsed
+      .map((b) => (b.name ?? "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+  if (projectBrandNames.size === 0) return new Set();
+
+  // Get product owner profile names
+  const { data: products } = await sup
+    .from("listings")
+    .select("id, owner_profile_id")
+    .in("id", productIds)
+    .eq("type", "product");
+
+  const profileIds = [
+    ...new Set(
+      ((products ?? []) as { id: string; owner_profile_id: string | null }[])
+        .map((p) => p.owner_profile_id)
+        .filter(Boolean) as string[]
+    ),
+  ];
+  if (profileIds.length === 0) return new Set();
+
+  const { data: profiles } = await sup
+    .from("profiles")
+    .select("id, display_name")
+    .in("id", profileIds);
+
+  const profileNameMap = new Map<string, string>();
+  for (const p of (profiles ?? []) as { id: string; display_name: string | null }[]) {
+    if (p.display_name) profileNameMap.set(p.id, p.display_name.trim().toLowerCase());
+  }
+
+  const matchSet = new Set<string>();
+  for (const product of ((products ?? []) as { id: string; owner_profile_id: string | null }[])) {
+    const ownerName = product.owner_profile_id
+      ? profileNameMap.get(product.owner_profile_id)
+      : null;
+    if (ownerName && projectBrandNames.has(ownerName)) {
+      matchSet.add(product.id);
+    }
+  }
+
+  return matchSet;
+}
+
+/**
+ * Compute and upsert photo-level matches with auto-selection.
+ * Called after project-level match computation with the same candidates and run_id.
+ */
+async function computeAndUpsertPhotoMatches(
+  projectId: string,
+  candidates: MatchCandidate[],
+  runId: string
+): Promise<{ upserted: number; errors: string[] }> {
+  const photoCandidates = extractPhotoCandidates(candidates);
+  if (photoCandidates.length === 0) return { upserted: 0, errors: [] };
+
+  // Collect unique image IDs and product IDs
+  const imageIds = [...new Set(photoCandidates.map((c) => c.listingImageId))];
+  const allProductIds = [...new Set(photoCandidates.map((c) => c.productId))];
+
+  // Check for manual selections and get brand match data
+  const sup = getSupabaseServiceClient();
+  const [brandMatchSet, manualByImage] = await Promise.all([
+    getBrandMatchSet(projectId, allProductIds),
+    getManualSelectionsByImage(imageIds),
+  ]);
+
+  // Build upsert rows with auto-selection
+  const rows: PhotoMatchUpsert[] = [];
+  const now = new Date().toISOString();
+
+  // Group photo candidates by image
+  const byImage = new Map<string, PhotoCandidate[]>();
+  for (const pc of photoCandidates) {
+    const arr = byImage.get(pc.listingImageId) ?? [];
+    arr.push(pc);
+    byImage.set(pc.listingImageId, arr);
+  }
+
+  for (const [imageId, imageCandidates] of byImage) {
+    const hasManual = manualByImage.has(imageId);
+
+    // Auto-select only if no manual selections exist for this image
+    const autoSelected = hasManual
+      ? []
+      : applyAutoSelection(imageCandidates, brandMatchSet);
+    const autoSelectedIds = new Set(autoSelected.map((c) => c.productId));
+
+    for (const c of imageCandidates) {
+      const isAutoSelected = autoSelectedIds.has(c.productId);
+      rows.push({
+        listing_image_id: c.listingImageId,
+        product_id: c.productId,
+        score: c.score,
+        embedding_score: c.embeddingScore,
+        attribute_score: c.attributeScore,
+        shared_keyword_count: c.sharedKeywordCount,
+        is_selected: isAutoSelected,
+        selected_mode: isAutoSelected ? "auto" : null,
+        selected_score: isAutoSelected ? c.score : null,
+        selected_at: isAutoSelected ? now : null,
+        run_id: runId,
+      });
+    }
+  }
+
+  const result = await upsertPhotoMatchesBatch(rows);
+
+  // Clean up stale photo matches (but preserve manual selections)
+  const deleteResult = await deleteStalePhotoMatches(imageIds, runId);
+  if (deleteResult.error) {
+    result.errors.push(deleteResult.error);
+  }
+
+  return result;
+}
+
+/**
+ * Check which images have manual selections (to skip auto-selection for those).
+ */
+async function getManualSelectionsByImage(imageIds: string[]): Promise<Set<string>> {
+  if (imageIds.length === 0) return new Set();
+  const sup = getSupabaseServiceClient();
+  const { data } = await sup
+    .from("photo_matches")
+    .select("listing_image_id")
+    .in("listing_image_id", imageIds)
+    .eq("is_selected", true)
+    .eq("selected_mode", "manual");
+
+  const set = new Set<string>();
+  for (const r of (data ?? []) as { listing_image_id: string }[]) {
+    set.add(r.listing_image_id);
+  }
+  return set;
 }
