@@ -9,6 +9,7 @@ import { TopNavAuth } from "@/components/layout/TopNavAuth";
 import { ShareCTA } from "@/components/layout/ShareCTA";
 import { TopNavLinks } from "@/components/layout/TopNavLinks";
 import { HeaderSearch } from "@/components/layout/HeaderSearch";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 import type { ProfileRole } from "@/lib/auth/config";
 
@@ -118,6 +119,7 @@ export function TopNav() {
             <HeaderSearch />
             {/* Desktop only: CTA + auth + theme */}
             <div className="hidden items-center gap-2 md:flex md:gap-4">
+              <NotificationBell />
               <ShareCTA userId={userId} role={profile.role} />
               <TopNavAuth
                 displayName={profile.displayName}
@@ -243,6 +245,20 @@ export function TopNav() {
                       className="rounded-[4px] px-3 py-2 text-sm text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
                     >
                       Saved
+                    </Link>
+                    <Link
+                      href="/me/following"
+                      onClick={closeDrawer}
+                      className="rounded-[4px] px-3 py-2 text-sm text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
+                    >
+                      Following
+                    </Link>
+                    <Link
+                      href="/me/notifications"
+                      onClick={closeDrawer}
+                      className="rounded-[4px] px-3 py-2 text-sm text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
+                    >
+                      Updates
                     </Link>
                     <Link
                       href="/me/settings"

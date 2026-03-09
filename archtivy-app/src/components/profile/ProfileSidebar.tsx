@@ -8,6 +8,7 @@ import { ProfileEditForm } from "@/components/profile/ProfileEditForm";
 import { ProfileContactButton } from "@/components/profile/ProfileContactButton";
 import type { Profile } from "@/lib/types/profiles";
 import type { CollaboratorItem } from "@/lib/db/listingTeamMembers";
+import { FollowButton } from "@/components/follow/FollowButton";
 
 interface ProfileSidebarProps {
   profile: Profile;
@@ -18,6 +19,9 @@ interface ProfileSidebarProps {
   firstListingForContact: { id: string; type: "project" | "product"; title: string } | null;
   collaborators: CollaboratorItem[];
   decodedUsername: string;
+  followTargetType: "designer" | "brand";
+  followTargetId: string;
+  initialFollowing: boolean;
 }
 
 /**
@@ -34,6 +38,9 @@ export function ProfileSidebar({
   firstListingForContact,
   collaborators,
   decodedUsername,
+  followTargetType,
+  followTargetId,
+  initialFollowing,
 }: ProfileSidebarProps) {
   const [bioExpanded, setBioExpanded] = useState(false);
 
@@ -116,12 +123,12 @@ export function ProfileSidebar({
                 className="flex-1 justify-center !rounded-full !h-9 !py-0 !bg-[#002abf] !text-white !border-[#002abf] hover:!bg-[#0024a8] hover:!border-[#0024a8]"
               />
             ) : null}
-            <button
-              type="button"
-              className="flex-1 inline-flex items-center justify-center rounded-full h-9 border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-[#002abf] hover:text-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2"
-            >
-              Follow
-            </button>
+            <FollowButton
+              targetType={followTargetType}
+              targetId={followTargetId}
+              initialFollowing={initialFollowing}
+              className="flex-1"
+            />
           </div>
         )}
 

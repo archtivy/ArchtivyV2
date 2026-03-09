@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { FilterPillDropdown } from "@/components/explore/filters/FilterPillDropdown";
 import { TaxonomyBreadcrumbPill } from "@/components/explore/filters/TaxonomyBreadcrumbPill";
 import { FacetFilterPills } from "@/components/explore/filters/FacetFilterPills";
+import { FollowFilterAction } from "@/components/follow/FollowFilterAction";
 import type { ExploreFilters } from "@/lib/explore/filters/schema";
 import { filtersToQueryString, countActiveFilters, buildExploreUrl } from "@/lib/explore/filters/query";
 import type { ExploreFilterOptions } from "@/lib/explore/filters/options";
@@ -309,13 +310,22 @@ export function ExploreFilterBar({
           />
         )}
         {options.materials.length > 0 && (
-          <FilterPillDropdown
-            label="Materials"
-            options={options.materials}
-            selected={currentFilters.materials}
-            onChange={(values) => update({ materials: values })}
-            data-testid="filter-materials"
-          />
+          <div className="flex shrink-0 items-center">
+            <FilterPillDropdown
+              label="Materials"
+              options={options.materials}
+              selected={currentFilters.materials}
+              onChange={(values) => update({ materials: values })}
+              data-testid="filter-materials"
+            />
+            {currentFilters.materials.length === 1 && (
+              <FollowFilterAction
+                targetType="material"
+                slugPath={currentFilters.materials[0]}
+                domain="material"
+              />
+            )}
+          </div>
         )}
         {options.areas.length > 0 && type === "projects" && (
           <FilterPillDropdown

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import type { TaxonomyTreeNode, ExploreType } from "@/lib/explore/filters/schema";
 import { TaxonomyFilterTree } from "./TaxonomyFilterTree";
+import { FollowFilterAction } from "@/components/follow/FollowFilterAction";
 
 const DROPDOWN_Z = 1000;
 const BACKDROP_Z = 999;
@@ -163,14 +164,21 @@ export function TaxonomyBreadcrumbPill({
           </span>
         </button>
         {hasSelection && (
-          <button
-            type="button"
-            onClick={() => handleSelect(null)}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-            aria-label="Clear category filter"
-          >
-            ×
-          </button>
+          <>
+            <FollowFilterAction
+              targetType="category"
+              slugPath={currentSlugPath!}
+              domain={type === "products" ? "product" : "project"}
+            />
+            <button
+              type="button"
+              onClick={() => handleSelect(null)}
+              className="flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              aria-label="Clear category filter"
+            >
+              ×
+            </button>
+          </>
         )}
       </div>
       {open && typeof document !== "undefined" && createPortal(dropdown, document.body)}

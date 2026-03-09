@@ -7,6 +7,7 @@ import { ProductCardPremium } from "@/components/listing/ProductCardPremium";
 import { HomeHeroSearch } from "@/components/search/HomeHeroSearch";
 import { ShareWorkTrigger } from "@/components/ShareWorkTrigger";
 import { LiveActivityStrip } from "@/components/home/LiveActivityStrip";
+import { NetworkFeedSection } from "@/components/home/NetworkFeedSection";
 
 const FEATURED_PROJECTS_LIMIT = 6;
 const FEATURED_PRODUCTS_LIMIT = 8;
@@ -48,6 +49,9 @@ export default async function Home() {
         {/* Live activity ticker — client-side, loads after hydration */}
         <LiveActivityStrip />
       </section>
+
+      {/* Personalized network feed — client-side, only for signed-in users */}
+      <NetworkFeedSection />
 
       {/* Featured Projects */}
       <section className="space-y-6">

@@ -14,6 +14,7 @@ import { setProjectMaterials } from "@/lib/db/materials";
 import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets } from "@/lib/taxonomy/taxonomyDb";
 import { processProjectImages } from "@/lib/matches/pipeline";
 import { computeAndUpsertMatchesForProject } from "@/lib/matches/engine";
+import { notifyDesignerPublishedProject } from "@/lib/notifications/create";
 
 const MIN_GALLERY_IMAGES = 3;
 
@@ -367,6 +368,11 @@ export async function createProject(
   const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
   const facetRes = await setListingFacets(listingId, facetValueIds);
   if (facetRes.error) console.warn("[createProject] facet values error (non-fatal):", facetRes.error);
+
+  // Notify followers of this designer — fire and forget
+  if (profile?.id) {
+    notifyDesignerPublishedProject(profile.id, listingId, title || "Untitled", slug).catch(() => {});
+  }
 
   revalidatePath("/explore");
   revalidatePath("/explore/projects");

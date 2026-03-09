@@ -39,6 +39,7 @@ import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets, getT
 import { processProductImages } from "@/lib/matches/pipeline";
 import { computeAndUpsertAllMatches } from "@/lib/matches/engine";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
+import { notifyBrandPublishedProduct } from "@/lib/notifications/create";
 
 export type { ActionResult } from "./types";
 
@@ -597,6 +598,11 @@ export async function createProductCanonical(
       await deleteProductRow(productId);
       return { error: `Document save failed: ${err.error}` };
     }
+  }
+
+  // Notify followers of this brand — fire and forget
+  if (profile?.id) {
+    notifyBrandPublishedProduct(profile.id, productId, title, slug).catch(() => {});
   }
 
   revalidatePath("/");

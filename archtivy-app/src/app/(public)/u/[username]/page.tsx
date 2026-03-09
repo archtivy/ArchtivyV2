@@ -7,7 +7,8 @@ import { CACHE_TAGS } from "@/lib/cache-tags";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { getProfileByUsername } from "@/lib/db/profiles";
+import { getProfileByUsername, getProfileByClerkId } from "@/lib/db/profiles";
+import { isFollowing as checkIsFollowing } from "@/lib/db/follows";
 import { getOwnedListingsForProfile } from "@/lib/db/listings";
 import { getTaggedListingsForProfile, getCollaboratorsForListings } from "@/lib/db/listingTeamMembers";
 import { getProjectIdsLinkedToProducts } from "@/lib/db/projectProductLinks";
@@ -82,6 +83,20 @@ export default async function PublicProfilePage({
   const claimStatus = (profile as { claim_status?: string }).claim_status ?? "unclaimed";
   const showClaim = !isOwner && claimStatus !== "claimed";
   const claimPending = claimStatus === "pending";
+
+  // Follow state: resolve viewer's profile and check follow status
+  const followTargetType = profile.role === "brand" ? "brand" : "designer";
+  let initialFollowing = false;
+  if (userId && !isOwner) {
+    const viewerProfile = await getProfileByClerkId(userId);
+    if (viewerProfile.data) {
+      initialFollowing = await checkIsFollowing(
+        viewerProfile.data.id,
+        followTargetType as "designer" | "brand",
+        profile.id
+      );
+    }
+  }
 
   const ownerClerkIds = [
     profile.clerk_user_id,
@@ -269,6 +284,9 @@ export default async function PublicProfilePage({
             claimPending={claimPending}
             firstListingForContact={contactPayload}
             decodedUsername={decoded}
+            followTargetType={followTargetType as "designer" | "brand"}
+            followTargetId={profile.id}
+            initialFollowing={initialFollowing}
           />
         </div>
 
@@ -285,6 +303,9 @@ export default async function PublicProfilePage({
               firstListingForContact={contactPayload}
               collaborators={collaborators}
               decodedUsername={decoded}
+              followTargetType={followTargetType as "designer" | "brand"}
+              followTargetId={profile.id}
+              initialFollowing={initialFollowing}
             />
           </aside>
 

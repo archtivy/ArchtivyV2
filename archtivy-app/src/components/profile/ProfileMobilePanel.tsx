@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ProfileContactButton } from "@/components/profile/ProfileContactButton";
+import { FollowButton } from "@/components/follow/FollowButton";
 import type { Profile } from "@/lib/types/profiles";
 
 interface ProfileMobilePanelProps {
@@ -12,6 +13,9 @@ interface ProfileMobilePanelProps {
   claimPending: boolean;
   firstListingForContact: { id: string; type: "project" | "product"; title: string } | null;
   decodedUsername: string;
+  followTargetType: "designer" | "brand";
+  followTargetId: string;
+  initialFollowing: boolean;
 }
 
 export function ProfileMobilePanel({
@@ -21,6 +25,9 @@ export function ProfileMobilePanel({
   claimPending,
   firstListingForContact,
   decodedUsername,
+  followTargetType,
+  followTargetId,
+  initialFollowing,
 }: ProfileMobilePanelProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -76,12 +83,12 @@ export function ProfileMobilePanel({
               className="flex-1 justify-center !rounded-full !h-9 !py-0 !bg-[#002abf] !text-white !border-[#002abf] hover:!bg-[#0024a8] hover:!border-[#0024a8]"
             />
           ) : null}
-          <button
-            type="button"
-            className="flex-1 inline-flex items-center justify-center rounded-full h-9 border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:border-[#002abf] hover:text-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2"
-          >
-            Follow
-          </button>
+          <FollowButton
+            targetType={followTargetType}
+            targetId={followTargetId}
+            initialFollowing={initialFollowing}
+            className="flex-1"
+          />
         </div>
       )}
 
