@@ -1,13 +1,40 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { NotificationDropdown } from "./NotificationDropdown";
 
 const POLL_INTERVAL = 30_000; // 30 seconds
 
-export function NotificationBell() {
+const BellIcon = () => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden
+  >
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+  </svg>
+);
+
+const bellCls =
+  "relative flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#002abf]/20 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200";
+
+interface NotificationBellProps {
+  /** When "link", clicking navigates to /me/notifications instead of opening a dropdown. */
+  mode?: "dropdown" | "link";
+}
+
+export function NotificationBell({ mode = "dropdown" }: NotificationBellProps) {
   const { user } = useUser();
+  const router = useRouter();
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -54,42 +81,40 @@ export function NotificationBell() {
     return () => document.removeEventListener("keydown", handle);
   }, [open, close]);
 
-  // When dropdown opens, reset count (it will re-poll)
-  const handleToggle = () => {
-    setOpen((prev) => !prev);
-  };
-
   if (!user?.id) return null;
 
+  const unreadDot = unreadCount > 0 && (
+    <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#002abf] dark:bg-[#5b7cff]" />
+  );
+
+  // Link mode: navigate to /me/notifications on click (used on mobile)
+  if (mode === "link") {
+    return (
+      <button
+        type="button"
+        onClick={() => router.push("/me/notifications")}
+        aria-label="Network Updates"
+        className={bellCls}
+      >
+        <BellIcon />
+        {unreadDot}
+      </button>
+    );
+  }
+
+  // Dropdown mode (default, used on desktop)
   return (
     <div className="relative" ref={containerRef}>
       <button
         type="button"
-        onClick={handleToggle}
+        onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="true"
         aria-label="Network Updates"
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#002abf]/20 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+        className={bellCls}
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-        >
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-        </svg>
-
-        {/* Unread dot */}
-        {unreadCount > 0 && (
-          <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#002abf] dark:bg-[#5b7cff]" />
-        )}
+        <BellIcon />
+        {unreadDot}
       </button>
 
       {open && <NotificationDropdown onClose={close} />}

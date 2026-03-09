@@ -128,20 +128,23 @@ export function TopNav() {
               />
               <ThemeToggle />
             </div>
-            {/* Mobile only: hamburger */}
-            <button
-              type="button"
-              onClick={() => setDrawerOpen(true)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-archtivy-primary focus:ring-offset-2 dark:text-zinc-400 dark:hover:bg-zinc-800 md:hidden"
-              aria-label="Open menu"
-              aria-expanded={drawerOpen}
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
-            </button>
+            {/* Mobile only: notification bell + hamburger */}
+            <div className="flex items-center gap-1.5 md:hidden">
+              <NotificationBell mode="link" />
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(true)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-archtivy-primary focus:ring-offset-2 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                aria-label="Open menu"
+                aria-expanded={drawerOpen}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+              </button>
+            </div>
           </div>
         </Container>
       </header>
