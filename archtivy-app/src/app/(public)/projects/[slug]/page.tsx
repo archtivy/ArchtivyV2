@@ -26,7 +26,7 @@ import {
   sanitizeListingImageUrl,
 } from "@/lib/db/listingImages";
 import { getPhotoProductTagsByImageIds } from "@/lib/db/photoProductTags";
-import { getSelectedPhotoMatchesByImageIds } from "@/lib/db/photoMatches";
+import { getSelectedPhotoMatchesByImageIds, photoMatchesExistForImages } from "@/lib/db/photoMatches";
 import { getListingDocumentsServer } from "@/lib/db/listingDocuments";
 import { resolveMentionedProducts } from "@/lib/db/mentionedProducts";
 import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
@@ -268,6 +268,28 @@ export default async function ProjectPage({
   let images: GalleryImage[];
   if (imagesWithIds.length > 0) {
     const imageIds = imagesWithIds.map((i) => i.id);
+
+    // Lazy keyword matching: if no photo_matches rows exist, run keyword engine.
+    // Deterministic, no AI/embedding dependency. Runs once per project.
+    const photoMatchesExist = await photoMatchesExistForImages(imageIds);
+    if (!photoMatchesExist) {
+      try {
+        const { computeKeywordPhotoMatches } = await import("@/lib/matches/engine");
+        const result = await computeKeywordPhotoMatches(project.id);
+        if (process.env.NODE_ENV === "development") {
+          console.log(
+            `[projects/[slug]] lazy keyword photo_matches: project=${project.id}`,
+            `upserted=${result.upserted} errors=${result.errors.length}`,
+            result.errors.length ? result.errors : ""
+          );
+        }
+      } catch (e) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[projects/[slug]] lazy keyword photo_matches failed:", e);
+        }
+      }
+    }
+
     const [tagsResult, photoMatchesResult] = await Promise.all([
       getPhotoProductTagsByImageIds(imageIds),
       getSelectedPhotoMatchesByImageIds(imageIds),
@@ -298,7 +320,7 @@ export default async function ProjectPage({
     const photoMatches = photoMatchesResult.data ?? [];
     const matchesByImageId: Record<string, GalleryImage["matchedProducts"]> = {};
     for (const m of photoMatches) {
-      (matchesByImageId[m.listing_image_id] ||= []).push({
+      (matchesByImageId[m.photo_id] ||= []).push({
         id: m.id,
         product_id: m.product_id,
         product_title: m.product_title ?? undefined,

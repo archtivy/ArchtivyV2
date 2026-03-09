@@ -26,9 +26,6 @@ const FREQUENCY_BONUS_PER_HIT = 2;
 
 /* ── Photo-level auto-selection thresholds ── */
 const PHOTO_AUTO_SELECT_SCORE = 85;
-const PHOTO_AUTO_SELECT_GAP = 10;
-const PHOTO_AUTO_SELECT_KEYWORDS = 5;
-const PHOTO_AUTO_SELECT_MAX = 6;
 
 /** Cosine distance (0..2 for normalized vectors) → similarity 0..100. */
 function distanceToScore(distance: number): number {
@@ -298,10 +295,10 @@ export async function computeAndUpsertMatchesForProject(
     .neq("run_id", runId);
   if (deleteError) errors.push(`delete old runs: ${deleteError.message}`);
 
-  // Photo-level matches with auto-selection
+  // Photo-level matches: keyword-based per-image matching
   let photoMatchesUpserted = 0;
   try {
-    const photoResult = await computeAndUpsertPhotoMatches(projectId, candidates, runId);
+    const photoResult = await computeKeywordPhotoMatches(projectId);
     photoMatchesUpserted = photoResult.upserted;
     if (photoResult.errors.length > 0) {
       errors.push(...photoResult.errors.map((e) => `photo_matches: ${e}`));
@@ -334,235 +331,231 @@ export async function computeAndUpsertAllMatches(): Promise<{
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * Photo-level matches: per-image product match computation + auto-selection
+ * Photo-level matches: keyword-based per-image product matching
+ *
+ * For each project image, combines alt + title + caption text, tokenizes,
+ * then scores every active product by keyword overlap. Deterministic,
+ * no embedding dependency.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-/** Per-image candidate: best score for a product against one project image. */
-interface PhotoCandidate {
-  listingImageId: string;
-  productId: string;
-  score: number;
-  embeddingScore: number;
-  attributeScore: number;
-  sharedKeywordCount: number;
+const KEYWORD_STOPWORDS = new Set([
+  "with", "and", "the", "modern", "beautiful", "elegant", "interior",
+  "architecture", "design", "for", "from", "that", "this", "into",
+  "our", "your", "its", "has", "have", "been", "will", "can",
+  "are", "was", "were", "but", "not", "all", "any", "each",
+  "new", "old", "also", "very", "just", "more", "most", "some",
+  "than", "then", "when", "where", "which", "while", "about",
+  "between", "through", "during", "before", "after", "above", "below",
+  "out", "off", "over", "under", "again", "once", "here", "there",
+  "how", "both", "few", "other", "such", "only", "same", "too",
+]);
+
+const PHOTO_MATCH_MIN_SCORE = 70;
+const PHOTO_MATCH_MAX_PER_IMAGE = 3;
+
+/** Normalize text → lowercase token set, removing punctuation and stopwords. */
+function tokenize(text: string): Set<string> {
+  const tokens = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 1 && !KEYWORD_STOPWORDS.has(t));
+  return new Set(tokens);
+}
+
+/** Score fields for keyword matching. */
+interface ProductKeywordData {
+  id: string;
+  titleTokens: Set<string>;
+  categoryTokens: Set<string>;
+  materialTokens: Set<string>;
+  colorTokens: Set<string>;
+  allTokens: Set<string>;
+}
+
+function buildProductKeywordData(product: {
+  id: string;
+  title: string | null;
+  product_category: string | null;
+  product_subcategory: string | null;
+  material_or_finish: string | null;
+  feature_highlight: string | null;
+  color: string | null;
+}): ProductKeywordData {
+  const titleTokens = tokenize(product.title ?? "");
+  const categoryTokens = tokenize(
+    [product.product_category, product.product_subcategory].filter(Boolean).join(" ")
+  );
+  const materialTokens = tokenize(
+    [product.material_or_finish, product.feature_highlight].filter(Boolean).join(" ")
+  );
+  const colorTokens = tokenize(product.color ?? "");
+  const allTokens = new Set([...titleTokens, ...categoryTokens, ...materialTokens, ...colorTokens]);
+  return { id: product.id, titleTokens, categoryTokens, materialTokens, colorTokens, allTokens };
+}
+
+/** Score one image's keyword set against one product. */
+function scoreImageProduct(imageTokens: Set<string>, product: ProductKeywordData): number {
+  let score = 0;
+
+  // +35 for title keyword overlap
+  for (const t of product.titleTokens) {
+    if (imageTokens.has(t)) { score += 35; break; }
+  }
+  // +25 for category/subcategory overlap
+  for (const t of product.categoryTokens) {
+    if (imageTokens.has(t)) { score += 25; break; }
+  }
+  // +25 for material/finish overlap
+  for (const t of product.materialTokens) {
+    if (imageTokens.has(t)) { score += 25; break; }
+  }
+  // +10 for color overlap
+  for (const t of product.colorTokens) {
+    if (imageTokens.has(t)) { score += 10; break; }
+  }
+  // +5 per additional keyword overlap (cap at +20)
+  let extraCount = 0;
+  for (const t of product.allTokens) {
+    if (imageTokens.has(t)) extraCount++;
+  }
+  // Subtract the keywords already counted above (max 4 primary matches)
+  const primaryHits = (score > 0 ? Math.min(4, Math.floor(score / 10)) : 0);
+  const extraHits = Math.max(0, extraCount - primaryHits);
+  score += Math.min(20, extraHits * 5);
+
+  return score;
 }
 
 /**
- * Extract per-photo candidates from project-level MatchCandidates.
- * Groups PairScores by projectImageId, takes best score per product per image.
- */
-function extractPhotoCandidates(candidates: MatchCandidate[]): PhotoCandidate[] {
-  // Map: projectImageId -> productId -> best PairScore
-  const byImage = new Map<string, Map<string, PairScore>>();
-
-  for (const c of candidates) {
-    for (const pair of c.scores) {
-      let imgMap = byImage.get(pair.projectImageId);
-      if (!imgMap) {
-        imgMap = new Map();
-        byImage.set(pair.projectImageId, imgMap);
-      }
-      const existing = imgMap.get(c.productId);
-      if (!existing || pair.combined > existing.combined) {
-        imgMap.set(c.productId, pair);
-      }
-    }
-  }
-
-  const result: PhotoCandidate[] = [];
-  for (const [imageId, productMap] of byImage) {
-    for (const [productId, pair] of productMap) {
-      result.push({
-        listingImageId: imageId,
-        productId,
-        score: pair.combined,
-        embeddingScore: pair.embeddingScore,
-        attributeScore: pair.attributeScore,
-        sharedKeywordCount: pair.sharedKeywordCount,
-      });
-    }
-  }
-
-  return result;
-}
-
-/**
- * Apply auto-selection rules to photo candidates for one image.
+ * Keyword-based photo match engine.
+ * Reads image text (alt/title/caption) from listing_images,
+ * reads all active products from listings, scores each pair,
+ * and upserts results into photo_matches.
  *
  * Rules:
- * 1. Score >= PHOTO_AUTO_SELECT_SCORE (85)
- * 2. At least one confidence rule passes:
- *    - Gap between #1 and #2 score >= PHOTO_AUTO_SELECT_GAP (10)
- *    - sharedKeywordCount >= PHOTO_AUTO_SELECT_KEYWORDS (5)
- *    - brandMatch == true (product brand matches project brand)
- * 3. Max PHOTO_AUTO_SELECT_MAX (6) per photo
- * 4. If ANY manual selection exists for this image, skip autos entirely
+ * - score >= 70 → written to photo_matches, is_selected=true
+ * - score >= 85 → selected_mode='auto'
+ * - score 70–84 → selected_mode='keyword'
+ * - If no product scores >= 70 for an image, take the top-1 as fallback
+ * - Max 3 products per image
+ * - Manual selections are never overwritten
  */
-function applyAutoSelection(
-  candidates: PhotoCandidate[],
-  brandMatchSet: Set<string>
-): PhotoCandidate[] {
-  if (candidates.length === 0) return [];
-
-  // Sort by score descending
-  const sorted = [...candidates].sort((a, b) => b.score - a.score);
-
-  // Gap between top-1 and top-2 scores
-  const globalGap =
-    sorted.length >= 2 ? sorted[0].score - sorted[1].score : Infinity;
-
-  const selected: PhotoCandidate[] = [];
-  for (const c of sorted) {
-    if (selected.length >= PHOTO_AUTO_SELECT_MAX) break;
-    if (c.score < PHOTO_AUTO_SELECT_SCORE) break;
-
-    // At least one confidence rule must pass
-    const passesConfidence =
-      globalGap >= PHOTO_AUTO_SELECT_GAP ||
-      c.sharedKeywordCount >= PHOTO_AUTO_SELECT_KEYWORDS ||
-      brandMatchSet.has(c.productId);
-
-    if (passesConfidence) {
-      selected.push(c);
-    }
-  }
-
-  return selected;
-}
-
-/**
- * Fetch brand match data: set of product IDs whose owner brand name
- * matches any brand name in the project's brands_used.
- */
-async function getBrandMatchSet(
-  projectId: string,
-  productIds: string[]
-): Promise<Set<string>> {
-  if (productIds.length === 0) return new Set();
-  const sup = getSupabaseServiceClient();
-
-  // Get project brands_used
-  const { data: projectRow } = await sup
-    .from("listings")
-    .select("brands_used")
-    .eq("id", projectId)
-    .single();
-  const brandsUsed = (projectRow?.brands_used ?? []) as { name?: string }[];
-  const projectBrandNames = new Set(
-    brandsUsed
-      .map((b) => (b.name ?? "").trim().toLowerCase())
-      .filter(Boolean)
-  );
-  if (projectBrandNames.size === 0) return new Set();
-
-  // Get product owner profile names
-  const { data: products } = await sup
-    .from("listings")
-    .select("id, owner_profile_id")
-    .in("id", productIds)
-    .eq("type", "product");
-
-  const profileIds = [
-    ...new Set(
-      ((products ?? []) as { id: string; owner_profile_id: string | null }[])
-        .map((p) => p.owner_profile_id)
-        .filter(Boolean) as string[]
-    ),
-  ];
-  if (profileIds.length === 0) return new Set();
-
-  const { data: profiles } = await sup
-    .from("profiles")
-    .select("id, display_name")
-    .in("id", profileIds);
-
-  const profileNameMap = new Map<string, string>();
-  for (const p of (profiles ?? []) as { id: string; display_name: string | null }[]) {
-    if (p.display_name) profileNameMap.set(p.id, p.display_name.trim().toLowerCase());
-  }
-
-  const matchSet = new Set<string>();
-  for (const product of ((products ?? []) as { id: string; owner_profile_id: string | null }[])) {
-    const ownerName = product.owner_profile_id
-      ? profileNameMap.get(product.owner_profile_id)
-      : null;
-    if (ownerName && projectBrandNames.has(ownerName)) {
-      matchSet.add(product.id);
-    }
-  }
-
-  return matchSet;
-}
-
-/**
- * Compute and upsert photo-level matches with auto-selection.
- * Called after project-level match computation with the same candidates and run_id.
- */
-async function computeAndUpsertPhotoMatches(
-  projectId: string,
-  candidates: MatchCandidate[],
-  runId: string
+export async function computeKeywordPhotoMatches(
+  projectId: string
 ): Promise<{ upserted: number; errors: string[] }> {
-  const photoCandidates = extractPhotoCandidates(candidates);
-  if (photoCandidates.length === 0) return { upserted: 0, errors: [] };
-
-  // Collect unique image IDs and product IDs
-  const imageIds = [...new Set(photoCandidates.map((c) => c.listingImageId))];
-  const allProductIds = [...new Set(photoCandidates.map((c) => c.productId))];
-
-  // Check for manual selections and get brand match data
   const sup = getSupabaseServiceClient();
-  const [brandMatchSet, manualByImage] = await Promise.all([
-    getBrandMatchSet(projectId, allProductIds),
-    getManualSelectionsByImage(imageIds),
-  ]);
+  const runId = crypto.randomUUID();
 
-  // Build upsert rows with auto-selection
-  const rows: PhotoMatchUpsert[] = [];
-  const now = new Date().toISOString();
+  // 1. Fetch project images with text fields
+  const { data: imageRows, error: imgErr } = await sup
+    .from("listing_images")
+    .select("id, alt, title, caption")
+    .eq("listing_id", projectId)
+    .order("sort_order", { ascending: true });
 
-  // Group photo candidates by image
-  const byImage = new Map<string, PhotoCandidate[]>();
-  for (const pc of photoCandidates) {
-    const arr = byImage.get(pc.listingImageId) ?? [];
-    arr.push(pc);
-    byImage.set(pc.listingImageId, arr);
+  if (imgErr) return { upserted: 0, errors: [imgErr.message] };
+  if (!imageRows || imageRows.length === 0) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[keywordPhotoMatches] project=${projectId} — 0 images`);
+    }
+    return { upserted: 0, errors: [] };
   }
 
-  for (const [imageId, imageCandidates] of byImage) {
-    const hasManual = manualByImage.has(imageId);
+  const images = imageRows as { id: string; alt: string | null; title: string | null; caption: string | null }[];
 
-    // Auto-select only if no manual selections exist for this image
-    const autoSelected = hasManual
-      ? []
-      : applyAutoSelection(imageCandidates, brandMatchSet);
-    const autoSelectedIds = new Set(autoSelected.map((c) => c.productId));
+  // 2. Fetch all active products
+  const { data: productRows, error: prodErr } = await sup
+    .from("listings")
+    .select("id, title, product_category, product_subcategory, material_or_finish, feature_highlight")
+    .eq("type", "product")
+    .is("deleted_at", null);
 
-    for (const c of imageCandidates) {
-      const isAutoSelected = autoSelectedIds.has(c.productId);
+  if (prodErr) return { upserted: 0, errors: [prodErr.message] };
+  if (!productRows || productRows.length === 0) {
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[keywordPhotoMatches] project=${projectId} — 0 active products in DB`);
+    }
+    return { upserted: 0, errors: [] };
+  }
+
+  const products = (productRows as {
+    id: string; title: string | null;
+    product_category: string | null; product_subcategory: string | null;
+    material_or_finish: string | null; feature_highlight: string | null;
+  }[]).map((p) => buildProductKeywordData({ ...p, color: null }));
+
+  // 3. Check for manual selections
+  const imageIds = images.map((img) => img.id);
+  const manualByImage = await getManualSelectionsByImage(imageIds);
+
+  // 4. Score each image × product
+  const now = new Date().toISOString();
+  const rows: PhotoMatchUpsert[] = [];
+  let fallbackUsed = 0;
+
+  for (const img of images) {
+    const text = [img.alt, img.title, img.caption].filter(Boolean).join(" ");
+    const imageTokens = tokenize(text);
+    if (imageTokens.size === 0) continue;
+
+    const hasManual = manualByImage.has(img.id);
+
+    // Score all products
+    const scored: { productId: string; score: number }[] = [];
+    for (const p of products) {
+      const s = scoreImageProduct(imageTokens, p);
+      if (s > 0) scored.push({ productId: p.id, score: s });
+    }
+    scored.sort((a, b) => b.score - a.score);
+
+    // Select matches: >= 70, max 3; fallback to top-1 if none qualify
+    let selected = scored.filter((s) => s.score >= PHOTO_MATCH_MIN_SCORE);
+    if (selected.length === 0 && scored.length > 0) {
+      selected = [scored[0]];
+      fallbackUsed++;
+    }
+    selected = selected.slice(0, PHOTO_MATCH_MAX_PER_IMAGE);
+
+    for (const m of selected) {
+      const isAuto = !hasManual && m.score >= PHOTO_AUTO_SELECT_SCORE;
+      const mode = hasManual ? null : (isAuto ? "auto" : "keyword");
       rows.push({
-        listing_image_id: c.listingImageId,
-        product_id: c.productId,
-        score: c.score,
-        embedding_score: c.embeddingScore,
-        attribute_score: c.attributeScore,
-        shared_keyword_count: c.sharedKeywordCount,
-        is_selected: isAutoSelected,
-        selected_mode: isAutoSelected ? "auto" : null,
-        selected_score: isAutoSelected ? c.score : null,
-        selected_at: isAutoSelected ? now : null,
+        photo_id: img.id,
+        product_id: m.productId,
+        score: m.score,
+        embedding_score: 0,
+        attribute_score: 0,
+        shared_keyword_count: 0,
+        is_selected: !hasManual,
+        selected_mode: mode,
+        selected_score: m.score,
+        selected_at: now,
         run_id: runId,
       });
     }
   }
 
+  if (process.env.NODE_ENV === "development") {
+    console.log(
+      `[keywordPhotoMatches] project=${projectId}`,
+      `photos_processed=${images.length}`,
+      `products_considered=${products.length}`,
+      `matches_written=${rows.length}`,
+      `fallback_used=${fallbackUsed}`
+    );
+  }
+
+  if (rows.length === 0) {
+    return { upserted: 0, errors: [] };
+  }
+
+  // 5. Upsert
   const result = await upsertPhotoMatchesBatch(rows);
 
-  // Clean up stale photo matches (but preserve manual selections)
+  // 6. Clean stale rows (preserve manual)
   const deleteResult = await deleteStalePhotoMatches(imageIds, runId);
-  if (deleteResult.error) {
-    result.errors.push(deleteResult.error);
-  }
+  if (deleteResult.error) result.errors.push(deleteResult.error);
 
   return result;
 }
@@ -575,14 +568,14 @@ async function getManualSelectionsByImage(imageIds: string[]): Promise<Set<strin
   const sup = getSupabaseServiceClient();
   const { data } = await sup
     .from("photo_matches")
-    .select("listing_image_id")
-    .in("listing_image_id", imageIds)
+    .select("photo_id")
+    .in("photo_id", imageIds)
     .eq("is_selected", true)
     .eq("selected_mode", "manual");
 
   const set = new Set<string>();
-  for (const r of (data ?? []) as { listing_image_id: string }[]) {
-    set.add(r.listing_image_id);
+  for (const r of (data ?? []) as { photo_id: string }[]) {
+    set.add(r.photo_id);
   }
   return set;
 }

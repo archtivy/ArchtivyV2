@@ -1,5 +1,7 @@
 /**
  * photo_matches table access: per-image product match selection for lightbox sidebar.
+ *
+ * DB column: photo_id (references listing_images.id)
  */
 
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
@@ -8,14 +10,14 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 
 export interface PhotoMatchRow {
   id: string;
-  listing_image_id: string;
+  photo_id: string;
   product_id: string;
   score: number;
   embedding_score: number | null;
   attribute_score: number | null;
   shared_keyword_count: number;
   is_selected: boolean;
-  selected_mode: "manual" | "auto" | null;
+  selected_mode: "manual" | "auto" | "keyword" | null;
   selected_score: number | null;
   selected_at: string | null;
   run_id: string | null;
@@ -23,10 +25,10 @@ export interface PhotoMatchRow {
 
 export interface PhotoMatchWithProduct {
   id: string;
-  listing_image_id: string;
+  photo_id: string;
   product_id: string;
   score: number;
-  selected_mode: "manual" | "auto";
+  selected_mode: "manual" | "auto" | "keyword";
   product_title: string | null;
   product_slug: string;
   product_thumbnail: string | null;
@@ -34,17 +36,36 @@ export interface PhotoMatchWithProduct {
 }
 
 export interface PhotoMatchUpsert {
-  listing_image_id: string;
+  photo_id: string;
   product_id: string;
   score: number;
   embedding_score: number;
   attribute_score: number;
   shared_keyword_count: number;
   is_selected: boolean;
-  selected_mode: "manual" | "auto" | null;
+  selected_mode: "manual" | "auto" | "keyword" | null;
   selected_score: number | null;
   selected_at: string | null;
   run_id: string;
+}
+
+/* ---------- Guards ---------- */
+
+/**
+ * Fast check: do ANY photo_matches rows exist for the given image IDs?
+ * Used to decide whether to trigger lazy computation on page load.
+ */
+export async function photoMatchesExistForImages(
+  imageIds: string[]
+): Promise<boolean> {
+  if (imageIds.length === 0) return true; // nothing to compute
+  const supabase = getSupabaseServiceClient();
+  const { count, error } = await supabase
+    .from("photo_matches")
+    .select("id", { count: "exact", head: true })
+    .in("photo_id", imageIds);
+  if (error) return true; // on error, skip computation
+  return (count ?? 0) > 0;
 }
 
 /* ---------- Queries ---------- */
@@ -61,8 +82,8 @@ export async function getSelectedPhotoMatchesByImageIds(
   const supabase = getSupabaseServiceClient();
   const { data, error } = await supabase
     .from("photo_matches")
-    .select("id, listing_image_id, product_id, score, selected_mode")
-    .in("listing_image_id", imageIds)
+    .select("id, photo_id, product_id, score, selected_mode")
+    .in("photo_id", imageIds)
     .eq("is_selected", true)
     .order("score", { ascending: false });
 
@@ -104,17 +125,17 @@ export async function getSelectedPhotoMatchesByImageIds(
     }
   }
 
-  const results: PhotoMatchWithProduct[] = (data as { id: string; listing_image_id: string; product_id: string; score: number; selected_mode: string }[]).map((r) => {
+  const results: PhotoMatchWithProduct[] = (data as { id: string; photo_id: string; product_id: string; score: number; selected_mode: string }[]).map((r) => {
     const product = productMap.get(r.product_id);
     const ownerName = product?.owner_profile_id
       ? profileMap.get(product.owner_profile_id) ?? null
       : null;
     return {
       id: r.id,
-      listing_image_id: r.listing_image_id,
+      photo_id: r.photo_id,
       product_id: r.product_id,
       score: Number(r.score),
-      selected_mode: (r.selected_mode ?? "auto") as "manual" | "auto",
+      selected_mode: (r.selected_mode ?? "auto") as "manual" | "auto" | "keyword",
       product_title: product?.title ?? null,
       product_slug: product?.slug ?? r.product_id,
       product_thumbnail: product?.cover_image_url ?? null,
@@ -129,7 +150,7 @@ export async function getSelectedPhotoMatchesByImageIds(
 
 /**
  * Batch upsert photo matches for a project run.
- * Uses (listing_image_id, product_id) as conflict target.
+ * Uses (photo_id, product_id) as conflict target.
  */
 export async function upsertPhotoMatchesBatch(
   rows: PhotoMatchUpsert[]
@@ -143,7 +164,7 @@ export async function upsertPhotoMatchesBatch(
   // Batch in chunks of 50
   for (let i = 0; i < rows.length; i += 50) {
     const chunk = rows.slice(i, i + 50).map((r) => ({
-      listing_image_id: r.listing_image_id,
+      photo_id: r.photo_id,
       product_id: r.product_id,
       score: r.score,
       embedding_score: r.embedding_score,
@@ -158,7 +179,7 @@ export async function upsertPhotoMatchesBatch(
     }));
     const { error } = await supabase
       .from("photo_matches")
-      .upsert(chunk, { onConflict: "listing_image_id,product_id" });
+      .upsert(chunk, { onConflict: "photo_id,product_id" });
     if (error) {
       errors.push(error.message);
     } else {
@@ -183,7 +204,7 @@ export async function deleteStalePhotoMatches(
   const { error } = await supabase
     .from("photo_matches")
     .delete()
-    .in("listing_image_id", imageIds)
+    .in("photo_id", imageIds)
     .neq("run_id", currentRunId)
     // Preserve manual selections from previous runs
     .neq("selected_mode", "manual");
@@ -224,13 +245,13 @@ export async function setPhotoMatchManualSelection(
  * Check if any manual selections exist for a given image.
  */
 export async function hasManualSelectionsForImage(
-  listingImageId: string
+  photoId: string
 ): Promise<boolean> {
   const supabase = getSupabaseServiceClient();
   const { data } = await supabase
     .from("photo_matches")
     .select("id")
-    .eq("listing_image_id", listingImageId)
+    .eq("photo_id", photoId)
     .eq("is_selected", true)
     .eq("selected_mode", "manual")
     .limit(1);

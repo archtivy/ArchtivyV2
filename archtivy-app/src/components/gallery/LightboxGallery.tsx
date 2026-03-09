@@ -185,7 +185,7 @@ export function LightboxGallery({
     product_thumbnail?: string;
     product_owner_name?: string;
     score: number;
-    selected_mode: "manual" | "auto";
+    selected_mode: "manual" | "auto" | "keyword";
   }>;
 
   /** Sanitize owner name: strip leading "by " to avoid "by by Studio" */
@@ -240,7 +240,7 @@ export function LightboxGallery({
   const currentImage = images[index];
   const hasMatchedProducts = activeMatches.length > 0;
   const relatedTitle = context === "project"
-    ? (productsForCurrentImage.length > 0 ? "Products in this image" : "Product matches")
+    ? "\u{1F50E} Matched Products"
     : "Used in projects";
   const baseHref = context === "project" ? "/products" : "/projects";
   const ownerName = sanitizeOwner(headerOverlay?.studioName);

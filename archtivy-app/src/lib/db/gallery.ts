@@ -21,7 +21,7 @@ export type MatchedProductMarker = {
   product_thumbnail?: string;
   product_owner_name?: string;
   score: number;
-  selected_mode: "manual" | "auto";
+  selected_mode: "manual" | "auto" | "keyword";
 };
 
 export type GalleryImage = {
