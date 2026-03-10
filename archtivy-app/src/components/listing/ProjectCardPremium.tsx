@@ -1,116 +1,58 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
 import type { ProjectCanonical } from "@/lib/canonical-models";
 import { getListingUrl } from "@/lib/canonical";
-import { getCityLabel, getOwnerProfileHref } from "@/lib/cardUtils";
-import { buildProjectCardMetrics } from "./cardMetrics";
+import { getOwnerProfileHref } from "@/lib/cardUtils";
+import { getCityLabel } from "@/lib/cardUtils";
+import { ProjectListingCard } from "./ProjectListingCard";
 
 export interface ProjectCardPremiumProps {
   project: ProjectCanonical;
 }
 
-function metaLine(p: ProjectCanonical): string {
-  const city = getCityLabel(p);
-  const year = p.year != null ? String(p.year) : null;
-  const cat = p.category?.trim() || null;
-  const parts = [city, year, cat].filter(Boolean);
-  return parts.length > 0 ? parts.join(" · ") : "";
-}
+const SQM_TO_SQFT = 10.7639;
 
 export function ProjectCardPremium({ project }: ProjectCardPremiumProps) {
-  const href = getListingUrl({ id: project.id, type: "project" });
-  const title = project.title?.trim() || "Project";
-  const meta = metaLine(project);
-  const teamCount = (project.team_members ?? []).length;
-  const p = project as ProjectCanonical & {
-    mentionedProducts?: unknown[];
-    connectedProducts?: unknown[];
-    productsUsed?: unknown[];
-    linkedProducts?: unknown[];
-    productLinks?: unknown[];
-  };
-  const candidates = [
-    p.mentionedProducts,
-    p.connectedProducts,
-    p.productsUsed,
-    p.linkedProducts,
-    p.productLinks,
-    p.mentioned_products,
-  ];
-  const productsArr = candidates.find((arr) => Array.isArray(arr) && arr.length > 0);
-  const productsCount = productsArr != null ? productsArr.length : undefined;
-  const brandsUsed = p.brands_used ?? [];
-  const brandsCount = productsCount == null && brandsUsed.length > 0 ? brandsUsed.length : undefined;
-  const metricsText = buildProjectCardMetrics({
-    productsCount,
-    brandsCount,
-    teamCount,
-  });
-  const owner = project.owner;
-  const ownerLabel = owner?.displayName?.trim() || null;
-  const ownerHref = ownerLabel ? getOwnerProfileHref(owner) : null;
-  const showOwner = Boolean(ownerLabel);
+  const href = getListingUrl({ id: project.id, type: "project", slug: project.slug });
+  const studioHref = project.owner ? getOwnerProfileHref(project.owner) : null;
+
+  // Location: city + country when both present, else one, else location_text
+  const city = getCityLabel(project);
+  const country = project.location?.country?.trim() ?? null;
+  const location = city && country ? `${city}, ${country}` : city || country || project.location_text?.trim() || null;
+  const locationHref = city
+    ? `/explore/projects?city=${encodeURIComponent(city)}`
+    : null;
+
+  const yearHref = project.year ? `/explore/projects?year=${project.year}` : null;
+
+  // Resolve area in sqft
+  const areaSqft =
+    project.area_sqft != null
+      ? project.area_sqft
+      : project.area_sqm != null
+      ? Math.round(project.area_sqm * SQM_TO_SQFT)
+      : null;
+
+  const teamAvatars = (project.team_members ?? []).map((m) => ({ name: m.name ?? "?" }));
 
   return (
-    <div
-      className="flex h-full flex-col overflow-hidden rounded border bg-white transition hover:shadow-md dark:bg-zinc-950"
-      style={{ borderColor: "#f1f1f1" }}
-    >
-      <Link href={href} className="block shrink-0 overflow-hidden focus:outline-none focus:ring-2 focus:ring-archtivy-primary focus:ring-inset">
-        <div className="aspect-[3/2] w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800/80">
-          {project.cover ? (
-            <Image
-              src={project.cover}
-              alt={title}
-              width={400}
-              height={267}
-              className="h-full w-full object-cover transition duration-200 hover:scale-[1.02]"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              unoptimized
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-zinc-400 dark:text-zinc-500" aria-hidden>
-              <span className="text-sm">—</span>
-            </div>
-          )}
-        </div>
-      </Link>
-      <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-5 lg:p-6">
-        <Link
-          href={href}
-          className="font-serif text-[18px] font-medium leading-tight tracking-tight text-zinc-900 hover:text-[#002abf] dark:text-zinc-100 dark:hover:text-[#5b7cff] sm:text-xl line-clamp-2 min-h-[2.5rem] focus:outline-none focus:ring-2 focus:ring-archtivy-primary focus:ring-offset-2"
-        >
-          {title}
-        </Link>
-        {showOwner && (
-          <p className="mt-1.5 truncate text-sm text-zinc-500 dark:text-zinc-400">
-            by{" "}
-            {ownerHref ? (
-              <Link
-                href={ownerHref}
-                className="text-zinc-500 no-underline transition hover:text-[#002abf] dark:text-zinc-400 dark:hover:text-[#5b7cff] focus:outline-none focus:ring-2 focus:ring-archtivy-primary focus:ring-offset-2 rounded"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {ownerLabel}
-              </Link>
-            ) : (
-              <span>{ownerLabel}</span>
-            )}
-          </p>
-        )}
-        {meta && (
-          <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 line-clamp-1">
-            {meta}
-          </p>
-        )}
-        {metricsText != null && (
-          <p className="mt-auto pt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-            {metricsText}
-          </p>
-        )}
-      </div>
-    </div>
+    <ProjectListingCard
+      image={project.cover}
+      imageAlt={project.title}
+      title={project.title}
+      href={href}
+      studioName={project.owner?.displayName ?? null}
+      studioHref={studioHref}
+      location={location}
+      locationHref={locationHref}
+      year={project.year}
+      yearHref={yearHref}
+      areaSqft={areaSqft}
+      connectionCount={project.connectionCount ?? 0}
+      teamAvatars={teamAvatars}
+      entityId={project.id}
+      entityTitle={project.title}
+    />
   );
 }

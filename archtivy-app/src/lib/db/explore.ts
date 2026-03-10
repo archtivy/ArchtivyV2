@@ -601,6 +601,13 @@ async function getProjectListingRowsFiltered(
     if ("gte" in range && range.gte != null) query = query.gte("area_sqft", range.gte);
     if ("lt" in range && range.lt != null) query = query.lt("area_sqft", range.lt);
   }
+  if (filters.project_status && filters.project_status.length > 0) {
+    query = query.in("project_status", filters.project_status);
+  }
+  if (filters.collaboration_only) {
+    query = query.not("project_collaboration_status", "is", null)
+      .not("project_collaboration_status", "eq", "not_open_for_collaboration");
+  }
 
   const order = projectOrder(sort);
   const { data, error, count } = await query
@@ -721,6 +728,13 @@ async function getProductRowsFiltered(
   }
   if (filters.brand?.trim()) {
     query = query.eq("owner_profile_id", filters.brand.trim());
+  }
+  if (filters.product_stage && filters.product_stage.length > 0) {
+    query = query.in("product_stage", filters.product_stage);
+  }
+  if (filters.collaboration_only) {
+    query = query.not("product_collaboration_status", "is", null)
+      .not("product_collaboration_status", "eq", "not_open_for_collaboration");
   }
 
   const order = productOrder(sort);

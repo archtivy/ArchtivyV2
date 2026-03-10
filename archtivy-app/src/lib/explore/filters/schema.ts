@@ -74,6 +74,7 @@ export const RESERVED_PARAM_NAMES = new Set([
   "year", "year_min", "year_max", "materials", "material_type",
   "area_bucket", "color", "sort", "type", "product_category", "sub",
   "taxonomy", "taxonomy_materials", "page", "offset",
+  "project_status", "product_stage", "collaboration",
 ]);
 
 /** URL search params schema (one-way: raw params -> typed filters). */
@@ -93,6 +94,9 @@ export const exploreFiltersSearchParamsSchema = z.object({
   color: commaList,
   sort: z.string().optional(),
   taxonomy_materials: commaList,
+  project_status: commaList,
+  product_stage: commaList,
+  collaboration: z.string().optional().transform((s) => s === "1" || s === "true"),
   /** @deprecated Legacy product taxonomy params — used for 301 redirect detection only. */
   type: optionalStr,
   product_category: optionalStr,
@@ -125,6 +129,12 @@ export interface ExploreFilters {
   sort: string;
   /** Dynamic facet filters: { facetSlug: [valueSlug, ...] }. */
   facets: Record<string, string[]>;
+  /** Filter by project status values. */
+  project_status: string[];
+  /** Filter by product stage values. */
+  product_stage: string[];
+  /** Only show listings open for collaboration. */
+  collaboration: boolean;
   /** @deprecated Legacy product taxonomy filters. Used for 301 redirect detection only. */
   product_type: string | null;
   /** @deprecated */
@@ -153,6 +163,9 @@ export const DEFAULT_EXPLORE_FILTERS: ExploreFilters = {
   color: [],
   sort: "newest",
   facets: {},
+  project_status: [],
+  product_stage: [],
+  collaboration: false,
   product_type: null,
   product_category: null,
   product_subcategory: null,

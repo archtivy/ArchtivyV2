@@ -18,6 +18,7 @@ import { FilesSection } from "@/components/files/FilesSection";
 import { areaSqftToBucket } from "@/lib/exploreFilters";
 import { getCityLabel, getOwnerProfileHref } from "@/lib/cardUtils";
 import type { TaxonomyCrumb, TaxonomyMaterialTag, TaxonomyFacetGroup } from "./TaxonomyTags";
+import { ProjectCollaborationSection } from "./CollaborationSection";
 
 export interface ProjectDetailLayoutProps {
   images: GalleryImage[];
@@ -153,6 +154,11 @@ export function ProjectDetailLayout({
           <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
             <div className="min-w-0 lg:col-span-8">
               <ProjectDetailContent project={project} />
+              <ProjectCollaborationSection
+                project_status={project.project_status}
+                project_collaboration_status={project.project_collaboration_status}
+                project_looking_for={project.project_looking_for}
+              />
             </div>
             <div className="lg:col-span-4">
               <NetworkSidebar

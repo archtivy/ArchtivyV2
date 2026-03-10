@@ -15,6 +15,13 @@ import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
 import { SubmissionProgressBar } from "@/components/add/SubmissionProgressBar";
 import { LocationPicker, type LocationValue } from "@/components/location/LocationPicker";
 import { PROJECT_CATEGORIES } from "@/lib/auth/config";
+import {
+  PROJECT_STATUS_VALUES,
+  PROJECT_STATUS_LABELS,
+  PROJECT_COLLAB_VALUES,
+  PROJECT_COLLAB_LABELS,
+  PROJECT_LOOKING_FOR_OPTIONS,
+} from "@/lib/lifecycle";
 import type { MemberTitleRow } from "./TeamMembersField";
 
 /** Minimal node shape the form needs from the DB project taxonomy tree. */
@@ -70,6 +77,10 @@ export interface ProjectFormInitialData {
   materialNodeIds?: string[];
   /** Pre-selected facet value IDs (for edit mode). */
   facetValueIds?: string[];
+  // Lifecycle
+  projectStatus?: string;
+  projectCollaborationStatus?: string;
+  projectLookingFor?: string[];
 }
 
 /** Resolve initial building-type / subcategory node IDs from initialData + nodes. */
@@ -159,6 +170,10 @@ export function AddProjectForm({
   const [materialNodeIdsJson, setMaterialNodeIdsJson] = useState(() => JSON.stringify(initialData?.materialNodeIds ?? []));
   const [facetValueIds, setFacetValueIds] = useState<string[]>(initialData?.facetValueIds ?? []);
   const [facetValueIdsJson, setFacetValueIdsJson] = useState(() => JSON.stringify(initialData?.facetValueIds ?? []));
+  const [projectStatus, setProjectStatus] = useState(initialData?.projectStatus ?? "");
+  const [projectCollabStatus, setProjectCollabStatus] = useState(initialData?.projectCollaborationStatus ?? "");
+  const [projectLookingFor, setProjectLookingFor] = useState<string[]>(initialData?.projectLookingFor ?? []);
+  const [projectLookingForJson, setProjectLookingForJson] = useState(() => JSON.stringify(initialData?.projectLookingFor ?? []));
 
   useEffect(() => {
     if (formMode === "admin" || updateAction) return;
@@ -187,6 +202,9 @@ export function AddProjectForm({
   useEffect(() => {
     setFacetValueIdsJson(JSON.stringify(facetValueIds));
   }, [facetValueIds]);
+  useEffect(() => {
+    setProjectLookingForJson(JSON.stringify(projectLookingFor));
+  }, [projectLookingFor]);
 
   const wordCount = useMemo(() => countWords(description), [description]);
   const descValid = wordCount >= MIN_DESC_WORDS && wordCount <= MAX_DESC_WORDS;
@@ -318,6 +336,7 @@ export function AddProjectForm({
       <input type="hidden" name="mentioned_products" value={mentionedProductsJson} />
       <input type="hidden" name="taxonomy_material_ids" value={materialNodeIdsJson} />
       <input type="hidden" name="facet_value_ids" value={facetValueIdsJson} />
+      <input type="hidden" name="project_looking_for" value={projectLookingForJson} />
       {initialData?.listingId && (
         <input type="hidden" name="_listingId" value={initialData.listingId} />
       )}
@@ -552,6 +571,77 @@ export function AddProjectForm({
               />
             </div>
           </div>
+        </section>
+
+        {/* Section: Lifecycle & Collaboration */}
+        <section className={sectionClass}>
+          <h2 className={sectionTitleClass}>Lifecycle &amp; Collaboration</h2>
+          <div>
+            <label htmlFor="project_status" className={labelClass}>
+              Project status
+            </label>
+            <select
+              id="project_status"
+              name="project_status"
+              value={projectStatus}
+              onChange={(e) => setProjectStatus(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Select status (optional)</option>
+              {PROJECT_STATUS_VALUES.map((v) => (
+                <option key={v} value={v}>
+                  {PROJECT_STATUS_LABELS[v]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="project_collaboration_status" className={labelClass}>
+              Collaboration status
+            </label>
+            <select
+              id="project_collaboration_status"
+              name="project_collaboration_status"
+              value={projectCollabStatus}
+              onChange={(e) => setProjectCollabStatus(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Select (optional)</option>
+              {PROJECT_COLLAB_VALUES.map((v) => (
+                <option key={v} value={v}>
+                  {PROJECT_COLLAB_LABELS[v]}
+                </option>
+              ))}
+            </select>
+          </div>
+          {projectCollabStatus && projectCollabStatus !== "not_open_for_collaboration" && (
+            <div>
+              <label className={labelClass}>Looking for</label>
+              <div className="flex flex-wrap gap-2">
+                {PROJECT_LOOKING_FOR_OPTIONS.map((opt) => {
+                  const checked = projectLookingFor.includes(opt.value);
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() =>
+                        setProjectLookingFor((prev) =>
+                          checked ? prev.filter((v) => v !== opt.value) : [...prev, opt.value]
+                        )
+                      }
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                        checked
+                          ? "border-[#002abf] bg-[#002abf] text-white"
+                          : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Section: Advanced Filters (material taxonomy + facets) */}

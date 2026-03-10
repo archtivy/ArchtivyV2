@@ -42,6 +42,13 @@ export interface Listing {
   team_members: TeamMember[];
   brands_used: BrandUsed[];
   materials?: MaterialTag[];
+  // Lifecycle & collaboration
+  project_status: string | null;
+  product_stage: string | null;
+  project_collaboration_status: string | null;
+  project_looking_for: string[] | null;
+  product_collaboration_status: string | null;
+  product_looking_for: string[] | null;
 }
 
 /** Detail page: Listing + normalized counts (0 when not in DB). */
@@ -85,6 +92,13 @@ export interface CreateListingInput {
   team_members?: TeamMember[];
   brands_used?: BrandUsed[];
   slug?: string | null;
+  // Lifecycle & collaboration
+  project_status?: string | null;
+  product_stage?: string | null;
+  project_collaboration_status?: string | null;
+  project_looking_for?: string[] | null;
+  product_collaboration_status?: string | null;
+  product_looking_for?: string[] | null;
 }
 
 /**
@@ -124,6 +138,13 @@ export interface ListingCardData {
   used_in_projects_count?: number;
   updated_at: string | null;
   materials?: MaterialTag[];
+  // Lifecycle & collaboration
+  project_status?: string | null;
+  product_stage?: string | null;
+  project_collaboration_status?: string | null;
+  project_looking_for?: string[] | null;
+  product_collaboration_status?: string | null;
+  product_looking_for?: string[] | null;
 }
 
 /**

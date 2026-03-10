@@ -18,6 +18,13 @@ import {
   getCategoriesForType,
   getSubcategoriesForCategory,
 } from "@/lib/taxonomy/productTaxonomy";
+import {
+  PRODUCT_STAGE_VALUES,
+  PRODUCT_STAGE_LABELS,
+  PRODUCT_COLLAB_VALUES,
+  PRODUCT_COLLAB_LABELS,
+  PRODUCT_LOOKING_FOR_OPTIONS,
+} from "@/lib/lifecycle";
 
 /** Minimal node shape the form needs from the DB taxonomy tree. */
 export interface TaxonomyNodeForForm {
@@ -75,6 +82,10 @@ export interface ProductFormInitialData {
   materialNodeIds?: string[];
   /** Pre-selected facet value IDs (for edit mode). */
   facetValueIds?: string[];
+  // Lifecycle
+  productStage?: string;
+  productCollaborationStatus?: string;
+  productLookingFor?: string[];
 }
 
 /** Resolve initial family/category/subcategory node IDs from initialData + nodes. */
@@ -186,6 +197,10 @@ export function AddProductForm({
   const [materialNodeIdsJson, setMaterialNodeIdsJson] = useState(() => JSON.stringify(initialData?.materialNodeIds ?? []));
   const [facetValueIds, setFacetValueIds] = useState<string[]>(initialData?.facetValueIds ?? []);
   const [facetValueIdsJson, setFacetValueIdsJson] = useState(() => JSON.stringify(initialData?.facetValueIds ?? []));
+  const [productStage, setProductStage] = useState(initialData?.productStage ?? "");
+  const [productCollabStatus, setProductCollabStatus] = useState(initialData?.productCollaborationStatus ?? "");
+  const [productLookingFor, setProductLookingFor] = useState<string[]>(initialData?.productLookingFor ?? []);
+  const [productLookingForJson, setProductLookingForJson] = useState(() => JSON.stringify(initialData?.productLookingFor ?? []));
 
   useEffect(() => {
     if (formMode === "admin" || updateAction) return;
@@ -207,6 +222,9 @@ export function AddProductForm({
   useEffect(() => {
     setFacetValueIdsJson(JSON.stringify(facetValueIds));
   }, [facetValueIds]);
+  useEffect(() => {
+    setProductLookingForJson(JSON.stringify(productLookingFor));
+  }, [productLookingFor]);
 
   const wordCount = useMemo(() => countWords(description), [description]);
   const descValid = wordCount >= MIN_DESC_WORDS;
@@ -355,6 +373,7 @@ export function AddProductForm({
       <input type="hidden" name="product_material_ids" value="[]" />
       <input type="hidden" name="taxonomy_material_ids" value={materialNodeIdsJson} />
       <input type="hidden" name="facet_value_ids" value={facetValueIdsJson} />
+      <input type="hidden" name="product_looking_for" value={productLookingForJson} />
       {/* Taxonomy: send node ID + legacy slugs derived from the selected node */}
       {useDbTaxonomy && (
         <>
@@ -677,6 +696,77 @@ export function AddProductForm({
           selectedFacetValueIds={facetValueIds}
           onFacetValueIdsChange={setFacetValueIds}
         />
+
+        {/* Section: Product Stage & Collaboration */}
+        <section className={sectionClass}>
+          <h2 className={sectionTitleClass}>Stage &amp; Collaboration</h2>
+          <div>
+            <label htmlFor="product_stage" className={labelClass}>
+              Product stage
+            </label>
+            <select
+              id="product_stage"
+              name="product_stage"
+              value={productStage}
+              onChange={(e) => setProductStage(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Select stage (optional)</option>
+              {PRODUCT_STAGE_VALUES.map((v) => (
+                <option key={v} value={v}>
+                  {PRODUCT_STAGE_LABELS[v]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="product_collaboration_status" className={labelClass}>
+              Collaboration status
+            </label>
+            <select
+              id="product_collaboration_status"
+              name="product_collaboration_status"
+              value={productCollabStatus}
+              onChange={(e) => setProductCollabStatus(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Select (optional)</option>
+              {PRODUCT_COLLAB_VALUES.map((v) => (
+                <option key={v} value={v}>
+                  {PRODUCT_COLLAB_LABELS[v]}
+                </option>
+              ))}
+            </select>
+          </div>
+          {productCollabStatus && productCollabStatus !== "not_open_for_collaboration" && (
+            <div>
+              <label className={labelClass}>Looking for</label>
+              <div className="flex flex-wrap gap-2">
+                {PRODUCT_LOOKING_FOR_OPTIONS.map((opt) => {
+                  const checked = productLookingFor.includes(opt.value);
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() =>
+                        setProductLookingFor((prev) =>
+                          checked ? prev.filter((v) => v !== opt.value) : [...prev, opt.value]
+                        )
+                      }
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                        checked
+                          ? "border-[#002abf] bg-[#002abf] text-white"
+                          : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </section>
 
         {/* Section: Connections */}
         <section className={sectionClass}>

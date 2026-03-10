@@ -109,32 +109,58 @@ export function NetworkFeedSection() {
     return null;
   }
 
-  // Render feed
+  // Split items by type
+  const projectItems = data.items.filter((i) => i.type === "project" && i.project);
+  const productItems = data.items.filter((i) => i.type === "product" && i.product);
+
+  // Render feed — projects and products in separate grids
   return (
-    <section className="space-y-6">
+    <section className="space-y-12">
       <h2 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
         From your network
       </h2>
-      <ul
-        className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3"
-        aria-label="From your network"
-      >
-        {data.items.map((item) => {
-          const id = item.project?.id ?? item.product?.id ?? "";
-          return (
-            <li key={id} className="h-full">
-              <p className="mb-1.5 truncate text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                {item.reason}
-              </p>
-              {item.type === "project" && item.project ? (
-                <ProjectCardPremium project={item.project} />
-              ) : item.type === "product" && item.product ? (
-                <ProductCardPremium product={item.product} />
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
+
+      {projectItems.length > 0 && (
+        <div className="space-y-5">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500">
+            Projects
+          </h3>
+          <ul
+            className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            aria-label="Projects from your network"
+          >
+            {projectItems.map((item) => (
+              <li key={item.project!.id}>
+                <p className="mb-1.5 truncate text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                  {item.reason}
+                </p>
+                <ProjectCardPremium project={item.project!} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {productItems.length > 0 && (
+        <div className="space-y-5">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500">
+            Products
+          </h3>
+          <ul
+            className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4"
+            aria-label="Products from your network"
+          >
+            {productItems.map((item) => (
+              <li key={item.product!.id}>
+                <p className="mb-1.5 truncate text-[11px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                  {item.reason}
+                </p>
+                <ProductCardPremium product={item.product!} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

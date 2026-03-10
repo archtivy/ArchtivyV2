@@ -14,7 +14,8 @@ import { setProjectMaterials } from "@/lib/db/materials";
 import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets } from "@/lib/taxonomy/taxonomyDb";
 import { processProjectImages } from "@/lib/matches/pipeline";
 import { computeAndUpsertMatchesForProject } from "@/lib/matches/engine";
-import { notifyDesignerPublishedProject } from "@/lib/notifications/create";
+import { notifyDesignerPublishedProject, notifyNearbyUsersOfOpportunity } from "@/lib/notifications/create";
+import { detectProjectOpportunities } from "@/lib/lifecycle";
 
 const MIN_GALLERY_IMAGES = 3;
 
@@ -202,6 +203,9 @@ export async function createProject(
   const team_members = parseTeamMembers(formData.get("team_members"));
   const material_ids = parseMaterialIds(formData.get("project_material_ids"));
   const mentioned_products = parseMentionedProducts(formData.get("mentioned_products"));
+  const project_status = (formData.get("project_status") as string)?.trim() || null;
+  const project_collaboration_status = (formData.get("project_collaboration_status") as string)?.trim() || null;
+  const project_looking_for = parseMaterialIds(formData.get("project_looking_for"));
 
   const isDraft = formData.get("draft") === "1";
 
@@ -259,6 +263,9 @@ export async function createProject(
       mentioned_products: mentioned_products.length > 0 ? mentioned_products : [],
       owner_clerk_user_id: userId,
       owner_profile_id: profile?.id ?? null,
+      project_status: project_status || null,
+      project_collaboration_status: project_collaboration_status || null,
+      project_looking_for: project_looking_for.length > 0 ? project_looking_for : [],
     })
     .select("id")
     .single();
@@ -372,6 +379,21 @@ export async function createProject(
   // Notify followers of this designer — fire and forget
   if (profile?.id) {
     notifyDesignerPublishedProject(profile.id, listingId, title || "Untitled", slug).catch(() => {});
+  }
+
+  // Notify nearby users if this project is an opportunity — fire and forget
+  const projectOpportunities = detectProjectOpportunities(project_status, project_collaboration_status);
+  if (projectOpportunities.length > 0) {
+    notifyNearbyUsersOfOpportunity({
+      listingId,
+      listingSlug: slug,
+      listingType: "project",
+      listingTitle: title || "Untitled",
+      locationCity: location_city,
+      locationCountry: location_country,
+      ownerProfileId: profile?.id ?? null,
+      opportunity: projectOpportunities[0],
+    }).catch(() => {});
   }
 
   revalidatePath("/explore");

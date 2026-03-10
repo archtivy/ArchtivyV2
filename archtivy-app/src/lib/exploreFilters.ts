@@ -53,6 +53,10 @@ export interface ProjectFilters {
   taxonomy?: string | null;
   /** Dynamic facet filters: { facetSlug: [valueSlug, ...] }. */
   facets: Record<string, string[]>;
+  /** Filter by project status values (e.g. ["concept", "design_development"]). */
+  project_status?: string[];
+  /** Only show listings open for collaboration. */
+  collaboration_only?: boolean;
 }
 
 export interface ProductFilters {
@@ -82,6 +86,10 @@ export interface ProductFilters {
   taxonomy?: string | null;
   /** Dynamic facet filters: { facetSlug: [valueSlug, ...] }. */
   facets: Record<string, string[]>;
+  /** Filter by product stage values (e.g. ["concept", "prototype"]). */
+  product_stage?: string[];
+  /** Only show listings open for collaboration. */
+  collaboration_only?: boolean;
 }
 
 export const DEFAULT_PROJECT_FILTERS: ProjectFilters = {

@@ -169,6 +169,9 @@ export async function createAdminProjectFull(
   const team_members = parseTeamMembers(formData.get("team_members"));
   const material_ids = parseMaterialIds(formData.get("project_material_ids"));
   const mentioned_products = parseMentionedProducts(formData.get("mentioned_products"));
+  const project_status = (formData.get("project_status") as string)?.trim() || null;
+  const project_collaboration_status = (formData.get("project_collaboration_status") as string)?.trim() || null;
+  const project_looking_for = parseMaterialIds(formData.get("project_looking_for"));
 
   if (!title) return { error: "Title is required." };
   if (!description?.trim()) return { error: "Description is required." };
@@ -216,6 +219,9 @@ export async function createAdminProjectFull(
       owner_clerk_user_id: null,
       owner_profile_id: ownerProfileId,
       cover_image_url: null,
+      project_status: project_status || null,
+      project_collaboration_status: project_collaboration_status || null,
+      project_looking_for: project_looking_for.length > 0 ? project_looking_for : [],
     })
     .select("id")
     .maybeSingle();
@@ -357,6 +363,9 @@ export async function createAdminProductFull(
   const material_ids = parseMaterialIds(formData.get("product_material_ids"));
   const color_options = parseColorOptions(formData.get("color_options"));
   const taxonomy_node_id = (formData.get("taxonomy_node_id") as string)?.trim() || null;
+  const product_stage = (formData.get("product_stage") as string)?.trim() || null;
+  const product_collaboration_status = (formData.get("product_collaboration_status") as string)?.trim() || null;
+  const product_looking_for = parseMaterialIds(formData.get("product_looking_for"));
 
   if (!title) return { error: "Product title is required." };
   if (!description?.trim()) return { error: "Product description is required." };
@@ -411,6 +420,9 @@ export async function createAdminProductFull(
       owner_clerk_user_id: null,
       owner_profile_id: ownerProfileId,
       cover_image_url: null,
+      product_stage: product_stage || null,
+      product_collaboration_status: product_collaboration_status || null,
+      product_looking_for: product_looking_for.length > 0 ? product_looking_for : [],
     })
     .select("id")
     .maybeSingle();
@@ -852,6 +864,9 @@ export async function updateProjectAction(
   const team_members = parseTeamMembers(formData.get("team_members"));
   const material_ids = parseMaterialIds(formData.get("project_material_ids"));
   const mentioned_products = parseMentionedProducts(formData.get("mentioned_products"));
+  const project_status_upd = (formData.get("project_status") as string)?.trim() || null;
+  const project_collab_status_upd = (formData.get("project_collaboration_status") as string)?.trim() || null;
+  const project_looking_for_upd = parseMaterialIds(formData.get("project_looking_for"));
 
   if (!title) return { error: "Title is required." };
   if (!description?.trim()) return { error: "Description is required." };
@@ -878,6 +893,9 @@ export async function updateProjectAction(
       team_members,
       brands_used: [],
       mentioned_products: mentioned_products.length > 0 ? mentioned_products : [],
+      project_status: project_status_upd || null,
+      project_collaboration_status: project_collab_status_upd || null,
+      project_looking_for: project_looking_for_upd.length > 0 ? project_looking_for_upd : [],
     })
     .eq("id", listingId);
 
@@ -971,8 +989,10 @@ export async function updateProductAction(
   const team_members = parseTeamMembers(formData.get("team_members"));
   const material_ids = parseMaterialIds(formData.get("product_material_ids"));
   const color_options = parseColorOptions(formData.get("color_options"));
-
   const taxonomy_node_id = (formData.get("taxonomy_node_id") as string)?.trim() || null;
+  const product_stage_upd = (formData.get("product_stage") as string)?.trim() || null;
+  const product_collab_status_upd = (formData.get("product_collaboration_status") as string)?.trim() || null;
+  const product_looking_for_upd = parseMaterialIds(formData.get("product_looking_for"));
 
   if (!title) return { error: "Product title is required." };
   if (!description?.trim()) return { error: "Description is required." };
@@ -1005,6 +1025,9 @@ export async function updateProductAction(
       dimensions: dimensions || null,
       year: year || null,
       team_members,
+      product_stage: product_stage_upd || null,
+      product_collaboration_status: product_collab_status_upd || null,
+      product_looking_for: product_looking_for_upd.length > 0 ? product_looking_for_upd : [],
     })
     .eq("id", listingId);
 

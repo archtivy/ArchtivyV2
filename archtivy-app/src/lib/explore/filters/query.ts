@@ -27,6 +27,9 @@ export function filtersToQueryString(filters: ExploreFilters, type: ExploreType)
   if (filters.material_type.length) p.set("material_type", filters.material_type.join(","));
   if (filters.area_bucket) p.set("area_bucket", filters.area_bucket);
   if (filters.color.length) p.set("color", filters.color.join(","));
+  if (filters.project_status.length) p.set("project_status", filters.project_status.join(","));
+  if (filters.product_stage.length) p.set("product_stage", filters.product_stage.join(","));
+  if (filters.collaboration) p.set("collaboration", "1");
   if (filters.sort && filters.sort !== "newest") p.set("sort", filters.sort);
   // Serialize each facet group as individual query param
   for (const [facetSlug, values] of Object.entries(filters.facets)) {
@@ -67,6 +70,9 @@ export function countActiveFilters(filters: ExploreFilters, type: ExploreType): 
   if (filters.material_type.length && type === "products") n += filters.material_type.length;
   if (filters.area_bucket && type === "projects") n += 1;
   if (filters.color.length && type === "products") n += filters.color.length;
+  if (filters.project_status.length && type === "projects") n += filters.project_status.length;
+  if (filters.product_stage.length && type === "products") n += filters.product_stage.length;
+  if (filters.collaboration) n += 1;
   // Count individual facet values
   for (const values of Object.values(filters.facets)) {
     n += values.length;
@@ -97,6 +103,8 @@ export function exploreFiltersToProjectFilters(f: ExploreFilters): ProjectFilter
     designers: f.designers.length ? f.designers : undefined,
     brands: f.brands.length ? f.brands : undefined,
     facets: f.facets,
+    project_status: f.project_status.length ? f.project_status : undefined,
+    collaboration_only: f.collaboration || undefined,
   };
 }
 
@@ -120,5 +128,7 @@ export function exploreFiltersToProductFilters(f: ExploreFilters): ProductFilter
     product_category: f.product_category?.trim() || null,
     product_subcategory: f.product_subcategory?.trim() || null,
     facets: f.facets,
+    product_stage: f.product_stage.length ? f.product_stage : undefined,
+    collaboration_only: f.collaboration || undefined,
   };
 }

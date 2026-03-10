@@ -17,7 +17,8 @@ export type NotificationEventType =
   | "brand_published_product"
   | "followed_category_new_listing"
   | "followed_material_new_listing"
-  | "admin_update";
+  | "admin_update"
+  | "opportunity_nearby";
 
 export type NotificationPriority = "low" | "normal" | "high";
 

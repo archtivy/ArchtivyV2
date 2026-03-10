@@ -1,70 +1,44 @@
-import Link from "next/link";
-import Image from "next/image";
 import type { ListingCardData } from "@/lib/types/listings";
 import { getListingUrl } from "@/lib/canonical";
-import { buildProductCardMetrics } from "./cardMetrics";
+import { ProductListingCard } from "./ProductListingCard";
 
 export interface ProductCardProps {
   listing: ListingCardData;
   imageUrl?: string | null;
-  /** Override canonical URL. When not provided, uses getListingUrl(listing). */
+  /** Override canonical product URL. */
   href?: string | null;
-  /** Owner display name. Shown under title with no prefix. */
+  /** Owner display name (already resolved by caller). */
   postedBy?: string | null;
 }
 
-export function ProductCard({
-  listing,
-  imageUrl,
-  href,
-  postedBy,
-}: ProductCardProps) {
-  const teamCount = (listing.team_members ?? []).length;
-  const projectsCount = listing.used_in_projects_count ?? 0;
-  const metricsText = buildProductCardMetrics(projectsCount, teamCount);
-  const linkHref = (href?.trim() || "") || getListingUrl(listing);
+export function ProductCard({ listing, imageUrl, href, postedBy }: ProductCardProps) {
+  const linkHref = href?.trim() || getListingUrl(listing);
   const title = listing.title?.trim() || "Product";
 
+  // Prefer product_category > legacy category
+  const category = listing.product_category ?? listing.category ?? null;
+  const categoryHref = category
+    ? `/explore/products?category=${encodeURIComponent(category)}`
+    : null;
+
+  // Build brand href from owner_profile_id when available (redirects to profile slug page)
+  const brandHref = listing.owner_profile_id
+    ? `/u/id/${listing.owner_profile_id}`
+    : null;
+
+  const connectionsCount = listing.used_in_projects_count ?? 0;
+
   return (
-    <Link
+    <ProductListingCard
+      image={imageUrl}
+      imageAlt={title}
+      brandName={postedBy ?? null}
+      brandHref={brandHref}
+      title={title}
       href={linkHref}
-      className="group block overflow-hidden rounded-lg border border-zinc-200 bg-white transition hover:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-archtivy-primary focus:ring-offset-2 dark:border-zinc-800 dark:bg-zinc-900 dark:focus:ring-offset-zinc-950"
-    >
-      <div className="aspect-[4/3] w-full overflow-hidden rounded-t-lg bg-zinc-100 dark:bg-zinc-800/80">
-        {imageUrl ? (
-          <Image
-            src={imageUrl}
-            alt={title}
-            width={400}
-            height={300}
-            className="h-full w-full object-cover transition group-hover:scale-[1.02]"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            unoptimized
-          />
-        ) : (
-          <div
-            className="flex h-full w-full items-center justify-center text-zinc-400 dark:text-zinc-500"
-            aria-hidden
-          >
-            <span className="text-sm">—</span>
-          </div>
-        )}
-      </div>
-      <div className="p-5">
-        <h3 className="font-serif text-lg font-medium tracking-tight text-zinc-900 group-hover:text-archtivy-primary dark:text-zinc-100 dark:group-hover:text-archtivy-primary line-clamp-2">
-          {title}
-        </h3>
-        {postedBy && (
-          <p className="mt-1 truncate text-sm text-zinc-500 dark:text-zinc-400">
-            {postedBy}
-          </p>
-        )}
-        {metricsText != null && (
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            {metricsText}
-          </p>
-        )}
-      </div>
-    </Link>
+      category={category}
+      categoryHref={categoryHref}
+      connectionsCount={connectionsCount}
+    />
   );
 }

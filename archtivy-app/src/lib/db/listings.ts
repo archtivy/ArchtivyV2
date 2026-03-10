@@ -255,6 +255,12 @@ export async function createListing(
     team_members: input.team_members ?? [],
     brands_used: input.brands_used ?? [],
     ...loc,
+    project_status: input.project_status ?? null,
+    product_stage: input.product_stage ?? null,
+    project_collaboration_status: input.project_collaboration_status ?? null,
+    project_looking_for: input.project_looking_for ?? [],
+    product_collaboration_status: input.product_collaboration_status ?? null,
+    product_looking_for: input.product_looking_for ?? [],
   };
   if (input.slug?.trim()) row.slug = input.slug.trim();
   if (input.type === "project") {

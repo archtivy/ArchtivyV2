@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
+import { Lato } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
+
+const lato = Lato({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-lato",
+  display: "swap",
+});
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { SiteShell } from "@/components/layout/SiteShell";
 import { Analytics } from "@vercel/analytics/react"; // ✅ bunu ekle
@@ -27,7 +35,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up">
-      <html lang="en" suppressHydrationWarning>
+      <html lang="en" suppressHydrationWarning className={lato.variable}>
         <head>
           <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         </head>

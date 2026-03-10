@@ -3,6 +3,7 @@ import {
   createGroupedNotification,
 } from "@/lib/db/notifications";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import type { DetectedOpportunity } from "@/lib/lifecycle";
 
 /**
  * Notify a profile that someone followed them.
@@ -190,6 +191,83 @@ export async function notifyFollowedCategoryNewListing(
       cta_label: `View ${listingType}`,
       cta_url: `/${prefix}/${listingSlug}`,
       group_key: `category_listing:${categoryNodeId}:${hourKey}`,
+    });
+  }
+}
+
+/**
+ * Notify nearby profiles when a listing creates an opportunity.
+ * Matches by city (exact) then same country. Filters by relevant role.
+ * Fire-and-forget — caller should not await.
+ */
+export async function notifyNearbyUsersOfOpportunity(input: {
+  listingId: string;
+  listingSlug: string;
+  listingType: "project" | "product";
+  listingTitle: string;
+  locationCity: string | null;
+  locationCountry: string | null;
+  ownerProfileId: string | null;
+  opportunity: DetectedOpportunity;
+}): Promise<void> {
+  const {
+    listingId,
+    listingSlug,
+    listingType,
+    listingTitle,
+    locationCity,
+    locationCountry,
+    ownerProfileId,
+    opportunity,
+  } = input;
+
+  if (!locationCity && !locationCountry) return;
+
+  const sup = getSupabaseServiceClient();
+
+  // Determine which roles to target based on opportunity type
+  const targetRoles =
+    listingType === "product"
+      ? ["brand", "designer"]
+      : ["designer", "brand"];
+
+  // Find profiles in same city or country, excluding the owner
+  const { data: profiles } = await sup
+    .from("profiles")
+    .select("id, role, location_city, location_country")
+    .in("role", targetRoles)
+    .or(
+      [
+        locationCity ? `location_city.ilike.${locationCity}` : null,
+        locationCountry ? `location_country.ilike.${locationCountry}` : null,
+      ]
+        .filter(Boolean)
+        .join(",")
+    )
+    .limit(200);
+
+  if (!profiles || profiles.length === 0) return;
+
+  const prefix = listingType === "project" ? "projects" : "products";
+  const ctaUrl = `/${prefix}/${listingSlug}`;
+  const dayKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  for (const profile of profiles) {
+    const p = profile as { id: string; role: string; location_city: string | null; location_country: string | null };
+    if (p.id === ownerProfileId) continue;
+
+    await createGroupedNotification({
+      recipient_profile_id: p.id,
+      actor_profile_id: ownerProfileId,
+      source: "system",
+      event_type: "opportunity_nearby",
+      entity_type: listingType,
+      entity_id: listingId,
+      title: opportunity.label,
+      body: `${opportunity.description}: ${listingTitle}`,
+      cta_label: `View ${listingType}`,
+      cta_url: ctaUrl,
+      group_key: `opportunity:${listingId}:${dayKey}`,
     });
   }
 }

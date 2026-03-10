@@ -39,7 +39,8 @@ import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets, getT
 import { processProductImages } from "@/lib/matches/pipeline";
 import { computeAndUpsertAllMatches } from "@/lib/matches/engine";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
-import { notifyBrandPublishedProduct } from "@/lib/notifications/create";
+import { notifyBrandPublishedProduct, notifyNearbyUsersOfOpportunity } from "@/lib/notifications/create";
+import { detectProductOpportunities } from "@/lib/lifecycle";
 
 export type { ActionResult } from "./types";
 
@@ -230,6 +231,9 @@ export async function createProduct(
   const teamMembers = parseTeamMembers(formData.get("team_members"));
   const docFiles = getDocumentFiles(formData);
   const taxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
+  const productStage = (formData.get("product_stage") as string)?.trim() || null;
+  const productCollabStatus = (formData.get("product_collaboration_status") as string)?.trim() || null;
+  const productLookingFor = parseMaterialIds(formData.get("product_looking_for"));
 
   if (!title) return { error: "Product title is required." };
   if (!description?.trim()) return { error: "Product description is required." };
@@ -284,6 +288,9 @@ export async function createProduct(
     dimensions: dimensions || null,
     year: year || null,
     team_members: teamMembers,
+    product_stage: productStage || null,
+    product_collaboration_status: productCollabStatus || null,
+    product_looking_for: productLookingFor.length > 0 ? productLookingFor : [],
   });
   if (createResult.error) return { error: createResult.error };
   const listingId = createResult.data!.id;
@@ -350,6 +357,21 @@ export async function createProduct(
   import("@/lib/matches/engine")
     .then(({ recomputeAllKeywordPhotoMatches }) => recomputeAllKeywordPhotoMatches())
     .catch((e: unknown) => console.warn("[createProduct] photo match recompute non-fatal:", e));
+
+  // Notify nearby users if this product is an opportunity — fire and forget
+  const productOpportunities = detectProductOpportunities(productStage, productCollabStatus);
+  if (productOpportunities.length > 0) {
+    notifyNearbyUsersOfOpportunity({
+      listingId,
+      listingSlug: resolvedSlug,
+      listingType: "product",
+      listingTitle: title,
+      locationCity: null,
+      locationCountry: null,
+      ownerProfileId: null,
+      opportunity: productOpportunities[0],
+    }).catch(() => {});
+  }
 
   return { slug: resolvedSlug };
 }

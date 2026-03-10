@@ -80,6 +80,12 @@ export interface ProjectCanonical {
   taxonomy_label?: string | null;
   /** Facet values assigned to this listing. */
   facet_values?: { facet_slug: string; value_slug: string; value_label: string }[];
+  /** Lifecycle: project status (concept, design_development, etc.). */
+  project_status?: string | null;
+  /** Lifecycle: collaboration status. */
+  project_collaboration_status?: string | null;
+  /** Lifecycle: roles/disciplines the project is looking for. */
+  project_looking_for?: string[] | null;
 }
 
 export interface ProductCanonical {
@@ -121,6 +127,12 @@ export interface ProductCanonical {
   taxonomy_label?: string | null;
   /** Facet values assigned to this listing. */
   facet_values?: { facet_slug: string; value_slug: string; value_label: string }[];
+  /** Lifecycle: product stage (concept, in_development, prototype, etc.). */
+  product_stage?: string | null;
+  /** Lifecycle: collaboration status. */
+  product_collaboration_status?: string | null;
+  /** Lifecycle: roles/disciplines the product is looking for. */
+  product_looking_for?: string[] | null;
 }
 
 /** Single source of truth: project rows are listings with type = 'project'. Tolerant: type ?? listing_type. */
@@ -269,6 +281,9 @@ export function normalizeProject(
     status: (raw.status as "PENDING" | "APPROVED") ?? "APPROVED",
     mentioned_products: parseMentionedProducts(raw.mentioned_products),
     brands_used,
+    project_status: (raw.project_status as string | null) ?? null,
+    project_collaboration_status: (raw.project_collaboration_status as string | null) ?? null,
+    project_looking_for: Array.isArray(raw.project_looking_for) ? (raw.project_looking_for as string[]) : [],
   };
 }
 
@@ -344,6 +359,9 @@ export function normalizeProduct(
     materials: materialTags.map((m) => ({ id: m.id, name: m.display_name, slug: m.slug })),
     material_tags: materialTags,
     status: (raw.status as "PENDING" | "APPROVED") ?? "APPROVED",
+    product_stage: (raw.product_stage as string | null) ?? null,
+    product_collaboration_status: (raw.product_collaboration_status as string | null) ?? null,
+    product_looking_for: Array.isArray(raw.product_looking_for) ? (raw.product_looking_for as string[]) : [],
   };
 }
 

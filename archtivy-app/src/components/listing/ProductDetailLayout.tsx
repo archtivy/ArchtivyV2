@@ -23,6 +23,7 @@ import type { ProductCanonical } from "@/lib/canonical-models";
 import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
 import type { ListingDocument } from "@/lib/types/listings";
 import { TaxonomyTags, type TaxonomyCrumb, type TaxonomyMaterialTag, type TaxonomyFacetGroup } from "./TaxonomyTags";
+import { ProductCollaborationSection } from "./CollaborationSection";
 
 function ShareIcon({ className }: { className?: string }) {
   return (
@@ -259,6 +260,11 @@ export function ProductDetailLayout({
                 listingDocuments={listingDocuments}
                 listingId={product.id}
                 useDownloadApi
+              />
+              <ProductCollaborationSection
+                product_stage={product.product_stage}
+                product_collaboration_status={product.product_collaboration_status}
+                product_looking_for={product.product_looking_for}
               />
             </div>
           </aside>
