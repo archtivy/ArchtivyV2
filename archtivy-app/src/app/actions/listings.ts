@@ -345,6 +345,12 @@ export async function createProduct(
   revalidatePath("/me/listings");
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
+
+  // New product created — recompute photo matches for all projects (non-blocking)
+  import("@/lib/matches/engine")
+    .then(({ recomputeAllKeywordPhotoMatches }) => recomputeAllKeywordPhotoMatches())
+    .catch((e: unknown) => console.warn("[createProduct] photo match recompute non-fatal:", e));
+
   return { slug: resolvedSlug };
 }
 
@@ -360,6 +366,7 @@ export async function deleteListing(listingId: string): Promise<ActionResult> {
   if (listing.owner_clerk_user_id !== userId) {
     return { error: "You can only delete your own listings." };
   }
+  const wasProduct = listing.type === "product";
   const { error: deleteError } = await dbDeleteListing(listingId);
   if (deleteError) {
     return { error: deleteError };
@@ -370,6 +377,14 @@ export async function deleteListing(listingId: string): Promise<ActionResult> {
   revalidatePath("/");
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
+
+  // If a product was deleted, recompute photo matches for all projects
+  if (wasProduct) {
+    import("@/lib/matches/engine")
+      .then(({ recomputeAllKeywordPhotoMatches }) => recomputeAllKeywordPhotoMatches())
+      .catch((e: unknown) => console.warn("[deleteListing] photo match recompute non-fatal:", e));
+  }
+
   return {};
 }
 

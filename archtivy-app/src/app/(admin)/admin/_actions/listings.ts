@@ -16,7 +16,7 @@ import type { TeamMember, BrandUsed } from "@/lib/types/listings";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
 import { processProjectImages, processProductImages } from "@/lib/matches/pipeline";
-import { computeAndUpsertMatchesForProject, computeAndUpsertAllMatches } from "@/lib/matches/engine";
+import { computeAndUpsertMatchesForProject, computeAndUpsertAllMatches, recomputeAllKeywordPhotoMatches } from "@/lib/matches/engine";
 import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets, getTaxonomyNodeById } from "@/lib/taxonomy/taxonomyDb";
 
 const MIN_GALLERY_IMAGES = 3;
@@ -594,6 +594,19 @@ export async function bulkUpdateListings(input: {
   revalidatePath("/explore");
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
+
+  // Check if any updated listing is a product — if so, recompute photo matches
+  const matchFields = ["title", "product_type", "product_category", "product_subcategory", "material_or_finish"];
+  const touchesMatchFields = matchFields.some((f) => f in input.patch);
+  if (touchesMatchFields) {
+    const { data: types } = await supabase.from("listings").select("type").in("id", ids).limit(1);
+    if ((types ?? []).some((t) => (t as { type: string }).type === "product")) {
+      recomputeAllKeywordPhotoMatches().catch((e: unknown) =>
+        console.warn("[bulkUpdateListings] photo match recompute non-fatal:", e)
+      );
+    }
+  }
+
   return { ok: true as const };
 }
 
@@ -717,6 +730,11 @@ export async function deleteListing(listingId: string) {
   if (!admin.ok) return { ok: false as const, error: admin.error };
 
   const supabase = getSupabaseServiceClient();
+
+  // Capture type before deletion so we know whether to recompute photo matches
+  const { data: listingRow } = await supabase.from("listings").select("type").eq("id", listingId).single();
+  const listingType = (listingRow as { type: string } | null)?.type;
+
   await supabase.from("listing_images").delete().eq("listing_id", listingId);
   await supabase.from("project_product_links").delete().or(`project_id.eq.${listingId},product_id.eq.${listingId}`);
   const { error } = await supabase.from("listings").delete().eq("id", listingId);
@@ -742,6 +760,14 @@ export async function deleteListing(listingId: string) {
   revalidatePath("/explore");
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
+
+  // If a product was deleted, recompute photo matches so stale references are cleared
+  if (listingType === "product") {
+    recomputeAllKeywordPhotoMatches().catch((e: unknown) =>
+      console.warn("[deleteListing] photo match recompute non-fatal:", e)
+    );
+  }
+
   return { ok: true as const };
 }
 
@@ -755,6 +781,11 @@ export async function bulkDeleteListings(ids: string[]) {
   if (uniqueIds.length === 0) return { ok: false as const, error: "No ids provided" };
 
   const supabase = getSupabaseServiceClient();
+
+  // Check if any of the deleted listings are products (before deletion)
+  const { data: typeRows } = await supabase.from("listings").select("type").in("id", uniqueIds);
+  const hasProduct = (typeRows ?? []).some((r) => (r as { type: string }).type === "product");
+
   for (const id of uniqueIds) {
     await supabase.from("listing_images").delete().eq("listing_id", id);
     await supabase.from("project_product_links").delete().or(`project_id.eq.${id},product_id.eq.${id}`);
@@ -781,6 +812,14 @@ export async function bulkDeleteListings(ids: string[]) {
   revalidatePath("/explore");
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
+
+  // If any deleted listing was a product, recompute photo matches
+  if (hasProduct) {
+    recomputeAllKeywordPhotoMatches().catch((e: unknown) =>
+      console.warn("[bulkDeleteListings] photo match recompute non-fatal:", e)
+    );
+  }
+
   return { ok: true as const };
 }
 
@@ -1042,6 +1081,12 @@ export async function updateProductAction(
   revalidatePath("/u/[username]", "page");
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
+
+  // Product metadata changed — recompute photo matches for all projects (non-blocking)
+  recomputeAllKeywordPhotoMatches().catch((e: unknown) =>
+    console.warn("[updateProductAction] photo match recompute non-fatal:", e)
+  );
+
   redirect(`/admin/products/${listingId}?saved=1`);
 }
 

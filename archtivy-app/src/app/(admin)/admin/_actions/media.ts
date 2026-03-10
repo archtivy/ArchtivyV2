@@ -80,6 +80,12 @@ export async function uploadListingImages(formData: FormData) {
     }
 
     revalidateListingPaths(listingId);
+
+    // Trigger match recomputation for new images (non-blocking)
+    recomputeMatchesAfterGalleryChange(listingId).catch((e: unknown) =>
+      console.warn("[uploadListingImages] match recompute non-fatal:", e)
+    );
+
     return { ok: true as const, images: appendResult.data };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Upload failed unexpectedly";
@@ -128,6 +134,12 @@ export async function deleteListingImage(imageId: string, listingId: string) {
   }
 
   revalidateListingPaths(listingId);
+
+  // Recompute matches after image removal (non-blocking)
+  recomputeMatchesAfterGalleryChange(listingId).catch((e: unknown) =>
+    console.warn("[deleteListingImage] match recompute non-fatal:", e)
+  );
+
   return { ok: true as const };
 }
 
@@ -212,7 +224,86 @@ export async function updateImageAlt(input: {
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/admin/media");
   revalidatePath("/admin/seo-quality");
+
+  // Recompute keyword photo matches for the parent project
+  await recomputePhotoMatchesForImage(supabase, input.imageId);
+
   return { ok: true as const };
+}
+
+/**
+ * Look up the parent listing for an image and recompute keyword photo matches.
+ * Non-fatal: errors are logged but do not fail the parent operation.
+ */
+async function recomputePhotoMatchesForImage(
+  supabase: ReturnType<typeof getSupabaseServiceClient>,
+  imageId: string
+) {
+  try {
+    const { data: img } = await supabase
+      .from("listing_images")
+      .select("listing_id")
+      .eq("id", imageId)
+      .single();
+    if (!img?.listing_id) return;
+
+    // Only recompute for projects (type = 'project')
+    const { data: listing } = await supabase
+      .from("listings")
+      .select("type")
+      .eq("id", img.listing_id)
+      .single();
+    if (listing?.type !== "project") return;
+
+    const { computeKeywordPhotoMatches } = await import("@/lib/matches/engine");
+    const result = await computeKeywordPhotoMatches(img.listing_id);
+    console.log(
+      `[updateImageAlt] recomputed photo_matches: project=${img.listing_id}`,
+      `upserted=${result.upserted} errors=${result.errors.length}`
+    );
+
+    // Revalidate the public project page so ISR picks up new matches
+    const { data: slug } = await supabase
+      .from("listings")
+      .select("slug")
+      .eq("id", img.listing_id)
+      .single();
+    if (slug?.slug) {
+      revalidatePath(`/projects/${slug.slug}`, "page");
+      revalidateTag(CACHE_TAGS.listings);
+    }
+  } catch (e) {
+    console.warn("[updateImageAlt] photo_matches recompute non-fatal:", e);
+  }
+}
+
+/**
+ * Recompute keyword photo matches for a listing after gallery changes (upload/delete).
+ * Only runs for projects. Non-fatal: errors are logged but do not fail the parent operation.
+ */
+async function recomputeMatchesAfterGalleryChange(listingId: string) {
+  const supabase = getSupabaseServiceClient();
+
+  // Only recompute for projects
+  const { data: listing } = await supabase
+    .from("listings")
+    .select("type, slug")
+    .eq("id", listingId)
+    .single();
+  if (listing?.type !== "project") return;
+
+  const { computeKeywordPhotoMatches } = await import("@/lib/matches/engine");
+  const result = await computeKeywordPhotoMatches(listingId);
+  console.log(
+    `[recomputeMatchesAfterGalleryChange] project=${listingId}`,
+    `upserted=${result.upserted} errors=${result.errors.length}`
+  );
+
+  // Revalidate the public project page so ISR picks up new matches
+  if (listing.slug) {
+    revalidatePath(`/projects/${listing.slug}`, "page");
+    revalidateTag(CACHE_TAGS.listings);
+  }
 }
 
 /** Update listing image alt and revalidate project edit page (for Editorial Image Manager). */

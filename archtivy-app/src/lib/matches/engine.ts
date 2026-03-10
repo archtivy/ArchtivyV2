@@ -339,7 +339,7 @@ export async function computeAndUpsertAllMatches(): Promise<{
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 const KEYWORD_STOPWORDS = new Set([
-  "with", "and", "the", "modern", "beautiful", "elegant", "interior",
+  "with", "and", "the", "or", "modern", "beautiful", "elegant", "interior",
   "architecture", "design", "for", "from", "that", "this", "into",
   "our", "your", "its", "has", "have", "been", "will", "can",
   "are", "was", "were", "but", "not", "all", "any", "each",
@@ -348,6 +348,7 @@ const KEYWORD_STOPWORDS = new Set([
   "between", "through", "during", "before", "after", "above", "below",
   "out", "off", "over", "under", "again", "once", "here", "there",
   "how", "both", "few", "other", "such", "only", "same", "too",
+  "product", "image", "photo", "picture", "view",
 ]);
 
 const PHOTO_MATCH_MIN_SCORE = 70;
@@ -558,6 +559,39 @@ export async function computeKeywordPhotoMatches(
   if (deleteResult.error) result.errors.push(deleteResult.error);
 
   return result;
+}
+
+/**
+ * Recompute keyword photo matches for ALL active projects.
+ * Use when product data changes (create/update/delete) so every project
+ * picks up the new product catalog. Non-blocking, non-fatal.
+ */
+export async function recomputeAllKeywordPhotoMatches(): Promise<{
+  projectsProcessed: number;
+  errors: string[];
+}> {
+  const sup = getSupabaseServiceClient();
+  const { data: projects, error } = await sup
+    .from("listings")
+    .select("id")
+    .eq("type", "project")
+    .is("deleted_at", null);
+
+  if (error || !projects) return { projectsProcessed: 0, errors: [error?.message ?? "fetch failed"] };
+
+  const errors: string[] = [];
+  let processed = 0;
+  for (const p of projects) {
+    try {
+      const result = await computeKeywordPhotoMatches(p.id);
+      if (result.errors.length > 0) errors.push(...result.errors);
+      processed++;
+    } catch (e) {
+      errors.push(`${p.id}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  console.log(`[recomputeAllKeywordPhotoMatches] processed=${processed}/${projects.length} errors=${errors.length}`);
+  return { projectsProcessed: processed, errors };
 }
 
 /**

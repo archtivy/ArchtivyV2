@@ -63,6 +63,15 @@ export async function DELETE(
     revalidatePath("/explore/products");
     revalidatePath("/sitemap.xml");
 
+    // If soft-deleted listing is a product, recompute photo matches for all projects
+    const { data: listing } = await supabase.from("listings").select("type").eq("id", id).single();
+    if ((listing as { type: string } | null)?.type === "product") {
+      const { recomputeAllKeywordPhotoMatches } = await import("@/lib/matches/engine");
+      recomputeAllKeywordPhotoMatches().catch((e: unknown) =>
+        console.warn("[soft-delete] photo match recompute non-fatal:", e)
+      );
+    }
+
     return Response.json({ success: true });
   } catch (e) {
     console.error("[DELETE /api/admin/listings]", e);
