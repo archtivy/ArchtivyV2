@@ -168,7 +168,7 @@ export function ProductDetailLayout({
     <>
       <div className="w-full bg-white dark:bg-zinc-950">
         {/* Two-column: gallery 58–60%, content 40–42% */}
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.45fr_1fr] lg:gap-14">
+        <div className="grid grid-cols-1 gap-10 pb-8 lg:grid-cols-[1.45fr_1fr] lg:gap-14">
           <div className="min-w-0">
             <ProductDetailGallery images={images} onImageClick={handleImageClick} />
           </div>
@@ -260,6 +260,7 @@ export function ProductDetailLayout({
                 listingDocuments={listingDocuments}
                 listingId={product.id}
                 useDownloadApi
+                listingTitle={product.title}
               />
               <ProductCollaborationSection
                 product_stage={product.product_stage}
@@ -269,6 +270,11 @@ export function ProductDetailLayout({
             </div>
           </aside>
         </div>
+
+        {/* Divider */}
+        {(usedProjects.length > 0 || moreInCategory.length > 0) && (
+          <hr className="border-zinc-100 dark:border-zinc-800" style={{ margin: "24px 0" }} />
+        )}
 
         {/* Used in Projects (only if at least 1 project) */}
         {usedProjects.length > 0 && (
