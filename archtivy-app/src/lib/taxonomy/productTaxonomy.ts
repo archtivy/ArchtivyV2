@@ -298,6 +298,7 @@ const TYPES: ProductTaxonomyType[] = [
           { id: "stone-cladding", label: "Stone cladding" },
           { id: "wood-cladding", label: "Wood cladding" },
           { id: "wall-covering", label: "Wall covering" },
+          { id: "brick", label: "Brick" },
           { id: "other-not-specified", label: PRODUCT_TAXONOMY_FALLBACK_SUBCATEGORY_LABEL },
         ],
       },
