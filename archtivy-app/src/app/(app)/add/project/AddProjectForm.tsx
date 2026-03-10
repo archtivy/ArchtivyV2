@@ -51,7 +51,7 @@ const sectionTitleClass = "text-base font-semibold text-zinc-900 dark:text-zinc-
 const MIN_DESC_WORDS = 300;
 const MAX_DESC_WORDS = 500;
 const MIN_GALLERY = 3;
-const PROJECT_REQUIRED_COUNT = 7;
+const PROJECT_REQUIRED_COUNT = 6;
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -260,12 +260,11 @@ export function AddProjectForm({
       hasCategorySelection,
       hasLocation,
       year.trim() !== "",
-      areaSqft.trim() !== "" && !Number.isNaN(Number(areaSqft)) && Number(areaSqft) > 0,
       descValid,
       galleryRequired ? galleryValid : true,
     ].filter(Boolean).length;
     return Math.round((done / PROJECT_REQUIRED_COUNT) * 100);
-  }, [title, hasCategorySelection, hasLocation, year, areaSqft, descValid, galleryRequired, galleryValid]);
+  }, [title, hasCategorySelection, hasLocation, year, descValid, galleryRequired, galleryValid]);
 
   const addTeamRow = () => setTeamRows((r) => [...r, { name: "", role: "" }]);
   const updateTeamRow = (i: number, field: "name" | "role", value: string) => {
@@ -540,14 +539,13 @@ export function AddProjectForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="area_sqft" className={labelClass}>
-                Area (sqft) <span className="text-archtivy-primary">*</span>
+                Area (sqft)
               </label>
               <input
                 id="area_sqft"
                 type="number"
                 name="area_sqft"
-                required
-                min={1}
+                min={0}
                 step={1}
                 value={areaSqft}
                 onChange={(e) => setAreaSqft(e.target.value)}
