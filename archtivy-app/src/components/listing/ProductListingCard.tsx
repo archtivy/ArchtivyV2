@@ -18,13 +18,9 @@ export interface ProductListingCardProps {
   title: string;
   /** href for product detail page. Required. */
   href: string;
-  /** Category label (taxonomy or raw category string). */
-  category?: string | null;
-  /** href for category link. Omit to render plain text. */
-  categoryHref?: string | null;
   /**
    * Number of projects this product has been used in.
-   * Only rendered when > 0 — no placeholder shown otherwise.
+   * Rendered as a badge on the image when > 0.
    */
   connectionsCount?: number;
 }
@@ -43,8 +39,6 @@ export function ProductListingCard({
   brandHref,
   title,
   href,
-  category,
-  categoryHref,
   connectionsCount = 0,
 }: ProductListingCardProps) {
   const alt = imageAlt ?? title;
@@ -107,6 +101,28 @@ export function ProductListingCard({
                 </svg>
               </div>
             )}
+
+            {/* ── Connections badge ────────────────────────────────────── */}
+            {connectionsCount > 0 && (
+              <span
+                className="absolute right-2 top-2 z-10"
+                style={{
+                  background: "rgba(0,0,0,0.58)",
+                  color: "#fff",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  lineHeight: 1,
+                  padding: "4px 8px",
+                  borderRadius: 999,
+                  letterSpacing: "0.01em",
+                  backdropFilter: "blur(2px)",
+                  WebkitBackdropFilter: "blur(2px)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {connectionsCount} connection{connectionsCount === 1 ? "" : "s"}
+              </span>
+            )}
           </div>
         </Link>
       </div>
@@ -134,7 +150,7 @@ export function ProductListingCard({
       )}
 
       {/* ── Title ─────────────────────────────────────────────────────── */}
-      <div style={{ marginBottom: 2 }}>
+      <div>
         <Link
           href={href}
           className="text-zinc-900 transition-opacity duration-200 hover:opacity-60 focus:outline-none focus-visible:underline dark:text-zinc-100"
@@ -143,34 +159,6 @@ export function ProductListingCard({
           {title}
         </Link>
       </div>
-
-      {/* ── Category ──────────────────────────────────────────────────── */}
-      {category && (
-        <div style={{ marginBottom: connectionsCount > 0 ? 6 : 0 }}>
-          {categoryHref ? (
-            <Link
-              href={categoryHref}
-              className="transition-opacity duration-200 hover:opacity-60 focus:outline-none focus-visible:underline"
-              style={{ fontSize: 12, color: "#8a8a8a", lineHeight: 1.4 }}
-            >
-              {category}
-            </Link>
-          ) : (
-            <span style={{ fontSize: 12, color: "#8a8a8a", lineHeight: 1.4 }}>
-              {category}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* ── Connections ───────────────────────────────────────────────── */}
-      {connectionsCount > 0 && (
-        <p
-          style={{ fontSize: 13, color: "#b0b0b0", margin: 0, lineHeight: 1.4 }}
-        >
-          {connectionsCount} connection{connectionsCount === 1 ? "" : "s"}
-        </p>
-      )}
     </article>
   );
 }

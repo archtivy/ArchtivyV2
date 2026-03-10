@@ -15,12 +15,6 @@ export function ProductCard({ listing, imageUrl, href, postedBy }: ProductCardPr
   const linkHref = href?.trim() || getListingUrl(listing);
   const title = listing.title?.trim() || "Product";
 
-  // Prefer product_category > legacy category
-  const category = listing.product_category ?? listing.category ?? null;
-  const categoryHref = category
-    ? `/explore/products?category=${encodeURIComponent(category)}`
-    : null;
-
   // Build brand href from owner_profile_id when available (redirects to profile slug page)
   const brandHref = listing.owner_profile_id
     ? `/u/id/${listing.owner_profile_id}`
@@ -36,8 +30,6 @@ export function ProductCard({ listing, imageUrl, href, postedBy }: ProductCardPr
       brandHref={brandHref}
       title={title}
       href={linkHref}
-      category={category}
-      categoryHref={categoryHref}
       connectionsCount={connectionsCount}
     />
   );

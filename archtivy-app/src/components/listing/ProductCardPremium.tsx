@@ -13,13 +13,7 @@ export function ProductCardPremium({ product }: ProductCardPremiumProps) {
   const href = getListingUrl({ id: product.id, type: "product", slug: product.slug });
   const brandHref = product.owner ? getOwnerProfileHref(product.owner) : null;
 
-  // Prefer taxonomy label > product_category > legacy category
-  const category = product.taxonomy_label ?? product.product_category ?? product.category ?? null;
-  const categoryHref = category
-    ? `/explore/products?category=${encodeURIComponent(category)}`
-    : null;
-
-  const connectionsCount = product.usedInProjectsCount ?? product.connectionCount ?? 0;
+  const connectionsCount = product.usedInProjectsCount ?? 0;
 
   return (
     <ProductListingCard
@@ -29,8 +23,6 @@ export function ProductCardPremium({ product }: ProductCardPremiumProps) {
       brandHref={brandHref}
       title={product.title}
       href={href}
-      category={category}
-      categoryHref={categoryHref}
       connectionsCount={connectionsCount}
     />
   );
