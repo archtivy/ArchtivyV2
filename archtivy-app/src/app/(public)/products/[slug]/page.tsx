@@ -47,7 +47,7 @@ function getCachedProduct(slug: string) {
   return unstable_cache(
     () => getProductCanonicalBySlug(slug),
     [`product:canonical:${slug}`],
-    { tags: [CACHE_TAGS.listings, `product:${slug}`], revalidate: 3600 }
+    { tags: [CACHE_TAGS.listings, CACHE_TAGS.matches, `product:${slug}`], revalidate: 3600 }
   )();
 }
 

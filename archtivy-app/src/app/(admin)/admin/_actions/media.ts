@@ -81,10 +81,12 @@ export async function uploadListingImages(formData: FormData) {
 
     revalidateListingPaths(listingId);
 
-    // Trigger match recomputation for new images (non-blocking)
-    recomputeMatchesAfterGalleryChange(listingId).catch((e: unknown) =>
-      console.warn("[uploadListingImages] match recompute non-fatal:", e)
-    );
+    // Determine listing type and trigger match recomputation (non-blocking)
+    const supabaseForType = getSupabaseServiceClient();
+    const { data: typeRow } = await supabaseForType.from("listings").select("type").eq("id", listingId).single();
+    const lType = (typeRow as { type: string } | null)?.type === "product" ? "product" as const : "project" as const;
+    const { enqueueMatchRecomputation } = await import("@/lib/matches/recompute");
+    enqueueMatchRecomputation({ event: "gallery_changed", listingId, listingType: lType });
 
     return { ok: true as const, images: appendResult.data };
   } catch (err) {
@@ -135,10 +137,11 @@ export async function deleteListingImage(imageId: string, listingId: string) {
 
   revalidateListingPaths(listingId);
 
-  // Recompute matches after image removal (non-blocking)
-  recomputeMatchesAfterGalleryChange(listingId).catch((e: unknown) =>
-    console.warn("[deleteListingImage] match recompute non-fatal:", e)
-  );
+  // Determine listing type and trigger match recomputation (non-blocking)
+  const { data: delTypeRow } = await supabase.from("listings").select("type").eq("id", listingId).single();
+  const delType = (delTypeRow as { type: string } | null)?.type === "product" ? "product" as const : "project" as const;
+  const { enqueueMatchRecomputation: enqueueDelMatch } = await import("@/lib/matches/recompute");
+  enqueueDelMatch({ event: "gallery_changed", listingId, listingType: delType });
 
   return { ok: true as const };
 }
@@ -225,85 +228,28 @@ export async function updateImageAlt(input: {
   revalidatePath("/admin/media");
   revalidatePath("/admin/seo-quality");
 
-  // Recompute keyword photo matches for the parent project
-  await recomputePhotoMatchesForImage(supabase, input.imageId);
-
-  return { ok: true as const };
-}
-
-/**
- * Look up the parent listing for an image and recompute keyword photo matches.
- * Non-fatal: errors are logged but do not fail the parent operation.
- */
-async function recomputePhotoMatchesForImage(
-  supabase: ReturnType<typeof getSupabaseServiceClient>,
-  imageId: string
-) {
+  // Recompute matches for the parent listing (non-blocking)
   try {
     const { data: img } = await supabase
       .from("listing_images")
       .select("listing_id")
-      .eq("id", imageId)
+      .eq("id", input.imageId)
       .single();
-    if (!img?.listing_id) return;
-
-    // Only recompute for projects (type = 'project')
-    const { data: listing } = await supabase
-      .from("listings")
-      .select("type")
-      .eq("id", img.listing_id)
-      .single();
-    if (listing?.type !== "project") return;
-
-    const { computeKeywordPhotoMatches } = await import("@/lib/matches/engine");
-    const result = await computeKeywordPhotoMatches(img.listing_id);
-    console.log(
-      `[updateImageAlt] recomputed photo_matches: project=${img.listing_id}`,
-      `upserted=${result.upserted} errors=${result.errors.length}`
-    );
-
-    // Revalidate the public project page so ISR picks up new matches
-    const { data: slug } = await supabase
-      .from("listings")
-      .select("slug")
-      .eq("id", img.listing_id)
-      .single();
-    if (slug?.slug) {
-      revalidatePath(`/projects/${slug.slug}`, "page");
-      revalidateTag(CACHE_TAGS.listings);
+    if (img?.listing_id) {
+      const { data: listing } = await supabase
+        .from("listings")
+        .select("type")
+        .eq("id", img.listing_id)
+        .single();
+      const imgListingType = (listing as { type: string } | null)?.type === "product" ? "product" as const : "project" as const;
+      const { enqueueMatchRecomputation: enqueueAltMatch } = await import("@/lib/matches/recompute");
+      enqueueAltMatch({ event: "image_metadata_changed", listingId: img.listing_id, listingType: imgListingType });
     }
   } catch (e) {
-    console.warn("[updateImageAlt] photo_matches recompute non-fatal:", e);
+    console.warn("[updateImageAlt] match recompute non-fatal:", e);
   }
-}
 
-/**
- * Recompute keyword photo matches for a listing after gallery changes (upload/delete).
- * Only runs for projects. Non-fatal: errors are logged but do not fail the parent operation.
- */
-async function recomputeMatchesAfterGalleryChange(listingId: string) {
-  const supabase = getSupabaseServiceClient();
-
-  // Only recompute for projects
-  const { data: listing } = await supabase
-    .from("listings")
-    .select("type, slug")
-    .eq("id", listingId)
-    .single();
-  if (listing?.type !== "project") return;
-
-  const { computeKeywordPhotoMatches } = await import("@/lib/matches/engine");
-  const result = await computeKeywordPhotoMatches(listingId);
-  console.log(
-    `[recomputeMatchesAfterGalleryChange] project=${listingId}`,
-    `upserted=${result.upserted} errors=${result.errors.length}`
-  );
-
-  // Revalidate the public project page so ISR picks up new matches
-  if (listing.slug) {
-    revalidatePath(`/projects/${listing.slug}`, "page");
-    revalidateTag(CACHE_TAGS.listings);
-  }
+  return { ok: true as const };
 }
 
 /** Update listing image alt and revalidate project edit page (for Editorial Image Manager). */

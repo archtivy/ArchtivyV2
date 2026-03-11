@@ -12,8 +12,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TeamMember, BrandUsed } from "@/lib/types/listings";
 import { setProjectMaterials } from "@/lib/db/materials";
 import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets } from "@/lib/taxonomy/taxonomyDb";
-import { processProjectImages } from "@/lib/matches/pipeline";
-import { computeAndUpsertMatchesForProject } from "@/lib/matches/engine";
 import { notifyDesignerPublishedProject, notifyNearbyUsersOfOpportunity } from "@/lib/notifications/create";
 import { detectProjectOpportunities } from "@/lib/lifecycle";
 
@@ -328,20 +326,9 @@ export async function createProject(
       // Non-fatal: listing and images are created
     }
 
-    try {
-      const pipelineResult = await processProjectImages(listingId);
-      console.log("[createProject] image_ai pipeline result: listing_images processed, image_ai rows upserted =", pipelineResult.processed, "errors =", pipelineResult.errors.length, pipelineResult.errors.length ? pipelineResult.errors : "");
-      if (pipelineResult.errors.length > 0) {
-        console.warn("[createProject] image_ai pipeline errors:", pipelineResult.errors);
-      }
-      const { upserted, errors: matchErrors } = await computeAndUpsertMatchesForProject(listingId);
-      console.log("[createProject] matches upserted =", upserted, "match errors =", matchErrors.length);
-      if (matchErrors.length > 0) {
-        console.warn("[createProject] matches upsert errors:", matchErrors);
-      }
-    } catch (e) {
-      console.warn("[createProject] matches pipeline non-fatal:", e);
-    }
+    // Match computation runs in background; cache invalidation happens after completion
+    const { enqueueMatchRecomputation } = await import("@/lib/matches/recompute");
+    enqueueMatchRecomputation({ event: "project_created", listingId });
   }
 
   const docFiles = getDocumentFiles(formData);

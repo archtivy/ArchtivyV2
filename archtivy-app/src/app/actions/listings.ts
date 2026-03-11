@@ -36,8 +36,6 @@ import type { ActionResult } from "./types";
 import { setProjectMaterials, setProductMaterials } from "@/lib/db/materials";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets, getTaxonomyNodeById } from "@/lib/taxonomy/taxonomyDb";
-import { processProductImages } from "@/lib/matches/pipeline";
-import { computeAndUpsertAllMatches } from "@/lib/matches/engine";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
 import { notifyBrandPublishedProduct, notifyNearbyUsersOfOpportunity } from "@/lib/notifications/create";
 import { detectProductOpportunities } from "@/lib/lifecycle";
@@ -200,6 +198,11 @@ export async function createProject(
   revalidatePath("/");
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
+
+  // Match computation + cache invalidation runs in background
+  const { enqueueMatchRecomputation: enqueueProjectCreate } = await import("@/lib/matches/recompute");
+  enqueueProjectCreate({ event: "project_created", listingId });
+
   return { id: listingId };
 }
 
@@ -348,10 +351,9 @@ export async function createProduct(
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
 
-  // New product created — recompute photo matches for all projects (non-blocking)
-  import("@/lib/matches/engine")
-    .then(({ recomputeAllKeywordPhotoMatches }) => recomputeAllKeywordPhotoMatches())
-    .catch((e: unknown) => console.warn("[createProduct] photo match recompute non-fatal:", e));
+  // Match computation + cache invalidation runs in background
+  const { enqueueMatchRecomputation } = await import("@/lib/matches/recompute");
+  enqueueMatchRecomputation({ event: "product_created", listingId });
 
   // Notify nearby users if this product is an opportunity — fire and forget
   const productOpportunities = detectProductOpportunities(productStage, productCollabStatus);
@@ -395,12 +397,12 @@ export async function deleteListing(listingId: string): Promise<ActionResult> {
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
 
-  // If a product was deleted, recompute photo matches for all projects
-  if (wasProduct) {
-    import("@/lib/matches/engine")
-      .then(({ recomputeAllKeywordPhotoMatches }) => recomputeAllKeywordPhotoMatches())
-      .catch((e: unknown) => console.warn("[deleteListing] photo match recompute non-fatal:", e));
-  }
+  // Recompute matches after deletion (non-blocking, invalidates caches on completion)
+  const { enqueueMatchRecomputation: enqueueDel } = await import("@/lib/matches/recompute");
+  enqueueDel({
+    event: wasProduct ? "product_deleted" : "project_deleted",
+    listingId,
+  });
 
   return {};
 }
@@ -447,6 +449,11 @@ export async function createProjectCanonical(
   revalidatePath("/explore/projects");
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
+
+  // Match computation + cache invalidation runs in background
+  const { enqueueMatchRecomputation: enqueueCanonicalProject } = await import("@/lib/matches/recompute");
+  enqueueCanonicalProject({ event: "project_created", listingId: projectId });
+
   return { slug };
 }
 
@@ -582,20 +589,9 @@ export async function createProductCanonical(
       return { error: coverErr.error ?? "Failed to set cover image." };
     }
 
-    try {
-      const pipelineResult = await processProductImages(productId);
-      console.log("[createProduct] image_ai pipeline result: listing_images processed, image_ai rows upserted =", pipelineResult.processed, "errors =", pipelineResult.errors.length, pipelineResult.errors.length ? pipelineResult.errors : "");
-      if (pipelineResult.errors.length > 0) {
-        console.warn("[createProduct] image_ai pipeline errors:", pipelineResult.errors);
-      }
-      const matchResult = await computeAndUpsertAllMatches();
-      console.log("[createProduct] matches recompute: projectsProcessed =", matchResult.projectsProcessed, "totalUpserted =", matchResult.totalUpserted, "match errors =", matchResult.errors.length);
-      if (matchResult.errors.length > 0) {
-        console.warn("[createProduct] matches recompute errors:", matchResult.errors);
-      }
-    } catch (e) {
-      console.warn("[createProduct] matches pipeline non-fatal:", e);
-    }
+    // Match computation + cache invalidation runs in background
+    const { enqueueMatchRecomputation: enqueueCanonical } = await import("@/lib/matches/recompute");
+    enqueueCanonical({ event: "product_created", listingId: productId });
   }
 
   if (materialIds.length >= 0) {

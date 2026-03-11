@@ -60,7 +60,7 @@ function getCachedProject(slug: string) {
   return unstable_cache(
     () => getProjectCanonicalBySlugOrId(slug),
     [`project:canonical:${slug}`],
-    { tags: [CACHE_TAGS.listings, `project:${slug}`], revalidate: 3600 }
+    { tags: [CACHE_TAGS.listings, CACHE_TAGS.matches, `project:${slug}`], revalidate: 3600 }
   )();
 }
 

@@ -15,8 +15,6 @@ import { setProjectMaterials, setProductMaterials } from "@/lib/db/materials";
 import type { TeamMember, BrandUsed } from "@/lib/types/listings";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
-import { processProjectImages, processProductImages } from "@/lib/matches/pipeline";
-import { computeAndUpsertMatchesForProject, computeAndUpsertAllMatches, recomputeAllKeywordPhotoMatches } from "@/lib/matches/engine";
 import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets, getTaxonomyNodeById } from "@/lib/taxonomy/taxonomyDb";
 
 const MIN_GALLERY_IMAGES = 3;
@@ -271,20 +269,9 @@ export async function createAdminProjectFull(
   }
   await supabase.from("listings").update({ cover_image_url: coverImageUrl }).eq("id", listingId);
 
-  try {
-    const pipelineResult = await processProjectImages(listingId);
-    console.log("[admin createProject] image_ai pipeline: image_ai rows upserted =", pipelineResult.processed, "errors =", pipelineResult.errors.length);
-    if (pipelineResult.errors.length > 0) {
-      console.warn("[admin createProject] image_ai pipeline errors:", pipelineResult.errors);
-    }
-    const { upserted, errors: matchErrors } = await computeAndUpsertMatchesForProject(listingId);
-    console.log("[admin createProject] matches upserted =", upserted, "match errors =", matchErrors.length);
-    if (matchErrors.length > 0) {
-      console.warn("[admin createProject] matches upsert errors:", matchErrors);
-    }
-  } catch (e) {
-    console.warn("[admin createProject] matches pipeline non-fatal:", e);
-  }
+  // Match computation runs in background; cache invalidation happens after completion
+  const { enqueueMatchRecomputation: enqueueProjectCreate } = await import("@/lib/matches/recompute");
+  enqueueProjectCreate({ event: "project_created", listingId });
 
   const docFiles = getDocumentFiles(formData);
   if (docFiles.length > 0) {
@@ -490,20 +477,9 @@ export async function createAdminProductFull(
   }
   await supabase.from("listings").update({ cover_image_url: coverImageUrl }).eq("id", listingId);
 
-  try {
-    const pipelineResult = await processProductImages(listingId);
-    console.log("[admin createProduct] image_ai pipeline: image_ai rows upserted =", pipelineResult.processed, "errors =", pipelineResult.errors.length);
-    if (pipelineResult.errors.length > 0) {
-      console.warn("[admin createProduct] image_ai pipeline errors:", pipelineResult.errors);
-    }
-    const matchResult = await computeAndUpsertAllMatches();
-    console.log("[admin createProduct] matches recompute: projectsProcessed =", matchResult.projectsProcessed, "totalUpserted =", matchResult.totalUpserted);
-    if (matchResult.errors.length > 0) {
-      console.warn("[admin createProduct] matches recompute errors:", matchResult.errors);
-    }
-  } catch (e) {
-    console.warn("[admin createProduct] matches pipeline non-fatal:", e);
-  }
+  // Match computation runs in background; cache invalidation happens after completion
+  const { enqueueMatchRecomputation: enqueueProductCreate } = await import("@/lib/matches/recompute");
+  enqueueProductCreate({ event: "product_created", listingId });
 
   if (docFiles.length > 0) {
     const docUpload = await uploadListingDocumentsServer(listingId, docFiles);
@@ -604,15 +580,20 @@ export async function bulkUpdateListings(input: {
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
 
-  // Check if any updated listing is a product — if so, recompute photo matches
-  const matchFields = ["title", "product_type", "product_category", "product_subcategory", "material_or_finish"];
+  // Recompute matches for affected listings (non-blocking)
+  const matchFields = ["title", "product_type", "product_category", "product_subcategory", "material_or_finish", "description", "category"];
   const touchesMatchFields = matchFields.some((f) => f in input.patch);
   if (touchesMatchFields) {
-    const { data: types } = await supabase.from("listings").select("type").in("id", ids).limit(1);
-    if ((types ?? []).some((t) => (t as { type: string }).type === "product")) {
-      recomputeAllKeywordPhotoMatches().catch((e: unknown) =>
-        console.warn("[bulkUpdateListings] photo match recompute non-fatal:", e)
-      );
+    const { data: types } = await supabase.from("listings").select("id, type").in("id", ids);
+    if (types?.length) {
+      const { enqueueMatchRecomputation: enqueueBulk } = await import("@/lib/matches/recompute");
+      for (const t of types) {
+        const listing = t as { id: string; type: string };
+        enqueueBulk({
+          event: listing.type === "product" ? "product_updated" : "project_updated",
+          listingId: listing.id,
+        });
+      }
     }
   }
 
@@ -770,11 +751,13 @@ export async function deleteListing(listingId: string) {
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
 
-  // If a product was deleted, recompute photo matches so stale references are cleared
-  if (listingType === "product") {
-    recomputeAllKeywordPhotoMatches().catch((e: unknown) =>
-      console.warn("[deleteListing] photo match recompute non-fatal:", e)
-    );
+  // Recompute matches after deletion (non-blocking, invalidates caches on completion)
+  if (listingType === "product" || listingType === "project") {
+    const { enqueueMatchRecomputation: enqueueDelete } = await import("@/lib/matches/recompute");
+    enqueueDelete({
+      event: listingType === "product" ? "product_deleted" : "project_deleted",
+      listingId,
+    });
   }
 
   return { ok: true as const };
@@ -822,11 +805,11 @@ export async function bulkDeleteListings(ids: string[]) {
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
 
-  // If any deleted listing was a product, recompute photo matches
+  // Recompute matches after bulk deletion (non-blocking)
   if (hasProduct) {
-    recomputeAllKeywordPhotoMatches().catch((e: unknown) =>
-      console.warn("[bulkDeleteListings] photo match recompute non-fatal:", e)
-    );
+    const { enqueueMatchRecomputation: enqueueBulkDel } = await import("@/lib/matches/recompute");
+    // Use first product ID as representative — the handler recomputes all keyword matches
+    enqueueBulkDel({ event: "product_deleted", listingId: uniqueIds[0] });
   }
 
   return { ok: true as const };
@@ -961,6 +944,11 @@ export async function updateProjectAction(
   revalidatePath("/u/[username]", "page");
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
+
+  // Recompute matches after project metadata changes (non-blocking, invalidates caches on completion)
+  const { enqueueMatchRecomputation: enqueueProjectMatch } = await import("@/lib/matches/recompute");
+  enqueueProjectMatch({ event: "project_updated", listingId });
+
   redirect(`/admin/projects/${listingId}?saved=1`);
 }
 
@@ -1102,10 +1090,9 @@ export async function updateProductAction(
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
 
-  // Product metadata changed — recompute photo matches for all projects (non-blocking)
-  recomputeAllKeywordPhotoMatches().catch((e: unknown) =>
-    console.warn("[updateProductAction] photo match recompute non-fatal:", e)
-  );
+  // Recompute matches after product metadata changes (non-blocking, invalidates caches on completion)
+  const { enqueueMatchRecomputation: enqueueProductMatch } = await import("@/lib/matches/recompute");
+  enqueueProductMatch({ event: "product_updated", listingId });
 
   redirect(`/admin/products/${listingId}?saved=1`);
 }

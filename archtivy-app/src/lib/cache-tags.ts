@@ -13,6 +13,8 @@ export const CACHE_TAGS = {
   explore: "explore",
   listings: "listings",
   profiles: "profiles",
+  /** Invalidated after match computation completes. Use on relationship caches. */
+  matches: "matches",
 } as const;
 
 export type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];
