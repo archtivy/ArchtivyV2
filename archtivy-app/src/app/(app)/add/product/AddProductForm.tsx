@@ -55,8 +55,7 @@ const sectionTitleClass =
   "text-base font-semibold text-zinc-900 dark:text-zinc-100 border-b border-zinc-100 dark:border-zinc-800 pb-3 mb-1";
 
 const MIN_DESC_WORDS = 200;
-const MIN_GALLERY = 3;
-const PRODUCT_REQUIRED_COUNT = 6;
+const PRODUCT_REQUIRED_COUNT = 5;
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -229,7 +228,6 @@ export function AddProductForm({
   const wordCount = useMemo(() => countWords(description), [description]);
   const descValid = wordCount >= MIN_DESC_WORDS;
   const galleryCount = imageFiles.length;
-  const galleryValid = galleryCount >= MIN_GALLERY;
   const [primaryImagePreviewUrl, setPrimaryImagePreviewUrl] = useState<string | null>(null);
   const [categoryFadedIn, setCategoryFadedIn] = useState(false);
   const [subcategoryFadedIn, setSubcategoryFadedIn] = useState(false);
@@ -305,9 +303,8 @@ export function AddProductForm({
   const hasSubcategory = useDbTaxonomy ? subcategoryNodeId !== "" : productSubcategory.trim() !== "";
   const hasType = useDbTaxonomy ? familyNodeId !== "" : productType.trim() !== "";
   const hasCategoryVal = useDbTaxonomy ? categoryNodeId !== "" : productCategory.trim() !== "";
-  const galleryRequired = !initialData;
   const canPublish =
-    title.trim() !== "" && descValid && hasType && hasSubcategory && (galleryRequired ? galleryValid : true);
+    title.trim() !== "" && descValid && hasType && hasSubcategory;
   const canSave = title.trim() !== "" && hasType && hasSubcategory;
 
   const productProgressPercent = useMemo(() => {
@@ -317,10 +314,9 @@ export function AddProductForm({
       hasCategoryVal,
       hasSubcategory,
       descValid,
-      galleryRequired ? galleryValid : true,
     ].filter(Boolean).length;
     return Math.round((done / PRODUCT_REQUIRED_COUNT) * 100);
-  }, [title, hasType, hasCategoryVal, hasSubcategory, descValid, galleryRequired, galleryValid]);
+  }, [title, hasType, hasCategoryVal, hasSubcategory, descValid]);
 
   const addTeamRow = () => setTeamRows((r) => [...r, { name: "", role: "" }]);
   const updateTeamRow = (i: number, field: "name" | "role", value: string) => {
@@ -419,7 +415,7 @@ export function AddProductForm({
               <GalleryUploadCard
                 files={imageFiles}
                 onChange={setImageFiles}
-                minCount={MIN_GALLERY}
+                minCount={0}
                 inputName=""
               />
             )}

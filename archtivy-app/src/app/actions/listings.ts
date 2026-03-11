@@ -256,11 +256,6 @@ export async function createProduct(
   }
 
   const imageFiles = getImageFiles(formData);
-  if (imageFiles.length < GALLERY_MIN_IMAGES) {
-    return {
-      error: `At least ${GALLERY_MIN_IMAGES} gallery images are required.`,
-    };
-  }
 
   const baseSlug = title
     .toLowerCase()
@@ -490,10 +485,6 @@ export async function createProductCanonical(
   }
 
   const imageFiles = getImageFiles(formData);
-  if (!isDraft && imageFiles.length < GALLERY_MIN_IMAGES) {
-    return { error: `At least ${GALLERY_MIN_IMAGES} gallery images are required.` };
-  }
-
   const row = await createProductRow({ title, subtitle: subtitle || null });
   if (!row) return { error: "Failed to create product." };
   const { id: productId, slug } = row;

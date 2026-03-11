@@ -389,9 +389,6 @@ export async function createAdminProductFull(
   if (descWords < 200) return { error: "Description must be at least 200 words." };
 
   const imageFiles = getImageFiles(formData);
-  if (imageFiles.length < MIN_GALLERY_IMAGES) {
-    return { error: `At least ${MIN_GALLERY_IMAGES} gallery images are required.` };
-  }
 
   const supabase = getSupabaseServiceClient();
   const baseSlug = slugFromTitle(title || "product");

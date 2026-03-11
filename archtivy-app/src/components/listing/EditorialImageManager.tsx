@@ -599,8 +599,8 @@ export function EditorialImageManager({
                     {deletePending ? "..." : "Delete image"}
                   </button>
                 </div>
-                <p className={`mt-3 text-xs ${images.length < 3 ? "text-amber-600" : "text-zinc-500"}`}>
-                  {images.length} image{images.length !== 1 ? "s" : ""}{images.length < 3 ? " — minimum 3 for publishing" : ""}
+                <p className="mt-3 text-xs text-zinc-500">
+                  {images.length} image{images.length !== 1 ? "s" : ""}
                 </p>
               </div>
 
