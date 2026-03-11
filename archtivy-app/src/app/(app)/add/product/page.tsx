@@ -1,13 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { AddProductForm, type TaxonomyNodeForForm } from "./AddProductForm";
+import { AddProductForm } from "./AddProductForm";
 import { Button } from "@/components/ui/Button";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getListingsByOwner } from "@/lib/db/listings";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { OnboardingSteps } from "@/components/onboarding/OnboardingSteps";
 import { getTaxonomyTree, getFacetsForDomain } from "@/lib/taxonomy/taxonomyDb";
-import { filterRetiredProductNodes } from "@/lib/taxonomy/productTaxonomy";
 import type { MemberTitleRow } from "../project/TeamMembersField";
 import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
 
@@ -43,21 +42,11 @@ export default async function AddProductPage() {
   const listingsCount = listings?.length ?? 0;
   const showOnboarding = listingsCount === 0;
 
-  const [memberTitles, taxonomyRes, materialTaxRes, facetsRes] = await Promise.all([
+  const [memberTitles, materialTaxRes, facetsRes] = await Promise.all([
     getActiveBrandMemberTitles(),
-    getTaxonomyTree("product"),
     getTaxonomyTree("material"),
     getFacetsForDomain("product"),
   ]);
-  const taxonomyNodes: TaxonomyNodeForForm[] = filterRetiredProductNodes(taxonomyRes.data ?? []).map((n) => ({
-    id: n.id,
-    parent_id: n.parent_id,
-    depth: n.depth,
-    label: n.label,
-    legacy_product_type: n.legacy_product_type,
-    legacy_product_category: n.legacy_product_category,
-    legacy_product_subcategory: n.legacy_product_subcategory,
-  }));
   const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
     id: n.id,
     parent_id: n.parent_id,
@@ -91,7 +80,7 @@ export default async function AddProductPage() {
           </Button>
         </p>
       </div>
-      <AddProductForm memberTitles={memberTitles} taxonomyNodes={taxonomyNodes} materialNodes={materialNodes} facets={facets} />
+      <AddProductForm memberTitles={memberTitles} materialNodes={materialNodes} facets={facets} />
         </div>
       </div>
     </div>

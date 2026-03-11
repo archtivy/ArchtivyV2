@@ -10,12 +10,11 @@ import { getProductMaterialOptions } from "@/lib/db/materials";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getListingImagesWithIds, sanitizeListingImageUrl } from "@/lib/db/listingImages";
 import { getPhotoProductTagsByImageIds } from "@/lib/db/photoProductTags";
-import { AddProductForm, type ProductFormInitialData, type TaxonomyNodeForForm } from "@/app/(app)/add/product/AddProductForm";
+import { AddProductForm, type ProductFormInitialData } from "@/app/(app)/add/product/AddProductForm";
 import { EditorialImageManager } from "@/components/listing/EditorialImageManager";
 import type { ImageTaggingItem } from "@/components/listing/ImageProductTaggingBlock";
 import type { MemberTitleRow } from "@/app/(app)/add/project/TeamMembersField";
 import { getTaxonomyTree, getFacetsForDomain, getListingMaterialNodeIds, getListingFacetValueIds } from "@/lib/taxonomy/taxonomyDb";
-import { filterRetiredProductNodes } from "@/lib/taxonomy/productTaxonomy";
 import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
 
 const toText = (v: unknown) => (v == null ? "" : String(v).trim());
@@ -47,28 +46,18 @@ export default async function AdminProductEditPage({
   searchParams: SearchParams;
 }) {
   const { id } = await params;
-  const [productRow, teamResult, memberTitles, imagesWithIdsResult, productMaterialOptions, taxonomyRes, materialTaxRes, facetsRes, existingMatNodeIdsRes, existingFacetValsRes] =
+  const [productRow, teamResult, memberTitles, imagesWithIdsResult, productMaterialOptions, materialTaxRes, facetsRes, existingMatNodeIdsRes, existingFacetValsRes] =
     await Promise.all([
       getProductListingBySlugOrId(id),
       getListingTeamMembersWithProfiles(id),
       getActiveBrandMemberTitles(),
       getListingImagesWithIds(id),
       getProductMaterialOptions(),
-      getTaxonomyTree("product"),
       getTaxonomyTree("material"),
       getFacetsForDomain("product"),
       getListingMaterialNodeIds(id),
       getListingFacetValueIds(id),
     ]);
-  const taxonomyNodes: TaxonomyNodeForForm[] = filterRetiredProductNodes(taxonomyRes.data ?? []).map((n) => ({
-    id: n.id,
-    parent_id: n.parent_id,
-    depth: n.depth,
-    label: n.label,
-    legacy_product_type: n.legacy_product_type,
-    legacy_product_category: n.legacy_product_category,
-    legacy_product_subcategory: n.legacy_product_subcategory,
-  }));
   const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
     id: n.id,
     parent_id: n.parent_id,
@@ -239,7 +228,6 @@ export default async function AdminProductEditPage({
         formMode="admin"
         initialData={initialData}
         updateAction={updateProductAction}
-        taxonomyNodes={taxonomyNodes}
         materialNodes={materialNodes}
         facets={facets}
       />

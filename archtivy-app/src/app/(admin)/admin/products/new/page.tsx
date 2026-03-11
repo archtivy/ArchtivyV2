@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { AddProductForm, type TaxonomyNodeForForm } from "@/app/(app)/add/product/AddProductForm";
+import { AddProductForm } from "@/app/(app)/add/product/AddProductForm";
 import { searchProfilesForOwner } from "@/lib/db/profiles";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import type { MemberTitleRow } from "@/app/(app)/add/project/TeamMembersField";
 import { getTaxonomyTree, getFacetsForDomain } from "@/lib/taxonomy/taxonomyDb";
-import { filterRetiredProductNodes } from "@/lib/taxonomy/productTaxonomy";
 import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
 
 async function getActiveBrandMemberTitles(): Promise<MemberTitleRow[]> {
@@ -21,23 +20,13 @@ async function getActiveBrandMemberTitles(): Promise<MemberTitleRow[]> {
 }
 
 export default async function AdminNewProductPage() {
-  const [{ data: profileOptions }, memberTitles, taxonomyRes, materialTaxRes, facetsRes] = await Promise.all([
+  const [{ data: profileOptions }, memberTitles, materialTaxRes, facetsRes] = await Promise.all([
     searchProfilesForOwner("", "product"),
     getActiveBrandMemberTitles(),
-    getTaxonomyTree("product"),
     getTaxonomyTree("material"),
     getFacetsForDomain("product"),
   ]);
   const profiles = profileOptions ?? [];
-  const taxonomyNodes: TaxonomyNodeForForm[] = filterRetiredProductNodes(taxonomyRes.data ?? []).map((n) => ({
-    id: n.id,
-    parent_id: n.parent_id,
-    depth: n.depth,
-    label: n.label,
-    legacy_product_type: n.legacy_product_type,
-    legacy_product_category: n.legacy_product_category,
-    legacy_product_subcategory: n.legacy_product_subcategory,
-  }));
   const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
     id: n.id,
     parent_id: n.parent_id,
@@ -72,7 +61,6 @@ export default async function AdminNewProductPage() {
           formMode="admin"
           ownerProfileOptions={profiles}
           memberTitles={memberTitles}
-          taxonomyNodes={taxonomyNodes}
           materialNodes={materialNodes}
           facets={facets}
         />
