@@ -177,6 +177,7 @@ export function EditorialImageManager({
   const [pulseTag, setPulseTag] = useState<{ x: number; y: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [aiGenerating, setAiGenerating] = useState(false);
   const [tagSaveStatus, setTagSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const tagSaveStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
@@ -364,6 +365,32 @@ export function EditorialImageManager({
     const next = (selectedIndex + 1) % images.length;
     setSelectedIndex(next);
   }, [handleSaveChanges, selectedIndex, images.length]);
+
+  const handleAiGenerate = useCallback(async () => {
+    if (!selectedImage) return;
+    setAiGenerating(true);
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/admin/ai/generate-image-seo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: selectedImage.imageUrl }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setSaveError(errData.error ?? "AI metadata generation failed. Please try again.");
+        return;
+      }
+      const data: { alt_text: string; title: string; caption: string } = await res.json();
+      setAltDraft(data.alt_text);
+      setImageTitleDraft(data.title);
+      setCaptionDraft(data.caption);
+    } catch {
+      setSaveError("AI metadata generation failed. Please try again.");
+    } finally {
+      setAiGenerating(false);
+    }
+  }, [selectedImage]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -606,12 +633,23 @@ export function EditorialImageManager({
 
               {/* SEO */}
               <div className="rounded-lg border border-zinc-100 bg-white p-4">
-                <h3
-                  className="text-sm font-medium text-zinc-900 border-b border-zinc-100 pb-2 mb-3"
-                  style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-                >
-                  SEO
-                </h3>
+                <div className="flex items-center justify-between border-b border-zinc-100 pb-2 mb-3">
+                  <h3
+                    className="text-sm font-medium text-zinc-900"
+                    style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+                  >
+                    SEO
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleAiGenerate}
+                    disabled={aiGenerating || !selectedImage}
+                    className="px-3 py-1 text-xs font-medium text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: ACCENT }}
+                  >
+                    {aiGenerating ? "Generating\u2026" : "AI Text"}
+                  </button>
+                </div>
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">
