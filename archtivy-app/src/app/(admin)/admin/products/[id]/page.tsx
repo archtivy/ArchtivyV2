@@ -15,6 +15,7 @@ import { EditorialImageManager } from "@/components/listing/EditorialImageManage
 import type { ImageTaggingItem } from "@/components/listing/ImageProductTaggingBlock";
 import type { MemberTitleRow } from "@/app/(app)/add/project/TeamMembersField";
 import { getTaxonomyTree, getFacetsForDomain, getListingMaterialNodeIds, getListingFacetValueIds } from "@/lib/taxonomy/taxonomyDb";
+import { filterRetiredProductNodes } from "@/lib/taxonomy/productTaxonomy";
 import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
 
 const toText = (v: unknown) => (v == null ? "" : String(v).trim());
@@ -59,7 +60,7 @@ export default async function AdminProductEditPage({
       getListingMaterialNodeIds(id),
       getListingFacetValueIds(id),
     ]);
-  const taxonomyNodes: TaxonomyNodeForForm[] = (taxonomyRes.data ?? []).map((n) => ({
+  const taxonomyNodes: TaxonomyNodeForForm[] = filterRetiredProductNodes(taxonomyRes.data ?? []).map((n) => ({
     id: n.id,
     parent_id: n.parent_id,
     depth: n.depth,

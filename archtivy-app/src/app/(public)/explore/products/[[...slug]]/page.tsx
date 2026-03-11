@@ -11,6 +11,7 @@ import { getTaxonomyNodeBySlugPath } from "@/lib/taxonomy/taxonomyDb";
 import { checkTaxonomySlugRedirect } from "@/lib/taxonomy/resolve";
 import { legacySlugsToNodeId } from "@/lib/taxonomy/resolve";
 import { getTaxonomyNodeById } from "@/lib/taxonomy/taxonomyDb";
+import { isLegacyType, resolveLegacyPath, isCanonicalProductSlugPath } from "@/lib/taxonomy/productTaxonomy";
 import { ExploreEditorialHeader } from "@/components/explore/ExploreEditorialHeader";
 import { ExploreProductsContent } from "@/components/explore/ExploreProductsContent";
 import { ExploreEmptyState } from "@/components/explore/ExploreEmptyState";
@@ -43,21 +44,25 @@ export default async function ExploreProductsPage({
   const sp = await searchParams;
   const taxonomySlug = slug?.length ? slug.join("/") : null;
 
-  // Validate taxonomy slug exists in DB
+  // Validate taxonomy slug: accept if it exists in the canonical product taxonomy
+  // (productTaxonomy.ts) OR in the DB taxonomy_nodes table.
   if (taxonomySlug) {
-    const node = await getTaxonomyNodeBySlugPath("product", taxonomySlug);
-    if (!node.data) {
-      // Check for redirect (moved slug)
-      const redir = await checkTaxonomySlugRedirect("product", taxonomySlug);
-      if (redir) {
-        const redirectParams = new URLSearchParams();
-        for (const [k, v] of Object.entries(sp)) {
-          if (typeof v === "string") redirectParams.set(k, v);
+    const isCanonical = isCanonicalProductSlugPath(taxonomySlug);
+    if (!isCanonical) {
+      // Not in canonical taxonomy — check DB for legacy/project nodes or redirects
+      const node = await getTaxonomyNodeBySlugPath("product", taxonomySlug);
+      if (!node.data) {
+        const redir = await checkTaxonomySlugRedirect("product", taxonomySlug);
+        if (redir) {
+          const redirectParams = new URLSearchParams();
+          for (const [k, v] of Object.entries(sp)) {
+            if (typeof v === "string") redirectParams.set(k, v);
+          }
+          const qs = redirectParams.toString();
+          redirect(`/explore/products/${redir}${qs ? `?${qs}` : ""}`);
         }
-        const qs = redirectParams.toString();
-        redirect(`/explore/products/${redir}${qs ? `?${qs}` : ""}`);
+        notFound();
       }
-      notFound();
     }
   }
 
@@ -67,19 +72,41 @@ export default async function ExploreProductsPage({
   const legacySub = typeof sp.sub === "string" ? sp.sub.trim() : null;
   if (!taxonomySlug && (legacyType || legacyCategory || legacySub)) {
     if (legacyType) {
+      const cleanParams = new URLSearchParams();
+      for (const [k, v] of Object.entries(sp)) {
+        if (!["type", "product_category", "sub", "taxonomy"].includes(k) && typeof v === "string") {
+          cleanParams.set(k, v);
+        }
+      }
+      const qs = cleanParams.toString();
+
+      // Try DB-backed legacy lookup first
       const nodeId = await legacySlugsToNodeId(legacyType, legacyCategory, legacySub);
       if (nodeId) {
         const nodeRes = await getTaxonomyNodeById(nodeId);
         if (nodeRes.data) {
-          const cleanParams = new URLSearchParams();
-          for (const [k, v] of Object.entries(sp)) {
-            if (!["type", "product_category", "sub", "taxonomy"].includes(k) && typeof v === "string") {
-              cleanParams.set(k, v);
-            }
-          }
-          const qs = cleanParams.toString();
           redirect(`/explore/products/${nodeRes.data.slug_path}${qs ? `?${qs}` : ""}`);
         }
+      }
+
+      // Fallback: resolve retired types (fixtures-fittings, surfaces-materials, appliances)
+      // via the frontend alias map, then look up the resolved type in the DB taxonomy tree
+      if (isLegacyType(legacyType)) {
+        const resolved = resolveLegacyPath(legacyType, legacyCategory, legacySub);
+        // Build slug path from resolved: try deepest match first
+        const slugCandidates = [
+          `${resolved.type}/${resolved.category}/${resolved.subcategory}`,
+          `${resolved.type}/${resolved.category}`,
+          resolved.type,
+        ];
+        for (const candidate of slugCandidates) {
+          const nodeRes = await getTaxonomyNodeBySlugPath("product", candidate);
+          if (nodeRes.data) {
+            redirect(`/explore/products/${nodeRes.data.slug_path}${qs ? `?${qs}` : ""}`);
+          }
+        }
+        // If no exact match found, redirect to the resolved root type
+        redirect(`/explore/products/${resolved.type}${qs ? `?${qs}` : ""}`);
       }
     }
   }

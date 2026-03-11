@@ -7,6 +7,7 @@ import { getListingsByOwner } from "@/lib/db/listings";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { OnboardingSteps } from "@/components/onboarding/OnboardingSteps";
 import { getTaxonomyTree, getFacetsForDomain } from "@/lib/taxonomy/taxonomyDb";
+import { filterRetiredProductNodes } from "@/lib/taxonomy/productTaxonomy";
 import type { MemberTitleRow } from "../project/TeamMembersField";
 import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
 
@@ -48,7 +49,7 @@ export default async function AddProductPage() {
     getTaxonomyTree("material"),
     getFacetsForDomain("product"),
   ]);
-  const taxonomyNodes: TaxonomyNodeForForm[] = (taxonomyRes.data ?? []).map((n) => ({
+  const taxonomyNodes: TaxonomyNodeForForm[] = filterRetiredProductNodes(taxonomyRes.data ?? []).map((n) => ({
     id: n.id,
     parent_id: n.parent_id,
     depth: n.depth,

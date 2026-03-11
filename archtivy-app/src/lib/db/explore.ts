@@ -24,6 +24,7 @@ import type { ProjectSortOption, ProductSortOption } from "@/lib/exploreFilters"
 import { getMaterialsByProjectIds, getMaterialsByProductIds } from "@/lib/db/materials";
 
 import { getTaxonomyNodeBySlugPath, getTaxonomyRedirect } from "@/lib/taxonomy/taxonomyDb";
+import { isLegacyType, isCanonicalProductSlugPath, getCanonicalLegacyTypes } from "@/lib/taxonomy/productTaxonomy";
 
 const supabase = () => getSupabaseServiceClient();
 
@@ -327,6 +328,11 @@ async function getListingIdsByTaxonomy(
  * Get listing IDs matching a taxonomy slug path, including unmapped listings via legacy columns.
  * Ensures backward compat: listings without taxonomy_node_id still appear if their legacy text
  * columns match the selected taxonomy node's legacy_* columns.
+ *
+ * For products: the visible taxonomy tree comes from the canonical PRODUCT_TAXONOMY config
+ * (productTaxonomy.ts), not the DB. When a canonical slug_path has no matching DB node,
+ * we fall back to matching unmapped listings by product_type column using
+ * getCanonicalLegacyTypes().
  */
 async function getListingIdsByTaxonomyWithLegacy(
   domain: "product" | "project",
@@ -342,13 +348,13 @@ async function getListingIdsByTaxonomyWithLegacy(
     .eq("domain", domain)
     .eq("is_active", true)
     .or(`slug_path.eq.${taxonomySlugPath},slug_path.like.${taxonomySlugPath}/%`);
-  if (!descendants?.length) return newIds;
 
   // 3. Query unmapped listings (taxonomy_node_id IS NULL) matching legacy columns
   const sup = supabase();
   const legacyIds = new Set<string>();
 
   if (domain === "project") {
+    if (!descendants?.length) return newIds;
     const legacyCategories = Array.from(
       new Set(
         (descendants as { legacy_project_category: string | null }[])
@@ -369,14 +375,22 @@ async function getListingIdsByTaxonomyWithLegacy(
       for (const r of data ?? []) legacyIds.add((r as { id: string }).id);
     }
   } else {
-    // Products: match by legacy_product_type (and optionally category/subcategory)
-    const legacyTypes = Array.from(
-      new Set(
-        (descendants as { legacy_product_type: string | null }[])
-          .map((d) => d.legacy_product_type)
-          .filter(Boolean) as string[]
-      )
-    );
+    // Products: match by legacy_product_type from DB nodes when available
+    let legacyTypes: string[] = [];
+    if (descendants?.length) {
+      legacyTypes = Array.from(
+        new Set(
+          (descendants as { legacy_product_type: string | null }[])
+            .map((d) => d.legacy_product_type)
+            .filter(Boolean) as string[]
+        )
+      );
+    }
+    // Fallback: when no DB taxonomy_node exists for this slug_path (canonical-only),
+    // derive legacy product_type values from the canonical taxonomy config.
+    if (legacyTypes.length === 0 && isCanonicalProductSlugPath(taxonomySlugPath)) {
+      legacyTypes = getCanonicalLegacyTypes(taxonomySlugPath);
+    }
     if (legacyTypes.length > 0) {
       const { data } = await sup
         .from("listings")
@@ -1140,7 +1154,9 @@ export async function getProductFilterOptions(): Promise<{
     sup.from("materials").select("name, slug").order("name", { ascending: true }),
     sup.from("listings").select("year").eq("type", "product").eq("status", "APPROVED").is("deleted_at", null).not("year", "is", null),
   ]);
-  const categories = Array.from(new Set((catRes.data ?? []).map((r) => (r as { category: string | null }).category?.trim()).filter(Boolean) as string[])).sort();
+  const categories = Array.from(new Set((catRes.data ?? []).map((r) => (r as { category: string | null }).category?.trim()).filter(Boolean) as string[]))
+    .filter((c) => !isLegacyType(c))
+    .sort();
   const materialTypes: string[] = [];
   const colors: string[] = [];
   const brands = (brandProfiles.data ?? []).map((r) => {

@@ -2,12 +2,17 @@
  * Unified filter options for explore (projects and products). Sourced from DB.
  * NO CACHE: Admin can add categories/materials/colors at any time and users must
  * see them immediately. Pages already set force-dynamic + revalidate=0.
+ *
+ * Product taxonomy tree: sourced from the canonical PRODUCT_TAXONOMY config
+ * (productTaxonomy.ts), NOT from taxonomy_nodes DB. This ensures the Explore
+ * category picker always matches the Add Product form exactly.
  */
 
 import { getProjectFilterOptions, getProductFilterOptions } from "@/lib/db/explore";
 import { getTaxonomyTree, getFacetsForDomain } from "@/lib/taxonomy/taxonomyDb";
 import type { TaxonomyNode } from "@/lib/taxonomy/taxonomyDb";
 import type { ExploreType, TaxonomyTreeNode, FacetFilterGroup } from "./schema";
+import { getCanonicalProductTree } from "@/lib/taxonomy/productTaxonomy";
 
 export interface ExploreFilterOptions {
   categories: { value: string; label: string }[];
@@ -95,14 +100,15 @@ async function getProjectOptions(): Promise<ExploreFilterOptions> {
 }
 
 async function getProductOptions(): Promise<ExploreFilterOptions> {
-  const [raw, taxonomyRes, materialTaxRes, facetRes] = await Promise.all([
+  const [raw, materialTaxRes, facetRes] = await Promise.all([
     getProductFilterOptions(),
-    getTaxonomyTree("product"),
     getTaxonomyTree("material"),
     getFacetsForDomain("product"),
   ]);
 
-  const taxonomyTree = buildTreeFromNodes(taxonomyRes.data ?? []);
+  // Product taxonomy tree: built from canonical PRODUCT_TAXONOMY config,
+  // not from taxonomy_nodes DB. This is the single source of truth.
+  const taxonomyTree = getCanonicalProductTree() as TaxonomyTreeNode[];
   const materialTaxonomy = buildTreeFromNodes(materialTaxRes.data ?? []);
   const facets: FacetFilterGroup[] = (facetRes.data ?? []).map((f) => ({
     slug: f.slug,
@@ -112,7 +118,7 @@ async function getProductOptions(): Promise<ExploreFilterOptions> {
   }));
 
   return {
-    categories: raw.categories.map((c) => ({ value: c, label: c })),
+    categories: [],
     taxonomyTree,
     locations: [],
     designers: [],
