@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useFormState } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { ActionResult } from "@/app/actions/types";
@@ -141,6 +141,7 @@ export function AddProjectForm({
   const router = useRouter();
   const action = updateAction ?? (formMode === "admin" ? createAdminProjectFull : createProject);
   const [state, formAction] = useFormState(action, null as ActionResult);
+  const [isSubmitting, startSubmitTransition] = useTransition();
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [locationValue, setLocationValue] = useState<LocationValue | null>(initialData?.locationValue ?? null);
@@ -305,7 +306,9 @@ export function AddProjectForm({
     imageFiles.forEach((f) => fd.append("images", f));
     documentFiles.forEach((f) => fd.append("documents", f));
     if (initialData?.listingId) fd.set("_listingId", initialData.listingId);
-    formAction(fd);
+    startSubmitTransition(() => {
+      formAction(fd);
+    });
   };
 
   const locationDisplay =
@@ -394,24 +397,25 @@ export function AddProjectForm({
               type="submit"
               variant="secondary"
               className="flex-1"
+              disabled={isSubmitting}
               onClick={() => {
                 const el = document.getElementById("draft-value") as HTMLInputElement | null;
                 if (el) el.value = "1";
               }}
             >
-              Save draft
+              {isSubmitting ? "Saving\u2026" : "Save draft"}
             </Button>
             <Button
               type="submit"
               variant="primary"
               className="flex-1"
-              disabled={!canPublish}
+              disabled={!canPublish || isSubmitting}
               onClick={() => {
                 const el = document.getElementById("draft-value") as HTMLInputElement | null;
                 if (el) el.value = "0";
               }}
             >
-              Publish
+              {isSubmitting ? "Publishing\u2026" : "Publish"}
             </Button>
           </div>
         }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useFormState } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { ActionResult } from "@/app/actions/types";
@@ -170,6 +170,7 @@ export function AddProductForm({
   const router = useRouter();
   const action = updateAction ?? (formMode === "admin" ? createAdminProductFull : createProductCanonical);
   const [state, formAction] = useFormState(action, null as ActionResult);
+  const [isSubmitting, startSubmitTransition] = useTransition();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
@@ -331,7 +332,7 @@ export function AddProductForm({
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitError(null);
     const form = formRef.current ?? e.currentTarget;
@@ -340,19 +341,21 @@ export function AddProductForm({
     formData.delete("documents");
     imageFiles.forEach((f) => formData.append("images", f));
     documentFiles.forEach((f) => formData.append("documents", f));
-    try {
-      const result = await action(null, formData);
-      if (result?.error) {
-        setSubmitError(result.error);
-      } else if (formMode !== "admin" && result && "slug" in result && result.slug) {
-        router.push(`/products/${result.slug}`);
+    startSubmitTransition(async () => {
+      try {
+        const result = await action(null, formData);
+        if (result?.error) {
+          setSubmitError(result.error);
+        } else if (formMode !== "admin" && result && "slug" in result && result.slug) {
+          router.push(`/products/${result.slug}`);
+        }
+      } catch (err) {
+        const isRedirect =
+          err instanceof Error && "digest" in err && String((err as { digest?: string }).digest).startsWith("NEXT_REDIRECT");
+        if (isRedirect) throw err;
+        setSubmitError(err instanceof Error ? err.message : "Submission failed");
       }
-    } catch (err) {
-      const isRedirect =
-        err instanceof Error && "digest" in err && String((err as { digest?: string }).digest).startsWith("NEXT_REDIRECT");
-      if (isRedirect) throw err;
-      setSubmitError(err instanceof Error ? err.message : "Submission failed");
-    }
+    });
   };
 
   return (
@@ -436,25 +439,25 @@ export function AddProductForm({
               type="submit"
               variant="secondary"
               className="flex-1"
-              disabled={!canSave}
+              disabled={!canSave || isSubmitting}
               onClick={() => {
                 const el = document.getElementById("product-draft-value") as HTMLInputElement | null;
                 if (el) el.value = "1";
               }}
             >
-              Save draft
+              {isSubmitting ? "Saving\u2026" : "Save draft"}
             </Button>
             <Button
               type="submit"
               variant="primary"
               className="flex-1"
-              disabled={!canPublish}
+              disabled={!canPublish || isSubmitting}
               onClick={() => {
                 const el = document.getElementById("product-draft-value") as HTMLInputElement | null;
                 if (el) el.value = "0";
               }}
             >
-              Publish
+              {isSubmitting ? "Publishing\u2026" : "Publish"}
             </Button>
           </div>
         }
