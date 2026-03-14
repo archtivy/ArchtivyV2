@@ -1,5 +1,4 @@
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
-import { listingCardSelect } from "@/lib/db/selects";
 import {
   detectProjectOpportunities,
   detectProductOpportunities,
@@ -111,10 +110,11 @@ function OpportunityCard({ listing }: { listing: OpportunityListing }) {
         ? PRODUCT_COLLAB_LABELS[listing.product_collaboration_status as ProductCollaborationStatus]
         : null;
 
-  const lookingFor =
+  const rawLookingFor =
     listing.type === "project"
-      ? (listing.project_looking_for ?? [])
-      : (listing.product_looking_for ?? []);
+      ? listing.project_looking_for
+      : listing.product_looking_for;
+  const lookingFor = Array.isArray(rawLookingFor) ? rawLookingFor : [];
 
   return (
     <Link
