@@ -28,8 +28,14 @@ export function TeamMembersField({
   onUpdateRow,
   onRemoveRow,
 }: TeamMembersFieldProps) {
-  const designerTitles = memberTitles.filter((t) => t.maps_to_role === "designer");
   const brandTitles = memberTitles.filter((t) => t.maps_to_role === "brand");
+  // All non-brand titles have maps_to_role="designer" in the DB.
+  // Split them into UI groups by label using sort_order ranges:
+  //   0-99  = Designer,  100-199 = Engineer,  200-299 = Construction
+  const allDesignerRows = memberTitles.filter((t) => t.maps_to_role === "designer");
+  const designerTitles = allDesignerRows.filter((t) => t.sort_order < 100);
+  const engineerTitles = allDesignerRows.filter((t) => t.sort_order >= 100 && t.sort_order < 200);
+  const constructionTitles = allDesignerRows.filter((t) => t.sort_order >= 200 && t.sort_order < 300);
 
   return (
     <div>
@@ -56,6 +62,24 @@ export function TeamMembersField({
                 {designerTitles.length > 0 && (
                   <optgroup label="Designer">
                     {designerTitles.map((t) => (
+                      <option key={t.label} value={t.label}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {engineerTitles.length > 0 && (
+                  <optgroup label="Engineer">
+                    {engineerTitles.map((t) => (
+                      <option key={t.label} value={t.label}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {constructionTitles.length > 0 && (
+                  <optgroup label="Construction / Project Delivery">
+                    {constructionTitles.map((t) => (
                       <option key={t.label} value={t.label}>
                         {t.label}
                       </option>

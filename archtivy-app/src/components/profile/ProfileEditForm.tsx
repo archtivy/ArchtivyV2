@@ -10,7 +10,7 @@ import { ProfileLocationPicker } from "@/components/location/ProfileLocationPick
 import type { ProfileLocationValue } from "@/components/location/ProfileLocationPicker";
 import { Button } from "@/components/ui/Button";
 import { ErrorMessage } from "@/components/ErrorMessage";
-import { DESIGNER_TITLES, BRAND_TYPES, READER_TYPES } from "@/lib/auth/config";
+import { DESIGNER_TITLE_GROUPS, BRAND_TYPE_GROUPS, READER_TYPES } from "@/lib/auth/config";
 
 const inputClass =
   "w-full rounded-md border border-zinc-300 bg-white px-3 py-2.5 text-zinc-900 placeholder-zinc-500 focus:border-archtivy-primary focus:outline-none focus:ring-1 focus:ring-archtivy-primary/50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-400";
@@ -204,10 +204,14 @@ export function ProfileEditForm({ profile }: ProfileEditFormProps) {
               defaultValue={profile.designer_discipline ?? ""}
             >
               <option value="">— Optional —</option>
-              {DESIGNER_TITLES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
+              {DESIGNER_TITLE_GROUPS.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.titles.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
@@ -239,10 +243,14 @@ export function ProfileEditForm({ profile }: ProfileEditFormProps) {
               defaultValue={profile.brand_type ?? ""}
             >
               <option value="">— Optional —</option>
-              {BRAND_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
+              {BRAND_TYPE_GROUPS.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.types.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

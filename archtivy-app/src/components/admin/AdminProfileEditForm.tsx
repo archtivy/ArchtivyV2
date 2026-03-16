@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AdminAvatarSection } from "@/components/admin/AdminAvatarSection";
 import { AdminLocationPicker } from "@/components/admin/AdminLocationPicker";
 import type { AdminLocationValue } from "@/components/admin/AdminLocationPicker";
-import { DESIGNER_TITLES, BRAND_TYPES } from "@/lib/auth/config";
+import { DESIGNER_TITLES, DESIGNER_TITLE_GROUPS, BRAND_TYPES, BRAND_TYPE_GROUPS } from "@/lib/auth/config";
 import type { ProfileRole } from "@/lib/auth/config";
 
 const inputClass =
@@ -189,10 +189,14 @@ export function AdminProfileEditForm({ profile, formAction }: AdminProfileEditFo
                   Legacy: {designerDiscipline}
                 </option>
               )}
-              {designerTitles.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
+              {DESIGNER_TITLE_GROUPS.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.titles.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
@@ -213,10 +217,14 @@ export function AdminProfileEditForm({ profile, formAction }: AdminProfileEditFo
               {hasLegacyBrand && (
                 <option value={brandType}>Legacy: {brandType}</option>
               )}
-              {brandTypes.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
+              {BRAND_TYPE_GROUPS.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.types.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

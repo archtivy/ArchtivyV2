@@ -13,9 +13,8 @@ import { Button } from "@/components/ui/Button";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import type { ProfileRole } from "@/lib/auth/config";
 import {
-  DESIGNER_TITLES,
-  BRAND_TYPES,
-  READER_TYPES,
+  DESIGNER_TITLE_GROUPS,
+  BRAND_TYPE_GROUPS,
 } from "@/lib/auth/config";
 
 const TOTAL_STEPS = 3;
@@ -280,10 +279,14 @@ export function OnboardingForm({
                   required
                 >
                   <option value="">Choose a discipline</option>
-                  {designerTitles.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
+                  {DESIGNER_TITLE_GROUPS.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.titles.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>
@@ -301,10 +304,14 @@ export function OnboardingForm({
                   required
                 >
                   <option value="">Choose a brand type</option>
-                  {brandTypes.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
+                  {BRAND_TYPE_GROUPS.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.types.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>
