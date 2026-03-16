@@ -156,6 +156,7 @@ export function AddProjectForm({
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
   const [teamRows, setTeamRows] = useState<Array<{ name: string; role: string }>>(() => {
     const t = initialData?.teamRows;
     return t && t.length > 0 ? t : [{ name: "", role: "" }];
@@ -199,6 +200,14 @@ export function AddProjectForm({
   useEffect(() => {
     setProjectLookingForJson(JSON.stringify(projectLookingFor));
   }, [projectLookingFor]);
+
+  // Scroll to error when it appears
+  const displayedError = submitError ?? state?.error ?? null;
+  useEffect(() => {
+    if (displayedError && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [displayedError]);
 
   const wordCount = useMemo(() => countWords(description), [description]);
   const descValid = wordCount >= MIN_DESC_WORDS && wordCount <= MAX_DESC_WORDS;
@@ -310,11 +319,19 @@ export function AddProjectForm({
           if (target) router.replace(`/projects/${target}`);
         }
       } catch (err) {
-        const isRedirect =
-          err instanceof Error &&
-          "digest" in err &&
-          String((err as { digest?: string }).digest).startsWith("NEXT_REDIRECT");
-        if (isRedirect) throw err;
+        const digest =
+          err instanceof Error && "digest" in err
+            ? String((err as { digest?: string }).digest)
+            : "";
+        if (digest.startsWith("NEXT_REDIRECT")) {
+          // Extract redirect URL from digest: "NEXT_REDIRECT;{type};{url};{statusCode}"
+          const redirectUrl = digest.split(";")[2];
+          if (redirectUrl) {
+            router.replace(redirectUrl);
+            return;
+          }
+          throw err;
+        }
         setSubmitError(err instanceof Error ? err.message : "Submission failed");
       }
     });
@@ -401,31 +418,38 @@ export function AddProjectForm({
           </>
         }
         mobileActions={
-          <div className="flex gap-3">
-            <Button
-              type="submit"
-              variant="secondary"
-              className="flex-1"
-              disabled={isSubmitting}
-              onClick={() => {
-                const el = document.getElementById("draft-value") as HTMLInputElement | null;
-                if (el) el.value = "1";
-              }}
-            >
-              {isSubmitting ? "Saving\u2026" : "Save draft"}
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              className="flex-1"
-              disabled={!canPublish || isSubmitting}
-              onClick={() => {
-                const el = document.getElementById("draft-value") as HTMLInputElement | null;
-                if (el) el.value = "0";
-              }}
-            >
-              {isSubmitting ? "Publishing\u2026" : "Publish"}
-            </Button>
+          <div className="space-y-2">
+            {displayedError && (
+              <p className="text-xs font-medium text-red-600 dark:text-red-400 truncate">
+                {displayedError}
+              </p>
+            )}
+            <div className="flex gap-3">
+              <Button
+                type="submit"
+                variant="secondary"
+                className="flex-1"
+                disabled={isSubmitting}
+                onClick={() => {
+                  const el = document.getElementById("draft-value") as HTMLInputElement | null;
+                  if (el) el.value = "1";
+                }}
+              >
+                {isSubmitting ? "Saving\u2026" : "Save draft"}
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                className="flex-1"
+                disabled={!canPublish || isSubmitting}
+                onClick={() => {
+                  const el = document.getElementById("draft-value") as HTMLInputElement | null;
+                  if (el) el.value = "0";
+                }}
+              >
+                {isSubmitting ? "Publishing\u2026" : "Publish"}
+              </Button>
+            </div>
           </div>
         }
       >
@@ -718,9 +742,9 @@ export function AddProjectForm({
           />
         </section>
 
-        {(submitError ?? state?.error) && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30">
-            <ErrorMessage message={submitError ?? state?.error ?? ""} className="max-w-xl text-red-800 dark:text-red-200" />
+        {displayedError && (
+          <div ref={errorRef} className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30">
+            <ErrorMessage message={displayedError} className="max-w-xl text-red-800 dark:text-red-200" />
           </div>
         )}
         </div>
