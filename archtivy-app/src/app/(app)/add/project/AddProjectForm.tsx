@@ -9,7 +9,8 @@ import { createAdminProjectFull } from "@/app/(admin)/admin/_actions/listings";
 import { Button } from "@/components/ui/Button";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { AddListingLayout } from "@/components/add/AddListingLayout";
-import { GalleryUploadCard } from "@/components/add/GalleryUploadCard";
+import { StorageGalleryUpload } from "@/components/add/StorageGalleryUpload";
+import type { UploadedGalleryItem } from "@/lib/storage/types";
 import { ListingPreviewCard } from "@/components/add/ListingPreviewCard";
 import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
 import { SubmissionProgressBar } from "@/components/add/SubmissionProgressBar";
@@ -69,8 +70,10 @@ export interface ProjectFormInitialData {
   year: string;
   teamRows: Array<{ name: string; role: string }>;
   mentionedRows: Array<{ brand_name_text: string; product_name_text: string }>;
-  /** Number of images already saved in the DB. Passed to GalleryUploadCard. */
+  /** Number of images already saved in the DB. */
   existingImageCount?: number;
+  /** Pre-loaded gallery items for edit mode (already uploaded to storage). */
+  galleryItems?: UploadedGalleryItem[];
   /** DB taxonomy node ID (new system). Used to pre-select the taxonomy hierarchy. */
   taxonomyNodeId?: string | null;
   /** Pre-selected material taxonomy node IDs (for edit mode). */
@@ -153,7 +156,8 @@ export function AddProjectForm({
   const [projSubcategoryNodeId, setProjSubcategoryNodeId] = useState(projInitIds.subcategoryId);
   const [areaSqft, setAreaSqft] = useState(initialData?.areaSqft ?? "");
   const [year, setYear] = useState(initialData?.year ?? "");
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [galleryItems, setGalleryItems] = useState<UploadedGalleryItem[]>(initialData?.galleryItems ?? []);
+  const [galleryUploading, setGalleryUploading] = useState(false);
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -211,24 +215,9 @@ export function AddProjectForm({
 
   const wordCount = useMemo(() => countWords(description), [description]);
   const descValid = wordCount >= MIN_DESC_WORDS && wordCount <= MAX_DESC_WORDS;
-  const galleryCount = imageFiles.length;
+  const galleryCount = galleryItems.length;
   const galleryValid = galleryCount >= MIN_GALLERY;
-  const [primaryImagePreviewUrl, setPrimaryImagePreviewUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (imageFiles.length === 0) {
-      setPrimaryImagePreviewUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
-      return;
-    }
-    const url = URL.createObjectURL(imageFiles[0]);
-    setPrimaryImagePreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return url;
-    });
-    return () => URL.revokeObjectURL(url);
-  }, [imageFiles]);
+  const primaryImagePreviewUrl = galleryItems.length > 0 ? galleryItems[0].url : null;
   // ── DB project taxonomy derived lists ──
   const dbBuildingTypes = useMemo(
     () => projectTaxonomyNodes.filter((n) => n.depth === 0),
@@ -247,7 +236,7 @@ export function AddProjectForm({
   }, [useDbProjectTaxonomy, projectTaxonomyNodes, buildingTypeNodeId, projSubcategoryNodeId]);
 
   const hasLocation = Boolean(locationValue?.location_text?.trim());
-  const galleryRequired = !initialData;
+  const galleryRequired = !initialData || galleryItems.length > 0;
   const hasCategorySelection = useDbProjectTaxonomy ? buildingTypeNodeId !== "" : category.trim() !== "";
   const canPublish =
     title.trim() !== "" &&
@@ -301,11 +290,16 @@ export function AddProjectForm({
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitError(null);
+    if (galleryUploading) {
+      setSubmitError("Please wait for image uploads to finish.");
+      return;
+    }
     const form = formRef.current ?? e.currentTarget;
     const fd = new FormData(form);
     fd.delete("images");
     fd.delete("documents");
-    imageFiles.forEach((f) => fd.append("images", f));
+    // Gallery: serialize uploaded metadata as JSON (no raw files)
+    fd.set("gallery", JSON.stringify(galleryItems));
     documentFiles.forEach((f) => fd.append("documents", f));
     if (initialData?.listingId) fd.set("_listingId", initialData.listingId);
     startSubmitTransition(async () => {
@@ -348,7 +342,6 @@ export function AddProjectForm({
       ref={formRef}
       action={formAction}
       onSubmit={handleSubmit}
-      encType="multipart/form-data"
       className="space-y-8"
     >
       <SubmissionProgressBar percent={projectProgressPercent} className="mb-6" />
@@ -397,14 +390,14 @@ export function AddProjectForm({
       <AddListingLayout
         sidebar={
           <>
-            {!initialData && (
-              <GalleryUploadCard
-                files={imageFiles}
-                onChange={setImageFiles}
-                minCount={MIN_GALLERY}
-                inputName=""
-              />
-            )}
+            <StorageGalleryUpload
+              items={galleryItems}
+              onChange={setGalleryItems}
+              onUploadingChange={setGalleryUploading}
+              minCount={MIN_GALLERY}
+              existingCount={initialData?.existingImageCount ?? 0}
+              disabled={isSubmitting}
+            />
             <ListingPreviewCard
               title={title}
               subtitle={locationDisplay}
@@ -441,7 +434,7 @@ export function AddProjectForm({
                 type="submit"
                 variant="primary"
                 className="flex-1"
-                disabled={!canPublish || isSubmitting}
+                disabled={!canPublish || isSubmitting || galleryUploading}
                 onClick={() => {
                   const el = document.getElementById("draft-value") as HTMLInputElement | null;
                   if (el) el.value = "0";

@@ -17,6 +17,7 @@ import type { LocationValue } from "@/components/location/LocationPicker";
 import type { MemberTitleRow } from "@/app/(app)/add/project/TeamMembersField";
 import { getTaxonomyTree, getFacetsForDomain, getListingMaterialNodeIds, getListingFacetValueIds } from "@/lib/taxonomy/taxonomyDb";
 import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
+import type { UploadedGalleryItem } from "@/lib/storage/types";
 
 const toText = (v: unknown) => (v == null ? "" : String(v).trim());
 
@@ -201,6 +202,14 @@ export default async function AdminProjectEditPage({
         }))
       : [{ brand_name_text: "", product_name_text: "" }],
     existingImageCount: imagesWithIds.length,
+    galleryItems: imagesWithIds
+      .filter((img) => sanitizeListingImageUrl(img.image_url) != null)
+      .map((img): UploadedGalleryItem => ({
+        path: img.image_url,
+        url: sanitizeListingImageUrl(img.image_url)!,
+        alt: img.alt ?? undefined,
+        caption: img.caption ?? undefined,
+      })),
     materialNodeIds: existingMaterialNodeIds,
     facetValueIds: existingFacetValueIds,
     taxonomyNodeId: listing.taxonomy_node_id ?? null,

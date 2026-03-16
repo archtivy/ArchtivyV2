@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
-import { uploadGalleryImagesServer } from "@/lib/storage/gallery";
+import { parseGalleryJson, type UploadedGalleryItem } from "@/lib/storage/types";
 import { uploadListingDocumentsServer } from "@/lib/storage/documents";
 import { addDocuments } from "@/lib/db/listingDocuments";
 import { getProfileByClerkId } from "@/lib/db/profiles";
@@ -44,9 +44,8 @@ async function ensureUniqueSlug(
   }
 }
 
-function getImageFiles(formData: FormData): File[] {
-  const raw = formData.getAll("images");
-  return raw.filter((f): f is File => f instanceof File && f.size > 0);
+function getGalleryItems(formData: FormData): UploadedGalleryItem[] {
+  return parseGalleryJson(formData.get("gallery"));
 }
 
 function getDocumentFiles(formData: FormData): File[] {
@@ -218,8 +217,8 @@ export async function createProject(
     }
   }
 
-  const imageFiles = getImageFiles(formData);
-  if (!isDraft && imageFiles.length < MIN_GALLERY_IMAGES) {
+  const galleryItems = getGalleryItems(formData);
+  if (!isDraft && galleryItems.length < MIN_GALLERY_IMAGES) {
     return {
       error: `At least ${MIN_GALLERY_IMAGES} gallery images are required.`,
     };
@@ -291,21 +290,11 @@ export async function createProject(
     }
   }
 
-  if (imageFiles.length > 0) {
-    const uploadResult = await uploadGalleryImagesServer(listingId, imageFiles);
-    if (uploadResult.error || !uploadResult.data?.length) {
-      await supabase.from("listings").delete().eq("id", listingId);
-      return {
-        error: uploadResult.error ?? "Image upload failed.",
-      };
-    }
-    const imageUrls = uploadResult.data;
-    const coverImageUrl = imageUrls[0];
-
-    const imageRows = imageUrls.map((image_url, i) => ({
+  if (galleryItems.length > 0) {
+    const imageRows = galleryItems.map((item, i) => ({
       listing_id: listingId,
-      image_url,
-      alt: null as string | null,
+      image_url: item.url,
+      alt: item.alt?.trim() || null,
       sort_order: i,
     }));
     const { error: imagesInsertError } = await supabase
@@ -317,14 +306,11 @@ export async function createProject(
       return { error: `Failed to save gallery: ${imagesInsertError.message}` };
     }
 
-    const { error: coverError } = await supabase
+    const coverImageUrl = galleryItems[0].url;
+    await supabase
       .from("listings")
       .update({ cover_image_url: coverImageUrl })
       .eq("id", listingId);
-
-    if (coverError) {
-      // Non-fatal: listing and images are created
-    }
 
     // Match computation runs in background; cache invalidation happens after completion
     const { enqueueMatchRecomputation } = await import("@/lib/matches/recompute");

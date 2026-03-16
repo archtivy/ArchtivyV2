@@ -8,6 +8,7 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getProfileByClerkIdForAdmin } from "@/lib/db/profiles";
 import { createAuditLog } from "@/lib/db/audit";
 import { uploadGalleryImagesServer } from "@/lib/storage/gallery";
+import { parseGalleryJson } from "@/lib/storage/types";
 import { uploadListingDocumentsServer } from "@/lib/storage/documents";
 import { persistListingDocuments } from "@/lib/db/listingDocumentsWrite";
 import { addDocuments } from "@/lib/db/listingDocuments";
@@ -177,8 +178,8 @@ export async function createAdminProjectFull(
   if (!projectTaxonomyNodeId && !category?.trim()) return { error: "Project category is required." };
   if (!year?.trim()) return { error: "Year is required." };
 
-  const imageFiles = getImageFiles(formData);
-  if (imageFiles.length < MIN_GALLERY_IMAGES) {
+  const galleryItems = parseGalleryJson(formData.get("gallery"));
+  if (galleryItems.length < MIN_GALLERY_IMAGES) {
     return { error: `At least ${MIN_GALLERY_IMAGES} gallery images are required.` };
   }
 
@@ -249,17 +250,10 @@ export async function createAdminProjectFull(
     }
   }
 
-  const uploadResult = await uploadGalleryImagesServer(listingId, imageFiles);
-  if (uploadResult.error || !uploadResult.data?.length) {
-    await supabase.from("listings").delete().eq("id", listingId);
-    return { error: uploadResult.error ?? "Image upload failed." };
-  }
-  const imageUrls = uploadResult.data;
-  const coverImageUrl = imageUrls[0];
-  const imageRows = imageUrls.map((image_url, i) => ({
+  const imageRows = galleryItems.map((item, i) => ({
     listing_id: listingId,
-    image_url,
-    alt: null as string | null,
+    image_url: item.url,
+    alt: item.alt?.trim() || null,
     sort_order: i,
   }));
   const { error: imagesInsertError } = await supabase.from("listing_images").insert(imageRows);
@@ -267,6 +261,7 @@ export async function createAdminProjectFull(
     await supabase.from("listings").delete().eq("id", listingId);
     return { error: `Failed to save gallery: ${imagesInsertError.message}` };
   }
+  const coverImageUrl = galleryItems[0].url;
   await supabase.from("listings").update({ cover_image_url: coverImageUrl }).eq("id", listingId);
 
   // Match computation runs in background; cache invalidation happens after completion
