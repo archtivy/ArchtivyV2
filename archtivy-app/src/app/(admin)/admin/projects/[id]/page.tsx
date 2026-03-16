@@ -160,6 +160,9 @@ export default async function AdminProjectEditPage({
     brands_used: { name?: string }[] | null;
     mentioned_products: { brand_name_text: string; product_name_text: string }[] | null;
     taxonomy_node_id: string | null;
+    project_status: string | null;
+    project_collaboration_status: string | null;
+    project_looking_for: string[] | null;
   };
 
   const teamWithProfiles = teamResult.data ?? [];
@@ -201,6 +204,9 @@ export default async function AdminProjectEditPage({
     materialNodeIds: existingMaterialNodeIds,
     facetValueIds: existingFacetValueIds,
     taxonomyNodeId: listing.taxonomy_node_id ?? null,
+    projectStatus: listing.project_status ?? "",
+    projectCollaborationStatus: listing.project_collaboration_status ?? "",
+    projectLookingFor: listing.project_looking_for ?? [],
   };
 
   const saved = toText(searchParams.saved) === "1";

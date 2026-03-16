@@ -9,12 +9,10 @@ export const listingCardSelect =
 
 /**
  * Canonical project listing select: all fields needed for ProjectCanonical.
- * NOTE: lifecycle columns (project_status, project_collaboration_status, project_looking_for)
- * are omitted here — they require the lifecycle migration to be applied first.
- * Use lifecycleProjectSelect for queries that need these fields.
+ * Includes lifecycle columns (project_status, project_collaboration_status, project_looking_for).
  */
 export const projectListingSelect =
-  "id, type, slug, title, description, created_at, updated_at, owner_clerk_user_id, owner_profile_id, cover_image_url, location, location_place_id, location_city, location_country, location_country_code, location_lat, location_lng, location_text, area_sqft, area_sqm, year, category, project_category, material_or_finish, team_members, brands_used, status, mentioned_products";
+  "id, type, slug, title, description, created_at, updated_at, owner_clerk_user_id, owner_profile_id, cover_image_url, location, location_place_id, location_city, location_country, location_country_code, location_lat, location_lng, location_text, area_sqft, area_sqm, year, category, project_category, material_or_finish, team_members, brands_used, status, mentioned_products, taxonomy_node_id, project_status, project_collaboration_status, project_looking_for";
 
 /**
  * Columns for product listings (listings.type = 'product').
