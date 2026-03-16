@@ -142,6 +142,7 @@ export function AddProjectForm({
   const action = updateAction ?? (formMode === "admin" ? createAdminProjectFull : createProject);
   const [state, formAction] = useFormState(action, null as ActionResult);
   const [isSubmitting, startSubmitTransition] = useTransition();
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [locationValue, setLocationValue] = useState<LocationValue | null>(initialData?.locationValue ?? null);
@@ -175,14 +176,6 @@ export function AddProjectForm({
   const [projectCollabStatus, setProjectCollabStatus] = useState(initialData?.projectCollaborationStatus ?? "");
   const [projectLookingFor, setProjectLookingFor] = useState<string[]>(initialData?.projectLookingFor ?? []);
   const [projectLookingForJson, setProjectLookingForJson] = useState(() => JSON.stringify(initialData?.projectLookingFor ?? []));
-
-  useEffect(() => {
-    if (formMode === "admin" || updateAction) return;
-    const result = state as ActionResult;
-    if (result?.error) return;
-    const target = result?.slug ?? result?.id;
-    if (target) router.replace(`/projects/${target}`);
-  }, [formMode, updateAction, state, router]);
 
   useEffect(() => {
     setTeamMembersJson(JSON.stringify(teamRows.filter((r) => r.name.trim() || r.role.trim())));
@@ -298,16 +291,32 @@ export function AddProjectForm({
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = formRef.current;
-    if (!form) return;
+    setSubmitError(null);
+    const form = formRef.current ?? e.currentTarget;
     const fd = new FormData(form);
     fd.delete("images");
     fd.delete("documents");
     imageFiles.forEach((f) => fd.append("images", f));
     documentFiles.forEach((f) => fd.append("documents", f));
     if (initialData?.listingId) fd.set("_listingId", initialData.listingId);
-    startSubmitTransition(() => {
-      formAction(fd);
+    startSubmitTransition(async () => {
+      try {
+        const result = await action(null, fd);
+        if (result?.error) {
+          setSubmitError(result.error);
+        } else if (formMode !== "admin" && !updateAction) {
+          const r = result as ActionResult;
+          const target = r?.slug ?? r?.id;
+          if (target) router.replace(`/projects/${target}`);
+        }
+      } catch (err) {
+        const isRedirect =
+          err instanceof Error &&
+          "digest" in err &&
+          String((err as { digest?: string }).digest).startsWith("NEXT_REDIRECT");
+        if (isRedirect) throw err;
+        setSubmitError(err instanceof Error ? err.message : "Submission failed");
+      }
     });
   };
 
@@ -709,9 +718,9 @@ export function AddProjectForm({
           />
         </section>
 
-        {state?.error && (
+        {(submitError ?? state?.error) && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30">
-            <ErrorMessage message={state.error} className="max-w-xl text-red-800 dark:text-red-200" />
+            <ErrorMessage message={submitError ?? state?.error ?? ""} className="max-w-xl text-red-800 dark:text-red-200" />
           </div>
         )}
         </div>

@@ -12,6 +12,10 @@ import { getTaxonomyNodeById } from "@/lib/taxonomy/taxonomyDb";
 import { ExploreEditorialHeader } from "@/components/explore/ExploreEditorialHeader";
 import { ExploreProjectsContent } from "@/components/explore/ExploreProjectsContent";
 import { ExploreEmptyState } from "@/components/explore/ExploreEmptyState";
+import { ExploreViewSwitcher, type ExploreViewMode } from "@/components/explore/ExploreViewSwitcher";
+import { ExploreContextBar } from "@/components/explore/ExploreContextBar";
+import { ExploreMap } from "@/components/explore/ExploreMap";
+import { ExploreIntelligence } from "@/components/explore/ExploreIntelligence";
 import { Container } from "@/components/layout/Container";
 
 export default async function ExploreProjectsPage({
@@ -79,6 +83,12 @@ export default async function ExploreProjectsPage({
   const filters = parseExploreFilters(sp, "projects", taxonomySlug, facetSlugs);
   const projectFilters = exploreFiltersToProjectFilters(filters);
 
+  const validViews: ExploreViewMode[] = ["grid", "map", "intelligence"];
+  const rawView = typeof sp.view === "string" ? sp.view : "grid";
+  const view: ExploreViewMode = validViews.includes(rawView as ExploreViewMode)
+    ? (rawView as ExploreViewMode)
+    : "grid";
+
   const [result, networkCounts, platformStats, designerProfiles] = await Promise.all([
     getProjectsCanonicalFiltered({
       filters: projectFilters,
@@ -118,29 +128,45 @@ export default async function ExploreProjectsPage({
       />
 
       <Container className="py-6">
-        {filters.q?.trim() && (
-          <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-            Search results for:{" "}
-            <span className="font-medium">&quot;{filters.q.trim()}&quot;</span>
-          </p>
+        <div className="mb-4 flex items-center justify-between gap-4">
+          {filters.q?.trim() ? (
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Search results for:{" "}
+              <span className="font-medium">&quot;{filters.q.trim()}&quot;</span>
+            </p>
+          ) : (
+            <div />
+          )}
+          <ExploreViewSwitcher current={view} />
+        </div>
+
+        {view === "grid" && (
+          <>
+            {!isEmpty && <ExploreContextBar total={total} />}
+            <div className={!isEmpty ? "mt-4" : undefined}>
+              {isEmpty ? (
+                <ExploreEmptyState
+                  type="projects"
+                  cityName={cityDisplay}
+                  showResetAndFirst={!cityDisplay}
+                />
+              ) : (
+                <ExploreProjectsContent
+                  key={filterSortKey}
+                  initialData={initialData}
+                  initialTotal={total}
+                  filters={projectFilters}
+                  sort={filters.sort as "newest" | "year_desc" | "area_desc"}
+                  stripItems={designerStripItems}
+                />
+              )}
+            </div>
+          </>
         )}
 
-        {isEmpty ? (
-          <ExploreEmptyState
-            type="projects"
-            cityName={cityDisplay}
-            showResetAndFirst={!cityDisplay}
-          />
-        ) : (
-          <ExploreProjectsContent
-            key={filterSortKey}
-            initialData={initialData}
-            initialTotal={total}
-            filters={projectFilters}
-            sort={filters.sort as "newest" | "year_desc" | "area_desc"}
-            stripItems={designerStripItems}
-          />
-        )}
+        {view === "map" && <ExploreMap />}
+
+        {view === "intelligence" && <ExploreIntelligence />}
       </Container>
     </div>
   );
