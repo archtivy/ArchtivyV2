@@ -17,6 +17,7 @@ import type { TeamMember, BrandUsed } from "@/lib/types/listings";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
 import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets, getTaxonomyNodeById } from "@/lib/taxonomy/taxonomyDb";
+import { notifySearchEngines } from "@/lib/seo/indexnow";
 
 const MIN_GALLERY_IMAGES = 3;
 
@@ -318,6 +319,7 @@ export async function createAdminProjectFull(
   revalidatePath("/explore/products");
   revalidatePath("/sitemap.xml");
   revalidatePath("/admin");
+  notifySearchEngines([`/projects/${slug}`]).catch(() => {});
   redirect(`/admin/projects/${listingId}`);
 }
 
@@ -515,6 +517,7 @@ export async function createAdminProductFull(
   revalidatePath("/explore/products");
   revalidatePath("/sitemap.xml");
   revalidatePath("/admin");
+  notifySearchEngines([`/products/${slug}`]).catch(() => {});
   redirect(`/admin/products/${listingId}`);
 }
 
@@ -1118,6 +1121,18 @@ export async function approveListingAction(listingId: string) {
   revalidatePath("/explore");
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
+
+  // Notify search engines — fire and forget
+  const { data: approved } = await supabase
+    .from("listings")
+    .select("slug, type")
+    .eq("id", listingId)
+    .maybeSingle();
+  if (approved?.slug) {
+    const prefix = approved.type === "product" ? "/products" : "/projects";
+    notifySearchEngines([`${prefix}/${approved.slug}`]).catch(() => {});
+  }
+
   return { ok: true as const };
 }
 

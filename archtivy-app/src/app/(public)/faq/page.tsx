@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { PageCTA } from "@/components/layout/PageCTA";
+import { buildFaqJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
 
 const TOP_QUESTIONS = [
   { title: "What is Archtivy?", id: "what-is-archtivy" },
@@ -133,8 +134,19 @@ export default async function FAQPage() {
   const profileResult = userId ? await getProfileByClerkId(userId) : { data: null };
   const role = profileResult.data?.role ?? undefined;
 
+  const allFaqItems = SECTIONS.flatMap((s) =>
+    s.items.map((item) => ({ question: item.q, answer: item.a }))
+  );
+  const faqJsonLd = buildFaqJsonLd(allFaqItems);
+
   return (
     <article className="space-y-16 sm:space-y-24">
+      {"@type" in faqJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
+        />
+      )}
       <header className="space-y-6 pt-4 text-center sm:pt-8">
         <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
           FAQ

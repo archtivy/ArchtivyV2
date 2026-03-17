@@ -1,6 +1,15 @@
+import type { Metadata } from "next";
+
 // No cache — this page always fetches fresh data on every request.
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+export const metadata: Metadata = {
+  title: "Explore — Architecture Network Intelligence | Archtivy",
+  description:
+    "Real-time market signals from the architecture network. Explore projects, products, designers, and brands with live intelligence.",
+  alternates: { canonical: "/explore" },
+};
 
 import { auth } from "@clerk/nextjs/server";
 import { getProfileByClerkId } from "@/lib/db/profiles";

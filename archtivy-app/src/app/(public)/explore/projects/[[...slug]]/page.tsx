@@ -1,8 +1,9 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getProjectsCanonicalFiltered, getExploreNetworkCounts } from "@/lib/db/explore";
 import { EXPLORE_PAGE_SIZE } from "@/lib/db/explore";
 import { parseExploreFilters } from "@/lib/explore/filters/parse";
-import { exploreFiltersToProjectFilters } from "@/lib/explore/filters/query";
+import { exploreFiltersToProjectFilters, countActiveFilters } from "@/lib/explore/filters/query";
 import { getExploreFilterOptions } from "@/lib/explore/filters/options";
 import { getPlatformStats } from "@/lib/db/platformActivity";
 import { getProfilesForStrip } from "@/lib/db/profiles";
@@ -17,6 +18,60 @@ import { ExploreContextBar } from "@/components/explore/ExploreContextBar";
 import { ExploreMap } from "@/components/explore/ExploreMap";
 import { ExploreIntelligence } from "@/components/explore/ExploreIntelligence";
 import { Container } from "@/components/layout/Container";
+import { getBaseUrl } from "@/lib/canonical";
+import { buildCollectionPageJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
+
+/** Taxonomy pages are indexable with per-node SEO; filtered views are noindex,follow. */
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug?: string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const sp = await searchParams;
+  const taxonomySlug = slug?.length ? slug.join("/") : null;
+  const options = await getExploreFilterOptions("projects");
+  const facetSlugs = options.facets.map((f) => f.slug);
+  const filters = parseExploreFilters(sp, "projects", taxonomySlug, facetSlugs);
+  const hasFilters = countActiveFilters(filters, "projects") > 0;
+
+  // Taxonomy slug page — use node SEO fields when available
+  if (taxonomySlug) {
+    const node = await getTaxonomyNodeBySlugPath("project", taxonomySlug);
+    const n = node.data;
+    if (n) {
+      const title = n.seo_title || `${n.label} Projects | Archtivy`;
+      const description =
+        n.meta_description ||
+        n.description ||
+        `Browse ${n.label.toLowerCase()} architecture projects on Archtivy.`;
+      const meta: Metadata = {
+        title,
+        description,
+        alternates: { canonical: `/explore/projects/${n.slug_path}` },
+        ...(n.featured_image ? { openGraph: { images: [n.featured_image] } } : {}),
+      };
+      if (hasFilters) {
+        return { ...meta, robots: { index: false, follow: true } };
+      }
+      return meta;
+    }
+  }
+
+  // Base explore/projects page
+  const base: Metadata = {
+    title: "Explore Projects — Architecture Portfolio | Archtivy",
+    description:
+      "Browse architecture projects from around the world. Filter by category, location, materials, and more on Archtivy.",
+    alternates: { canonical: "/explore/projects" },
+  };
+  if (hasFilters) {
+    return { ...base, robots: { index: false, follow: true } };
+  }
+  return base;
+}
 
 export default async function ExploreProjectsPage({
   params,
@@ -29,9 +84,11 @@ export default async function ExploreProjectsPage({
   const sp = await searchParams;
   const taxonomySlug = slug?.length ? slug.join("/") : null;
 
-  // Validate taxonomy slug exists in DB
+  // Validate taxonomy slug exists in DB; keep node ref for JSON-LD + intro_text
+  let taxonomyNode: import("@/lib/taxonomy/taxonomyDb").TaxonomyNode | null = null;
   if (taxonomySlug) {
     const node = await getTaxonomyNodeBySlugPath("project", taxonomySlug);
+    taxonomyNode = node.data;
     if (!node.data) {
       const redir = await checkTaxonomySlugRedirect("project", taxonomySlug);
       if (redir) {
@@ -117,8 +174,28 @@ export default async function ExploreProjectsPage({
     href: `/u/${d.username ?? `id/${d.id}`}`,
   }));
 
+  const baseUrl = getBaseUrl();
+  const collectionName = taxonomyNode
+    ? (taxonomyNode.seo_title || `${taxonomyNode.label} Projects`)
+    : "Architecture Projects";
+  const collectionDesc = taxonomyNode
+    ? (taxonomyNode.meta_description || taxonomyNode.description || `Browse ${taxonomyNode.label.toLowerCase()} projects.`)
+    : "Browse architecture projects from around the world on Archtivy.";
+  const collectionUrl = taxonomyNode
+    ? `${baseUrl}/explore/projects/${taxonomyNode.slug_path}`
+    : `${baseUrl}/explore/projects`;
+  const collectionJsonLd = buildCollectionPageJsonLd({
+    name: collectionName,
+    description: collectionDesc,
+    url: collectionUrl,
+  });
+
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(collectionJsonLd) }}
+      />
       <ExploreEditorialHeader
         type="projects"
         counts={networkCounts}
@@ -126,6 +203,14 @@ export default async function ExploreProjectsPage({
         currentFilters={filters}
         platformStats={platformStats}
       />
+
+      {taxonomyNode?.intro_text && (
+        <Container className="pt-4">
+          <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+            {taxonomyNode.intro_text}
+          </p>
+        </Container>
+      )}
 
       <Container className="py-6">
         <div className="mb-4 flex items-center justify-between gap-4">

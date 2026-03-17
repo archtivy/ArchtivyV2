@@ -47,7 +47,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/data-processing`,    lastModified: staticLastMod, changeFrequency: "yearly",  priority: 0.3 },
   ];
 
-  const [projectsRes, productsRes, profilesRes] = await Promise.all([
+  const [projectsRes, productsRes, profilesRes, taxonomyRes] = await Promise.all([
     supabase
       .from("listings")
       .select("id, slug, updated_at")
@@ -70,11 +70,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .eq("is_hidden", false)
       .order("updated_at", { ascending: false })
       .limit(5000),
+    supabase
+      .from("taxonomy_nodes")
+      .select("domain, slug_path, updated_at")
+      .eq("is_active", true)
+      .order("domain")
+      .order("depth", { ascending: true })
+      .order("sort_order", { ascending: true }),
   ]);
 
   const projectRows = (projectsRes.data ?? []) as { id: string; slug: string | null; updated_at: string | null }[];
   const productRows = (productsRes.data ?? []) as { id: string; slug: string | null; updated_at: string | null }[];
   const profileRows = (profilesRes.data ?? []) as { id: string; username: string | null; updated_at: string | null }[];
+  const taxonomyRows = (taxonomyRes.data ?? []) as { domain: string; slug_path: string; updated_at: string | null }[];
 
   // ✅ Safety buffer toward the 50k URL limit if you increase limits later
   const MAX = 45000;
@@ -103,5 +111,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     };
   });
 
-  return [...staticEntries, ...projectUrls, ...productUrls, ...profileUrls];
+  const taxonomyUrls: MetadataRoute.Sitemap = taxonomyRows.map((t) => {
+    const prefix = t.domain === "product" ? "/explore/products" : "/explore/projects";
+    return {
+      url: `${base}${prefix}/${t.slug_path}`,
+      lastModified: t.updated_at ? new Date(t.updated_at) : staticLastMod,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    };
+  });
+
+  return [...staticEntries, ...taxonomyUrls, ...projectUrls, ...productUrls, ...profileUrls];
 }

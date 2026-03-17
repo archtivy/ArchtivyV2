@@ -158,6 +158,57 @@ export function buildBreadcrumbJsonLd(
   };
 }
 
+/**
+ * JSON-LD builder for the homepage.
+ * Combines WebSite (for sitelinks search) and Organization schemas.
+ */
+export function buildHomepageJsonLd(baseUrl: string): Record<string, unknown>[] {
+  return [
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: "Archtivy",
+      url: baseUrl,
+      description:
+        "The platform where architectural work is documented, products are credited, and professionals connect across cities.",
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: `${baseUrl}/explore/projects?q={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
+      },
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "Archtivy",
+      url: baseUrl,
+      logo: `${baseUrl}/logo.png`,
+      sameAs: [],
+    },
+  ];
+}
+
+/**
+ * JSON-LD builder for collection/explore pages.
+ * Produces a CollectionPage schema for category-level explore views.
+ */
+export function buildCollectionPageJsonLd(opts: {
+  name: string;
+  description: string;
+  url: string;
+}): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: opts.name,
+    description: opts.description,
+    url: opts.url,
+  };
+}
+
 /** Minimal profile shape used by the JSON-LD builder (avoids importing the full Profile type). */
 export interface ProfileJsonLdInput {
   display_name: string | null;

@@ -208,6 +208,13 @@ export function TaxonomyDbManager() {
     });
   };
 
+  const handleSaveSeo = (nodeId: string, seo: { seo_title: string | null; meta_description: string | null; intro_text: string | null; featured_image: string | null }) => {
+    startTransition(async () => {
+      await editTaxonomyNode(nodeId, seo);
+      await loadData();
+    });
+  };
+
   if (!state) {
     return (
       <div className="rounded border border-zinc-200 bg-white p-6">
@@ -312,6 +319,7 @@ export function TaxonomyDbManager() {
                   childrenMap={childrenMap}
                   counts={state.nodeCounts}
                   onToggleActive={handleToggleActive}
+                  onSaveSeo={handleSaveSeo}
                 />
               ))}
             </div>
@@ -500,17 +508,25 @@ function RecursiveTreeNode({
   childrenMap,
   counts,
   onToggleActive,
+  onSaveSeo,
 }: {
   node: TaxonomyNode;
   childrenMap: Map<string, TaxonomyNode[]>;
   counts: Record<string, number>;
   onToggleActive: (id: string, active: boolean) => void;
+  onSaveSeo: (id: string, seo: { seo_title: string | null; meta_description: string | null; intro_text: string | null; featured_image: string | null }) => void;
 }) {
   const [expanded, setExpanded] = useState(node.depth === 0);
+  const [seoOpen, setSeoOpen] = useState(false);
+  const [seoTitle, setSeoTitle] = useState(node.seo_title ?? "");
+  const [metaDesc, setMetaDesc] = useState(node.meta_description ?? "");
+  const [introText, setIntroText] = useState(node.intro_text ?? "");
+  const [featuredImage, setFeaturedImage] = useState(node.featured_image ?? "");
   const children = (childrenMap.get(node.id) ?? []).sort((a, b) => a.sort_order - b.sort_order);
   const hasChildren = children.length > 0;
   const indent = node.depth * 24;
   const count = counts[node.id] ?? 0;
+  const hasSeo = !!(node.seo_title || node.meta_description);
 
   return (
     <div>
@@ -541,6 +557,16 @@ function RecursiveTreeNode({
         </span>
         <button
           type="button"
+          onClick={() => setSeoOpen(!seoOpen)}
+          className={`shrink-0 rounded px-2 py-0.5 text-xs ${
+            hasSeo ? "text-blue-700 hover:bg-blue-50" : "text-zinc-400 hover:bg-zinc-100"
+          }`}
+          title="Edit SEO fields"
+        >
+          SEO
+        </button>
+        <button
+          type="button"
           onClick={() => onToggleActive(node.id, !node.is_active)}
           className={`shrink-0 rounded px-2 py-0.5 text-xs ${
             node.is_active
@@ -551,6 +577,63 @@ function RecursiveTreeNode({
           {node.is_active ? "Active" : "Inactive"}
         </button>
       </div>
+      {seoOpen && (
+        <div
+          className="border-b border-zinc-200 bg-zinc-50 px-4 py-3 space-y-2"
+          style={{ paddingLeft: `${indent + 40}px` }}
+        >
+          <div className="text-xs font-medium text-zinc-600 mb-1">SEO Fields — {node.label}</div>
+          <input
+            value={seoTitle}
+            onChange={(e) => setSeoTitle(e.target.value)}
+            placeholder="SEO title (falls back to label)"
+            className="h-8 w-full rounded border border-zinc-200 px-2 text-xs outline-none focus:ring-1 focus:ring-[#002abf]/30"
+          />
+          <input
+            value={metaDesc}
+            onChange={(e) => setMetaDesc(e.target.value)}
+            placeholder="Meta description (falls back to description)"
+            className="h-8 w-full rounded border border-zinc-200 px-2 text-xs outline-none focus:ring-1 focus:ring-[#002abf]/30"
+          />
+          <textarea
+            value={introText}
+            onChange={(e) => setIntroText(e.target.value)}
+            placeholder="Intro text (shown above listings)"
+            rows={2}
+            className="w-full rounded border border-zinc-200 px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-[#002abf]/30"
+          />
+          <input
+            value={featuredImage}
+            onChange={(e) => setFeaturedImage(e.target.value)}
+            placeholder="Featured image URL (OG image)"
+            className="h-8 w-full rounded border border-zinc-200 px-2 text-xs outline-none focus:ring-1 focus:ring-[#002abf]/30"
+          />
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                onSaveSeo(node.id, {
+                  seo_title: seoTitle.trim() || null,
+                  meta_description: metaDesc.trim() || null,
+                  intro_text: introText.trim() || null,
+                  featured_image: featuredImage.trim() || null,
+                });
+                setSeoOpen(false);
+              }}
+              className="rounded bg-[#002abf] px-3 py-1 text-xs font-medium text-white hover:bg-[#001f8f]"
+            >
+              Save SEO
+            </button>
+            <button
+              type="button"
+              onClick={() => setSeoOpen(false)}
+              className="rounded border border-zinc-200 px-3 py-1 text-xs text-zinc-600 hover:bg-zinc-100"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       {expanded && children.map((child) => (
         <RecursiveTreeNode
           key={child.id}
@@ -558,6 +641,7 @@ function RecursiveTreeNode({
           childrenMap={childrenMap}
           counts={counts}
           onToggleActive={onToggleActive}
+          onSaveSeo={onSaveSeo}
         />
       ))}
     </div>

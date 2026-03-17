@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 export const revalidate = 3600; // ISR: revalidate every hour
 
 import Link from "next/link";
@@ -8,6 +10,29 @@ import { HomeHeroSearch } from "@/components/search/HomeHeroSearch";
 import { ShareWorkTrigger } from "@/components/ShareWorkTrigger";
 import { LiveActivityStrip } from "@/components/home/LiveActivityStrip";
 import { NetworkFeedSection } from "@/components/home/NetworkFeedSection";
+import { getBaseUrl } from "@/lib/canonical";
+import { buildHomepageJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
+
+export const metadata: Metadata = {
+  title: "Archtivy — The Intelligence Layer of Architecture",
+  description:
+    "The platform where architectural work is documented, products are credited, and professionals connect across cities. Explore projects, products, designers, and brands.",
+  openGraph: {
+    title: "Archtivy — The Intelligence Layer of Architecture",
+    description:
+      "Explore architecture projects, building products, designers, and brands. Document work, credit specifications, and connect across cities.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Archtivy — The Intelligence Layer of Architecture",
+    description:
+      "Explore architecture projects, building products, designers, and brands.",
+  },
+  alternates: {
+    canonical: "/",
+  },
+};
 
 const FEATURED_PROJECTS_LIMIT = 6;
 const FEATURED_PRODUCTS_LIMIT = 8;
@@ -18,8 +43,18 @@ export default async function Home() {
     getProductsCanonical(FEATURED_PRODUCTS_LIMIT),
   ]);
 
+  const baseUrl = getBaseUrl();
+  const jsonLdItems = buildHomepageJsonLd(baseUrl);
+
   return (
     <div className="space-y-16 pb-24 sm:space-y-20 sm:pb-28">
+      {jsonLdItems.map((item, i) => (
+        <script
+          key={i}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(item) }}
+        />
+      ))}
       {/* Hero */}
       <section className="text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400 dark:text-zinc-500">

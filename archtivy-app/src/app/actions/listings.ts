@@ -39,6 +39,7 @@ import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets, getT
 import { persistListingTeamMembers } from "@/app/actions/createProject";
 import { notifyBrandPublishedProduct, notifyNearbyUsersOfOpportunity } from "@/lib/notifications/create";
 import { detectProductOpportunities } from "@/lib/lifecycle";
+import { notifySearchEngines } from "@/lib/seo/indexnow";
 
 export type { ActionResult } from "./types";
 
@@ -370,6 +371,7 @@ export async function createProduct(
     }).catch(() => {});
   }
 
+  notifySearchEngines([`/products/${resolvedSlug}`]).catch(() => {});
   return { slug: resolvedSlug };
 }
 

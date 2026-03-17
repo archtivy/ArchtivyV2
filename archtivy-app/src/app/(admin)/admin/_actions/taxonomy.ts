@@ -350,7 +350,15 @@ export async function addTaxonomyNode(input: {
 
 export async function editTaxonomyNode(
   id: string,
-  updates: { label?: string; sort_order?: number; is_active?: boolean }
+  updates: {
+    label?: string;
+    sort_order?: number;
+    is_active?: boolean;
+    seo_title?: string | null;
+    meta_description?: string | null;
+    intro_text?: string | null;
+    featured_image?: string | null;
+  }
 ): Promise<{ ok: boolean; error?: string }> {
   const admin = await ensureAdmin();
   if (!admin.ok) return { ok: false, error: admin.error };

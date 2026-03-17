@@ -16,8 +16,10 @@ import { ExploreEditorialHeader } from "@/components/explore/ExploreEditorialHea
 import { ExploreProductsContent } from "@/components/explore/ExploreProductsContent";
 import { ExploreEmptyState } from "@/components/explore/ExploreEmptyState";
 import { Container } from "@/components/layout/Container";
+import { getBaseUrl } from "@/lib/canonical";
+import { buildCollectionPageJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
 
-/** Filtered product views: noindex,follow so taxonomy values do not create indexable pages. */
+/** Taxonomy pages are indexable with per-node SEO; filtered views are noindex,follow. */
 export async function generateMetadata({
   params,
   searchParams,
@@ -30,7 +32,41 @@ export async function generateMetadata({
   const taxonomySlug = slug?.length ? slug.join("/") : null;
   const filters = parseExploreFilters(sp, "products", taxonomySlug);
   const hasFilters = countActiveFilters(filters, "products") > 0;
-  return hasFilters ? { robots: { index: false, follow: true } } : {};
+
+  // Taxonomy slug page — use node SEO fields when available
+  if (taxonomySlug) {
+    const node = await getTaxonomyNodeBySlugPath("product", taxonomySlug);
+    const n = node.data;
+    if (n) {
+      const title = n.seo_title || `${n.label} — Building Products | Archtivy`;
+      const description =
+        n.meta_description ||
+        n.description ||
+        `Browse ${n.label.toLowerCase()} building products on Archtivy.`;
+      const meta: Metadata = {
+        title,
+        description,
+        alternates: { canonical: `/explore/products/${n.slug_path}` },
+        ...(n.featured_image ? { openGraph: { images: [n.featured_image] } } : {}),
+      };
+      if (hasFilters) {
+        return { ...meta, robots: { index: false, follow: true } };
+      }
+      return meta;
+    }
+  }
+
+  // Base explore/products page
+  const base: Metadata = {
+    title: "Explore Products — Building Materials & Specifications | Archtivy",
+    description:
+      "Discover building products, materials, furniture, and specifications for architecture projects on Archtivy.",
+    alternates: { canonical: "/explore/products" },
+  };
+  if (hasFilters) {
+    return { ...base, robots: { index: false, follow: true } };
+  }
+  return base;
 }
 
 export default async function ExploreProductsPage({
@@ -123,6 +159,13 @@ export default async function ExploreProductsPage({
     redirect(`/explore/products/${rawTaxonomy}${qs ? `?${qs}` : ""}`);
   }
 
+  // Fetch taxonomy node for JSON-LD + intro_text (re-uses cached query if already fetched during validation)
+  let taxonomyNode: import("@/lib/taxonomy/taxonomyDb").TaxonomyNode | null = null;
+  if (taxonomySlug) {
+    const nodeRes = await getTaxonomyNodeBySlugPath("product", taxonomySlug);
+    taxonomyNode = nodeRes.data;
+  }
+
   // Fetch filter options (includes facet slugs for dynamic parsing)
   const options = await getExploreFilterOptions("products");
   const facetSlugs = options.facets.map((f) => f.slug);
@@ -158,8 +201,28 @@ export default async function ExploreProductsPage({
     href: `/u/${b.username ?? `id/${b.id}`}`,
   }));
 
+  const baseUrl = getBaseUrl();
+  const collectionName = taxonomyNode
+    ? (taxonomyNode.seo_title || `${taxonomyNode.label} — Building Products`)
+    : "Building Products";
+  const collectionDesc = taxonomyNode
+    ? (taxonomyNode.meta_description || taxonomyNode.description || `Browse ${taxonomyNode.label.toLowerCase()} products.`)
+    : "Discover building products, materials, furniture, and specifications on Archtivy.";
+  const collectionUrl = taxonomyNode
+    ? `${baseUrl}/explore/products/${taxonomyNode.slug_path}`
+    : `${baseUrl}/explore/products`;
+  const collectionJsonLd = buildCollectionPageJsonLd({
+    name: collectionName,
+    description: collectionDesc,
+    url: collectionUrl,
+  });
+
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(collectionJsonLd) }}
+      />
       <ExploreEditorialHeader
         type="products"
         counts={networkCounts}
@@ -167,6 +230,14 @@ export default async function ExploreProductsPage({
         currentFilters={filters}
         platformStats={platformStats}
       />
+
+      {taxonomyNode?.intro_text && (
+        <Container className="pt-4">
+          <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+            {taxonomyNode.intro_text}
+          </p>
+        </Container>
+      )}
 
       <Container className="py-6">
         {filters.q?.trim() && (

@@ -14,6 +14,7 @@ import { setProjectMaterials } from "@/lib/db/materials";
 import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets } from "@/lib/taxonomy/taxonomyDb";
 import { notifyDesignerPublishedProject, notifyNearbyUsersOfOpportunity } from "@/lib/notifications/create";
 import { detectProjectOpportunities } from "@/lib/lifecycle";
+import { notifySearchEngines } from "@/lib/seo/indexnow";
 
 const MIN_GALLERY_IMAGES = 3;
 
@@ -372,6 +373,7 @@ export async function createProject(
   revalidatePath("/explore");
   revalidatePath("/explore/projects");
   revalidatePath("/");
+  notifySearchEngines([`/projects/${slug}`]).catch(() => {});
   return {
     id: listingId,
     slug,

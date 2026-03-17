@@ -28,6 +28,11 @@ export interface TaxonomyNode {
   legacy_project_category: string | null;
   created_at: string;
   updated_at: string;
+  /* SEO fields — nullable; frontend falls back to label/description when NULL */
+  seo_title: string | null;
+  meta_description: string | null;
+  intro_text: string | null;
+  featured_image: string | null;
 }
 
 export interface Facet {
@@ -73,7 +78,7 @@ type DbResult<T> = { data: T; error: null } | { data: null; error: string };
 // ─── Taxonomy Nodes ──────────────────────────────────────────────────────────
 
 const NODE_SELECT =
-  "id, domain, parent_id, depth, slug, slug_path, label, label_plural, description, icon_key, sort_order, is_active, legacy_product_type, legacy_product_category, legacy_product_subcategory, legacy_project_category, created_at, updated_at";
+  "id, domain, parent_id, depth, slug, slug_path, label, label_plural, description, icon_key, sort_order, is_active, legacy_product_type, legacy_product_category, legacy_product_subcategory, legacy_project_category, created_at, updated_at, seo_title, meta_description, intro_text, featured_image";
 
 /** Get all taxonomy nodes for a domain, ordered by depth then sort_order. */
 export async function getTaxonomyTree(
@@ -219,7 +224,7 @@ export async function createTaxonomyNode(input: {
 
 export async function updateTaxonomyNode(
   id: string,
-  updates: Partial<Pick<TaxonomyNode, "label" | "label_plural" | "description" | "icon_key" | "sort_order" | "is_active">>
+  updates: Partial<Pick<TaxonomyNode, "label" | "label_plural" | "description" | "icon_key" | "sort_order" | "is_active" | "seo_title" | "meta_description" | "intro_text" | "featured_image">>
 ): Promise<DbResult<TaxonomyNode>> {
   const { data, error } = await supa()
     .from("taxonomy_nodes")
