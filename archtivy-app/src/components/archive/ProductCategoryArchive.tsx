@@ -14,7 +14,7 @@ import { buildCollectionPageJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/json
 interface ProductCategoryArchiveProps {
   node: TaxonomyNode;
   ancestors: TaxonomyNode[];
-  children: SubcategoryLinkItem[];
+  childNodes: SubcategoryLinkItem[];
   listings: ProductCanonical[];
   total: number;
   page: number;
@@ -24,7 +24,7 @@ interface ProductCategoryArchiveProps {
 export function ProductCategoryArchive({
   node,
   ancestors,
-  children,
+  childNodes,
   listings,
   total,
   page,
@@ -61,8 +61,8 @@ export function ProductCategoryArchive({
       <JsonLd schemas={[collectionJsonLd, breadcrumbJsonLd]} />
       <ArchiveBreadcrumb segments={breadcrumbSegments} current={node.label} />
       <ArchiveHeader title={title} intro={intro} count={total} />
-      {!isSubcategory && children.length > 0 && (
-        <SubcategoryLinks baseSegment="products" items={children} />
+      {!isSubcategory && childNodes.length > 0 && (
+        <SubcategoryLinks baseSegment="products" items={childNodes} />
       )}
       <ArchiveListingGrid type="product" items={listings} />
       <ArchivePagination

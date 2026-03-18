@@ -148,7 +148,7 @@ export default async function ProductSegmentsPage({
         <ProductCategoryArchive
           node={archiveData.node}
           ancestors={archiveData.ancestors}
-          children={archiveData.children}
+          childNodes={archiveData.childNodes}
           listings={archiveData.listings}
           total={archiveData.total}
           page={archiveData.page}
@@ -207,7 +207,7 @@ export default async function ProductSegmentsPage({
         <ProductCategoryArchive
           node={archiveData.node}
           ancestors={archiveData.ancestors}
-          children={archiveData.children}
+          childNodes={archiveData.childNodes}
           listings={archiveData.listings}
           total={archiveData.total}
           page={archiveData.page}

@@ -25,7 +25,7 @@ export const ARCHIVE_PAGE_SIZE = 24;
 export interface ArchiveData<T> {
   node: TaxonomyNode;
   ancestors: TaxonomyNode[];
-  children: SubcategoryLinkItem[];
+  childNodes: SubcategoryLinkItem[];
   listings: T[];
   total: number;
   page: number;
@@ -61,7 +61,7 @@ export async function fetchProjectArchive(
         getNodeListingCountsWithDescendants("project"),
       ]);
 
-      const children: SubcategoryLinkItem[] = (childrenRes.data ?? []).map((c) => ({
+      const childNodes: SubcategoryLinkItem[] = (childrenRes.data ?? []).map((c) => ({
         label: c.label,
         slug_path: c.slug_path,
         description: c.description,
@@ -74,7 +74,7 @@ export async function fetchProjectArchive(
       return {
         node,
         ancestors: ancestorsRes.data ?? [],
-        children,
+        childNodes,
         listings: listingsRes.data,
         total,
         page: safePage,
@@ -115,7 +115,7 @@ export async function fetchProductArchive(
         getNodeListingCountsWithDescendants("product"),
       ]);
 
-      const children: SubcategoryLinkItem[] = (childrenRes.data ?? []).map((c) => ({
+      const childNodes: SubcategoryLinkItem[] = (childrenRes.data ?? []).map((c) => ({
         label: c.label,
         slug_path: c.slug_path,
         description: c.description,
@@ -128,7 +128,7 @@ export async function fetchProductArchive(
       return {
         node,
         ancestors: ancestorsRes.data ?? [],
-        children,
+        childNodes,
         listings: listingsRes.data,
         total,
         page: safePage,

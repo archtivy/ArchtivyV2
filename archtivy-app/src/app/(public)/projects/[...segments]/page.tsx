@@ -156,7 +156,7 @@ export default async function ProjectSegmentsPage({
         <ProjectCategoryArchive
           node={archiveData.node}
           ancestors={archiveData.ancestors}
-          children={archiveData.children}
+          childNodes={archiveData.childNodes}
           listings={archiveData.listings}
           total={archiveData.total}
           page={archiveData.page}
@@ -216,7 +216,7 @@ export default async function ProjectSegmentsPage({
         <ProjectCategoryArchive
           node={archiveData.node}
           ancestors={archiveData.ancestors}
-          children={archiveData.children}
+          childNodes={archiveData.childNodes}
           listings={archiveData.listings}
           total={archiveData.total}
           page={archiveData.page}
