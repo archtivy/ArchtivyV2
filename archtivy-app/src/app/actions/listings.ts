@@ -117,6 +117,7 @@ export async function createProject(
   const description = (formData.get("description") as string)?.trim() ?? null;
   const location = (formData.get("location") as string)?.trim() ?? null;
   const category = (formData.get("category") as string)?.trim() ?? null;
+  const taxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
   const areaSqftRaw = formData.get("area_sqft");
   const areaSqft =
     areaSqftRaw !== null && areaSqftRaw !== ""
@@ -129,8 +130,17 @@ export async function createProject(
   if (!title) return { error: "Project title is required." };
   if (!description?.trim()) return { error: "Project description is required." };
   if (!location?.trim()) return { error: "Project location is required." };
-  if (!category?.trim()) return { error: "Project category is required." };
+  if (!taxonomyNodeId && !category?.trim()) return { error: "Project category is required." };
   if (!year?.trim()) return { error: "Year is required." };
+
+  // Derive legacy category from taxonomy node when taxonomy is primary but category is empty
+  let resolvedCategory: string | null = category;
+  if (taxonomyNodeId && !category?.trim()) {
+    const nodeRes = await getTaxonomyNodeById(taxonomyNodeId);
+    if (nodeRes.data) {
+      resolvedCategory = nodeRes.data.legacy_project_category || nodeRes.data.label || null;
+    }
+  }
 
   const imageFiles = getImageFiles(formData);
   if (imageFiles.length < GALLERY_MIN_IMAGES) {
@@ -145,7 +155,7 @@ export async function createProject(
     description: description.trim(),
     owner_clerk_user_id: userId,
     location: location.trim() || null,
-    category: category.trim() || null,
+    category: resolvedCategory?.trim() || null,
     area_sqft: areaSqft != null && !Number.isNaN(areaSqft) && areaSqft > 0 ? areaSqft : null,
     year: year.trim() || null,
     team_members: teamMembers,
@@ -153,6 +163,14 @@ export async function createProject(
   });
   if (createResult.error) return { error: createResult.error };
   const listingId = createResult.data!.id;
+
+  // Set taxonomy node (new DB taxonomy system)
+  if (taxonomyNodeId) {
+    const taxRes = await setListingTaxonomyNode(listingId, taxonomyNodeId);
+    if (taxRes.error) {
+      console.warn("[createProject] taxonomy node set error (non-fatal):", taxRes.error);
+    }
+  }
 
   const uploadResult = await uploadGalleryImages(listingId, imageFiles);
   if (uploadResult.error || !uploadResult.data?.length) {
@@ -295,6 +313,14 @@ export async function createProduct(
   const listingId = createResult.data!.id;
   const resolvedSlug = slug;
 
+  // Set taxonomy node (new DB taxonomy system)
+  if (taxonomyNodeId) {
+    const taxRes = await setListingTaxonomyNode(listingId, taxonomyNodeId);
+    if (taxRes.error) {
+      console.warn("[createProduct] taxonomy node set error (non-fatal):", taxRes.error);
+    }
+  }
+
   if (teamMembers.length > 0) {
     try {
       const supabase = getSupabaseServiceClient();
@@ -345,6 +371,14 @@ export async function createProduct(
       );
     }
   }
+
+  // Set material taxonomy nodes + facet values (advanced filters)
+  const taxonomyMaterialIds = parseMaterialIds(formData.get("taxonomy_material_ids"));
+  const matRes = await setListingMaterialNodes(listingId, taxonomyMaterialIds);
+  if (matRes.error) console.warn("[createProduct] material nodes set error (non-fatal):", matRes.error);
+  const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
+  const facetRes = await setListingFacets(listingId, facetValueIds);
+  if (facetRes.error) console.warn("[createProduct] facet values set error (non-fatal):", facetRes.error);
 
   revalidatePath("/explore/products");
   revalidatePath("/");

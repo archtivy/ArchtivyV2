@@ -70,7 +70,7 @@ export function ListingCard(props: ListingCardProps) {
   const isProject = props.type === "project";
   const item = isProject ? props.project : props.product;
 
-  const href = getListingUrl({ id: item.id, type: props.type, slug: item.slug });
+  const href = getListingUrl({ id: item.id, type: props.type, slug: item.slug, taxonomySlugPath: item.taxonomy_slug_path });
   const title = item.title?.trim() || (isProject ? "Untitled Project" : "Untitled Product");
   const cover = item.cover ?? null;
 

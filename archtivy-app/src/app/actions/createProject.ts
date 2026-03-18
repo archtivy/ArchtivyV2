@@ -218,6 +218,16 @@ export async function createProject(
     }
   }
 
+  // Derive legacy category from taxonomy node when taxonomy is primary but category is empty
+  let resolvedCategory: string | null = category;
+  if (taxonomy_node_id && !category?.trim()) {
+    const { getTaxonomyNodeById } = await import("@/lib/taxonomy/taxonomyDb");
+    const nodeRes = await getTaxonomyNodeById(taxonomy_node_id);
+    if (nodeRes.data) {
+      resolvedCategory = nodeRes.data.legacy_project_category || nodeRes.data.label || null;
+    }
+  }
+
   const galleryItems = getGalleryItems(formData);
   if (!isDraft && galleryItems.length < MIN_GALLERY_IMAGES) {
     return {
@@ -244,8 +254,8 @@ export async function createProject(
       title,
       description: description || null,
       slug,
-      category: category || null,
-      project_category: category || null,
+      category: resolvedCategory || null,
+      project_category: resolvedCategory || null,
       year: year || null,
       area_sqft: area_sqft != null && !Number.isNaN(area_sqft) && area_sqft > 0 ? area_sqft : null,
       location: location_text,

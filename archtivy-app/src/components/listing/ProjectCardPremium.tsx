@@ -13,7 +13,7 @@ export interface ProjectCardPremiumProps {
 const SQM_TO_SQFT = 10.7639;
 
 export function ProjectCardPremium({ project }: ProjectCardPremiumProps) {
-  const href = getListingUrl({ id: project.id, type: "project", slug: project.slug });
+  const href = getListingUrl({ id: project.id, type: "project", slug: project.slug, taxonomySlugPath: project.taxonomy_slug_path });
   const studioHref = project.owner ? getOwnerProfileHref(project.owner) : null;
 
   // Location: city + country when both present, else one, else location_text

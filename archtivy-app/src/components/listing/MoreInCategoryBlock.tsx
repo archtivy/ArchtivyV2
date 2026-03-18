@@ -16,32 +16,49 @@ export interface MoreInCategoryBlockProps {
   /** Type for href and grid layout */
   type: "projects" | "products";
   items: MoreInCategoryItem[];
+  /** Optional category label for heading, e.g. "Residential" → "More Residential Projects" */
+  categoryLabel?: string | null;
+  /** Optional link to the archive page for "View all" */
+  viewAllHref?: string | null;
 }
 
 const MORE_LIMIT = 8;
 
 /**
  * Compact card grid for "More in this category" on listing detail pages.
- * TODO: Prefer recent/popular when such sort fields exist.
  */
-export function MoreInCategoryBlock({ type, items }: MoreInCategoryBlockProps) {
+export function MoreInCategoryBlock({ type, items, categoryLabel, viewAllHref }: MoreInCategoryBlockProps) {
   const list = items.slice(0, MORE_LIMIT);
   if (list.length === 0) return null;
 
   const baseHref = type === "projects" ? "/projects" : "/products";
   const aspectClass = type === "projects" ? "aspect-[4/3]" : "aspect-square";
+  const typeLabel = type === "projects" ? "Projects" : "Products";
+  const heading = categoryLabel
+    ? `More ${categoryLabel} ${typeLabel}`
+    : `More in this category`;
 
   return (
     <section
       className="mt-10 border-t border-zinc-100 pt-10 dark:border-zinc-800"
       aria-labelledby="more-in-category-heading"
     >
-      <h2
-        id="more-in-category-heading"
-        className="mb-4 font-serif text-xl font-normal text-zinc-900 dark:text-zinc-100"
-      >
-        More in this category
-      </h2>
+      <div className="mb-4 flex items-baseline justify-between">
+        <h2
+          id="more-in-category-heading"
+          className="font-serif text-xl font-normal text-zinc-900 dark:text-zinc-100"
+        >
+          {heading}
+        </h2>
+        {viewAllHref && (
+          <Link
+            href={viewAllHref}
+            className="text-sm text-[#002abf] hover:underline"
+          >
+            View all &rarr;
+          </Link>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
         {list.map((item) => {
           const href = `${baseHref}/${item.slug ?? item.id}`;

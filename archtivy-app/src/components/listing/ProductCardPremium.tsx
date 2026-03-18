@@ -10,7 +10,7 @@ export interface ProductCardPremiumProps {
 }
 
 export function ProductCardPremium({ product }: ProductCardPremiumProps) {
-  const href = getListingUrl({ id: product.id, type: "product", slug: product.slug });
+  const href = getListingUrl({ id: product.id, type: "product", slug: product.slug, taxonomySlugPath: product.taxonomy_slug_path });
   const brandHref = product.owner ? getOwnerProfileHref(product.owner) : null;
 
   const connectionsCount = product.usedInProjectsCount ?? 0;

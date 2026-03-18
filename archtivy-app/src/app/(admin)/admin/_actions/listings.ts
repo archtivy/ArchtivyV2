@@ -179,6 +179,15 @@ export async function createAdminProjectFull(
   if (!projectTaxonomyNodeId && !category?.trim()) return { error: "Project category is required." };
   if (!year?.trim()) return { error: "Year is required." };
 
+  // Derive legacy category from taxonomy node when taxonomy is primary but category is empty
+  let resolvedCreateCategory: string | null = category;
+  if (projectTaxonomyNodeId && !category?.trim()) {
+    const nodeRes = await getTaxonomyNodeById(projectTaxonomyNodeId);
+    if (nodeRes.data) {
+      resolvedCreateCategory = nodeRes.data.legacy_project_category || nodeRes.data.label || null;
+    }
+  }
+
   const galleryItems = parseGalleryJson(formData.get("gallery"));
   if (galleryItems.length < MIN_GALLERY_IMAGES) {
     return { error: `At least ${MIN_GALLERY_IMAGES} gallery images are required.` };
@@ -202,7 +211,8 @@ export async function createAdminProjectFull(
       title,
       description: description || null,
       slug,
-      category: category || null,
+      category: resolvedCreateCategory || null,
+      project_category: resolvedCreateCategory || null,
       year: year || null,
       area_sqft: areaSqftValue,
       location: location_text,
@@ -852,6 +862,15 @@ export async function updateProjectAction(
   if (!projectTaxonomyNodeId && !category?.trim()) return { error: "Project category is required." };
   if (!year?.trim()) return { error: "Year is required." };
 
+  // Derive legacy category from taxonomy node when taxonomy is primary but category is empty
+  let resolvedCategory: string | null = category;
+  if (projectTaxonomyNodeId && !category?.trim()) {
+    const nodeRes = await getTaxonomyNodeById(projectTaxonomyNodeId);
+    if (nodeRes.data) {
+      resolvedCategory = nodeRes.data.legacy_project_category || nodeRes.data.label || null;
+    }
+  }
+
   const supabase = getSupabaseServiceClient();
   const { error: updateError } = await supabase
     .from("listings")
@@ -864,7 +883,8 @@ export async function updateProjectAction(
       location_country: location_country || null,
       location_lat: location_lat != null && !Number.isNaN(location_lat) ? location_lat : null,
       location_lng: location_lng != null && !Number.isNaN(location_lng) ? location_lng : null,
-      category: category || null,
+      category: resolvedCategory || null,
+      project_category: resolvedCategory || null,
       year: year || null,
       area_sqft: area_sqft != null && !Number.isNaN(area_sqft) && area_sqft > 0 ? area_sqft : null,
       material_or_finish: material_or_finish || null,

@@ -271,6 +271,11 @@ export default async function PublicProfilePage({
         location={location}
         heroImageUrl={heroImageUrl}
         stats={heroStats}
+        exploreHref={
+          profile.username
+            ? `/explore?type=${profile.role === "brand" ? "brands" : "designers"}&focus=${encodeURIComponent(profile.username)}`
+            : null
+        }
       />
 
       {/* ── Content: pulls 2.5rem up over hero bottom edge ── */}
