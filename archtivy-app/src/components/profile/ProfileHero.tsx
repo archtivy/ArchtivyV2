@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 interface HeroStat {
   label: string;
@@ -11,6 +12,8 @@ interface ProfileHeroProps {
   location: string | null;
   heroImageUrl: string | null;
   stats: HeroStat[];
+  /** Link to the explore map focused on this profile. */
+  exploreHref?: string | null;
 }
 
 /**
@@ -24,6 +27,7 @@ export function ProfileHero({
   location,
   heroImageUrl,
   stats,
+  exploreHref,
 }: ProfileHeroProps) {
   return (
     <div
@@ -95,6 +99,17 @@ export function ProfileHero({
                     <circle cx="12" cy="10" r="3" />
                   </svg>
                   {location}
+                  {exploreHref && (
+                    <>
+                      <span className="mx-1.5 opacity-40">·</span>
+                      <Link
+                        href={exploreHref}
+                        className="text-white/50 transition-colors hover:text-white/80"
+                      >
+                        View on map
+                      </Link>
+                    </>
+                  )}
                 </p>
               )}
               {/* Mobile-only inline stats — hidden on sm+ (desktop uses big right-side stats) */}

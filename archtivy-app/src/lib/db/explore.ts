@@ -28,6 +28,30 @@ import { isLegacyType, isCanonicalProductSlugPath, getCanonicalLegacyTypes } fro
 
 const supabase = () => getSupabaseServiceClient();
 
+/**
+ * Batch-fetch primary taxonomy slug_path for a set of listing IDs.
+ * Returns a Map<listingId, slug_path>.
+ */
+async function getTaxonomySlugPaths(
+  listingIds: string[]
+): Promise<Map<string, string>> {
+  if (listingIds.length === 0) return new Map();
+  const { data } = await supabase()
+    .from("listing_taxonomy_node")
+    .select("listing_id, taxonomy_node:taxonomy_nodes(slug_path)")
+    .eq("is_primary", true)
+    .in("listing_id", listingIds);
+  const map = new Map<string, string>();
+  for (const row of data ?? []) {
+    const r = row as Record<string, unknown>;
+    const id = r.listing_id as string | undefined;
+    const node = r.taxonomy_node as { slug_path?: string } | { slug_path?: string }[] | null;
+    const slugPath = Array.isArray(node) ? node[0]?.slug_path : node?.slug_path;
+    if (id && slugPath) map.set(id, slugPath);
+  }
+  return map;
+}
+
 /** Map listing_images rows to ProductImageRow shape for normalizeProduct (listing_id = product_id, image_url = src). */
 function listingImagesToProductImageRows(
   listingId: string,
@@ -796,11 +820,12 @@ export async function getProjectsCanonical(
   const ids = rows.map((r) => String(r.id));
   const clerkIds = Array.from(new Set(rows.map((r) => r.owner_clerk_user_id as string | null).filter(Boolean) as string[]));
   const ownerProfileIds = Array.from(new Set(rows.map((r) => (r as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id).filter(Boolean) as string[]));
-  const [imageResult, profilesByClerk, profilesById, materialsMap] = await Promise.all([
+  const [imageResult, profilesByClerk, profilesById, materialsMap, taxMap] = await Promise.all([
     getImagesByListingIds(ids),
     clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
     ownerProfileIds.length > 0 ? getProfilesByIds(ownerProfileIds) : Promise.resolve({ data: [] }),
     getMaterialsByProjectIds(ids),
+    getTaxonomySlugPaths(ids),
   ]);
   const { data: imageRows, error: imgError } = imageResult;
   if (imgError && process.env.NODE_ENV === "development") {
@@ -836,6 +861,7 @@ export async function getProjectsCanonical(
     const profileId = (row as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id ?? null;
     const clerkId = (row.owner_clerk_user_id as string) ?? null;
     project.owner = profileId ? ownerByProfileId[profileId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
+    project.taxonomy_slug_path = taxMap.get(String(row.id)) ?? null;
     result.push(project);
   }
   return result;
@@ -853,12 +879,13 @@ export async function getProductsCanonical(
   const ids = rows.map((r) => String(r.id));
   const clerkIds = Array.from(new Set(rows.map((r) => (r as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id).filter(Boolean) as string[]));
   const brandProfileIds = Array.from(new Set(rows.map((r) => (r as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id).filter(Boolean) as string[]));
-  const [imageResult, usedCounts, materialMap, profilesByClerk, profilesById] = await Promise.all([
+  const [imageResult, usedCounts, materialMap, profilesByClerk, profilesById, taxMap] = await Promise.all([
     getImagesByListingIds(ids),
     getUsedInProjectsCountByProductIds(ids),
     getMaterialsByProductIds(ids),
     clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
     brandProfileIds.length > 0 ? getProfilesByIds(brandProfileIds) : Promise.resolve({ data: [] }),
+    getTaxonomySlugPaths(ids),
   ]);
   const imageRows = imageResult.data ?? [];
   const ownerByClerkId: Record<string, ProjectOwner> = {};
@@ -887,6 +914,7 @@ export async function getProductsCanonical(
     const brandId = (row as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id ?? null;
     const clerkId = (row as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id ?? null;
     product.owner = brandId ? ownerByProfileId[brandId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
+    product.taxonomy_slug_path = taxMap.get(String(row.id)) ?? null;
     return product;
   });
 }
@@ -918,11 +946,12 @@ export async function getProjectsCanonicalFiltered({
   const ids = rows.map((r) => String(r.id));
   const clerkIds = Array.from(new Set(rows.map((r) => r.owner_clerk_user_id as string | null).filter(Boolean) as string[]));
   const ownerProfileIds = Array.from(new Set(rows.map((r) => (r as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id).filter(Boolean) as string[]));
-  const [imageResult, profilesByClerk, profilesById, materialsMap] = await Promise.all([
+  const [imageResult, profilesByClerk, profilesById, materialsMap, taxMap] = await Promise.all([
     getImagesByListingIds(ids),
     clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
     ownerProfileIds.length > 0 ? getProfilesByIds(ownerProfileIds) : Promise.resolve({ data: [] }),
     getMaterialsByProjectIds(ids),
+    getTaxonomySlugPaths(ids),
   ]);
   const { data: imageRows } = imageResult;
   const byListingId: Record<string, { listing_id: string; image_url: string; alt: string | null; sort_order: number }[]> = {};
@@ -955,6 +984,7 @@ export async function getProjectsCanonicalFiltered({
     const profileId = (row as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id ?? null;
     const clerkId = (row.owner_clerk_user_id as string) ?? null;
     project.owner = profileId ? ownerByProfileId[profileId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
+    project.taxonomy_slug_path = taxMap.get(String(row.id)) ?? null;
     data.push(project);
   }
   return { data, total };
@@ -1011,12 +1041,13 @@ export async function getProductsCanonicalFiltered({
         .filter(Boolean) as string[]
     )
   );
-  const [imageResult, usedCounts, materialMap, profilesByClerk, profilesById] = await Promise.all([
+  const [imageResult, usedCounts, materialMap, profilesByClerk, profilesById, taxMap] = await Promise.all([
     getImagesByListingIds(ids),
     getUsedInProjectsCountByProductIds(ids),
     getMaterialsByProductIds(ids),
     clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
     brandProfileIds.length > 0 ? getProfilesByIds(brandProfileIds) : Promise.resolve({ data: [] }),
+    getTaxonomySlugPaths(ids),
   ]);
   const imageRows = imageResult.data ?? [];
   const ownerByClerkId: Record<string, ProjectOwner> = {};
@@ -1049,6 +1080,7 @@ export async function getProductsCanonicalFiltered({
       : clerkId
         ? ownerByClerkId[clerkId] ?? null
         : null;
+    product.taxonomy_slug_path = taxMap.get(String(row.id)) ?? null;
     return product;
   });
   return { data, total };

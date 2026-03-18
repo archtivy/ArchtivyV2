@@ -9,6 +9,7 @@ const activeClass = "text-[#002abf] dark:text-[#002abf]";
 
 export function TopNavLinks() {
   const pathname = usePathname();
+  const isExploreMap = pathname === "/explore";
   const isProjects = pathname?.startsWith("/explore/projects") ?? false;
   const isProducts = pathname?.startsWith("/explore/products") ?? false;
   const isDesigners = pathname?.startsWith("/explore/designers") ?? false;
@@ -16,6 +17,13 @@ export function TopNavLinks() {
 
   return (
     <>
+      <Link
+        href="/explore"
+        className={`group relative ${baseClass} ${isExploreMap ? activeClass : ""}`}
+      >
+        Explore
+        <span className="absolute bottom-0 left-0 h-[1.5px] w-0 bg-[#002abf] transition-all duration-300 group-hover:w-full" />
+      </Link>
       <Link
         href="/explore/projects"
         className={`${baseClass} ${isProjects ? activeClass : ""}`}

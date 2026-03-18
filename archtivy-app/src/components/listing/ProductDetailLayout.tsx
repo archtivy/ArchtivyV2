@@ -24,6 +24,7 @@ import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
 import type { ListingDocument } from "@/lib/types/listings";
 import { TaxonomyTags, type TaxonomyCrumb, type TaxonomyMaterialTag, type TaxonomyFacetGroup } from "./TaxonomyTags";
 import { ProductCollaborationSection } from "./CollaborationSection";
+import { BrandNetwork, type BrandProductCard } from "./BrandNetwork";
 
 function ShareIcon({ className }: { className?: string }) {
   return (
@@ -81,12 +82,16 @@ export interface ProductDetailLayoutProps {
   /** More in this category (for RelatedSection). Excludes current product. */
   moreInCategory?: RelatedSectionItem[];
   categoryTotalCount?: number;
+  /** Archive page URL for "View all" link in more-in-category */
+  moreCategoryHref?: string | null;
   /** Taxonomy data for sidebar tags */
   taxonomyTags?: {
     categoryCrumbs: TaxonomyCrumb[];
     materialNodes: TaxonomyMaterialTag[];
     facetGroups: TaxonomyFacetGroup[];
   };
+  /** "More from this brand" — other products by the same brand profile */
+  brandOtherProducts?: BrandProductCard[];
 }
 
 export function ProductDetailLayout({
@@ -109,7 +114,9 @@ export function ProductDetailLayout({
   usedInProjectsTotalCount,
   moreInCategory = [],
   categoryTotalCount,
+  moreCategoryHref,
   taxonomyTags,
+  brandOtherProducts = [],
 }: ProductDetailLayoutProps) {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
@@ -209,6 +216,15 @@ export function ProductDetailLayout({
                   <ShareIcon className="h-4 w-4" />
                   Share
                 </button>
+                {mapHref?.trim() && (
+                  <Link
+                    href={mapHref}
+                    className={ctaClass}
+                    style={btnRadius}
+                  >
+                    Explore on Map
+                  </Link>
+                )}
                 {shareToast && (
                   <span role="status" className="text-sm text-zinc-500 dark:text-zinc-400">Link copied</span>
                 )}
@@ -254,6 +270,16 @@ export function ProductDetailLayout({
                   <TeamList members={teamForList} compact />
                 </div>
               )}
+              {/* More from this brand */}
+              {brandOtherProducts.length > 0 && brandName && (
+                <div className="border-t border-zinc-100 pt-6 dark:border-zinc-800">
+                  <BrandNetwork
+                    brandName={brandName}
+                    brandHref={brandHref}
+                    products={brandOtherProducts}
+                  />
+                </div>
+              )}
               {/* Files */}
               <FilesSection
                 raw={product.documents}
@@ -296,9 +322,10 @@ export function ProductDetailLayout({
             items={moreInCategory}
             totalCount={categoryTotalCount ?? moreInCategory.length}
             viewAllHref={
-              (product.product_category ?? product.category)?.trim()
+              moreCategoryHref ??
+              ((product.product_category ?? product.category)?.trim()
                 ? productExploreUrl({ category: (product.product_category ?? product.category)!.trim() })
-                : null
+                : null)
             }
             variant="product"
             mobileLayout="scroll"

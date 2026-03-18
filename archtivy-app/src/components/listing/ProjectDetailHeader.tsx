@@ -66,6 +66,8 @@ export interface ProjectDetailHeaderProps {
   authorHref?: string | null;
   /** For "Contact via Archtivy" lead modal. */
   listingType?: "project" | "product";
+  /** "Explore on Map" link (e.g. /explore?type=projects&focus=slug). */
+  mapHref?: string | null;
 }
 
 export function ProjectDetailHeader({
@@ -77,6 +79,7 @@ export function ProjectDetailHeader({
   authorDisplayName,
   authorHref,
   listingType = "project",
+  mapHref,
 }: ProjectDetailHeaderProps) {
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
@@ -163,6 +166,15 @@ export function ProjectDetailHeader({
           <ShareIcon className="h-4 w-4 shrink-0" />
           Share
         </button>
+        {mapHref?.trim() && (
+          <Link
+            href={mapHref}
+            className={ctaClass}
+            style={btnRadius}
+          >
+            Explore on Map
+          </Link>
+        )}
         {shareToast && (
           <span role="status" className="text-sm text-zinc-500 dark:text-zinc-400">
             Link copied

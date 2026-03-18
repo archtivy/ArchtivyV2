@@ -19,6 +19,9 @@ import { areaSqftToBucket } from "@/lib/exploreFilters";
 import { getCityLabel, getOwnerProfileHref } from "@/lib/cardUtils";
 import type { TaxonomyCrumb, TaxonomyMaterialTag, TaxonomyFacetGroup } from "./TaxonomyTags";
 import { ProjectCollaborationSection } from "./CollaborationSection";
+import type { ArchitectProjectCard } from "./ArchitectNetwork";
+import type { TeamMemberWithProjectsData } from "./TeamMemberProjects";
+import type { CollaborationPairData } from "./CollaborationHints";
 
 export interface ProjectDetailLayoutProps {
   images: GalleryImage[];
@@ -37,12 +40,24 @@ export interface ProjectDetailLayoutProps {
   mapHref?: string | null;
   /** More in this category items. */
   moreInCategory?: { id: string; slug: string | null; title: string; thumbnail?: string | null; location?: string | null }[];
+  /** Category label for "More [label] Projects" heading */
+  moreCategoryLabel?: string | null;
+  /** Archive page URL for "View all" link */
+  moreCategoryHref?: string | null;
   /** Taxonomy data for sidebar tags */
   taxonomyTags?: {
     categoryCrumbs: TaxonomyCrumb[];
     materialNodes: TaxonomyMaterialTag[];
     facetGroups: TaxonomyFacetGroup[];
   };
+  /** "More from this architect" — other projects by the same owner */
+  architectProjects?: ArchitectProjectCard[];
+  /** Team members with their other projects */
+  teamMembersWithProjects?: TeamMemberWithProjectsData[];
+  /** Collaboration pairs */
+  collaborationPairs?: CollaborationPairData[];
+  /** Map of profile_id -> username for collaboration links */
+  collaborationUsernameMap?: Record<string, string | null>;
 }
 
 export function ProjectDetailLayout({
@@ -58,7 +73,13 @@ export function ProjectDetailLayout({
   connectionLine,
   mapHref,
   moreInCategory = [],
+  moreCategoryLabel,
+  moreCategoryHref,
   taxonomyTags,
+  architectProjects = [],
+  teamMembersWithProjects = [],
+  collaborationPairs = [],
+  collaborationUsernameMap = {},
 }: ProjectDetailLayoutProps) {
   const [lightboxOpen, setLightboxOpen] = React.useState(false);
   const [lightboxIndex, setLightboxIndex] = React.useState(0);
@@ -149,6 +170,7 @@ export function ProjectDetailLayout({
             metaLineParts={metaLineParts}
             authorDisplayName={project.owner?.displayName ?? null}
             authorHref={getOwnerProfileHref(project.owner) ?? null}
+            mapHref={mapHref}
           />
 
           <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
@@ -169,6 +191,12 @@ export function ProjectDetailLayout({
                 sharedByHref={getOwnerProfileHref(project.owner) ?? null}
                 mapHref={mapHref}
                 taxonomyTags={taxonomyTags}
+                architectProjects={architectProjects}
+                architectDisplayName={project.owner?.displayName?.trim() ?? null}
+                architectProfileHref={getOwnerProfileHref(project.owner) ?? null}
+                teamMembersWithProjects={teamMembersWithProjects}
+                collaborationPairs={collaborationPairs}
+                collaborationUsernameMap={collaborationUsernameMap}
               />
               <div className="mt-6">
                 <FilesSection
@@ -181,7 +209,7 @@ export function ProjectDetailLayout({
             </div>
           </div>
           {moreInCategory.length > 0 && (
-            <MoreInCategoryBlock type="projects" items={moreInCategory} />
+            <MoreInCategoryBlock type="projects" items={moreInCategory} categoryLabel={moreCategoryLabel} viewAllHref={moreCategoryHref} />
           )}
         </div>
       </div>
