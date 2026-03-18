@@ -1,0 +1,39 @@
+import Link from "next/link";
+
+export interface BreadcrumbSegment {
+  label: string;
+  href: string;
+}
+
+interface ArchiveBreadcrumbProps {
+  segments: BreadcrumbSegment[];
+  /** Final non-linked label (current page). */
+  current: string;
+}
+
+/**
+ * Simple breadcrumb trail for archive pages.
+ * Home / Projects / Residential / Houses
+ */
+export function ArchiveBreadcrumb({ segments, current }: ArchiveBreadcrumbProps) {
+  return (
+    <nav
+      className="mb-6 flex flex-wrap items-center gap-1.5 text-sm text-[#374151]"
+      aria-label="Breadcrumb"
+    >
+      <Link href="/" className="hover:text-zinc-900 transition-colors">
+        Home
+      </Link>
+      {segments.map((seg) => (
+        <span key={seg.href} className="contents">
+          <span aria-hidden className="text-zinc-300">/</span>
+          <Link href={seg.href} className="hover:text-zinc-900 transition-colors">
+            {seg.label}
+          </Link>
+        </span>
+      ))}
+      <span aria-hidden className="text-zinc-300">/</span>
+      <span className="text-zinc-900 font-medium">{current}</span>
+    </nav>
+  );
+}

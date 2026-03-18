@@ -34,18 +34,33 @@ export interface ListingRouteParams {
   type: "project" | "product";
   /** Prefer slug over id for canonical, SEO-safe URLs. */
   slug?: string | null;
+  /**
+   * The primary taxonomy slug_path (e.g. "residential/houses").
+   * When provided, the URL becomes /projects/{taxonomySlugPath}/{slug}.
+   * When omitted, falls back to flat /projects/{slug}.
+   */
+  taxonomySlugPath?: string | null;
 }
 
 /**
  * Single canonical resolver for listing URLs.
  * Always prefers slug when available; falls back to id so UUID-based rows
  * still resolve (they will 308-redirect server-side to the slug URL).
+ *
+ * When taxonomySlugPath is provided, the URL becomes taxonomy-aware:
+ *   /projects/{cat}/{subcat}/{slug}  (2-level taxonomy)
+ *   /projects/{cat}/{slug}           (1-level taxonomy)
+ *   /projects/{slug}                 (no taxonomy — fallback)
  */
 export function getListingUrl(listing: ListingRouteParams): string {
   const segment = listing.slug?.trim() || listing.id;
-  return listing.type === "project"
-    ? `/projects/${segment}`
-    : `/products/${segment}`;
+  const base = listing.type === "project" ? "/projects" : "/products";
+
+  if (listing.taxonomySlugPath) {
+    return `${base}/${listing.taxonomySlugPath}/${segment}`;
+  }
+
+  return `${base}/${segment}`;
 }
 
 /**

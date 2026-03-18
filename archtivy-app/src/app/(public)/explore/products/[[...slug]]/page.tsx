@@ -46,12 +46,11 @@ export async function generateMetadata({
       const meta: Metadata = {
         title,
         description,
-        alternates: { canonical: `/explore/products/${n.slug_path}` },
+        // Canonical points to the archive page; explore is a filtered view
+        alternates: { canonical: `/products/${n.slug_path}` },
+        robots: { index: false, follow: true },
         ...(n.featured_image ? { openGraph: { images: [n.featured_image] } } : {}),
       };
-      if (hasFilters) {
-        return { ...meta, robots: { index: false, follow: true } };
-      }
       return meta;
     }
   }

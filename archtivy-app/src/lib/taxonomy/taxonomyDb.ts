@@ -238,7 +238,9 @@ export async function updateTaxonomyNode(
 
 // ─── Listing ↔ Taxonomy Node ────────────────────────────────────────────────
 
-/** Set the primary taxonomy node for a listing (upserts). */
+/** Set the primary taxonomy node for a listing (upserts).
+ *  Ensures exactly one is_primary=true junction row per listing by
+ *  clearing any previous primary before inserting the new one. */
 export async function setListingTaxonomyNode(
   listingId: string,
   nodeId: string
@@ -251,6 +253,16 @@ export async function setListingTaxonomyNode(
     .update({ taxonomy_node_id: nodeId })
     .eq("id", listingId);
   if (updateErr) return { data: null, error: updateErr.message };
+
+  // Clear any existing primary junction rows for this listing
+  // (only those with is_primary=true and a different node)
+  const { error: clearErr } = await s
+    .from("listing_taxonomy_node")
+    .update({ is_primary: false })
+    .eq("listing_id", listingId)
+    .eq("is_primary", true)
+    .neq("taxonomy_node_id", nodeId);
+  if (clearErr) return { data: null, error: clearErr.message };
 
   // Upsert the junction row
   const { error: junctionErr } = await s
@@ -581,6 +593,84 @@ export async function getNodeListingCounts(): Promise<DbResult<Record<string, nu
     counts[row.taxonomy_node_id] = (counts[row.taxonomy_node_id] ?? 0) + 1;
   }
   return { data: counts, error: null };
+}
+
+/**
+ * Count APPROVED, non-deleted listings per taxonomy node (includes descendants).
+ * For each node, counts listings linked to the node or any of its descendants.
+ * Used by archive hub pages to show listing counts on category cards.
+ */
+export async function getNodeListingCountsWithDescendants(
+  domain: "product" | "project"
+): Promise<DbResult<Record<string, number>>> {
+  // 1. Get all active nodes for this domain
+  const { data: nodes, error: nodesErr } = await supa()
+    .from("taxonomy_nodes")
+    .select("id, parent_id, slug_path")
+    .eq("domain", domain)
+    .eq("is_active", true);
+  if (nodesErr) return { data: null, error: nodesErr.message };
+  const allNodes = (nodes ?? []) as { id: string; parent_id: string | null; slug_path: string }[];
+
+  // 2. Count listings per node (only APPROVED, non-deleted)
+  const { data: links, error: linksErr } = await supa()
+    .from("listing_taxonomy_node")
+    .select("taxonomy_node_id, listings!inner(status, deleted_at)")
+    .eq("listings.status", "APPROVED")
+    .is("listings.deleted_at", null);
+  if (linksErr) {
+    // Fallback: use simple count without status filter
+    const { data: fallbackLinks, error: fallbackErr } = await supa()
+      .from("listing_taxonomy_node")
+      .select("taxonomy_node_id");
+    if (fallbackErr) return { data: null, error: fallbackErr.message };
+    const directCounts: Record<string, number> = {};
+    for (const row of (fallbackLinks ?? []) as { taxonomy_node_id: string }[]) {
+      directCounts[row.taxonomy_node_id] = (directCounts[row.taxonomy_node_id] ?? 0) + 1;
+    }
+    return rollUpCounts(allNodes, directCounts);
+  }
+
+  const directCounts: Record<string, number> = {};
+  for (const row of (links ?? []) as { taxonomy_node_id: string }[]) {
+    directCounts[row.taxonomy_node_id] = (directCounts[row.taxonomy_node_id] ?? 0) + 1;
+  }
+
+  return rollUpCounts(allNodes, directCounts);
+}
+
+/** Roll up direct counts so parents include descendant counts. */
+function rollUpCounts(
+  allNodes: { id: string; parent_id: string | null }[],
+  directCounts: Record<string, number>
+): DbResult<Record<string, number>> {
+  // Build parent->children map
+  const childrenOf = new Map<string, string[]>();
+  for (const n of allNodes) {
+    if (n.parent_id) {
+      const arr = childrenOf.get(n.parent_id) ?? [];
+      arr.push(n.id);
+      childrenOf.set(n.parent_id, arr);
+    }
+  }
+
+  // Recursive sum
+  const cache = new Map<string, number>();
+  function sum(nodeId: string): number {
+    if (cache.has(nodeId)) return cache.get(nodeId)!;
+    let total = directCounts[nodeId] ?? 0;
+    for (const childId of childrenOf.get(nodeId) ?? []) {
+      total += sum(childId);
+    }
+    cache.set(nodeId, total);
+    return total;
+  }
+
+  const result: Record<string, number> = {};
+  for (const n of allNodes) {
+    result[n.id] = sum(n.id);
+  }
+  return { data: result, error: null };
 }
 
 /** Count listings that have no taxonomy_node_id set. */

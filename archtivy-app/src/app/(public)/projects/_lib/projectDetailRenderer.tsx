@@ -1,24 +1,12 @@
-// ISR: data cache revalidates every hour; admin mutations bust it immediately via
-// revalidatePath("/projects/[slug]", "page") + revalidateTag(CACHE_TAGS.listings).
-export const revalidate = 3600;
+/**
+ * Shared project detail renderer.
+ * Handles all data loading + JSX for the project detail page.
+ * Called by the catch-all route after URL validation/redirects are resolved.
+ */
 
-import { unstable_cache } from "next/cache";
-import { CACHE_TAGS } from "@/lib/cache-tags";
 import Link from "next/link";
-import { notFound, permanentRedirect } from "next/navigation";
-
-// Matches bare UUID v4. Used to detect /projects/{uuid} requests that should
-// 308-redirect to the canonical /projects/{slug} URL.
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-import type { Metadata } from "next";
-import { auth } from "@clerk/nextjs/server";
-import {
-  getProjectCanonicalBySlugOrId,
-  getProjectsCanonicalFiltered,
-} from "@/lib/db/explore";
-import { getProfileByClerkId } from "@/lib/db/profiles";
-import { getAbsoluteUrl, getBaseUrl } from "@/lib/canonical";
+import { getAbsoluteUrl, getBaseUrl, getListingUrl } from "@/lib/canonical";
+import { getProjectsCanonicalFiltered } from "@/lib/db/explore";
 import { getProductsForProject } from "@/lib/db/projectProductLinks";
 import {
   getFirstImageUrlPerListingIds,
@@ -30,13 +18,12 @@ import { getSelectedPhotoMatchesByImageIds, photoMatchesExistForImages } from "@
 import { getListingDocumentsServer } from "@/lib/db/listingDocuments";
 import { resolveMentionedProducts } from "@/lib/db/mentionedProducts";
 import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
+import { getOtherProjectsByOwner, getTeamMemberOtherProjects, getCollaborationPairs } from "@/lib/db/networkDiscovery";
 import { getGalleryBookmarkState } from "@/app/actions/galleryBookmarks";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { ProjectDetailLayout } from "@/components/listing/ProjectDetailLayout";
-import { MoreInCategoryBlock } from "@/components/listing/MoreInCategoryBlock";
 import type { GalleryImage } from "@/lib/db/gallery";
 import type { ProjectCanonical } from "@/lib/canonical-models";
-import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
 import type { UsedProductItem } from "@/components/listing/ProjectDetailContent";
 import { DEFAULT_PROJECT_FILTERS } from "@/lib/exploreFilters";
 import {
@@ -55,15 +42,6 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { getListingTaxonomyNodes, getListingFacets, getTaxonomyAncestors } from "@/lib/taxonomy/taxonomyDb";
 import type { TaxonomyCrumb, TaxonomyMaterialTag, TaxonomyFacetGroup } from "@/components/listing/TaxonomyTags";
 
-/** Per-slug cached project fetch; busted by revalidateTag(CACHE_TAGS.listings). */
-function getCachedProject(slug: string) {
-  return unstable_cache(
-    () => getProjectCanonicalBySlugOrId(slug),
-    [`project:canonical:${slug}`],
-    { tags: [CACHE_TAGS.listings, CACHE_TAGS.matches, `project:${slug}`], revalidate: 3600 }
-  )();
-}
-
 function canonicalGalleryToGalleryImages(
   gallery: { url: string; alt: string }[]
 ): GalleryImage[] {
@@ -75,19 +53,15 @@ function canonicalGalleryToGalleryImages(
   }));
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
-  const { slug } = await params;
-  const project = await getCachedProject(slug);
-  if (!project) return {};
-  if (project.status === "PENDING") return { title: "Project" };
-
-  const path = `/projects/${project.slug ?? project.id}`;
-  const canonical = getAbsoluteUrl(path);
-
+/**
+ * Build SEO metadata for a project detail page.
+ * Pure function — no side effects.
+ */
+export function buildProjectDetailMetadata(
+  project: ProjectCanonical,
+  canonicalPath: string
+) {
+  const canonical = getAbsoluteUrl(canonicalPath);
   const seoInput: ProjectSeoInput = {
     title: project.title?.trim() || "Project",
     slug: project.slug ?? project.id,
@@ -113,10 +87,10 @@ export async function generateMetadata({
   return {
     title: seoTitle,
     description: metaDescription,
-    alternates: { canonical },
+    alternates: { canonical: canonicalPath },
     robots: { index: true, follow: true },
     openGraph: {
-      type: "article",
+      type: "article" as const,
       title: seoTitle,
       description: metaDescription,
       url: canonical,
@@ -126,7 +100,7 @@ export async function generateMetadata({
       }),
     },
     twitter: {
-      card: "summary_large_image",
+      card: "summary_large_image" as const,
       title: seoTitle,
       description: metaDescription,
       ...(imageUrl && { images: [imageUrl] }),
@@ -134,31 +108,17 @@ export async function generateMetadata({
   };
 }
 
-export default async function ProjectPage({
-  params,
+/**
+ * Async Server Component that loads all data and renders the project detail page.
+ * The route is responsible for fetching the project, handling auth, and redirects.
+ */
+export async function ProjectDetailRenderer({
+  project,
+  canonicalPath,
 }: {
-  params: Promise<{ slug: string }>;
+  project: ProjectCanonical;
+  canonicalPath: string;
 }) {
-  const { slug } = await params;
-  const project = await getCachedProject(slug);
-  if (!project) notFound();
-
-  // If the URL contains a bare UUID and the listing has a canonical slug,
-  // issue a permanent (308) redirect so only the slug URL is indexed.
-  if (UUID_RE.test(slug) && project.slug && project.slug !== slug) {
-    permanentRedirect(`/projects/${project.slug}`);
-  }
-
-  const { userId } = await auth();
-  const profileRes = await getProfileByClerkId(userId ?? "");
-  const profile = profileRes.data as { is_admin?: boolean } | null;
-  const isAdmin = Boolean(profile?.is_admin);
-
-  if (project.status === "PENDING") {
-    const isOwner = Boolean(userId && project.owner_clerk_user_id === userId);
-    if (!isOwner && !isAdmin) notFound();
-  }
-
   const [usedResult, isSaved, teamResult, docsResult, taxNodesResult, facetsResult] = await Promise.all([
     getProductsForProject(project.id, { sources: ["manual", "photo_tag"] }).catch(() =>
       getProductsForProject(project.id)
@@ -169,6 +129,7 @@ export default async function ProjectPage({
     getListingTaxonomyNodes(project.id),
     getListingFacets(project.id),
   ]);
+
   const usedListingsRaw = usedResult.data ?? [];
   const usedListings = Array.from(
     new Map(usedListingsRaw.map((p) => [p.id, p])).values()
@@ -263,14 +224,44 @@ export default async function ProjectPage({
 
   const teamWithProfiles = teamResult.data ?? null;
 
+  // ── Network Discovery ──
+  const ownerProfileId = project.owner?.profileId ?? null;
+  const teamProfileIds = (teamWithProfiles ?? [])
+    .map((m) => m.profile_id)
+    .filter((id) => !id.startsWith("fallback-"));
+
+  const [architectProjectsResult, teamMemberProjectsResult, collaborationPairsResult] = await Promise.all([
+    ownerProfileId
+      ? getOtherProjectsByOwner(ownerProfileId, project.id)
+      : Promise.resolve({ data: [], error: null }),
+    getTeamMemberOtherProjects(project.id, teamProfileIds),
+    getCollaborationPairs(teamProfileIds),
+  ]);
+
+  const architectProjects = architectProjectsResult.data ?? [];
+  const teamMemberProjectsMap = teamMemberProjectsResult.data ?? {};
+  const collaborationPairs = collaborationPairsResult.data ?? [];
+
+  const teamMembersWithProjects = (teamWithProfiles ?? []).map((m) => ({
+    profile_id: m.profile_id,
+    display_name: m.display_name,
+    title: m.title,
+    username: m.username,
+    avatar_url: null as string | null,
+    projects: teamMemberProjectsMap[m.profile_id] ?? [],
+  }));
+
+  const collaborationUsernameMap: Record<string, string | null> = {};
+  for (const m of teamWithProfiles ?? []) {
+    collaborationUsernameMap[m.profile_id] = m.username;
+  }
+
   const imagesWithIdsResult = await getListingImagesWithIds(project.id);
   const imagesWithIds = imagesWithIdsResult.data ?? [];
   let images: GalleryImage[];
   if (imagesWithIds.length > 0) {
     const imageIds = imagesWithIds.map((i) => i.id);
 
-    // Lazy keyword matching: if no photo_matches rows exist, run keyword engine.
-    // Deterministic, no AI/embedding dependency. Runs once per project.
     const photoMatchesExist = await photoMatchesExistForImages(imageIds);
     if (!photoMatchesExist) {
       try {
@@ -278,14 +269,14 @@ export default async function ProjectPage({
         const result = await computeKeywordPhotoMatches(project.id);
         if (process.env.NODE_ENV === "development") {
           console.log(
-            `[projects/[slug]] lazy keyword photo_matches: project=${project.id}`,
+            `[projects] lazy keyword photo_matches: project=${project.id}`,
             `upserted=${result.upserted} errors=${result.errors.length}`,
             result.errors.length ? result.errors : ""
           );
         }
       } catch (e) {
         if (process.env.NODE_ENV === "development") {
-          console.warn("[projects/[slug]] lazy keyword photo_matches failed:", e);
+          console.warn("[projects] lazy keyword photo_matches failed:", e);
         }
       }
     }
@@ -316,7 +307,6 @@ export default async function ProjectPage({
         product_owner_name: product?.brand ?? undefined,
       });
     }
-    // Group photo matches by image ID
     const photoMatches = photoMatchesResult.data ?? [];
     const matchesByImageId: Record<string, GalleryImage["matchedProducts"]> = {};
     for (const m of photoMatches) {
@@ -341,7 +331,6 @@ export default async function ProjectPage({
         photoTags: tagsByImageId[img.id] ?? [],
         matchedProducts: matchesByImageId[img.id] ?? [],
       }));
-    // Each image: id = listing_images.id, photoTags = manual tags, matchedProducts = AI matches.
   } else {
     images = canonicalGalleryToGalleryImages(project.gallery);
   }
@@ -369,7 +358,7 @@ export default async function ProjectPage({
       }));
   }
 
-  const currentPath = `/projects/${project.slug ?? project.id}`;
+  const currentPath = canonicalPath;
   const productsCount = usedProducts.length;
   const professionalsCount = teamWithProfiles?.length ?? 0;
   const connectionLine =
@@ -378,10 +367,10 @@ export default async function ProjectPage({
       : null;
   const mapHref =
     project.location?.lat != null && project.location?.lng != null
-      ? `https://www.google.com/maps?q=${project.location.lat},${project.location.lng}`
+      ? `/explore?type=projects&focus=${encodeURIComponent(project.slug ?? project.id)}`
       : null;
 
-  const canonicalUrl = getAbsoluteUrl(`/projects/${project.slug ?? project.id}`);
+  const canonicalUrl = getAbsoluteUrl(canonicalPath);
   const mainJsonLd = buildProjectJsonLd(project, canonicalUrl);
 
   const seoInputForPage: ProjectSeoInput = {
@@ -399,11 +388,16 @@ export default async function ProjectPage({
   };
 
   const faqJsonLd = buildFaqJsonLd(generateProjectFaq(seoInputForPage));
-  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+  const breadcrumbItems = [
     { name: "Home", url: getAbsoluteUrl("/") },
-    { name: "Projects", url: getAbsoluteUrl("/explore/projects") },
+    { name: "Projects", url: getAbsoluteUrl("/projects") },
+    ...categoryCrumbs.map((c) => ({
+      name: c.label,
+      url: getAbsoluteUrl(`/projects/${c.slug_path}`),
+    })),
     { name: project.title, url: canonicalUrl },
-  ]);
+  ];
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
 
   return (
     <div className="pt-1 pb-6 sm:pt-2 sm:pb-8">
@@ -417,9 +411,20 @@ export default async function ProjectPage({
           Home
         </Link>
         <span aria-hidden>/</span>
-        <Link href="/explore/projects" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+        <Link href="/projects" className="hover:text-zinc-900 dark:hover:text-zinc-100">
           Projects
         </Link>
+        {categoryCrumbs.map((crumb) => (
+          <span key={crumb.slug_path} className="contents">
+            <span aria-hidden>/</span>
+            <Link
+              href={`/projects/${crumb.slug_path}`}
+              className="hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
+              {crumb.label}
+            </Link>
+          </span>
+        ))}
         <span aria-hidden>/</span>
         <span className="text-[#374151] dark:text-zinc-400">{project.title}</span>
       </nav>
@@ -437,11 +442,17 @@ export default async function ProjectPage({
         connectionLine={connectionLine}
         mapHref={mapHref}
         moreInCategory={moreInCategory}
+        moreCategoryLabel={primaryNode?.label ?? null}
+        moreCategoryHref={primaryNode ? `/projects/${primaryNode.slug_path}` : null}
         taxonomyTags={{
           categoryCrumbs,
           materialNodes: materialTaxNodes,
           facetGroups: taxonomyFacetGroups,
         }}
+        architectProjects={architectProjects}
+        teamMembersWithProjects={teamMembersWithProjects}
+        collaborationPairs={collaborationPairs}
+        collaborationUsernameMap={collaborationUsernameMap}
       />
     </div>
   );

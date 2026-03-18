@@ -3,7 +3,14 @@
  * These functions prefer the new taxonomy_node data, falling back to legacy text columns.
  */
 
-import { findNodeByLegacyProduct, findNodeByLegacyProject, getTaxonomyRedirect, type TaxonomyNode } from "./taxonomyDb";
+import {
+  findNodeByLegacyProduct,
+  findNodeByLegacyProject,
+  getTaxonomyRedirect,
+  getTaxonomyAncestors,
+  getListingTaxonomyNodes,
+  type TaxonomyNode,
+} from "./taxonomyDb";
 
 /**
  * Resolve display label for a product listing.
@@ -116,4 +123,95 @@ export async function checkTaxonomySlugRedirect(
 ): Promise<string | null> {
   const res = await getTaxonomyRedirect(domain, slugPath);
   return res.data?.new_slug_path ?? null;
+}
+
+// ─── Taxonomy Path Helper ────────────────────────────────────────────────────
+
+/** A single segment in a listing's taxonomy path. */
+export interface TaxonomyPathSegment {
+  /** taxonomy_nodes.id */
+  id: string;
+  label: string;
+  slug: string;
+  slug_path: string;
+  depth: number;
+  domain: string;
+}
+
+/** The full resolved taxonomy path for a listing. */
+export interface ListingTaxonomyPath {
+  /** All segments from root to deepest node, ordered by depth ascending. */
+  segments: TaxonomyPathSegment[];
+  /** The primary (deepest assigned) node, or null if no taxonomy is set. */
+  primary: TaxonomyPathSegment | null;
+  /** The root category (depth 0), or null. */
+  category: TaxonomyPathSegment | null;
+  /** The subcategory (depth 1), or null. */
+  subcategory: TaxonomyPathSegment | null;
+  /** Display string like "Residential → Houses". */
+  display: string;
+}
+
+const EMPTY_PATH: ListingTaxonomyPath = {
+  segments: [],
+  primary: null,
+  category: null,
+  subcategory: null,
+  display: "",
+};
+
+/**
+ * Resolve the full primary taxonomy path for a listing.
+ * Returns the ancestor chain from root to the assigned node.
+ *
+ * Use this for breadcrumbs, detail pages, canonical route generation,
+ * archive page linking, and internal linking.
+ */
+export async function getListingTaxonomyPath(
+  listingId: string
+): Promise<ListingTaxonomyPath> {
+  const nodesRes = await getListingTaxonomyNodes(listingId);
+  const nodes = nodesRes.data ?? [];
+  const primaryNode = nodes.find((n) => n.is_primary) ?? null;
+  if (!primaryNode) return EMPTY_PATH;
+
+  const ancestorsRes = await getTaxonomyAncestors(
+    primaryNode.domain,
+    primaryNode.slug_path
+  );
+  const ancestors = ancestorsRes.data ?? [];
+
+  const segments: TaxonomyPathSegment[] = ancestors.map((n) => ({
+    id: n.id,
+    label: n.label,
+    slug: n.slug,
+    slug_path: n.slug_path,
+    depth: n.depth,
+    domain: n.domain,
+  }));
+
+  const category = segments.find((s) => s.depth === 0) ?? null;
+  const subcategory = segments.find((s) => s.depth === 1) ?? null;
+  const primary = segments.length > 0 ? segments[segments.length - 1] : null;
+  const display = segments.map((s) => s.label).join(" → ");
+
+  return { segments, primary, category, subcategory, display };
+}
+
+/**
+ * Resolve taxonomy path from a listing that already has taxonomy data loaded.
+ * Synchronous — does not hit the DB. For use when you already have taxonomy
+ * crumbs from the detail page fetch.
+ */
+export function buildTaxonomyPathFromCrumbs(
+  crumbs: { label: string; slug_path: string }[]
+): Pick<ListingTaxonomyPath, "display" | "category" | "subcategory"> {
+  const display = crumbs.map((c) => c.label).join(" → ");
+  const category = crumbs.length > 0
+    ? { ...crumbs[0], id: "", slug: crumbs[0].slug_path.split("/").pop() ?? "", depth: 0, domain: "" }
+    : null;
+  const subcategory = crumbs.length > 1
+    ? { ...crumbs[1], id: "", slug: crumbs[1].slug_path.split("/").pop() ?? "", depth: 1, domain: "" }
+    : null;
+  return { display, category, subcategory };
 }

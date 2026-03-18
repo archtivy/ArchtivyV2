@@ -1,29 +1,23 @@
-// ISR: data cache revalidates every hour; admin mutations bust it via
-// revalidatePath("/products/[slug]", "page") + revalidateTag(CACHE_TAGS.listings).
-export const revalidate = 3600;
+/**
+ * Shared product detail renderer.
+ * Handles all data loading + JSX for the product detail page.
+ * Called by the catch-all route after URL validation/redirects are resolved.
+ */
 
-import { unstable_cache } from "next/cache";
-import { CACHE_TAGS } from "@/lib/cache-tags";
 import Link from "next/link";
-import { notFound, permanentRedirect } from "next/navigation";
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-import type { Metadata } from "next";
-import { auth } from "@clerk/nextjs/server";
-import { getProductForProductPage } from "@/app/actions/listings";
-import { getProductCanonicalBySlug } from "@/lib/db/explore";
+import { getAbsoluteUrl, getListingUrl } from "@/lib/canonical";
 import { getProductsCanonicalFiltered } from "@/lib/db/explore";
-import { getAbsoluteUrl } from "@/lib/canonical";
 import { getProjectsForProduct } from "@/lib/db/projectProductLinks";
 import { getFirstImageUrlPerListingIds } from "@/lib/db/listingImages";
-import { getProfileById, getProfileByClerkId } from "@/lib/db/profiles";
+import { getProfileById } from "@/lib/db/profiles";
 import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
+import { getOtherProductsByBrand } from "@/lib/db/networkDiscovery";
 import { getGalleryBookmarkState } from "@/app/actions/galleryBookmarks";
 import { getListingDocumentsServer } from "@/lib/db/listingDocuments";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { ProductDetailLayout } from "@/components/listing/ProductDetailLayout";
 import { DEFAULT_PRODUCT_FILTERS } from "@/lib/exploreFilters";
+import type { ProductCanonical } from "@/lib/canonical-models";
 import type { GalleryImage } from "@/lib/db/gallery";
 import {
   buildProductJsonLd,
@@ -42,15 +36,6 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { getListingTaxonomyNodes, getListingFacets, getTaxonomyAncestors } from "@/lib/taxonomy/taxonomyDb";
 import type { TaxonomyCrumb, TaxonomyMaterialTag, TaxonomyFacetGroup } from "@/components/listing/TaxonomyTags";
 
-/** Per-slug cached product fetch; busted by revalidateTag(CACHE_TAGS.listings). */
-function getCachedProduct(slug: string) {
-  return unstable_cache(
-    () => getProductCanonicalBySlug(slug),
-    [`product:canonical:${slug}`],
-    { tags: [CACHE_TAGS.listings, CACHE_TAGS.matches, `product:${slug}`], revalidate: 3600 }
-  )();
-}
-
 function canonicalGalleryToGalleryImages(
   gallery: { url: string; alt: string }[]
 ): GalleryImage[] {
@@ -62,18 +47,14 @@ function canonicalGalleryToGalleryImages(
   }));
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
-  const { slug } = await params;
-  const product = (await getCachedProduct(slug)) ?? (await getProductForProductPage(slug));
-  if (!product) return {};
-  if (product.status === "PENDING") return { title: "Product" };
-
-  const path = `/products/${product.slug ?? product.id}`;
-  const canonical = getAbsoluteUrl(path);
+/**
+ * Build SEO metadata for a product detail page.
+ */
+export function buildProductDetailMetadata(
+  product: ProductCanonical,
+  canonicalPath: string
+) {
+  const canonical = getAbsoluteUrl(canonicalPath);
 
   const brandName =
     extractBrandName((product as unknown as Record<string, unknown>).brands_used) ??
@@ -113,10 +94,10 @@ export async function generateMetadata({
   return {
     title: seoTitle,
     description: metaDescription,
-    alternates: { canonical },
+    alternates: { canonical: canonicalPath },
     robots: { index: true, follow: true },
     openGraph: {
-      type: "article",
+      type: "article" as const,
       title: seoTitle,
       description: metaDescription,
       url: canonical,
@@ -126,7 +107,7 @@ export async function generateMetadata({
       }),
     },
     twitter: {
-      card: "summary_large_image",
+      card: "summary_large_image" as const,
       title: seoTitle,
       description: metaDescription,
       ...(imageUrl && { images: [imageUrl] }),
@@ -134,31 +115,17 @@ export async function generateMetadata({
   };
 }
 
-export default async function ProductPage({
-  params,
+/**
+ * Async Server Component that loads all data and renders the product detail page.
+ */
+export async function ProductDetailRenderer({
+  product,
+  canonicalPath,
 }: {
-  params: Promise<{ slug: string }>;
+  product: ProductCanonical;
+  canonicalPath: string;
 }) {
-  const { slug } = await params;
-  const product = (await getCachedProduct(slug)) ?? (await getProductForProductPage(slug));
-  if (!product) notFound();
-
-  // If the URL contains a bare UUID and the listing has a canonical slug,
-  // issue a permanent (308) redirect so only the slug URL is indexed.
-  if (UUID_RE.test(slug) && product.slug && product.slug !== slug) {
-    permanentRedirect(`/products/${product.slug}`);
-  }
-
-  if (product.status === "PENDING") {
-    const { userId } = await auth();
-    const profileRes = await getProfileByClerkId(userId ?? "");
-    const profile = profileRes.data as { is_admin?: boolean } | null;
-    const isOwner = Boolean(userId && product.owner_clerk_user_id === userId);
-    const isAdmin = Boolean(profile?.is_admin);
-    if (!isOwner && !isAdmin) notFound();
-  }
-
-  const [relatedResult, isSaved, brandResult, teamResult, docsResult, taxNodesResult, facetsResult] = await Promise.all([
+  const [relatedResult, isSaved, brandResult, teamResult, docsResult, taxNodesResult, facetsResult, brandOtherProductsResult] = await Promise.all([
     getProjectsForProduct(product.id),
     getGalleryBookmarkState("product", product.id),
     product.brand_profile_id ? getProfileById(product.brand_profile_id) : Promise.resolve({ data: null, error: null }),
@@ -166,6 +133,9 @@ export default async function ProductPage({
     getListingDocumentsServer(product.id),
     getListingTaxonomyNodes(product.id),
     getListingFacets(product.id),
+    product.brand_profile_id
+      ? getOtherProductsByBrand(product.brand_profile_id, product.id)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   // Process taxonomy data for sidebar tags
@@ -201,7 +171,6 @@ export default async function ProductPage({
   const productCategory =
     (product.product_category ?? product.category)?.trim() ?? "";
 
-  // Fetch same-category products for relatedProducts fallback and "More in this category" (limit 6)
   const sameCategoryProducts: { id: string; slug: string; title: string; thumbnail?: string | null }[] = productCategory
     ? ((await getProductsCanonicalFiltered({
         filters: { ...DEFAULT_PRODUCT_FILTERS, product_category: productCategory },
@@ -245,16 +214,15 @@ export default async function ProductPage({
   const teamWithProfiles = teamResult.data ?? null;
 
   const images = canonicalGalleryToGalleryImages(product.gallery);
-  const currentPath = `/products/${product.slug ?? product.id}`;
+  const currentPath = canonicalPath;
   const listingDocuments = docsResult.data ?? [];
-  const productPath = `/products/${product.slug ?? product.id}`;
 
   const relatedListingsForLayout = relatedListings.map((p) => {
     const row = p as { id: string; slug?: string; title: string; location?: string | null };
     return { id: row.id, slug: row.slug, title: row.title, location: row.location ?? null };
   });
 
-  const canonicalUrl = getAbsoluteUrl(`/products/${product.slug ?? product.id}`);
+  const canonicalUrl = getAbsoluteUrl(canonicalPath);
   const mainJsonLd = buildProductJsonLd(product, brandName, brandHref, canonicalUrl);
 
   const seoInputForPage: ProductSeoInput = {
@@ -281,11 +249,16 @@ export default async function ProductPage({
   };
 
   const faqJsonLd = buildFaqJsonLd(generateProductFaq(seoInputForPage));
-  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+  const breadcrumbItems = [
     { name: "Home", url: getAbsoluteUrl("/") },
-    { name: "Products", url: getAbsoluteUrl("/explore/products") },
+    { name: "Products", url: getAbsoluteUrl("/products") },
+    ...categoryCrumbs.map((c) => ({
+      name: c.label,
+      url: getAbsoluteUrl(`/products/${c.slug_path}`),
+    })),
     { name: product.title, url: canonicalUrl },
-  ]);
+  ];
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
@@ -300,9 +273,20 @@ export default async function ProductPage({
           Home
         </Link>
         <span aria-hidden>/</span>
-        <Link href="/explore/products" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+        <Link href="/products" className="hover:text-zinc-900 dark:hover:text-zinc-100">
           Products
         </Link>
+        {categoryCrumbs.map((crumb) => (
+          <span key={crumb.slug_path} className="contents">
+            <span aria-hidden>/</span>
+            <Link
+              href={`/products/${crumb.slug_path}`}
+              className="hover:text-zinc-900 dark:hover:text-zinc-100"
+            >
+              {crumb.label}
+            </Link>
+          </span>
+        ))}
         <span aria-hidden>/</span>
         <span className="text-[#374151] dark:text-zinc-400">{product.title}</span>
       </nav>
@@ -317,18 +301,20 @@ export default async function ProductPage({
         currentPath={currentPath}
         relatedItems={relatedItems}
         listingDocuments={listingDocuments}
-        signInRedirectUrl={getAbsoluteUrl(productPath)}
+        signInRedirectUrl={getAbsoluteUrl(canonicalPath)}
         relatedListings={relatedListingsForLayout}
         thumbnailMap={thumbnailMap}
         teamWithProfiles={teamWithProfiles}
         relatedProducts={relatedProducts}
-        mapHref={null}
+        mapHref={brandProfile?.username ? `/explore?type=brands&focus=${encodeURIComponent(brandProfile.username)}` : null}
         moreInCategory={moreInCategory}
+        moreCategoryHref={primaryNode ? `/products/${primaryNode.slug_path}` : null}
         taxonomyTags={{
           categoryCrumbs,
           materialNodes: materialTaxNodes,
           facetGroups: taxonomyFacetGroups,
         }}
+        brandOtherProducts={brandOtherProductsResult.data ?? []}
       />
       </div>
     </div>
