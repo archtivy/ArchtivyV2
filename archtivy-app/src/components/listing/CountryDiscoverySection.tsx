@@ -1,8 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import type { CountryProjectItem, CountryDesignerItem } from "@/lib/db/networkDiscovery";
+
+/** Returns true only for absolute http/https URLs. */
+function isValidImageUrl(url: unknown): url is string {
+  if (typeof url !== "string" || !url) return false;
+  return url.startsWith("https://") || url.startsWith("http://");
+}
 
 // ── More Projects from {Country} ────────────────────────────────────────────
 
@@ -41,6 +48,7 @@ export function CountryProjectsSection({ country, items }: CountryProjectsProps)
           if (city) locationParts.push(city);
           if (item.year != null) locationParts.push(String(item.year));
           const subtitle = locationParts.join(" · ") || null;
+          const hasImage = isValidImageUrl(item.cover_image_url);
 
           return (
             <Link
@@ -49,14 +57,14 @@ export function CountryProjectsSection({ country, items }: CountryProjectsProps)
               className="group flex flex-col rounded-lg focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
             >
               <div className="relative w-full overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800 aspect-[4/3]">
-                {item.cover_image_url ? (
+                {hasImage ? (
                   <Image
-                    src={item.cover_image_url}
+                    src={item.cover_image_url as string}
                     alt=""
                     fill
                     className="object-cover transition-opacity group-hover:opacity-95"
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                    unoptimized={item.cover_image_url.startsWith("http")}
+                    unoptimized
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-sm text-zinc-400 dark:text-zinc-500">
@@ -82,6 +90,33 @@ export function CountryProjectsSection({ country, items }: CountryProjectsProps)
         })}
       </div>
     </section>
+  );
+}
+
+// ── Designer Avatar with onError fallback ───────────────────────────────────
+
+function DesignerAvatar({ src, name }: { src: string | null; name: string }) {
+  const [failed, setFailed] = useState(false);
+  const validSrc = isValidImageUrl(src) && !failed;
+
+  return (
+    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
+      {validSrc ? (
+        <Image
+          src={src}
+          alt=""
+          fill
+          className="object-cover object-center"
+          sizes="64px"
+          unoptimized
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span className="flex h-full w-full items-center justify-center text-lg font-medium text-zinc-500 dark:text-zinc-400">
+          {name[0]?.toUpperCase() ?? "?"}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -126,22 +161,7 @@ export function CountryDesignersSection({ country, items }: CountryDesignersProp
               className="group flex flex-col items-center rounded-lg border border-zinc-200 bg-white p-5 transition hover:border-[#002abf]/30 hover:bg-zinc-50/50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-[#002abf]/40 dark:hover:bg-zinc-900/80 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
               style={{ borderRadius: 4 }}
             >
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
-                {designer.avatar_url ? (
-                  <Image
-                    src={designer.avatar_url}
-                    alt=""
-                    fill
-                    className="object-cover object-center"
-                    sizes="64px"
-                    unoptimized={!designer.avatar_url.includes("supabase.co")}
-                  />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center text-lg font-medium text-zinc-500 dark:text-zinc-400">
-                    {displayName[0]?.toUpperCase() ?? "?"}
-                  </span>
-                )}
-              </div>
+              <DesignerAvatar src={designer.avatar_url} name={displayName} />
               <span className="mt-3 truncate text-sm font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-[#002abf]">
                 {displayName}
               </span>
