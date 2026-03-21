@@ -131,9 +131,9 @@ export function CountryDesignersSection({ country, items }: CountryDesignersProp
                   <Image
                     src={designer.avatar_url}
                     alt=""
-                    width={64}
-                    height={64}
-                    className="object-cover"
+                    fill
+                    className="object-cover object-center"
+                    sizes="64px"
                     unoptimized={!designer.avatar_url.includes("supabase.co")}
                   />
                 ) : (
