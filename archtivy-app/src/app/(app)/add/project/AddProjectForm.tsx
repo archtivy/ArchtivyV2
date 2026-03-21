@@ -15,7 +15,10 @@ import { ListingPreviewCard } from "@/components/add/ListingPreviewCard";
 import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
 import { SubmissionProgressBar } from "@/components/add/SubmissionProgressBar";
 import { LocationPicker, type LocationValue } from "@/components/location/LocationPicker";
-import { PROJECT_CATEGORIES } from "@/lib/auth/config";
+import {
+  PROJECT_TAXONOMY,
+  getSubcategoriesForBuildingType,
+} from "@/lib/taxonomy/projectTaxonomy";
 import {
   PROJECT_STATUS_VALUES,
   PROJECT_STATUS_LABELS,
@@ -149,7 +152,9 @@ export function AddProjectForm({
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [locationValue, setLocationValue] = useState<LocationValue | null>(initialData?.locationValue ?? null);
+  // ── Static taxonomy state (used when projectTaxonomyNodes is empty) ──
   const [category, setCategory] = useState(initialData?.category ?? "");
+  const [staticSubcategory, setStaticSubcategory] = useState("");
   // ── DB project taxonomy state ──
   const [projInitIds] = useState(() => resolveInitialProjectIds(projectTaxonomyNodes, initialData));
   const [buildingTypeNodeId, setBuildingTypeNodeId] = useState(projInitIds.buildingTypeId);
@@ -234,6 +239,12 @@ export function AddProjectForm({
     if (buildingTypeNodeId) return projectTaxonomyNodes.find((n) => n.id === buildingTypeNodeId) ?? null;
     return null;
   }, [useDbProjectTaxonomy, projectTaxonomyNodes, buildingTypeNodeId, projSubcategoryNodeId]);
+
+  // ── Static taxonomy derived lists (fallback when DB taxonomy not provided) ──
+  const staticSubcategories = useMemo(
+    () => (category ? getSubcategoriesForBuildingType(category) : []),
+    [category]
+  );
 
   const hasLocation = Boolean(locationValue?.location_text?.trim());
   const galleryRequired = !initialData || galleryItems.length > 0;
@@ -348,11 +359,13 @@ export function AddProjectForm({
       <input type="hidden" name="team_members" value={teamMembersJson} />
       <input type="hidden" name="draft" value="0" id="draft-value" />
       <input type="hidden" name="project_material_ids" value="[]" />
-      {useDbProjectTaxonomy && (
+      {useDbProjectTaxonomy ? (
         <>
           <input type="hidden" name="taxonomy_node_id" value={selectedProjectNode?.id ?? ""} />
           <input type="hidden" name="category" value={selectedProjectNode?.legacy_project_category ?? ""} />
         </>
+      ) : (
+        <input type="hidden" name="category" value={PROJECT_TAXONOMY.find((bt) => bt.id === category)?.legacyCategory ?? category} />
       )}
       <input type="hidden" name="mentioned_products" value={mentionedProductsJson} />
       <input type="hidden" name="taxonomy_material_ids" value={materialNodeIdsJson} />
@@ -506,26 +519,48 @@ export function AddProjectForm({
               )}
             </>
           ) : (
-            <div>
-              <label htmlFor="category" className={labelClass}>
-                Category <span className="text-archtivy-primary">*</span>
-              </label>
-              <select
-                id="category"
-                name="category"
-                required
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Select category</option>
-                {PROJECT_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <>
+              <div>
+                <label htmlFor="category" className={labelClass}>
+                  Building type <span className="text-archtivy-primary">*</span>
+                </label>
+                <select
+                  id="category"
+                  value={category}
+                  onChange={(e) => {
+                    setCategory(e.target.value);
+                    setStaticSubcategory("");
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">Select building type</option>
+                  {PROJECT_TAXONOMY.map((bt) => (
+                    <option key={bt.id} value={bt.id}>
+                      {bt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {category && staticSubcategories.length > 0 && (
+                <div>
+                  <label htmlFor="static_subcategory" className={labelClass}>
+                    Subcategory
+                  </label>
+                  <select
+                    id="static_subcategory"
+                    name="subcategory"
+                    value={staticSubcategory}
+                    onChange={(e) => setStaticSubcategory(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Select subcategory (optional)</option>
+                    {staticSubcategories.map((s) => (
+                      <option key={s.id} value={s.id}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
           )}
         </section>
 
