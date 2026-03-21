@@ -140,6 +140,147 @@ export async function getOtherProductsByBrand(
   return { data: (data ?? []) as BrandProductItem[], error: null };
 }
 
+// ── Country-based discovery ──────────────────────────────────────────────────
+
+export interface CountryProjectItem {
+  id: string;
+  slug: string | null;
+  title: string;
+  cover_image_url: string | null;
+  location_city: string | null;
+  location_country: string | null;
+  year: number | string | null;
+  owner_display_name: string | null;
+  owner_username: string | null;
+}
+
+/**
+ * Fetch recent APPROVED projects from the same country, excluding the current one.
+ * Ordered by newest first for quality/recency bias.
+ */
+export async function getProjectsByCountry(
+  country: string,
+  excludeProjectId: string,
+  limit = 8,
+): Promise<DbResult<CountryProjectItem[]>> {
+  const trimmed = country.trim();
+  if (!trimmed) return { data: [], error: null };
+
+  const sup = getSupabaseServiceClient();
+  const { data, error } = await sup
+    .from("listings")
+    .select("id, slug, title, cover_image_url, location_city, location_country, year, profiles!listings_owner_profile_id_fkey(display_name, username)")
+    .eq("type", "project")
+    .eq("status", "APPROVED")
+    .is("deleted_at", null)
+    .eq("location_country", trimmed)
+    .neq("id", excludeProjectId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) return { data: null, error: error.message };
+
+  type Row = {
+    id: string;
+    slug: string | null;
+    title: string;
+    cover_image_url: string | null;
+    location_city: string | null;
+    location_country: string | null;
+    year: number | string | null;
+    profiles: { display_name: string | null; username: string | null } | null;
+  };
+  const rows = (data ?? []) as unknown as Row[];
+  return {
+    data: rows.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      title: r.title,
+      cover_image_url: r.cover_image_url,
+      location_city: r.location_city,
+      location_country: r.location_country,
+      year: r.year,
+      owner_display_name: r.profiles?.display_name ?? null,
+      owner_username: r.profiles?.username ?? null,
+    })),
+    error: null,
+  };
+}
+
+export interface CountryDesignerItem {
+  id: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  location_city: string | null;
+  location_country: string | null;
+  designer_discipline: string | null;
+  listing_count: number;
+}
+
+/**
+ * Fetch designer profiles from the same country, ranked by listing count (quality proxy).
+ */
+export async function getDesignersByCountry(
+  country: string,
+  limit = 8,
+): Promise<DbResult<CountryDesignerItem[]>> {
+  const trimmed = country.trim();
+  if (!trimmed) return { data: [], error: null };
+
+  const sup = getSupabaseServiceClient();
+  const { data, error } = await sup
+    .from("profiles")
+    .select("id, display_name, username, avatar_url, location_city, location_country, designer_discipline")
+    .eq("role", "designer")
+    .eq("location_country", trimmed)
+    .not("username", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(50);
+
+  if (error) return { data: null, error: error.message };
+
+  type ProfileRow = {
+    id: string;
+    display_name: string | null;
+    username: string | null;
+    avatar_url: string | null;
+    location_city: string | null;
+    location_country: string | null;
+    designer_discipline: string | null;
+  };
+  const profiles = (data ?? []) as ProfileRow[];
+  if (profiles.length === 0) return { data: [], error: null };
+
+  // Count listings per profile for quality ranking
+  const profileIds = profiles.map((p) => p.id);
+  const { data: countData } = await sup
+    .from("listings")
+    .select("owner_profile_id")
+    .in("owner_profile_id", profileIds)
+    .eq("type", "project")
+    .eq("status", "APPROVED")
+    .is("deleted_at", null);
+
+  const counts: Record<string, number> = {};
+  for (const row of (countData ?? []) as { owner_profile_id: string }[]) {
+    counts[row.owner_profile_id] = (counts[row.owner_profile_id] ?? 0) + 1;
+  }
+
+  const ranked = profiles
+    .map((p) => ({ ...p, listing_count: counts[p.id] ?? 0 }))
+    .sort((a, b) => {
+      // Prefer profiles with listings, then by listing count, then by having an avatar
+      if (a.listing_count !== b.listing_count) return b.listing_count - a.listing_count;
+      if (a.avatar_url && !b.avatar_url) return -1;
+      if (!a.avatar_url && b.avatar_url) return 1;
+      return 0;
+    })
+    .slice(0, limit);
+
+  return { data: ranked, error: null };
+}
+
 export interface CollaborationPair {
   profileA: string;
   profileB: string;

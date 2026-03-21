@@ -18,7 +18,7 @@ import { getSelectedPhotoMatchesByImageIds, photoMatchesExistForImages } from "@
 import { getListingDocumentsServer } from "@/lib/db/listingDocuments";
 import { resolveMentionedProducts } from "@/lib/db/mentionedProducts";
 import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
-import { getOtherProjectsByOwner, getTeamMemberOtherProjects, getCollaborationPairs } from "@/lib/db/networkDiscovery";
+import { getOtherProjectsByOwner, getTeamMemberOtherProjects, getCollaborationPairs, getProjectsByCountry, getDesignersByCountry } from "@/lib/db/networkDiscovery";
 import { getGalleryBookmarkState } from "@/app/actions/galleryBookmarks";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { ProjectDetailLayout } from "@/components/listing/ProjectDetailLayout";
@@ -230,17 +230,27 @@ export async function ProjectDetailRenderer({
     .map((m) => m.profile_id)
     .filter((id) => !id.startsWith("fallback-"));
 
-  const [architectProjectsResult, teamMemberProjectsResult, collaborationPairsResult] = await Promise.all([
+  const projectCountry = project.location?.country?.trim() ?? null;
+
+  const [architectProjectsResult, teamMemberProjectsResult, collaborationPairsResult, countryProjectsResult, countryDesignersResult] = await Promise.all([
     ownerProfileId
       ? getOtherProjectsByOwner(ownerProfileId, project.id)
       : Promise.resolve({ data: [], error: null }),
     getTeamMemberOtherProjects(project.id, teamProfileIds),
     getCollaborationPairs(teamProfileIds),
+    projectCountry
+      ? getProjectsByCountry(projectCountry, project.id, 8)
+      : Promise.resolve({ data: [], error: null }),
+    projectCountry
+      ? getDesignersByCountry(projectCountry, 8)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   const architectProjects = architectProjectsResult.data ?? [];
   const teamMemberProjectsMap = teamMemberProjectsResult.data ?? {};
   const collaborationPairs = collaborationPairsResult.data ?? [];
+  const countryProjects = countryProjectsResult.data ?? [];
+  const countryDesigners = countryDesignersResult.data ?? [];
 
   const teamMembersWithProjects = (teamWithProfiles ?? []).map((m) => ({
     profile_id: m.profile_id,
@@ -453,6 +463,9 @@ export async function ProjectDetailRenderer({
         teamMembersWithProjects={teamMembersWithProjects}
         collaborationPairs={collaborationPairs}
         collaborationUsernameMap={collaborationUsernameMap}
+        countryProjects={countryProjects}
+        countryDesigners={countryDesigners}
+        countryName={projectCountry}
       />
     </div>
   );

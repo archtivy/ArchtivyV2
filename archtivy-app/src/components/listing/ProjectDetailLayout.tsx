@@ -22,6 +22,8 @@ import { ProjectCollaborationSection } from "./CollaborationSection";
 import type { ArchitectProjectCard } from "./ArchitectNetwork";
 import type { TeamMemberWithProjectsData } from "./TeamMemberProjects";
 import type { CollaborationPairData } from "./CollaborationHints";
+import type { CountryProjectItem, CountryDesignerItem } from "@/lib/db/networkDiscovery";
+import { CountryProjectsSection, CountryDesignersSection } from "./CountryDiscoverySection";
 
 export interface ProjectDetailLayoutProps {
   images: GalleryImage[];
@@ -58,6 +60,12 @@ export interface ProjectDetailLayoutProps {
   collaborationPairs?: CollaborationPairData[];
   /** Map of profile_id -> username for collaboration links */
   collaborationUsernameMap?: Record<string, string | null>;
+  /** Projects from the same country */
+  countryProjects?: CountryProjectItem[];
+  /** Designers from the same country */
+  countryDesigners?: CountryDesignerItem[];
+  /** Country name for section headings */
+  countryName?: string | null;
 }
 
 export function ProjectDetailLayout({
@@ -80,6 +88,9 @@ export function ProjectDetailLayout({
   teamMembersWithProjects = [],
   collaborationPairs = [],
   collaborationUsernameMap = {},
+  countryProjects = [],
+  countryDesigners = [],
+  countryName,
 }: ProjectDetailLayoutProps) {
   const [lightboxOpen, setLightboxOpen] = React.useState(false);
   const [lightboxIndex, setLightboxIndex] = React.useState(0);
@@ -210,6 +221,12 @@ export function ProjectDetailLayout({
           </div>
           {moreInCategory.length > 0 && (
             <MoreInCategoryBlock type="projects" items={moreInCategory} categoryLabel={moreCategoryLabel} viewAllHref={moreCategoryHref} />
+          )}
+          {countryName && countryProjects.length > 0 && (
+            <CountryProjectsSection country={countryName} items={countryProjects} />
+          )}
+          {countryName && countryDesigners.length > 0 && (
+            <CountryDesignersSection country={countryName} items={countryDesigners} />
           )}
         </div>
       </div>
