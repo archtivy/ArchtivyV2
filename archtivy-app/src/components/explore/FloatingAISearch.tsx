@@ -80,9 +80,10 @@ export function FloatingAISearch({
 
   return (
     <div
-      className={`absolute bottom-5 left-1/2 z-30 w-[calc(100%-24px)] max-w-[580px] -translate-x-1/2 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+      className={`absolute left-1/2 z-30 w-[calc(100%-24px)] max-w-[580px] -translate-x-1/2 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         panelOpen ? "sm:max-w-[400px] sm:-translate-x-[calc(50%+100px)]" : ""
       }`}
+      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
     >
       {/* Suggestion chips — shown only on focus when no active search */}
       {!hasActiveSearch && (

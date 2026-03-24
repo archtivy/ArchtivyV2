@@ -2,19 +2,18 @@ import { NextResponse } from "next/server";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 
 /**
- * GET /api/explore/network?listingId=<uuid>&type=project|product
+ * GET /api/explore/network?listingId=<uuid>&type=project|product|brand|designer
  *
  * Returns network data for a selected pin on the explore map:
- * - Team members (with usernames + avatar URLs)
- * - Products used in the project (or projects using the product)
- * - Other projects by the same architect
- * - Collaboration pairs
- * - Owner profile info
+ * - project: Team members, used products, other projects by owner, collaboration pairs
+ * - product: Projects using this product, brand's other products
+ * - brand: Popular products by brand, related projects & designers
+ * - designer: Designer's projects, related brands
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const listingId = searchParams.get("listingId");
-  const pinType = searchParams.get("type") as "project" | "product" | null;
+  const pinType = searchParams.get("type") as "project" | "product" | "brand" | "designer" | null;
 
   if (!listingId || !pinType) {
     return NextResponse.json({ error: "listingId and type are required" }, { status: 400 });
@@ -264,6 +263,202 @@ export async function GET(request: Request) {
       brandProducts,
       brandProfile,
       brandProfileId,
+    });
+  }
+
+  if (pinType === "brand") {
+    const profileId = listingId; // For brand pins, listingId is actually the profile ID
+
+    // Fetch brand profile and all approved products in parallel
+    const [brandProfRes, brandProductsRes] = await Promise.all([
+      sup
+        .from("profiles")
+        .select("display_name, username, avatar_url")
+        .eq("id", profileId)
+        .maybeSingle(),
+      sup
+        .from("listings")
+        .select("id, slug, title, cover_image_url, category, views_count, created_at")
+        .eq("owner_profile_id", profileId)
+        .eq("type", "product")
+        .eq("status", "APPROVED")
+        .is("deleted_at", null)
+        .order("views_count", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false }),
+    ]);
+
+    if (!brandProfRes.data) {
+      return NextResponse.json({ error: "Brand profile not found" }, { status: 404 });
+    }
+
+    const brandProfile = {
+      displayName: brandProfRes.data.display_name,
+      username: brandProfRes.data.username,
+      avatarUrl: brandProfRes.data.avatar_url,
+    };
+
+    const allProducts = brandProductsRes.data ?? [];
+    const totalProducts = allProducts.length;
+    const allProductIds = allProducts.map((p) => p.id);
+
+    // Get project usage counts for all brand products
+    let productUsageCounts: Record<string, number> = {};
+    let allRelatedProjectIds: string[] = [];
+    if (allProductIds.length > 0) {
+      const { data: linkRows } = await sup
+        .from("project_product_links")
+        .select("product_id, project_id")
+        .in("product_id", allProductIds);
+
+      if (linkRows) {
+        for (const row of linkRows) {
+          productUsageCounts[row.product_id] = (productUsageCounts[row.product_id] ?? 0) + 1;
+        }
+        const projectIdSet = new Set(linkRows.map((r) => r.project_id).filter(Boolean));
+        allRelatedProjectIds = Array.from(projectIdSet);
+      }
+    }
+
+    const usedInProjectsCount = allRelatedProjectIds.length;
+
+    // Sort products by usage count DESC, then views DESC, then created_at DESC
+    const sortedProducts = [...allProducts].sort((a, b) => {
+      const usageA = productUsageCounts[a.id] ?? 0;
+      const usageB = productUsageCounts[b.id] ?? 0;
+      if (usageB !== usageA) return usageB - usageA;
+      const viewsA = a.views_count ?? 0;
+      const viewsB = b.views_count ?? 0;
+      if (viewsB !== viewsA) return viewsB - viewsA;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    const popularProducts = sortedProducts.slice(0, 8).map((p) => ({
+      id: p.id,
+      slug: p.slug,
+      title: p.title,
+      coverUrl: p.cover_image_url,
+      category: p.category,
+      projectUsageCount: productUsageCounts[p.id] ?? 0,
+    }));
+
+    // Related project IDs (limit 20)
+    const relatedProjectIds = allRelatedProjectIds.slice(0, 20);
+
+    // Related designer IDs: owners of those projects
+    let relatedDesignerIds: string[] = [];
+    if (relatedProjectIds.length > 0) {
+      const { data: projectRows } = await sup
+        .from("listings")
+        .select("owner_profile_id")
+        .in("id", relatedProjectIds)
+        .eq("type", "project")
+        .eq("status", "APPROVED")
+        .is("deleted_at", null);
+
+      if (projectRows) {
+        const designerSet = new Set(
+          projectRows.map((r) => r.owner_profile_id).filter(Boolean) as string[]
+        );
+        relatedDesignerIds = Array.from(designerSet).slice(0, 10);
+      }
+    }
+
+    return NextResponse.json({
+      brandProfile,
+      popularProducts,
+      totalProducts,
+      usedInProjectsCount,
+      relatedProjectIds,
+      relatedDesignerIds,
+    });
+  }
+
+  if (pinType === "designer") {
+    const profileId = listingId; // For designer pins, listingId is actually the profile ID
+
+    // Fetch designer profile and their projects in parallel
+    const [designerProfRes, projectsRes] = await Promise.all([
+      sup
+        .from("profiles")
+        .select("display_name, username, avatar_url")
+        .eq("id", profileId)
+        .maybeSingle(),
+      sup
+        .from("listings")
+        .select("id, slug, title, cover_image_url, year, location_city")
+        .eq("owner_profile_id", profileId)
+        .eq("type", "project")
+        .eq("status", "APPROVED")
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(8),
+    ]);
+
+    if (!designerProfRes.data) {
+      return NextResponse.json({ error: "Designer profile not found" }, { status: 404 });
+    }
+
+    const designerProfile = {
+      displayName: designerProfRes.data.display_name,
+      username: designerProfRes.data.username,
+      avatarUrl: designerProfRes.data.avatar_url,
+    };
+
+    const projectRows = projectsRes.data ?? [];
+    const designerProjects = projectRows.map((p) => ({
+      id: p.id,
+      slug: p.slug,
+      title: p.title,
+      coverUrl: p.cover_image_url,
+      year: p.year,
+      city: p.location_city,
+    }));
+
+    const relatedProjectIds = projectRows.map((p) => p.id);
+
+    // Get total project count (may exceed the limit of 8)
+    const { count: totalProjects } = await sup
+      .from("listings")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_profile_id", profileId)
+      .eq("type", "project")
+      .eq("status", "APPROVED")
+      .is("deleted_at", null);
+
+    // Get related brand IDs from products used in the designer's projects
+    let relatedBrandIds: string[] = [];
+    if (relatedProjectIds.length > 0) {
+      const { data: productLinkRows } = await sup
+        .from("project_product_links")
+        .select("product_id")
+        .in("project_id", relatedProjectIds);
+
+      if (productLinkRows && productLinkRows.length > 0) {
+        const productIds = [...new Set(productLinkRows.map((r) => r.product_id).filter(Boolean))];
+
+        const { data: productRows } = await sup
+          .from("listings")
+          .select("owner_profile_id")
+          .in("id", productIds)
+          .eq("type", "product")
+          .eq("status", "APPROVED")
+          .is("deleted_at", null);
+
+        if (productRows) {
+          const brandSet = new Set(
+            productRows.map((r) => r.owner_profile_id).filter(Boolean) as string[]
+          );
+          relatedBrandIds = Array.from(brandSet);
+        }
+      }
+    }
+
+    return NextResponse.json({
+      designerProfile,
+      designerProjects,
+      totalProjects: totalProjects ?? projectRows.length,
+      relatedBrandIds,
+      relatedProjectIds,
     });
   }
 

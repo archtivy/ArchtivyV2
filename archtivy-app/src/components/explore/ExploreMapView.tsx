@@ -149,30 +149,72 @@ export function ExploreMapView({ pins, initialCenter, spotlight, recentPins = []
 
   const spotlightId = spotlight?.id ?? null;
 
+  // Pre-compute radial offsets for colocated pins (same lat/lng).
+  // Uses a golden-angle spiral so pins fan out evenly around the true location.
+  // The offset (~20 m) is sub-pixel at city zoom but separates at street zoom.
+  const pinOffsets = useMemo(() => {
+    const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ≈ 2.399 rad
+    const BASE_RADIUS = 0.00018; // degrees — ≈ 20 m at the equator
+
+    // Group by coordinate key
+    const groups = new Map<string, MapPin[]>();
+    for (const p of pins) {
+      const key = `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
+      const arr = groups.get(key);
+      if (arr) arr.push(p);
+      else groups.set(key, [p]);
+    }
+
+    const offsets = new Map<string, [number, number]>(); // id → [lng, lat]
+    for (const [, arr] of groups) {
+      if (arr.length < 2) {
+        offsets.set(arr[0].id, [arr[0].lng, arr[0].lat]);
+        continue;
+      }
+      // Spread pins in a golden-angle spiral around the group center
+      const cLat = arr[0].lat;
+      const cLng = arr[0].lng;
+      for (let i = 0; i < arr.length; i++) {
+        const angle = i * GOLDEN_ANGLE;
+        const r = BASE_RADIUS * Math.sqrt((i + 1) / arr.length);
+        // Adjust lng offset for latitude compression
+        const lngScale = 1 / Math.max(Math.cos(cLat * Math.PI / 180), 0.01);
+        offsets.set(arr[i].id, [
+          cLng + r * lngScale * Math.cos(angle),
+          cLat + r * Math.sin(angle),
+        ]);
+      }
+    }
+    return offsets;
+  }, [pins]);
+
   const geojson = useMemo(
     (): GeoJSON.FeatureCollection<GeoJSON.Point> => ({
       type: "FeatureCollection",
-      features: pins.map((p) => ({
-        type: "Feature" as const,
-        geometry: { type: "Point" as const, coordinates: [p.lng, p.lat] },
-        properties: {
-          id: p.id,
-          pinType: p.type,
-          title: p.title,
-          locationLabel: p.locationLabel,
-          imageUrl: p.imageUrl ?? "",
-          subtitle: p.subtitle ?? "",
-          year: p.year ?? "",
-          isSpotlight: p.id === spotlightId,
-          isNew:
-            p.createdAt != null &&
-            Date.now() - new Date(p.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000,
-          isHighlighted: highlightedPinIds.has(p.id),
-          isSearchMatch: searchActive ? searchMatchedIds.has(p.id) : true,
-        },
-      })),
+      features: pins.map((p) => {
+        const coords = pinOffsets.get(p.id) ?? [p.lng, p.lat];
+        return {
+          type: "Feature" as const,
+          geometry: { type: "Point" as const, coordinates: coords },
+          properties: {
+            id: p.id,
+            pinType: p.type,
+            title: p.title,
+            locationLabel: p.locationLabel,
+            imageUrl: p.imageUrl ?? "",
+            subtitle: p.subtitle ?? "",
+            year: p.year ?? "",
+            isSpotlight: p.id === spotlightId,
+            isNew:
+              p.createdAt != null &&
+              Date.now() - new Date(p.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000,
+            isHighlighted: highlightedPinIds.has(p.id),
+            isSearchMatch: searchActive ? searchMatchedIds.has(p.id) : true,
+          },
+        };
+      }),
     }),
-    [pins, spotlightId, highlightedPinIds, searchActive, searchMatchedIds],
+    [pins, pinOffsets, spotlightId, highlightedPinIds, searchActive, searchMatchedIds],
   );
 
   const geojsonRef = useRef(geojson);
@@ -476,6 +518,28 @@ export function ExploreMapView({ pins, initialCenter, spotlight, recentPins = []
         },
       });
 
+      /* ── Network relationship lines ──────────────────────────────────── */
+
+      map.addSource("network-lines", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+
+      map.addLayer({
+        id: "network-lines",
+        type: "line",
+        source: "network-lines",
+        paint: {
+          "line-color": "rgba(0, 42, 191, 0.18)",
+          "line-width": 1.2,
+          "line-dasharray": [4, 3],
+        },
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
+      }, "new-pin-ring"); // render below pins
+
       /* ── Interactions ────────────────────────────────────────────────── */
 
       let hoveredId: string | null = null;
@@ -626,6 +690,39 @@ export function ExploreMapView({ pins, initialCenter, spotlight, recentPins = []
     // Future: pipe owner filter into AI search context
     void ownerName;
   }, []);
+
+  /* ── Network lines: update when selection/highlights change ────────────── */
+
+  useEffect(() => {
+    if (!sourceReadyRef.current || !mapRef.current) return;
+    const src = mapRef.current.getSource("network-lines") as mapboxgl.GeoJSONSource | undefined;
+    if (!src) return;
+
+    if (!selected || highlightedPinIds.size === 0) {
+      src.setData({ type: "FeatureCollection", features: [] });
+      return;
+    }
+
+    const features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
+    const from: [number, number] = [selected.lng, selected.lat];
+
+    for (const hId of highlightedPinIds) {
+      const pin = pinMapRef.current.get(hId);
+      if (!pin || pin.id === selected.id) continue;
+      // Skip pins at essentially the same location (avoids zero-length lines)
+      if (Math.abs(pin.lat - selected.lat) < 0.001 && Math.abs(pin.lng - selected.lng) < 0.001) continue;
+      features.push({
+        type: "Feature",
+        geometry: {
+          type: "LineString",
+          coordinates: [from, [pin.lng, pin.lat]],
+        },
+        properties: {},
+      });
+    }
+
+    src.setData({ type: "FeatureCollection", features });
+  }, [selected, highlightedPinIds, pins]);
 
   /* ── AI search handler (intent-based) ─────────────────────────────────── */
 
@@ -825,7 +922,7 @@ export function ExploreMapView({ pins, initialCenter, spotlight, recentPins = []
 
       {/* ── Micro activity strip — lower left ──────────────────────────── */}
       {currentFeedPin && !selected && (
-        <div className="absolute bottom-20 left-4 z-10 sm:bottom-24">
+        <div className="absolute left-4 z-10 sm:bottom-24" style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)" }}>
           <button
             key={currentFeedPin.id}
             onClick={() => selectPin(currentFeedPin)}

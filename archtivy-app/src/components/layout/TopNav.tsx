@@ -35,6 +35,7 @@ const mobileNavLinks = [
   { href: "/explore/products", label: "Products" },
   { href: "/explore/designers", label: "Designers" },
   { href: "/explore/brands", label: "Brands" },
+  { href: "/explore", label: "Explore" },
 ];
 
 export function TopNav() {

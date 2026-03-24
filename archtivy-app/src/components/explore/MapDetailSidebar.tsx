@@ -72,6 +72,43 @@ interface BrandProduct {
   coverUrl: string | null;
 }
 
+interface BrandPopularProduct {
+  id: string;
+  slug: string | null;
+  title: string;
+  coverUrl: string | null;
+  category: string | null;
+  projectUsageCount: number;
+}
+
+interface BrandNetworkData {
+  brandProfile: OwnerProfile;
+  popularProducts: BrandPopularProduct[];
+  totalProducts: number;
+  usedInProjectsCount: number;
+  relatedProjectIds: string[];
+  relatedDesignerIds: string[];
+}
+
+interface DesignerProject {
+  id: string;
+  slug: string | null;
+  title: string;
+  coverUrl: string | null;
+  year: string | null;
+  city: string | null;
+}
+
+interface DesignerNetworkData {
+  designerProfile: OwnerProfile;
+  designerProjects: DesignerProject[];
+  totalProjects: number;
+  relatedBrandIds: string[];
+  relatedProjectIds: string[];
+}
+
+type NetworkData = ProjectNetworkData | ProductNetworkData | BrandNetworkData | DesignerNetworkData;
+
 interface ProjectNetworkData {
   teamMembers: TeamMember[];
   usedProducts: UsedProduct[];
@@ -115,12 +152,12 @@ export function MapDetailSidebar({
 }: MapDetailSidebarProps) {
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [networkData, setNetworkData] = useState<ProjectNetworkData | ProductNetworkData | null>(null);
+  const [networkData, setNetworkData] = useState<NetworkData | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Fetch network data when a pin is selected
   useEffect(() => {
-    if (!selected || !selected.entityId || (selected.type !== "project" && selected.type !== "product")) {
+    if (!selected || !selected.entityId) {
       setNetworkData(null);
       return;
     }
@@ -153,34 +190,26 @@ export function MapDetailSidebar({
     const relatedIds = new Set<string>();
 
     if (selected.type === "project") {
-      const data = networkData as ProjectNetworkData;
-      // Other projects by same architect
-      for (const p of data.architectProjects) {
-        relatedIds.add(`project-${p.id}`);
-      }
-      // Product pins for used products
-      for (const p of data.usedProducts) {
-        relatedIds.add(`product-${p.id}`);
-      }
-      // Architect/designer pin if on map
+      const data = networkData as Partial<ProjectNetworkData>;
+      for (const p of data.architectProjects ?? []) relatedIds.add(`project-${p.id}`);
+      for (const p of data.usedProducts ?? []) relatedIds.add(`product-${p.id}`);
       if (selected.ownerProfileId) {
         relatedIds.add(`designer-${selected.ownerProfileId}`);
         relatedIds.add(`brand-${selected.ownerProfileId}`);
       }
     } else if (selected.type === "product") {
-      const data = networkData as ProductNetworkData;
-      // Projects using this product
-      for (const p of data.usedInProjects) {
-        relatedIds.add(`project-${p.id}`);
-      }
-      // Other brand products
-      for (const p of data.brandProducts) {
-        relatedIds.add(`product-${p.id}`);
-      }
-      // Brand pin
-      if (data.brandProfileId) {
-        relatedIds.add(`brand-${data.brandProfileId}`);
-      }
+      const data = networkData as Partial<ProductNetworkData>;
+      for (const p of data.usedInProjects ?? []) relatedIds.add(`project-${p.id}`);
+      for (const p of data.brandProducts ?? []) relatedIds.add(`product-${p.id}`);
+      if (data.brandProfileId) relatedIds.add(`brand-${data.brandProfileId}`);
+    } else if (selected.type === "brand") {
+      const data = networkData as Partial<BrandNetworkData>;
+      for (const id of data.relatedProjectIds ?? []) relatedIds.add(`project-${id}`);
+      for (const id of data.relatedDesignerIds ?? []) relatedIds.add(`designer-${id}`);
+    } else if (selected.type === "designer") {
+      const data = networkData as Partial<DesignerNetworkData>;
+      for (const id of data.relatedProjectIds ?? []) relatedIds.add(`project-${id}`);
+      for (const id of data.relatedBrandIds ?? []) relatedIds.add(`brand-${id}`);
     }
 
     onHighlightPins(relatedIds);
@@ -373,7 +402,15 @@ export function MapDetailSidebar({
 
             {/* ── 5. PROJECT network sections ────────────── */}
             {selected.type === "project" && networkData && !loading && (() => {
-              const data = networkData as ProjectNetworkData;
+              const raw = networkData as Partial<ProjectNetworkData>;
+              const data = {
+                ownerProfile: raw.ownerProfile ?? null,
+                ownerProfileId: raw.ownerProfileId ?? null,
+                teamMembers: raw.teamMembers ?? [],
+                usedProducts: raw.usedProducts ?? [],
+                collaborationPairs: raw.collaborationPairs ?? [],
+                architectProjects: raw.architectProjects ?? [],
+              };
               return (
                 <>
                   {/* Owner / Architect Profile */}
@@ -504,7 +541,13 @@ export function MapDetailSidebar({
 
             {/* ── 6. PRODUCT network sections ────────────── */}
             {selected.type === "product" && networkData && !loading && (() => {
-              const data = networkData as ProductNetworkData;
+              const raw = networkData as Partial<ProductNetworkData>;
+              const data = {
+                brandProfile: raw.brandProfile ?? null,
+                brandProfileId: raw.brandProfileId ?? null,
+                usedInProjects: raw.usedInProjects ?? [],
+                brandProducts: raw.brandProducts ?? [],
+              };
               return (
                 <>
                   {/* Brand profile */}
@@ -608,8 +651,180 @@ export function MapDetailSidebar({
               );
             })()}
 
-            {/* ── 7. Designer/Brand pin — show same-owner on map */}
-            {(selected.type === "designer" || selected.type === "brand") && (
+            {/* ── 7. BRAND network sections ──────────────── */}
+            {selected.type === "brand" && networkData && !loading && (() => {
+              const raw = networkData as Partial<BrandNetworkData>;
+              const data = {
+                brandProfile: raw.brandProfile ?? null,
+                popularProducts: raw.popularProducts ?? [],
+                totalProducts: raw.totalProducts ?? 0,
+                usedInProjectsCount: raw.usedInProjectsCount ?? 0,
+                relatedProjectIds: raw.relatedProjectIds ?? [],
+                relatedDesignerIds: raw.relatedDesignerIds ?? [],
+              };
+              return (
+                <>
+                  {/* Brand stats */}
+                  {(data.totalProducts > 0 || data.usedInProjectsCount > 0) && (
+                    <div className="flex gap-4 px-5 py-3">
+                      {data.totalProducts > 0 && (
+                        <div className="text-center">
+                          <div className="text-lg font-semibold text-zinc-900">{data.totalProducts}</div>
+                          <div className="text-[10px] text-zinc-400">Products</div>
+                        </div>
+                      )}
+                      {data.usedInProjectsCount > 0 && (
+                        <div className="text-center">
+                          <div className="text-lg font-semibold text-zinc-900">{data.usedInProjectsCount}</div>
+                          <div className="text-[10px] text-zinc-400">Used in Projects</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Popular products */}
+                  {data.popularProducts.length > 0 && (
+                    <div className="border-t border-zinc-100 px-5 py-4">
+                      <SectionTitle icon="product">
+                        Popular Products{data.totalProducts > 0 ? ` · ${data.totalProducts}` : ""}
+                      </SectionTitle>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        {data.popularProducts.map((p) => {
+                          const mapPin = allPins.find((pin) => pin.entityId === p.id && pin.type === "product");
+                          return (
+                            <button
+                              key={p.id}
+                              onClick={() => { if (mapPin) onSelectPin(mapPin); }}
+                              className="group overflow-hidden rounded-lg text-left ring-1 ring-zinc-100 transition-all hover:ring-zinc-200 hover:shadow-sm"
+                            >
+                              {p.coverUrl ? (
+                                <div className="aspect-[4/3] w-full overflow-hidden bg-zinc-100">
+                                  <img src={p.coverUrl} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                </div>
+                              ) : (
+                                <div className="flex aspect-[4/3] w-full items-center justify-center bg-zinc-50">
+                                  <span className="text-[9px] text-zinc-300">No image</span>
+                                </div>
+                              )}
+                              <div className="p-2">
+                                <div className="truncate text-xs font-medium text-zinc-900">{p.title}</div>
+                                <div className="flex items-center gap-1">
+                                  {p.category && (
+                                    <span className="truncate text-[10px] text-zinc-400">{p.category}</span>
+                                  )}
+                                  {p.projectUsageCount > 0 && (
+                                    <span className="text-[10px] text-zinc-300">· {p.projectUsageCount} {p.projectUsageCount === 1 ? "project" : "projects"}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {data.totalProducts > data.popularProducts.length && (
+                        <Link
+                          href={selected.href}
+                          className="mt-3 flex items-center justify-center gap-1 text-xs font-medium text-[#002abf] transition-colors hover:text-[#0022a0]"
+                        >
+                          View all products
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                          </svg>
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+
+            {/* ── 7b. DESIGNER network sections ─────────────── */}
+            {selected.type === "designer" && networkData && !loading && (() => {
+              const raw = networkData as Partial<DesignerNetworkData>;
+              const data = {
+                designerProfile: raw.designerProfile ?? null,
+                designerProjects: raw.designerProjects ?? [],
+                totalProjects: raw.totalProjects ?? 0,
+                relatedBrandIds: raw.relatedBrandIds ?? [],
+                relatedProjectIds: raw.relatedProjectIds ?? [],
+              };
+              return (
+                <>
+                  {/* Designer projects */}
+                  {data.designerProjects.length > 0 && (
+                    <div className="px-5 py-4">
+                      <SectionTitle icon="project">
+                        Projects{data.totalProjects > 0 ? ` · ${data.totalProjects}` : ""}
+                      </SectionTitle>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        {data.designerProjects.map((p) => {
+                          const mapPin = allPins.find((pin) => pin.entityId === p.id && pin.type === "project");
+                          return (
+                            <button
+                              key={p.id}
+                              onClick={() => { if (mapPin) onSelectPin(mapPin); }}
+                              className="group overflow-hidden rounded-lg text-left ring-1 ring-zinc-100 transition-all hover:ring-zinc-200 hover:shadow-sm"
+                            >
+                              {p.coverUrl ? (
+                                <div className="aspect-[4/3] w-full overflow-hidden bg-zinc-100">
+                                  <img src={p.coverUrl} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                </div>
+                              ) : (
+                                <div className="flex aspect-[4/3] w-full items-center justify-center bg-zinc-50">
+                                  <span className="text-[9px] text-zinc-300">No image</span>
+                                </div>
+                              )}
+                              <div className="p-2">
+                                <div className="truncate text-xs font-medium text-zinc-900">{p.title}</div>
+                                {(p.city || p.year) && (
+                                  <div className="truncate text-[10px] text-zinc-400">
+                                    {[p.city, p.year].filter(Boolean).join(" · ")}
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {data.totalProjects > data.designerProjects.length && (
+                        <Link
+                          href={selected.href}
+                          className="mt-3 flex items-center justify-center gap-1 text-xs font-medium text-[#002abf] transition-colors hover:text-[#0022a0]"
+                        >
+                          View full portfolio
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                          </svg>
+                        </Link>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Fallback if no projects */}
+                  {data.designerProjects.length === 0 && (
+                    <div className="px-5 py-4">
+                      <div className="rounded-lg bg-zinc-50 px-4 py-3">
+                        <p className="text-xs font-medium text-zinc-600">
+                          Visit this designer&apos;s profile to explore their portfolio and collaborations.
+                        </p>
+                        <Link
+                          href={selected.href}
+                          className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#002abf] transition-colors hover:text-[#0022a0]"
+                        >
+                          Explore full details
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                          </svg>
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+
+            {/* ── 7c. Brand/Designer — loading fallback ──── */}
+            {(selected.type === "designer" || selected.type === "brand") && !networkData && !loading && (
               <div className="px-5 py-4">
                 <div className="rounded-lg bg-zinc-50 px-4 py-3">
                   <p className="text-xs font-medium text-zinc-600">
