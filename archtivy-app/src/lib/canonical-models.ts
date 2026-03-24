@@ -408,6 +408,8 @@ export function projectCanonicalToCardData(
   return {
     id: p.id,
     type: "project",
+    slug: p.slug ?? null,
+    taxonomy_slug_path: p.taxonomy_slug_path ?? null,
     title: p.title,
     description: p.description,
     location: p.location_text,
@@ -443,6 +445,8 @@ export function productCanonicalToCardData(p: ProductCanonical): ListingCardData
   return {
     id: p.id,
     type: "product",
+    slug: p.slug ?? null,
+    taxonomy_slug_path: p.taxonomy_slug_path ?? null,
     title: p.title,
     description: p.description,
     location: null,

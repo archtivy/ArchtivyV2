@@ -46,18 +46,28 @@ export default async function AdminProductEditPage({
   searchParams: SearchParams;
 }) {
   const { id } = await params;
-  const [productRow, teamResult, memberTitles, imagesWithIdsResult, productMaterialOptions, materialTaxRes, facetsRes, existingMatNodeIdsRes, existingFacetValsRes] =
+  const [productRow, teamResult, memberTitles, imagesWithIdsResult, productMaterialOptions, productTaxRes, materialTaxRes, facetsRes, existingMatNodeIdsRes, existingFacetValsRes] =
     await Promise.all([
       getProductListingBySlugOrId(id),
       getListingTeamMembersWithProfiles(id),
       getActiveBrandMemberTitles(),
       getListingImagesWithIds(id),
       getProductMaterialOptions(),
+      getTaxonomyTree("product"),
       getTaxonomyTree("material"),
       getFacetsForDomain("product"),
       getListingMaterialNodeIds(id),
       getListingFacetValueIds(id),
     ]);
+  const productTaxonomyNodes = (productTaxRes.data ?? []).map((n) => ({
+    id: n.id,
+    parent_id: n.parent_id,
+    depth: n.depth,
+    label: n.label,
+    legacy_product_type: n.legacy_product_type ?? null,
+    legacy_product_category: n.legacy_product_category ?? null,
+    legacy_product_subcategory: n.legacy_product_subcategory ?? null,
+  }));
   const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
     id: n.id,
     parent_id: n.parent_id,
@@ -228,6 +238,7 @@ export default async function AdminProductEditPage({
         formMode="admin"
         initialData={initialData}
         updateAction={updateProductAction}
+        taxonomyNodes={productTaxonomyNodes}
         materialNodes={materialNodes}
         facets={facets}
       />

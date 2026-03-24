@@ -42,11 +42,21 @@ export default async function AddProductPage() {
   const listingsCount = listings?.length ?? 0;
   const showOnboarding = listingsCount === 0;
 
-  const [memberTitles, materialTaxRes, facetsRes] = await Promise.all([
+  const [memberTitles, productTaxRes, materialTaxRes, facetsRes] = await Promise.all([
     getActiveBrandMemberTitles(),
+    getTaxonomyTree("product"),
     getTaxonomyTree("material"),
     getFacetsForDomain("product"),
   ]);
+  const productTaxonomyNodes = (productTaxRes.data ?? []).map((n) => ({
+    id: n.id,
+    parent_id: n.parent_id,
+    depth: n.depth,
+    label: n.label,
+    legacy_product_type: n.legacy_product_type ?? null,
+    legacy_product_category: n.legacy_product_category ?? null,
+    legacy_product_subcategory: n.legacy_product_subcategory ?? null,
+  }));
   const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
     id: n.id,
     parent_id: n.parent_id,
@@ -80,7 +90,7 @@ export default async function AddProductPage() {
           </Button>
         </p>
       </div>
-      <AddProductForm memberTitles={memberTitles} materialNodes={materialNodes} facets={facets} />
+      <AddProductForm memberTitles={memberTitles} taxonomyNodes={productTaxonomyNodes} materialNodes={materialNodes} facets={facets} />
         </div>
       </div>
     </div>

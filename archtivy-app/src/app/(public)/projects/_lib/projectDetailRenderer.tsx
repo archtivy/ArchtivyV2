@@ -348,11 +348,18 @@ export async function ProjectDetailRenderer({
   const mentionedRaw = project.mentioned_products ?? [];
   const mentionedResolved = mentionedRaw.length > 0 ? await resolveMentionedProducts(mentionedRaw) : [];
 
+  // Prefer taxonomy-based category; fall back to legacy field
   let moreInCategory: { id: string; slug: string | null; title: string; thumbnail?: string | null; location?: string | null }[] = [];
-  const categoryTrim = project.category?.trim();
-  if (categoryTrim) {
+  const taxonomySlugForCategory = primaryNode?.slug_path ?? null;
+  const legacyCategoryTrim = project.category?.trim() ?? null;
+  const categoryFilter = taxonomySlugForCategory
+    ? { ...DEFAULT_PROJECT_FILTERS, taxonomy: taxonomySlugForCategory }
+    : legacyCategoryTrim
+      ? { ...DEFAULT_PROJECT_FILTERS, category: [legacyCategoryTrim] }
+      : null;
+  if (categoryFilter) {
     const { data: sameCat } = await getProjectsCanonicalFiltered({
-      filters: { ...DEFAULT_PROJECT_FILTERS, category: [categoryTrim] },
+      filters: categoryFilter,
       limit: 9,
       sort: "newest",
     });

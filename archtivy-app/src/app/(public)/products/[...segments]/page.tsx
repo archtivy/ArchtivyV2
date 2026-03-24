@@ -22,6 +22,9 @@ import {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Max taxonomy depth (type/category/subcategory) + 1 listing slug = 4 segments. */
+const MAX_SEGMENTS = 4;
+
 /** Per-slug cached product fetch; busted by revalidateTag(CACHE_TAGS.listings). */
 function getCachedProduct(slug: string) {
   return unstable_cache(
@@ -50,6 +53,27 @@ async function resolveCanonicalPath(
   return `/products/${slug}`;
 }
 
+/**
+ * Try to find a product by the last segment (the listing slug).
+ * Returns null if not found.
+ */
+async function findProduct(slug: string) {
+  return (await getCachedProduct(slug)) ?? (await getProductForProductPage(slug));
+}
+
+/**
+ * Auth-gate for PENDING listings.
+ */
+async function authCheckPending(product: { status: string; owner_clerk_user_id?: string | null }) {
+  if (product.status !== "PENDING") return;
+  const { userId } = await auth();
+  const profileRes = await getProfileByClerkId(userId ?? "");
+  const profile = profileRes.data as { is_admin?: boolean } | null;
+  const isOwner = Boolean(userId && product.owner_clerk_user_id === userId);
+  const isAdmin = Boolean(profile?.is_admin);
+  if (!isOwner && !isAdmin) notFound();
+}
+
 // ─── Metadata ──────────────────────────────────────────────────────────────
 
 export async function generateMetadata({
@@ -58,68 +82,49 @@ export async function generateMetadata({
   params: Promise<{ segments: string[] }>;
 }): Promise<Metadata> {
   const { segments } = await params;
-  if (segments.length > 3) return {};
+  if (segments.length > MAX_SEGMENTS) return {};
 
+  const listingSlug = segments[segments.length - 1];
+  const taxonomyParts = segments.slice(0, -1);
+  const taxonomySlugPath = taxonomyParts.length > 0 ? taxonomyParts.join("/") : null;
+
+  // If only 1 segment, check if it's an archive page first
   if (segments.length === 1) {
-    const [slug] = segments;
-    const archiveData = await fetchProductArchive(slug);
+    const archiveData = await fetchProductArchive(segments[0]);
     if (archiveData) {
       const { node } = archiveData;
-      const title = node.seo_title || `${node.label} Products | Archtivy`;
-      const description =
-        node.meta_description ||
-        node.description ||
-        `Browse ${node.label.toLowerCase()} products on Archtivy.`;
       return {
-        title,
-        description,
+        title: node.seo_title || `${node.label} Products | Archtivy`,
+        description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} products on Archtivy.`,
         alternates: { canonical: `/products/${node.slug_path}` },
         robots: { index: true, follow: true },
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
       };
     }
-    const product = (await getCachedProduct(slug)) ?? (await getProductForProductPage(slug));
-    if (!product) return {};
-    if (product.status === "PENDING") return { title: "Product" };
-    const canonicalPath = await resolveCanonicalPath(product.id, product.slug ?? product.id);
-    return buildProductDetailMetadata(product, canonicalPath);
   }
 
-  if (segments.length === 2) {
-    const [cat, slugOrSub] = segments;
-    const slugPath = `${cat}/${slugOrSub}`;
-    const archiveData = await fetchProductArchive(slugPath);
+  // If 2+ segments, check if ALL segments form an archive slug_path
+  if (taxonomySlugPath) {
+    const fullSlug = segments.join("/");
+    const archiveData = await fetchProductArchive(fullSlug);
     if (archiveData) {
       const { node } = archiveData;
-      const title = node.seo_title || `${node.label} Products | Archtivy`;
-      const description =
-        node.meta_description ||
-        node.description ||
-        `Browse ${node.label.toLowerCase()} products on Archtivy.`;
       return {
-        title,
-        description,
+        title: node.seo_title || `${node.label} Products | Archtivy`,
+        description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} products on Archtivy.`,
         alternates: { canonical: `/products/${node.slug_path}` },
         robots: { index: true, follow: true },
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
       };
     }
-    const product = (await getCachedProduct(slugOrSub)) ?? (await getProductForProductPage(slugOrSub));
-    if (!product) return {};
-    if (product.status === "PENDING") return { title: "Product" };
-    return buildProductDetailMetadata(product, `/products/${cat}/${product.slug ?? product.id}`);
   }
 
-  if (segments.length === 3) {
-    const [, , listingSlug] = segments;
-    const product = (await getCachedProduct(listingSlug)) ?? (await getProductForProductPage(listingSlug));
-    if (!product) return {};
-    if (product.status === "PENDING") return { title: "Product" };
-    const canonicalPath = await resolveCanonicalPath(product.id, product.slug ?? product.id);
-    return buildProductDetailMetadata(product, canonicalPath);
-  }
-
-  return {};
+  // Otherwise it's a detail page — last segment is the listing slug
+  const product = await findProduct(listingSlug);
+  if (!product) return {};
+  if (product.status === "PENDING") return { title: "Product" };
+  const canonicalPath = await resolveCanonicalPath(product.id, product.slug ?? product.id);
+  return buildProductDetailMetadata(product, canonicalPath);
 }
 
 // ─── Page Component ─────────────────────────────────────────────────────────
@@ -134,143 +139,54 @@ export default async function ProductSegmentsPage({
   const { segments } = await params;
   const { page: pageParam } = await searchParams;
 
-  if (segments.length > 3) notFound();
+  if (segments.length > MAX_SEGMENTS) notFound();
 
-  // ── 1 segment: /products/{slug} ──
-  if (segments.length === 1) {
-    const [slug] = segments;
+  // ── Try as archive page first ──────────────────────────────────────────
+  // Check progressively: try full path as archive, then without last segment.
+  // This handles: /products/furniture (1 seg), /products/furniture/seating (2 seg),
+  // /products/furniture/seating/armchair (3 seg — could be archive OR detail)
 
-    // Archive check
-    const pageNum = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
-    const archiveData = await fetchProductArchive(slug, pageNum);
-    if (archiveData) {
-      return (
-        <ProductCategoryArchive
-          node={archiveData.node}
-          ancestors={archiveData.ancestors}
-          childNodes={archiveData.childNodes}
-          listings={archiveData.listings}
-          total={archiveData.total}
-          page={archiveData.page}
-          totalPages={archiveData.totalPages}
-        />
-      );
-    }
-
-    // Detail page
-    const product = (await getCachedProduct(slug)) ?? (await getProductForProductPage(slug));
-    if (!product) notFound();
-
-    // UUID → slug redirect
-    if (UUID_RE.test(slug) && product.slug && product.slug !== slug) {
-      const canonical = await resolveCanonicalPath(product.id, product.slug);
-      permanentRedirect(canonical);
-    }
-
-    // Auth check for PENDING
-    if (product.status === "PENDING") {
-      const { userId } = await auth();
-      const profileRes = await getProfileByClerkId(userId ?? "");
-      const profile = profileRes.data as { is_admin?: boolean } | null;
-      const isOwner = Boolean(userId && product.owner_clerk_user_id === userId);
-      const isAdmin = Boolean(profile?.is_admin);
-      if (!isOwner && !isAdmin) notFound();
-    }
-
-    // Redirect to canonical taxonomy-aware URL if taxonomy exists
-    const taxPath = await getListingTaxonomyPath(product.id);
-    if (taxPath.primary && product.slug) {
-      const canonical = getListingUrl({
-        id: product.id,
-        type: "product",
-        slug: product.slug,
-        taxonomySlugPath: taxPath.primary.slug_path,
-      });
-      permanentRedirect(canonical);
-    }
-
-    // Fallback: no taxonomy
-    const canonicalPath = `/products/${product.slug ?? product.id}`;
-    return <ProductDetailRenderer product={product} canonicalPath={canonicalPath} />;
+  // Try the FULL segment path as an archive
+  const fullSlugPath = segments.join("/");
+  const pageNum = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+  const fullArchive = await fetchProductArchive(fullSlugPath, pageNum);
+  if (fullArchive) {
+    return (
+      <ProductCategoryArchive
+        node={fullArchive.node}
+        ancestors={fullArchive.ancestors}
+        childNodes={fullArchive.childNodes}
+        listings={fullArchive.listings}
+        total={fullArchive.total}
+        page={fullArchive.page}
+        totalPages={fullArchive.totalPages}
+      />
+    );
   }
 
-  // ── 2 segments: /products/{cat}/{slugOrSub} ──
-  if (segments.length === 2) {
-    const [cat, slugOrSub] = segments;
-    const slugPath = `${cat}/${slugOrSub}`;
+  // ── Not an archive — treat as detail page ──────────────────────────────
+  // Last segment is the listing slug; preceding segments are taxonomy path
+  const listingSlug = segments[segments.length - 1];
 
-    // Archive check
-    const pageNum = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
-    const archiveData = await fetchProductArchive(slugPath, pageNum);
-    if (archiveData) {
-      return (
-        <ProductCategoryArchive
-          node={archiveData.node}
-          ancestors={archiveData.ancestors}
-          childNodes={archiveData.childNodes}
-          listings={archiveData.listings}
-          total={archiveData.total}
-          page={archiveData.page}
-          totalPages={archiveData.totalPages}
-        />
-      );
-    }
+  // UUID → slug redirect
+  const product = await findProduct(listingSlug);
+  if (!product) notFound();
 
-    // Detail page
-    const product = (await getCachedProduct(slugOrSub)) ?? (await getProductForProductPage(slugOrSub));
-    if (!product) notFound();
-
-    const taxPath = await getListingTaxonomyPath(product.id);
-    const canonicalPath = await resolveCanonicalPath(product.id, product.slug ?? product.id);
-
-    // Auth check for PENDING
-    if (product.status === "PENDING") {
-      const { userId } = await auth();
-      const profileRes = await getProfileByClerkId(userId ?? "");
-      const profile = profileRes.data as { is_admin?: boolean } | null;
-      const isOwner = Boolean(userId && product.owner_clerk_user_id === userId);
-      const isAdmin = Boolean(profile?.is_admin);
-      if (!isOwner && !isAdmin) notFound();
-    }
-
-    // Redirect if URL doesn't match canonical
-    const currentUrlPath = `/products/${cat}/${product.slug ?? product.id}`;
-    if (canonicalPath !== currentUrlPath) {
-      permanentRedirect(canonicalPath);
-    }
-
-    if (taxPath.category && taxPath.category.slug !== cat) {
-      permanentRedirect(canonicalPath);
-    }
-
-    return <ProductDetailRenderer product={product} canonicalPath={canonicalPath} />;
+  if (UUID_RE.test(listingSlug) && product.slug && product.slug !== listingSlug) {
+    const canonical = await resolveCanonicalPath(product.id, product.slug);
+    permanentRedirect(canonical);
   }
 
-  // ── 3 segments: /products/{cat}/{subcat}/{listingSlug} ──
-  if (segments.length === 3) {
-    const [cat, subcat, listingSlug] = segments;
+  await authCheckPending(product);
 
-    const product = (await getCachedProduct(listingSlug)) ?? (await getProductForProductPage(listingSlug));
-    if (!product) notFound();
+  // Resolve canonical URL
+  const canonicalPath = await resolveCanonicalPath(product.id, product.slug ?? product.id);
+  const currentUrlPath = `/products/${segments.join("/")}`;
 
-    // Auth check for PENDING
-    if (product.status === "PENDING") {
-      const { userId } = await auth();
-      const profileRes = await getProfileByClerkId(userId ?? "");
-      const profile = profileRes.data as { is_admin?: boolean } | null;
-      const isOwner = Boolean(userId && product.owner_clerk_user_id === userId);
-      const isAdmin = Boolean(profile?.is_admin);
-      if (!isOwner && !isAdmin) notFound();
-    }
-
-    const canonicalPath = await resolveCanonicalPath(product.id, product.slug ?? product.id);
-    const currentUrlPath = `/products/${cat}/${subcat}/${product.slug ?? product.id}`;
-    if (canonicalPath !== currentUrlPath) {
-      permanentRedirect(canonicalPath);
-    }
-
-    return <ProductDetailRenderer product={product} canonicalPath={canonicalPath} />;
+  // Redirect to canonical if URL doesn't match
+  if (canonicalPath !== currentUrlPath) {
+    permanentRedirect(canonicalPath);
   }
 
-  notFound();
+  return <ProductDetailRenderer product={product} canonicalPath={canonicalPath} />;
 }

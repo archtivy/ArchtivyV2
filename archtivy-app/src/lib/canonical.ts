@@ -40,6 +40,8 @@ export interface ListingRouteParams {
    * When omitted, falls back to flat /projects/{slug}.
    */
   taxonomySlugPath?: string | null;
+  /** Snake-case alias for taxonomySlugPath. Accepted for compatibility with DB models. */
+  taxonomy_slug_path?: string | null;
 }
 
 /**
@@ -48,16 +50,18 @@ export interface ListingRouteParams {
  * still resolve (they will 308-redirect server-side to the slug URL).
  *
  * When taxonomySlugPath is provided, the URL becomes taxonomy-aware:
- *   /projects/{cat}/{subcat}/{slug}  (2-level taxonomy)
- *   /projects/{cat}/{slug}           (1-level taxonomy)
- *   /projects/{slug}                 (no taxonomy — fallback)
+ *   /products/{type}/{cat}/{subcat}/{slug}  (3-level product taxonomy)
+ *   /projects/{cat}/{subcat}/{slug}         (2-level project taxonomy)
+ *   /projects/{cat}/{slug}                  (1-level taxonomy)
+ *   /projects/{slug}                        (no taxonomy — fallback)
  */
 export function getListingUrl(listing: ListingRouteParams): string {
   const segment = listing.slug?.trim() || listing.id;
   const base = listing.type === "project" ? "/projects" : "/products";
 
-  if (listing.taxonomySlugPath) {
-    return `${base}/${listing.taxonomySlugPath}/${segment}`;
+  const taxPath = listing.taxonomySlugPath ?? listing.taxonomy_slug_path ?? null;
+  if (taxPath) {
+    return `${base}/${taxPath}/${segment}`;
   }
 
   return `${base}/${segment}`;

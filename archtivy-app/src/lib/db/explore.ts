@@ -411,20 +411,30 @@ async function getListingIdsByTaxonomyWithLegacy(
       );
     }
     // Fallback: when no DB taxonomy_node exists for this slug_path (canonical-only),
-    // derive legacy product_type values from the canonical taxonomy config.
+    // derive legacy product_type (and optionally product_category) from the slug path.
     if (legacyTypes.length === 0 && isCanonicalProductSlugPath(taxonomySlugPath)) {
       legacyTypes = getCanonicalLegacyTypes(taxonomySlugPath);
     }
     if (legacyTypes.length > 0) {
-      const { data } = await sup
+      const parts = taxonomySlugPath.split("/");
+      const legacyCategorySlug = parts.length >= 2 ? parts[1] : null;
+      const legacySubcategorySlug = parts.length >= 3 ? parts[2] : null;
+      let query = sup
         .from("listings")
         .select("id")
         .eq("type", "product")
         .eq("status", "APPROVED")
         .is("deleted_at", null)
         .is("taxonomy_node_id", null)
-        .in("product_type", legacyTypes)
-        .limit(2000);
+        .in("product_type", legacyTypes);
+      // Narrow by legacy category/subcategory when the slug path is deeper than root
+      if (legacyCategorySlug) {
+        query = query.eq("product_category", legacyCategorySlug);
+      }
+      if (legacySubcategorySlug) {
+        query = query.eq("product_subcategory", legacySubcategorySlug);
+      }
+      const { data } = await query.limit(2000);
       for (const r of data ?? []) legacyIds.add((r as { id: string }).id);
     }
   }

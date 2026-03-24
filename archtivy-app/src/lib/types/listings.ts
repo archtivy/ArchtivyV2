@@ -108,6 +108,10 @@ export interface CreateListingInput {
 export interface ListingCardData {
   id: string;
   type: ListingType;
+  /** Listing slug (human-readable URL segment). */
+  slug?: string | null;
+  /** Primary taxonomy slug_path (e.g. "furniture/seating"). Used for canonical URL generation. */
+  taxonomy_slug_path?: string | null;
   title: string;
   description: string | null;
   location: string | null;

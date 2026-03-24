@@ -20,13 +20,23 @@ async function getActiveBrandMemberTitles(): Promise<MemberTitleRow[]> {
 }
 
 export default async function AdminNewProductPage() {
-  const [{ data: profileOptions }, memberTitles, materialTaxRes, facetsRes] = await Promise.all([
+  const [{ data: profileOptions }, memberTitles, productTaxRes, materialTaxRes, facetsRes] = await Promise.all([
     searchProfilesForOwner("", "product"),
     getActiveBrandMemberTitles(),
+    getTaxonomyTree("product"),
     getTaxonomyTree("material"),
     getFacetsForDomain("product"),
   ]);
   const profiles = profileOptions ?? [];
+  const productTaxonomyNodes = (productTaxRes.data ?? []).map((n) => ({
+    id: n.id,
+    parent_id: n.parent_id,
+    depth: n.depth,
+    label: n.label,
+    legacy_product_type: n.legacy_product_type ?? null,
+    legacy_product_category: n.legacy_product_category ?? null,
+    legacy_product_subcategory: n.legacy_product_subcategory ?? null,
+  }));
   const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
     id: n.id,
     parent_id: n.parent_id,
@@ -61,6 +71,7 @@ export default async function AdminNewProductPage() {
           formMode="admin"
           ownerProfileOptions={profiles}
           memberTitles={memberTitles}
+          taxonomyNodes={productTaxonomyNodes}
           materialNodes={materialNodes}
           facets={facets}
         />

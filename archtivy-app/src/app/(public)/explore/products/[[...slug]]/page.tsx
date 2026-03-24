@@ -1,20 +1,21 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { getProductsCanonicalFiltered, getExploreNetworkCounts } from "@/lib/db/explore";
+import { getProductsCanonicalFiltered } from "@/lib/db/explore";
 import { EXPLORE_PAGE_SIZE } from "@/lib/db/explore";
 import { parseExploreFilters } from "@/lib/explore/filters/parse";
 import { exploreFiltersToProductFilters, countActiveFilters } from "@/lib/explore/filters/query";
 import { getExploreFilterOptions } from "@/lib/explore/filters/options";
-import { getPlatformStats } from "@/lib/db/platformActivity";
 import { getProfilesForStrip } from "@/lib/db/profiles";
 import { getTaxonomyNodeBySlugPath } from "@/lib/taxonomy/taxonomyDb";
 import { checkTaxonomySlugRedirect } from "@/lib/taxonomy/resolve";
 import { legacySlugsToNodeId } from "@/lib/taxonomy/resolve";
 import { getTaxonomyNodeById } from "@/lib/taxonomy/taxonomyDb";
 import { isLegacyType, resolveLegacyPath, isCanonicalProductSlugPath } from "@/lib/taxonomy/productTaxonomy";
-import { ExploreEditorialHeader } from "@/components/explore/ExploreEditorialHeader";
+import { auth } from "@clerk/nextjs/server";
+import Link from "next/link";
 import { ExploreProductsContent } from "@/components/explore/ExploreProductsContent";
 import { ExploreEmptyState } from "@/components/explore/ExploreEmptyState";
+import { PopularBrandsStrip } from "@/components/explore/PopularBrandsStrip";
 import { Container } from "@/components/layout/Container";
 import { getBaseUrl } from "@/lib/canonical";
 import { buildCollectionPageJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
@@ -75,6 +76,8 @@ export default async function ExploreProductsPage({
   params: Promise<{ slug?: string[] }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const { userId } = await auth();
+  const isLoggedIn = Boolean(userId);
   const { slug } = await params;
   const sp = await searchParams;
   const taxonomySlug = slug?.length ? slug.join("/") : null;
@@ -172,15 +175,13 @@ export default async function ExploreProductsPage({
   const filters = parseExploreFilters(sp, "products", taxonomySlug, facetSlugs);
   const productFilters = exploreFiltersToProductFilters(filters);
 
-  const [result, networkCounts, platformStats, brandProfiles] = await Promise.all([
+  const [result, brandProfiles] = await Promise.all([
     getProductsCanonicalFiltered({
       filters: productFilters,
       limit: EXPLORE_PAGE_SIZE,
       offset: 0,
       sort: filters.sort as "newest" | "year_desc",
     }),
-    getExploreNetworkCounts(),
-    getPlatformStats(),
     getProfilesForStrip(["brand"], 18),
   ]);
 
@@ -196,7 +197,6 @@ export default async function ExploreProductsPage({
     id: b.id,
     name: b.display_name ?? b.username ?? "Brand",
     logoUrl: b.avatar_url,
-    locationText: null,
     href: `/u/${b.username ?? `id/${b.id}`}`,
   }));
 
@@ -222,25 +222,77 @@ export default async function ExploreProductsPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(collectionJsonLd) }}
       />
-      <ExploreEditorialHeader
-        type="products"
-        counts={networkCounts}
-        options={options}
-        currentFilters={filters}
-        platformStats={platformStats}
-      />
 
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <header className="border-b border-zinc-100 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+        <Container>
+          <div className="pb-5 pt-8 sm:pb-6 sm:pt-10">
+            <h1 className="font-serif text-3xl font-normal tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-100">
+              Explore Products
+            </h1>
+            <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+              Products used in real projects and connected across a global network of people, brands, and ideas.
+            </p>
+            <p className="mt-2.5 text-xs text-zinc-400 dark:text-zinc-500">
+              Sign in to access product files and connect with brands
+            </p>
+          </div>
+        </Container>
+      </header>
+
+      {/* ── Access box (logged-out only) ───────────────────────────────── */}
+      {!isLoggedIn && (
+        <div className="border-b border-zinc-100 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+          <Container className="py-4">
+            <div
+              className="flex flex-col gap-3 border border-zinc-200/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800"
+              style={{ borderRadius: 6, backgroundColor: "#f6f7f8" }}
+            >
+              <div>
+                <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                  Unlock full access
+                </p>
+                <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                  Contact brands and download product files
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Link
+                  href="/sign-in?redirect_url=/explore/products"
+                  className="rounded border border-zinc-300 bg-white px-3.5 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-500"
+                  style={{ borderRadius: 4 }}
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/sign-up?redirect_url=/explore/products"
+                  className="rounded border border-zinc-300 bg-white px-3.5 py-1.5 text-xs font-medium text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-500"
+                  style={{ borderRadius: 4 }}
+                >
+                  Sign up
+                </Link>
+              </div>
+            </div>
+          </Container>
+        </div>
+      )}
+
+      {/* ── Popular Brands Strip ───────────────────────────────────────── */}
+      <PopularBrandsStrip items={brandStripItems} />
+
+      {/* ── Taxonomy intro ─────────────────────────────────────────────── */}
       {taxonomyNode?.intro_text && (
-        <Container className="pt-4">
+        <Container className="pt-5">
           <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
             {taxonomyNode.intro_text}
           </p>
         </Container>
       )}
 
-      <Container className="py-6">
+      {/* ── Main content: sidebar + grid ───────────────────────────────── */}
+      <Container className="py-8">
         {filters.q?.trim() && (
-          <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mb-5 text-sm text-zinc-600 dark:text-zinc-400">
             Search results for:{" "}
             <span className="font-medium">&quot;{filters.q.trim()}&quot;</span>
           </p>
@@ -259,7 +311,8 @@ export default async function ExploreProductsPage({
             initialTotal={total}
             filters={productFilters}
             sort={filters.sort as "newest" | "year_desc"}
-            stripItems={brandStripItems}
+            exploreFilters={filters}
+            filterOptions={options}
           />
         )}
       </Container>

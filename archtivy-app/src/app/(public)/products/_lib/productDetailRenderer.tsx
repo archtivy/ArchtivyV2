@@ -168,12 +168,19 @@ export async function ProductDetailRenderer({
       ? (await getFirstImageUrlPerListingIds(projectIds)).data ?? {}
       : {};
 
-  const productCategory =
-    (product.product_category ?? product.category)?.trim() ?? "";
+  // Prefer taxonomy-based category resolution; fall back to legacy field
+  const taxonomySlugForCategory = primaryNode?.slug_path ?? null;
+  const legacyProductCategory = (product.product_category ?? product.category)?.trim() ?? "";
 
-  const sameCategoryProducts: { id: string; slug: string; title: string; thumbnail?: string | null }[] = productCategory
+  const categoryFilter = taxonomySlugForCategory
+    ? { ...DEFAULT_PRODUCT_FILTERS, taxonomy: taxonomySlugForCategory }
+    : legacyProductCategory
+      ? { ...DEFAULT_PRODUCT_FILTERS, product_category: legacyProductCategory }
+      : null;
+
+  const sameCategoryProducts: { id: string; slug: string; title: string; thumbnail?: string | null }[] = categoryFilter
     ? ((await getProductsCanonicalFiltered({
-        filters: { ...DEFAULT_PRODUCT_FILTERS, product_category: productCategory },
+        filters: categoryFilter,
         limit: 7,
         sort: "newest",
       })).data ?? [])
