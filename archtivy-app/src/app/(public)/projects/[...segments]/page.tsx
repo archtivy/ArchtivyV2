@@ -35,21 +35,25 @@ function getCachedProject(slug: string) {
 
 /**
  * Resolve the canonical detail path for a project.
+ * Returns { path, hasTaxonomy } so callers know whether taxonomy was resolved.
  */
 async function resolveCanonicalPath(
   projectId: string,
   slug: string
-): Promise<string> {
+): Promise<{ path: string; hasTaxonomy: boolean }> {
   const taxPath = await getListingTaxonomyPath(projectId);
   if (taxPath.primary) {
-    return getListingUrl({
-      id: projectId,
-      type: "project",
-      slug,
-      taxonomySlugPath: taxPath.primary.slug_path,
-    });
+    return {
+      path: getListingUrl({
+        id: projectId,
+        type: "project",
+        slug,
+        taxonomySlugPath: taxPath.primary.slug_path,
+      }),
+      hasTaxonomy: true,
+    };
   }
-  return `/projects/${slug}`;
+  return { path: `/projects/${slug}`, hasTaxonomy: false };
 }
 
 async function findProject(slug: string) {
@@ -112,7 +116,7 @@ export async function generateMetadata({
   const project = await findProject(listingSlug);
   if (!project) return {};
   if (project.status === "PENDING") return { title: "Project" };
-  const canonicalPath = await resolveCanonicalPath(project.id, project.slug ?? project.id);
+  const { path: canonicalPath } = await resolveCanonicalPath(project.id, project.slug ?? project.id);
   return buildProjectDetailMetadata(project, canonicalPath);
 }
 
@@ -150,26 +154,44 @@ export default async function ProjectSegmentsPage({
 
   // ── Not an archive — treat as detail page ──────────────────────────────
   const listingSlug = segments[segments.length - 1];
+  const taxonomyPrefix = segments.length > 1 ? segments.slice(0, -1).join("/") : null;
 
   const project = await findProject(listingSlug);
   if (!project) notFound();
 
   // UUID → slug redirect
   if (UUID_RE.test(listingSlug) && project.slug && project.slug !== listingSlug) {
-    const canonical = await resolveCanonicalPath(project.id, project.slug);
+    const { path: canonical } = await resolveCanonicalPath(project.id, project.slug);
     permanentRedirect(canonical);
   }
 
   await authCheckPending(project);
 
   // Resolve canonical URL
-  const canonicalPath = await resolveCanonicalPath(project.id, project.slug ?? project.id);
+  const { path: canonicalPath, hasTaxonomy } = await resolveCanonicalPath(
+    project.id,
+    project.slug ?? project.id,
+  );
   const currentUrlPath = `/projects/${segments.join("/")}`;
 
-  // Redirect to canonical if URL doesn't match
-  if (canonicalPath !== currentUrlPath) {
+  // Redirect logic:
+  // - If taxonomy was resolved AND current URL doesn't match → redirect to canonical
+  // - If NO taxonomy was resolved but URL has a prefix → keep the current URL as-is
+  //   (don't strip a valid taxonomy prefix just because resolution failed)
+  // - If NO taxonomy and URL is flat → render as-is
+  if (hasTaxonomy && canonicalPath !== currentUrlPath) {
     permanentRedirect(canonicalPath);
   }
 
-  return <ProjectDetailRenderer project={project} canonicalPath={canonicalPath} />;
+  // For flat URLs: if taxonomy exists, redirect to canonical
+  if (!taxonomyPrefix && hasTaxonomy && canonicalPath !== currentUrlPath) {
+    permanentRedirect(canonicalPath);
+  }
+
+  // Render with the best available canonical path.
+  // If we're on a taxonomy-prefixed URL but resolution failed, use the current URL as canonical
+  // so we don't lose the taxonomy prefix.
+  const effectiveCanonical = (taxonomyPrefix && !hasTaxonomy) ? currentUrlPath : canonicalPath;
+
+  return <ProjectDetailRenderer project={project} canonicalPath={effectiveCanonical} taxonomySlugPath={taxonomyPrefix} />;
 }

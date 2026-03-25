@@ -1369,6 +1369,11 @@ export async function getProjectCanonicalBySlugOrId(
   } else {
     project.owner = null;
   }
+
+  // Hydrate taxonomy_slug_path for canonical URL generation
+  const taxMap = await getTaxonomySlugPaths([id]);
+  project.taxonomy_slug_path = taxMap.get(id) ?? null;
+
   return project;
 }
 
@@ -1411,5 +1416,10 @@ export async function getProductCanonicalBySlug(
   const usedCount = usedCounts[id] ?? 0;
   product.usedInProjectsCount = usedCount;
   product.connectionCount += usedCount;
+
+  // Hydrate taxonomy_slug_path for canonical URL generation
+  const taxMap = await getTaxonomySlugPaths([id]);
+  product.taxonomy_slug_path = taxMap.get(id) ?? null;
+
   return product;
 }

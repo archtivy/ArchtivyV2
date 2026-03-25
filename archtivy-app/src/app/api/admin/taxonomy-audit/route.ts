@@ -10,6 +10,7 @@ import { PRODUCT_TAXONOMY, PRODUCT_TAXONOMY_FALLBACK_SUBCATEGORY_ID } from "@/li
  * Admin-only. Use this after running syncCanonicalProductTaxonomy + backfillProductTaxonomyLinks.
  */
 export async function GET() {
+  try {
   const authResult = await requireAdminApi();
   if (authResult instanceof NextResponse) return authResult;
 
@@ -17,11 +18,7 @@ export async function GET() {
 
   // ── 1. Product listings: taxonomy_node_id coverage ───────────────────
 
-  const [
-    { count: totalProducts },
-    { count: productsWithNode },
-    { count: productsWithoutNode },
-  ] = await Promise.all([
+  const [prodTotal, prodWith, prodWithout] = await Promise.all([
     sup.from("listings").select("id", { count: "exact", head: true })
       .eq("type", "product").eq("status", "APPROVED").is("deleted_at", null),
     sup.from("listings").select("id", { count: "exact", head: true })
@@ -32,13 +29,20 @@ export async function GET() {
       .is("taxonomy_node_id", null),
   ]);
 
+  if (prodTotal.error || prodWith.error || prodWithout.error) {
+    return NextResponse.json({
+      error: "Product count query failed",
+      details: [prodTotal.error?.message, prodWith.error?.message, prodWithout.error?.message].filter(Boolean),
+    }, { status: 500 });
+  }
+
+  const totalProducts = prodTotal.count ?? 0;
+  const productsWithNode = prodWith.count ?? 0;
+  const productsWithoutNode = prodWithout.count ?? 0;
+
   // ── 2. Project listings: taxonomy_node_id coverage ───────────────────
 
-  const [
-    { count: totalProjects },
-    { count: projectsWithNode },
-    { count: projectsWithoutNode },
-  ] = await Promise.all([
+  const [projTotal, projWith, projWithout] = await Promise.all([
     sup.from("listings").select("id", { count: "exact", head: true })
       .eq("type", "project").eq("status", "APPROVED").is("deleted_at", null),
     sup.from("listings").select("id", { count: "exact", head: true })
@@ -48,6 +52,17 @@ export async function GET() {
       .eq("type", "project").eq("status", "APPROVED").is("deleted_at", null)
       .is("taxonomy_node_id", null),
   ]);
+
+  if (projTotal.error || projWith.error || projWithout.error) {
+    return NextResponse.json({
+      error: "Project count query failed",
+      details: [projTotal.error?.message, projWith.error?.message, projWithout.error?.message].filter(Boolean),
+    }, { status: 500 });
+  }
+
+  const totalProjects = projTotal.count ?? 0;
+  const projectsWithNode = projWith.count ?? 0;
+  const projectsWithoutNode = projWithout.count ?? 0;
 
   // ── 3. Unmapped product listings: sample of what couldn't be linked ──
 
@@ -176,4 +191,11 @@ export async function GET() {
         : `WARN — ${projectsWithoutNode} projects still unmapped`,
     },
   });
+  } catch (err) {
+    console.error("[taxonomy-audit] Unhandled error:", err);
+    return NextResponse.json(
+      { error: "Taxonomy audit failed", message: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
+  }
 }

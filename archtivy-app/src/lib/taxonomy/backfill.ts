@@ -2,7 +2,12 @@
 
 /**
  * Admin-only backfill action: populates taxonomy_node_id on existing listings
- * by matching legacy text columns to taxonomy_nodes.legacy_* columns.
+ * by matching legacy text columns to taxonomy_nodes.
+ *
+ * Matching strategy (in order):
+ * 1. Exact match on legacy_product_type / legacy_product_category / legacy_product_subcategory
+ * 2. Normalized fuzzy match (casing, hyphens, singularization, aliases)
+ * 3. Parent fallback (match type+category when subcategory fails)
  *
  * Safe to run multiple times — only processes listings with NULL taxonomy_node_id.
  */
@@ -11,6 +16,7 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { revalidateTag } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { findNodeByLegacyProduct, findNodeByLegacyProject, setListingTaxonomyNode } from "./taxonomyDb";
+import { fuzzyMatchProductNode, fuzzyMatchProjectNode, type TaxonomyNodeForMatch } from "./normalize";
 
 const BATCH_SIZE = 100;
 
@@ -19,11 +25,13 @@ export interface BackfillMapping {
   listing_type: "product" | "project";
   legacy_category: string;
   mapped_node_slug_path: string | null;
-  status: "mapped_exact" | "mapped_to_parent" | "no_match" | "skipped";
+  status: "mapped_exact" | "mapped_normalized" | "mapped_to_parent" | "no_match" | "skipped";
+  confidence?: string;
 }
 
 export interface BackfillSummary {
   mapped_exact: number;
+  mapped_normalized: number;
   mapped_to_parent: number;
   no_match: number;
   skipped: number;
@@ -47,11 +55,21 @@ export interface BackfillOptions {
 }
 
 /**
+ * Load all active taxonomy nodes for fuzzy matching.
+ */
+async function loadAllNodes(): Promise<TaxonomyNodeForMatch[]> {
+  const sup = getSupabaseServiceClient();
+  const { data } = await sup
+    .from("taxonomy_nodes")
+    .select("id, slug_path, slug, label, depth, legacy_product_type, legacy_product_category, legacy_product_subcategory, legacy_project_category")
+    .eq("is_active", true);
+
+  return (data ?? []) as TaxonomyNodeForMatch[];
+}
+
+/**
  * Run the full backfill. Returns stats.
  * Call this from the admin taxonomies page.
- *
- * @param options.dryRun – When true, outputs listing_id → taxonomy_node mapping
- *   without writing to the DB. Use this to preview changes before committing.
  */
 export async function runTaxonomyBackfill(options?: BackfillOptions): Promise<BackfillStats> {
   const dryRun = options?.dryRun ?? false;
@@ -66,6 +84,11 @@ export async function runTaxonomyBackfill(options?: BackfillOptions): Promise<Ba
   };
 
   const supa = getSupabaseServiceClient();
+
+  // Pre-load all taxonomy nodes for fuzzy matching
+  const allNodes = await loadAllNodes();
+  const productNodes = allNodes.filter((n) => n.legacy_product_type || n.slug_path.split("/").length <= 3);
+  const projectNodes = allNodes.filter((n) => n.legacy_project_category || n.slug_path.split("/").length === 1);
 
   // ── Backfill products ────────────────────────────────────────────────────
   let productOffset = 0;
@@ -105,36 +128,61 @@ export async function runTaxonomyBackfill(options?: BackfillOptions): Promise<Ba
         continue;
       }
 
-      // Find deepest matching node, tracking match depth for reporting
+      // ── Step 1: Exact match via DB query ──
       let nodeId: string | null = null;
       let slugPath: string | null = null;
-      let matchedExact = false;
+      let status: BackfillMapping["status"] = "no_match";
+      let confidence: string | undefined;
       const legacyDepth = [row.product_type, row.product_category, row.product_subcategory].filter(Boolean).length;
 
       if (row.product_subcategory && row.product_category) {
         const res = await findNodeByLegacyProduct(row.product_type, row.product_category, row.product_subcategory);
         nodeId = res.data?.id ?? null;
         slugPath = res.data?.slug_path ?? null;
-        if (nodeId) matchedExact = true;
+        if (nodeId) { status = "mapped_exact"; confidence = "exact"; }
       }
       if (!nodeId && row.product_category) {
         const res = await findNodeByLegacyProduct(row.product_type, row.product_category);
         nodeId = res.data?.id ?? null;
         slugPath = res.data?.slug_path ?? null;
-        // Exact if listing only had type+category
-        if (nodeId && legacyDepth <= 2) matchedExact = true;
+        if (nodeId) {
+          status = legacyDepth <= 2 ? "mapped_exact" : "mapped_to_parent";
+          confidence = "exact";
+        }
       }
       if (!nodeId) {
         const res = await findNodeByLegacyProduct(row.product_type);
         nodeId = res.data?.id ?? null;
         slugPath = res.data?.slug_path ?? null;
-        if (nodeId && legacyDepth <= 1) matchedExact = true;
+        if (nodeId) {
+          status = legacyDepth <= 1 ? "mapped_exact" : "mapped_to_parent";
+          confidence = "exact";
+        }
       }
 
-      const legacyStr = [row.product_type, row.product_category, row.product_subcategory].filter(Boolean).join("/");
-      const mappingStatus: BackfillMapping["status"] = nodeId
-        ? matchedExact ? "mapped_exact" : "mapped_to_parent"
-        : "no_match";
+      // ── Step 2: Fuzzy match if exact failed ──
+      if (!nodeId) {
+        const fuzzy = fuzzyMatchProductNode(
+          productNodes,
+          row.product_type,
+          row.product_category,
+          row.product_subcategory,
+        );
+        if (fuzzy) {
+          nodeId = fuzzy.node.id;
+          slugPath = fuzzy.node.slug_path;
+          confidence = fuzzy.confidence;
+          // Determine status based on depth comparison
+          const matchDepth = fuzzy.node.depth;
+          if (matchDepth >= legacyDepth - 1) {
+            status = "mapped_normalized";
+          } else {
+            status = "mapped_to_parent";
+          }
+        }
+      }
+
+      const legacyStr = [row.product_type, row.product_category, row.product_subcategory].filter(Boolean).join(" / ");
 
       if (dryRun) {
         stats.mappings!.push({
@@ -142,7 +190,8 @@ export async function runTaxonomyBackfill(options?: BackfillOptions): Promise<Ba
           listing_type: "product",
           legacy_category: legacyStr,
           mapped_node_slug_path: slugPath,
-          status: mappingStatus,
+          status,
+          confidence,
         });
         if (nodeId) stats.productsBackfilled++;
       } else if (nodeId) {
@@ -195,9 +244,27 @@ export async function runTaxonomyBackfill(options?: BackfillOptions): Promise<Ba
         continue;
       }
 
+      // ── Step 1: Exact match ──
+      let nodeId: string | null = null;
+      let slugPath: string | null = null;
+      let status: BackfillMapping["status"] = "no_match";
+      let confidence: string | undefined;
+
       const res = await findNodeByLegacyProject(row.category);
-      const nodeId = res.data?.id ?? null;
-      const slugPath = res.data?.slug_path ?? null;
+      nodeId = res.data?.id ?? null;
+      slugPath = res.data?.slug_path ?? null;
+      if (nodeId) { status = "mapped_exact"; confidence = "exact"; }
+
+      // ── Step 2: Fuzzy match if exact failed ──
+      if (!nodeId) {
+        const fuzzy = fuzzyMatchProjectNode(projectNodes, row.category);
+        if (fuzzy) {
+          nodeId = fuzzy.node.id;
+          slugPath = fuzzy.node.slug_path;
+          confidence = fuzzy.confidence;
+          status = "mapped_normalized";
+        }
+      }
 
       if (dryRun) {
         stats.mappings!.push({
@@ -205,7 +272,8 @@ export async function runTaxonomyBackfill(options?: BackfillOptions): Promise<Ba
           listing_type: "project",
           legacy_category: row.category,
           mapped_node_slug_path: slugPath,
-          status: nodeId ? "mapped_exact" : "no_match",
+          status,
+          confidence,
         });
         if (nodeId) stats.projectsBackfilled++;
       } else if (nodeId) {
@@ -229,6 +297,7 @@ export async function runTaxonomyBackfill(options?: BackfillOptions): Promise<Ba
   if (dryRun && stats.mappings) {
     stats.summary = {
       mapped_exact: stats.mappings.filter((m) => m.status === "mapped_exact").length,
+      mapped_normalized: stats.mappings.filter((m) => m.status === "mapped_normalized").length,
       mapped_to_parent: stats.mappings.filter((m) => m.status === "mapped_to_parent").length,
       no_match: stats.mappings.filter((m) => m.status === "no_match").length,
       skipped: stats.mappings.filter((m) => m.status === "skipped").length,

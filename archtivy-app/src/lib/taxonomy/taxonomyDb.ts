@@ -28,11 +28,11 @@ export interface TaxonomyNode {
   legacy_project_category: string | null;
   created_at: string;
   updated_at: string;
-  /* SEO fields — nullable; frontend falls back to label/description when NULL */
-  seo_title: string | null;
-  meta_description: string | null;
-  intro_text: string | null;
-  featured_image: string | null;
+  /* SEO fields — optional; not present on all DB schemas. Frontend falls back to label/description. */
+  seo_title?: string | null;
+  meta_description?: string | null;
+  intro_text?: string | null;
+  featured_image?: string | null;
 }
 
 export interface Facet {
@@ -78,7 +78,7 @@ type DbResult<T> = { data: T; error: null } | { data: null; error: string };
 // ─── Taxonomy Nodes ──────────────────────────────────────────────────────────
 
 const NODE_SELECT =
-  "id, domain, parent_id, depth, slug, slug_path, label, label_plural, description, icon_key, sort_order, is_active, legacy_product_type, legacy_product_category, legacy_product_subcategory, legacy_project_category, created_at, updated_at, seo_title, meta_description, intro_text, featured_image";
+  "id, domain, parent_id, depth, slug, slug_path, label, label_plural, description, icon_key, sort_order, is_active, legacy_product_type, legacy_product_category, legacy_product_subcategory, legacy_project_category, created_at, updated_at";
 
 /** Get all taxonomy nodes for a domain, ordered by depth then sort_order. */
 export async function getTaxonomyTree(
@@ -276,11 +276,18 @@ export async function setListingTaxonomyNode(
   return { data: undefined, error: null };
 }
 
-/** Get taxonomy nodes linked to a listing. */
+/**
+ * Get taxonomy nodes linked to a listing.
+ * Primary source: listing_taxonomy_node junction table.
+ * Fallback: listings.taxonomy_node_id direct column (written by some older flows).
+ */
 export async function getListingTaxonomyNodes(
   listingId: string
 ): Promise<DbResult<(TaxonomyNode & { is_primary: boolean })[]>> {
-  const { data, error } = await supa()
+  const s = supa();
+
+  // 1. Check junction table first
+  const { data, error } = await s
     .from("listing_taxonomy_node")
     .select(`is_primary, taxonomy_nodes:taxonomy_node_id (${NODE_SELECT})`)
     .eq("listing_id", listingId);
@@ -290,7 +297,40 @@ export async function getListingTaxonomyNodes(
   const result = rows
     .filter((r) => r.taxonomy_nodes)
     .map((r) => ({ ...r.taxonomy_nodes, is_primary: r.is_primary }));
-  return { data: result, error: null };
+
+  if (result.length > 0) return { data: result, error: null };
+
+  // 2. Fallback: check listings.taxonomy_node_id direct column
+  const { data: listing, error: listingErr } = await s
+    .from("listings")
+    .select("taxonomy_node_id")
+    .eq("id", listingId)
+    .maybeSingle();
+  if (listingErr) return { data: null, error: listingErr.message };
+
+  const directNodeId = (listing as { taxonomy_node_id: string | null } | null)?.taxonomy_node_id;
+  if (!directNodeId) return { data: [], error: null };
+
+  // Found a direct node ID — fetch the node and also repair the junction table
+  const { data: nodeData, error: nodeErr } = await s
+    .from("taxonomy_nodes")
+    .select(NODE_SELECT)
+    .eq("id", directNodeId)
+    .maybeSingle();
+  if (nodeErr || !nodeData) return { data: [], error: null };
+
+  const node = nodeData as TaxonomyNode;
+
+  // Repair: create the missing junction row so future lookups are fast
+  await s
+    .from("listing_taxonomy_node")
+    .upsert(
+      { listing_id: listingId, taxonomy_node_id: directNodeId, is_primary: true },
+      { onConflict: "listing_id,taxonomy_node_id" }
+    )
+    .then(() => {}); // fire-and-forget, don't block the read path
+
+  return { data: [{ ...node, is_primary: true }], error: null };
 }
 
 /**

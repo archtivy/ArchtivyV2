@@ -115,9 +115,12 @@ export function buildProjectDetailMetadata(
 export async function ProjectDetailRenderer({
   project,
   canonicalPath,
+  taxonomySlugPath,
 }: {
   project: ProjectCanonical;
   canonicalPath: string;
+  /** Taxonomy slug path from URL segments (e.g. "residential/houses"). Used as fallback for breadcrumbs. */
+  taxonomySlugPath?: string | null;
 }) {
   const [usedResult, isSaved, teamResult, docsResult, taxNodesResult, facetsResult] = await Promise.all([
     getProductsForProject(project.id, { sources: ["manual", "photo_tag"] }).catch(() =>
@@ -176,9 +179,17 @@ export async function ProjectDetailRenderer({
   }
   const taxonomyFacetGroups = Array.from(facetGroupMap.values());
   let categoryCrumbs: TaxonomyCrumb[] = [];
+  console.log("[ProjectDetail] taxNodes count:", taxNodes.length, "primaryNode:", primaryNode ? { domain: primaryNode.domain, slug_path: primaryNode.slug_path } : null, "taxonomySlugPath prop:", taxonomySlugPath);
   if (primaryNode) {
     const ancestorsRes = await getTaxonomyAncestors(primaryNode.domain, primaryNode.slug_path);
     categoryCrumbs = (ancestorsRes.data ?? []).map((n) => ({ label: n.label, slug_path: n.slug_path }));
+    console.log("[ProjectDetail] breadcrumbs from primaryNode:", primaryNode.slug_path, "→", categoryCrumbs.length, "crumbs:", categoryCrumbs.map(c => c.label), "error:", ancestorsRes.error);
+  } else if (taxonomySlugPath) {
+    const ancestorsRes = await getTaxonomyAncestors("project", taxonomySlugPath);
+    categoryCrumbs = (ancestorsRes.data ?? []).map((n) => ({ label: n.label, slug_path: n.slug_path }));
+    console.log("[ProjectDetail] breadcrumbs from URL fallback:", taxonomySlugPath, "→", categoryCrumbs.length, "crumbs:", categoryCrumbs.map(c => c.label), "error:", ancestorsRes.error);
+  } else {
+    console.log("[ProjectDetail] NO breadcrumbs: primaryNode=null, taxonomySlugPath=null");
   }
 
   const documents = (docsResult.data ?? []).map((d) => ({

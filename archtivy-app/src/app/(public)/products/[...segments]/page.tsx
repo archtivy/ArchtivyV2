@@ -36,34 +36,31 @@ function getCachedProduct(slug: string) {
 
 /**
  * Resolve the canonical detail path for a product.
+ * Returns { path, hasTaxonomy } so callers know whether taxonomy was resolved.
  */
 async function resolveCanonicalPath(
   productId: string,
   slug: string
-): Promise<string> {
+): Promise<{ path: string; hasTaxonomy: boolean }> {
   const taxPath = await getListingTaxonomyPath(productId);
   if (taxPath.primary) {
-    return getListingUrl({
-      id: productId,
-      type: "product",
-      slug,
-      taxonomySlugPath: taxPath.primary.slug_path,
-    });
+    return {
+      path: getListingUrl({
+        id: productId,
+        type: "product",
+        slug,
+        taxonomySlugPath: taxPath.primary.slug_path,
+      }),
+      hasTaxonomy: true,
+    };
   }
-  return `/products/${slug}`;
+  return { path: `/products/${slug}`, hasTaxonomy: false };
 }
 
-/**
- * Try to find a product by the last segment (the listing slug).
- * Returns null if not found.
- */
 async function findProduct(slug: string) {
   return (await getCachedProduct(slug)) ?? (await getProductForProductPage(slug));
 }
 
-/**
- * Auth-gate for PENDING listings.
- */
 async function authCheckPending(product: { status: string; owner_clerk_user_id?: string | null }) {
   if (product.status !== "PENDING") return;
   const { userId } = await auth();
@@ -85,10 +82,8 @@ export async function generateMetadata({
   if (segments.length > MAX_SEGMENTS) return {};
 
   const listingSlug = segments[segments.length - 1];
-  const taxonomyParts = segments.slice(0, -1);
-  const taxonomySlugPath = taxonomyParts.length > 0 ? taxonomyParts.join("/") : null;
 
-  // If only 1 segment, check if it's an archive page first
+  // Try full path as archive
   if (segments.length === 1) {
     const archiveData = await fetchProductArchive(segments[0]);
     if (archiveData) {
@@ -103,8 +98,7 @@ export async function generateMetadata({
     }
   }
 
-  // If 2+ segments, check if ALL segments form an archive slug_path
-  if (taxonomySlugPath) {
+  if (segments.length >= 2) {
     const fullSlug = segments.join("/");
     const archiveData = await fetchProductArchive(fullSlug);
     if (archiveData) {
@@ -119,11 +113,11 @@ export async function generateMetadata({
     }
   }
 
-  // Otherwise it's a detail page — last segment is the listing slug
+  // Detail page metadata
   const product = await findProduct(listingSlug);
   if (!product) return {};
   if (product.status === "PENDING") return { title: "Product" };
-  const canonicalPath = await resolveCanonicalPath(product.id, product.slug ?? product.id);
+  const { path: canonicalPath } = await resolveCanonicalPath(product.id, product.slug ?? product.id);
   return buildProductDetailMetadata(product, canonicalPath);
 }
 
@@ -142,11 +136,6 @@ export default async function ProductSegmentsPage({
   if (segments.length > MAX_SEGMENTS) notFound();
 
   // ── Try as archive page first ──────────────────────────────────────────
-  // Check progressively: try full path as archive, then without last segment.
-  // This handles: /products/furniture (1 seg), /products/furniture/seating (2 seg),
-  // /products/furniture/seating/armchair (3 seg — could be archive OR detail)
-
-  // Try the FULL segment path as an archive
   const fullSlugPath = segments.join("/");
   const pageNum = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const fullArchive = await fetchProductArchive(fullSlugPath, pageNum);
@@ -165,28 +154,45 @@ export default async function ProductSegmentsPage({
   }
 
   // ── Not an archive — treat as detail page ──────────────────────────────
-  // Last segment is the listing slug; preceding segments are taxonomy path
   const listingSlug = segments[segments.length - 1];
+  const taxonomyPrefix = segments.length > 1 ? segments.slice(0, -1).join("/") : null;
 
-  // UUID → slug redirect
   const product = await findProduct(listingSlug);
   if (!product) notFound();
 
+  // UUID → slug redirect
   if (UUID_RE.test(listingSlug) && product.slug && product.slug !== listingSlug) {
-    const canonical = await resolveCanonicalPath(product.id, product.slug);
+    const { path: canonical } = await resolveCanonicalPath(product.id, product.slug);
     permanentRedirect(canonical);
   }
 
   await authCheckPending(product);
 
   // Resolve canonical URL
-  const canonicalPath = await resolveCanonicalPath(product.id, product.slug ?? product.id);
+  const { path: canonicalPath, hasTaxonomy } = await resolveCanonicalPath(
+    product.id,
+    product.slug ?? product.id,
+  );
   const currentUrlPath = `/products/${segments.join("/")}`;
 
-  // Redirect to canonical if URL doesn't match
-  if (canonicalPath !== currentUrlPath) {
+  // Redirect logic:
+  // - If taxonomy was resolved AND current URL doesn't match → redirect to canonical
+  // - If NO taxonomy was resolved but URL has a prefix → keep the current URL as-is
+  //   (don't strip a valid taxonomy prefix just because resolution failed)
+  // - If NO taxonomy and URL is flat → render as-is
+  if (hasTaxonomy && canonicalPath !== currentUrlPath) {
     permanentRedirect(canonicalPath);
   }
 
-  return <ProductDetailRenderer product={product} canonicalPath={canonicalPath} />;
+  // For flat URLs: if taxonomy exists, redirect to canonical
+  if (!taxonomyPrefix && hasTaxonomy && canonicalPath !== currentUrlPath) {
+    permanentRedirect(canonicalPath);
+  }
+
+  // Render with the best available canonical path.
+  // If we're on a taxonomy-prefixed URL but resolution failed, use the current URL as canonical
+  // so we don't lose the taxonomy prefix.
+  const effectiveCanonical = (taxonomyPrefix && !hasTaxonomy) ? currentUrlPath : canonicalPath;
+
+  return <ProductDetailRenderer product={product} canonicalPath={effectiveCanonical} taxonomySlugPath={taxonomyPrefix} />;
 }
