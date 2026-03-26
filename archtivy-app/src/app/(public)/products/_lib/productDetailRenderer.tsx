@@ -210,13 +210,14 @@ export async function ProductDetailRenderer({
   const moreInCategory = sameCategoryProducts;
 
   const relatedItems = relatedListings.map((p) => {
-    const row = p as { id: string; slug?: string; title: string };
+    const row = p as { id: string; slug?: string; title: string; taxonomy_slug_path?: string | null };
     return {
       id: row.id,
       slug: row.slug ?? row.id,
       title: row.title,
       subtitle: null as string | null,
       thumbnail: thumbnailMap[row.id],
+      taxonomy_slug_path: row.taxonomy_slug_path ?? null,
     };
   });
 
@@ -236,8 +237,8 @@ export async function ProductDetailRenderer({
   const listingDocuments = docsResult.data ?? [];
 
   const relatedListingsForLayout = relatedListings.map((p) => {
-    const row = p as { id: string; slug?: string; title: string; location?: string | null };
-    return { id: row.id, slug: row.slug, title: row.title, location: row.location ?? null };
+    const row = p as { id: string; slug?: string; title: string; location?: string | null; taxonomy_slug_path?: string | null };
+    return { id: row.id, slug: row.slug, title: row.title, location: row.location ?? null, taxonomy_slug_path: row.taxonomy_slug_path ?? null };
   });
 
   const canonicalUrl = getAbsoluteUrl(canonicalPath);

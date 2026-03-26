@@ -8,6 +8,7 @@
  * every numeric field is normalized via toN() before returning.
  */
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { batchResolveTaxonomySlugPaths } from "@/lib/taxonomy/resolve";
 
 // ─── Return types ─────────────────────────────────────────────────────────────
 
@@ -45,6 +46,7 @@ export interface ProductMomentum {
   prev_count: number;
   growth_pct: number;
   is_new_entry: boolean;
+  taxonomy_slug_path?: string | null;
 }
 
 export interface ActiveCategory {
@@ -164,15 +166,20 @@ export async function getExploreIntelligence(): Promise<ExploreIntelligenceData>
       is_new_entry:  toB(r.is_new_entry),
     })),
 
-    productsMomentum: raw4.map((r) => ({
-      product_id:    toS(r.product_id),
-      product_title: toS(r.product_title),
-      product_slug:  toNS(r.product_slug),
-      current_count: toN(r.current_count),
-      prev_count:    toN(r.prev_count),
-      growth_pct:    toN(r.growth_pct),
-      is_new_entry:  toB(r.is_new_entry),
-    })),
+    productsMomentum: await (async () => {
+      const items: ProductMomentum[] = raw4.map((r) => ({
+        product_id:    toS(r.product_id),
+        product_title: toS(r.product_title),
+        product_slug:  toNS(r.product_slug),
+        current_count: toN(r.current_count),
+        prev_count:    toN(r.prev_count),
+        growth_pct:    toN(r.growth_pct),
+        is_new_entry:  toB(r.is_new_entry),
+      }));
+      const taxMap = await batchResolveTaxonomySlugPaths(items.map((i) => i.product_id));
+      for (const item of items) item.taxonomy_slug_path = taxMap.get(item.product_id) ?? null;
+      return items;
+    })(),
 
     activeCategories: raw5.map((r) => ({
       category:      toS(r.category),

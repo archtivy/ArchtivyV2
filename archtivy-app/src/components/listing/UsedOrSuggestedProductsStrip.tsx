@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { getListingUrl } from "@/lib/canonical";
 
 export interface StripProductItem {
   id: string;
@@ -7,6 +8,7 @@ export interface StripProductItem {
   title: string;
   subtitle?: string | null;
   thumbnail?: string | null;
+  taxonomy_slug_path?: string | null;
 }
 
 export interface UsedOrSuggestedProductsStripProps {
@@ -42,7 +44,7 @@ export function UsedOrSuggestedProductsStrip({
         {items.map((item) => (
           <Link
             key={item.id}
-            href={`/products/${item.slug ?? item.id}`}
+            href={getListingUrl({ id: item.id, type: "product", slug: item.slug, taxonomy_slug_path: item.taxonomy_slug_path })}
             className="group flex shrink-0 flex-col items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500"
           >
             <div className="relative h-[92px] w-[92px] overflow-hidden rounded bg-zinc-100 dark:bg-zinc-800">

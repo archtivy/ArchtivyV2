@@ -14,6 +14,7 @@ export interface UsedProductItem {
   title: string;
   brand?: string | null;
   thumbnail?: string | null;
+  taxonomy_slug_path?: string | null;
 }
 
 export interface ProjectDetailContentProps {

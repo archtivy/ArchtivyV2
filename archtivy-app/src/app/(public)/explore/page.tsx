@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { getListingUrl } from "@/lib/canonical";
+import { batchResolveTaxonomySlugPaths } from "@/lib/taxonomy/resolve";
 import { ExploreMapView, type MapPin } from "@/components/explore/ExploreMapView";
 
 export const dynamic = "force-dynamic";
@@ -78,10 +80,15 @@ export default async function ExplorePage({
       .limit(2000),
   ]);
 
+  // Batch resolve taxonomy paths for canonical URLs
+  const projectRows = projectsRes.data ?? [];
+  const projectIds = projectRows.map((r) => r.id);
+  const taxMap = projectIds.length > 0 ? await batchResolveTaxonomySlugPaths(projectIds) : new Map<string, string>();
+
   const pins: MapPin[] = [];
   const projectPins: MapPin[] = [];
 
-  for (const r of projectsRes.data ?? []) {
+  for (const r of projectRows) {
     const lat = safeCoord(r.location_lat);
     const lng = safeCoord(r.location_lng);
     if (lat == null || lng == null) continue;
@@ -93,7 +100,7 @@ export default async function ExplorePage({
       locationLabel: loc(r.location_city, r.location_country),
       lat,
       lng,
-      href: `/projects/${encodeURIComponent((r.slug as string) ?? r.id)}`,
+      href: getListingUrl({ id: r.id, type: "project", slug: (r.slug as string) ?? null, taxonomy_slug_path: taxMap.get(r.id) ?? null }),
       imageUrl: (r.cover_image_url as string | null) ?? null,
       subtitle: (r.category as string | null) ?? null,
       year: (r.year as string | null) ?? null,

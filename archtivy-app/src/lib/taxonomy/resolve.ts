@@ -307,6 +307,41 @@ export async function getListingTaxonomyPath(
 }
 
 /**
+ * Batch-resolve primary taxonomy slug_paths for an array of listing IDs.
+ * Returns a Map<listingId, slug_path>.
+ * Uses a single query to listing_taxonomy_node + taxonomy_nodes.
+ * Items without a taxonomy link will be absent from the map.
+ */
+export async function batchResolveTaxonomySlugPaths(
+  listingIds: string[]
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (listingIds.length === 0) return map;
+
+  const unique = Array.from(new Set(listingIds));
+  const supa = getSupabaseServiceClient();
+  const { data, error } = await supa
+    .from("listing_taxonomy_node")
+    .select("listing_id, taxonomy_node:taxonomy_nodes(slug_path)")
+    .eq("is_primary", true)
+    .in("listing_id", unique);
+
+  if (error || !data) return map;
+
+  for (const row of data) {
+    const r = row as Record<string, unknown>;
+    const listingId = r.listing_id as string | undefined;
+    const node = r.taxonomy_node as { slug_path?: string } | { slug_path?: string }[] | null;
+    const slugPath = Array.isArray(node) ? node[0]?.slug_path : node?.slug_path;
+    if (listingId && slugPath) {
+      map.set(listingId, slugPath);
+    }
+  }
+
+  return map;
+}
+
+/**
  * Resolve taxonomy path from a listing that already has taxonomy data loaded.
  * Synchronous — does not hit the DB. For use when you already have taxonomy
  * crumbs from the detail page fetch.

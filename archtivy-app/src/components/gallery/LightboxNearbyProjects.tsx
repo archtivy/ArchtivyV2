@@ -3,6 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { getListingUrl } from "@/lib/canonical";
 import { getNearbyProjects, type NearbyProjectCard } from "@/app/actions/nearbyProjects";
 
 const AUTO_ADVANCE_MS = 5000;
@@ -103,7 +104,7 @@ export function LightboxNearbyProjects({
           </div>
           <div className="p-3">
             <Link
-              href={`/projects/${current.slug ?? current.id}`}
+              href={getListingUrl({ id: current.id, type: "project", slug: current.slug, taxonomy_slug_path: current.taxonomy_slug_path })}
               onClick={onClose}
               className="block rounded focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-0 focus:ring-offset-[#252528]"
               style={{ borderRadius: "4px" }}

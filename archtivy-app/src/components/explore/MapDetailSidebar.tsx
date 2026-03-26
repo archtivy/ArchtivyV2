@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { getListingUrl } from "@/lib/canonical";
 import type { MapPin, PinType } from "./ExploreMapView";
 
 const COLORS: Record<PinType, string> = {
@@ -34,6 +35,7 @@ interface UsedProduct {
   title: string;
   coverUrl: string | null;
   brandName: string | null;
+  taxonomy_slug_path?: string | null;
 }
 
 interface ArchitectProject {
@@ -1070,7 +1072,7 @@ function ProductRow({ product, allPins, onSelectPin }: { product: UsedProduct; a
 
   return (
     <Link
-      href={`/products/${product.slug ?? product.id}`}
+      href={getListingUrl({ id: product.id, type: "product", slug: product.slug, taxonomy_slug_path: product.taxonomy_slug_path })}
       className="block rounded-md p-1.5 transition-colors hover:bg-zinc-50"
     >
       {inner}

@@ -4,6 +4,7 @@
  */
 
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { batchResolveTaxonomySlugPaths } from "@/lib/taxonomy/resolve";
 
 const LISTING_STATUS = "APPROVED";
 
@@ -208,6 +209,7 @@ export interface ModuleProject {
   title: string;
   slug: string | null;
   coverImage: string | null;
+  taxonomy_slug_path?: string | null;
 }
 
 export interface ModuleBrand {
@@ -226,6 +228,7 @@ export interface ModuleProduct {
   projectsCount: number;
   brandName: string | null;
   projectThumbs: string[];
+  taxonomy_slug_path?: string | null;
 }
 
 export interface ExploreModules {
@@ -409,6 +412,15 @@ export async function getExploreModules(city?: string | null, limit = 5): Promis
       });
     }
   }
+
+  // Enrich with taxonomy slug_paths
+  const allListingIds = [
+    ...topProjects.map((p) => p.id),
+    ...productLeaders.map((p) => p.id),
+  ];
+  const taxMap = await batchResolveTaxonomySlugPaths(allListingIds);
+  for (const p of topProjects) p.taxonomy_slug_path = taxMap.get(p.id) ?? null;
+  for (const p of productLeaders) p.taxonomy_slug_path = taxMap.get(p.id) ?? null;
 
   return {
     marketLeadersDesigners,

@@ -10,6 +10,8 @@ export type PhotoTagMarker = {
   product_thumbnail?: string;
   /** Display name of the user who shared the product. */
   product_owner_name?: string;
+  /** Taxonomy slug path for canonical URL generation. */
+  taxonomy_slug_path?: string | null;
 };
 
 /** AI-matched product for a specific gallery image (from photo_matches). */

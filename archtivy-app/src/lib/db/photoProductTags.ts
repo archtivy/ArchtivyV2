@@ -1,4 +1,5 @@
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { batchResolveTaxonomySlugPaths } from "@/lib/taxonomy/resolve";
 
 const TABLE = "photo_product_tags";
 const PPL = "project_product_links";
@@ -33,6 +34,7 @@ export interface PhotoTagProduct {
   brand?: string | null;
   color_options?: string[] | null;
   thumbnail?: string | null;
+  taxonomy_slug_path?: string | null;
 }
 
 /** Tag with joined product (listings + products + brand from profiles). For lightbox and public pages. */
@@ -113,6 +115,9 @@ export async function getPhotoProductTagsByImageIds(
   const productById: Record<string, { color_options?: string[] | null }> = {};
   for (const r of productRows) productById[r.id] = { color_options: r.color_options ?? null };
 
+  // Batch resolve taxonomy slug paths
+  const taxMap = await batchResolveTaxonomySlugPaths(productIds);
+
   const productMap: Record<string, PhotoTagProduct> = {};
   for (const id of productIds) {
     const list = listingById[id];
@@ -125,6 +130,7 @@ export async function getPhotoProductTagsByImageIds(
       brand: list.owner_profile_id ? (brandByProfileId[list.owner_profile_id] || null) : null,
       color_options: prod?.color_options ?? null,
       thumbnail: list.cover_image_url?.trim() || null,
+      taxonomy_slug_path: taxMap.get(id) ?? null,
     };
   }
 

@@ -5,6 +5,7 @@
  */
 
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { batchResolveTaxonomySlugPaths } from "@/lib/taxonomy/resolve";
 
 export type MentionedEntry = { brand_name_text: string; product_name_text: string };
 
@@ -12,6 +13,7 @@ export type MentionedResolvedItem = MentionedEntry & {
   productId?: string;
   productSlug?: string;
   productTitle?: string;
+  taxonomy_slug_path?: string | null;
 };
 
 function normalize(s: string): string {
@@ -43,7 +45,7 @@ export async function resolveMentionedProducts(
   if (error) return mentioned.map((m) => ({ ...m }));
   const rows = (products ?? []) as { id: string; slug: string | null; title: string | null }[];
 
-  return mentioned.map((entry) => {
+  const results: MentionedResolvedItem[] = mentioned.map((entry) => {
     const wantTitle = normalize(entry.product_name_text);
     if (!wantTitle) return { ...entry };
 
@@ -62,4 +64,15 @@ export async function resolveMentionedProducts(
       productTitle: found.title ?? undefined,
     };
   });
+
+  // Enrich matched items with taxonomy slug_paths
+  const matchedIds = results.filter((r) => r.productId).map((r) => r.productId!);
+  if (matchedIds.length > 0) {
+    const taxMap = await batchResolveTaxonomySlugPaths(matchedIds);
+    for (const r of results) {
+      if (r.productId) r.taxonomy_slug_path = taxMap.get(r.productId) ?? null;
+    }
+  }
+
+  return results;
 }

@@ -6,6 +6,7 @@ import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
 import type { ProjectDocumentItem } from "./ProjectDetailContent";
 import { projectExploreUrl } from "@/lib/exploreUrls";
 import { areaSqftToBucket } from "@/lib/exploreFilters";
+import { getListingUrl } from "@/lib/canonical";
 import type { ProjectOwner } from "@/lib/canonical-models";
 
 const ACCENT = "#002abf";
@@ -24,6 +25,7 @@ export interface UsedProductSidebarItem {
   title: string;
   brand?: string | null;
   thumbnail?: string | null;
+  taxonomy_slug_path?: string | null;
 }
 
 export interface MentionedSidebarItem {
@@ -32,6 +34,7 @@ export interface MentionedSidebarItem {
   productId?: string;
   productSlug?: string;
   productTitle?: string;
+  taxonomy_slug_path?: string | null;
 }
 
 export interface ProjectOverviewSidebarProps {
@@ -194,7 +197,7 @@ export function ProjectOverviewSidebar({
             {usedProducts.map((p) => (
               <li key={p.id}>
                 <Link
-                  href={`/products/${p.slug}`}
+                  href={getListingUrl({ id: p.id, type: "product", slug: p.slug, taxonomy_slug_path: p.taxonomy_slug_path })}
                   className="text-sm text-[#111827] hover:text-[#002abf] dark:text-zinc-100 dark:hover:text-[#002abf]"
                 >
                   {p.title}
@@ -220,7 +223,7 @@ export function ProjectOverviewSidebar({
                 return (
                   <li key={i}>
                     <Link
-                      href={`/products/${item.productSlug}`}
+                      href={getListingUrl({ id: item.productId!, type: "product", slug: item.productSlug, taxonomy_slug_path: item.taxonomy_slug_path })}
                       className="text-[#111827] hover:text-[#002abf] dark:text-zinc-100 dark:hover:text-[#002abf]"
                     >
                       {label}

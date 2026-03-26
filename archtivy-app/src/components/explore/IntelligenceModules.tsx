@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { getListingUrl } from "@/lib/canonical";
 import type { ExploreModules } from "@/lib/explore/queries";
 import type { ExplorePanelType } from "@/lib/explore/exploreParams";
 
@@ -153,7 +154,7 @@ export function IntelligenceModules({ modules, onViewAll }: IntelligenceModulesP
                     {modules.topProjects.map((p) => (
                       <Link
                         key={p.id}
-                        href={`/projects/${p.slug ?? p.id}`}
+                        href={getListingUrl({ id: p.id, type: "project", slug: p.slug, taxonomy_slug_path: p.taxonomy_slug_path })}
                         className="flex items-center gap-3 rounded border border-[#eeeeee] bg-white p-3 transition hover:bg-zinc-50"
                       >
                         <div className="relative h-12 w-16 shrink-0 overflow-hidden rounded bg-zinc-100">
@@ -191,7 +192,7 @@ export function IntelligenceModules({ modules, onViewAll }: IntelligenceModulesP
                       <li key={p.id} className="rounded border border-[#eeeeee] bg-white p-4">
                         {p.slug ? (
                           <Link
-                            href={`/products/${p.slug}`}
+                            href={getListingUrl({ id: p.id, type: "product", slug: p.slug, taxonomy_slug_path: p.taxonomy_slug_path })}
                             className="text-sm font-medium text-zinc-900 hover:text-[#002abf]"
                           >
                             {p.title}

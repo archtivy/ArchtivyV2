@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { getListingUrl } from "@/lib/canonical";
 
 export interface RelatedSectionItem {
   id: string;
@@ -11,6 +12,7 @@ export interface RelatedSectionItem {
   location?: string | null;
   /** For ProductCard: owner display name */
   postedBy?: string | null;
+  taxonomy_slug_path?: string | null;
 }
 
 export interface RelatedSectionProps {
@@ -37,13 +39,12 @@ export function RelatedSection({
 }: RelatedSectionProps) {
   if (items.length === 0) return null;
 
-  const baseHref = variant === "project" ? "/projects" : "/products";
   const shown = Math.min(desktopShown, items.length, 4);
   const total = totalCount ?? items.length;
   const moreCount = Math.max(total - shown, 0);
 
   const renderInlineCard = (item: RelatedSectionItem) => {
-    const href = `${baseHref}/${item.slug ?? item.id}`;
+    const href = getListingUrl({ id: item.id, type: variant, slug: item.slug, taxonomy_slug_path: item.taxonomy_slug_path });
     return (
       <Link
         key={item.id}

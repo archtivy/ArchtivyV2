@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { getListingUrl } from "@/lib/canonical";
 
 export interface BrandProductCard {
   id: string;
   slug: string | null;
   title: string;
   cover_image_url: string | null;
+  taxonomy_slug_path?: string | null;
 }
 
 export interface BrandNetworkProps {
@@ -29,7 +31,7 @@ export function BrandNetwork({ brandName, brandHref, products }: BrandNetworkPro
       </h2>
       <div className="space-y-2">
         {products.map((p) => {
-          const href = `/products/${p.slug ?? p.id}`;
+          const href = getListingUrl({ id: p.id, type: "product", slug: p.slug, taxonomy_slug_path: p.taxonomy_slug_path });
           return (
             <Link
               key={p.id}

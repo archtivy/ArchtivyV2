@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { getListingUrl } from "@/lib/canonical";
 import type { CountryProjectItem, CountryDesignerItem } from "@/lib/db/networkDiscovery";
 
 /** Returns true only for absolute http/https URLs. */
@@ -42,7 +43,7 @@ export function CountryProjectsSection({ country, items }: CountryProjectsProps)
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
         {items.map((item) => {
-          const href = `/projects/${item.slug ?? item.id}`;
+          const href = getListingUrl({ id: item.id, type: "project", slug: item.slug, taxonomy_slug_path: item.taxonomy_slug_path });
           const locationParts: string[] = [];
           const city = item.location_city != null ? String(item.location_city).trim() : "";
           if (city) locationParts.push(city);

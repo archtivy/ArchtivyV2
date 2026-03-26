@@ -3,12 +3,14 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { getListingUrl } from "@/lib/canonical";
 
 export interface TeamMemberProjectCard {
   id: string;
   slug: string | null;
   title: string;
   cover_image_url: string | null;
+  taxonomy_slug_path?: string | null;
 }
 
 export interface TeamMemberWithProjectsData {
@@ -135,7 +137,7 @@ function TeamMemberRow({ member }: { member: TeamMemberWithProjectsData }) {
           {member.projects.map((p) => (
             <Link
               key={p.id}
-              href={`/projects/${p.slug ?? p.id}`}
+              href={getListingUrl({ id: p.id, type: "project", slug: p.slug, taxonomy_slug_path: p.taxonomy_slug_path })}
               className="group flex items-center gap-2.5 rounded p-1 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
             >
               <span className="relative h-8 w-11 shrink-0 overflow-hidden rounded bg-zinc-100 dark:bg-zinc-800">

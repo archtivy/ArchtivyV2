@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabaseClient";
 import { listingCardSelect } from "@/lib/db/selects";
 import type { BrandUsed, ListingCardData, ListingSummary, TeamMember } from "@/lib/types/listings";
+import { batchResolveTaxonomySlugPaths } from "@/lib/taxonomy/resolve";
 
 const PPL = "project_product_links";
 const LISTINGS = "listings";
@@ -88,7 +89,7 @@ export async function getProductsForProject(
 
   const { data: listings, error: listError } = await supabase
     .from(LISTINGS)
-    .select("id, type, title, description, created_at")
+    .select("id, type, slug, title, description, created_at")
     .in("id", productIds)
     .eq("type", "product")
     .is("deleted_at", null);
@@ -97,10 +98,18 @@ export async function getProductsForProject(
     return { data: null, error: listError.message };
   }
 
+  const rows = listings ?? [];
   const order = new Map(productIds.map((id, i) => [id, i]));
-  const sorted = (listings ?? []).sort(
+  const sorted = rows.sort(
     (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)
   );
+
+  // Enrich with taxonomy slug_paths
+  const taxMap = await batchResolveTaxonomySlugPaths(sorted.map((r) => r.id));
+  for (const r of sorted) {
+    (r as Record<string, unknown>).taxonomy_slug_path = taxMap.get(r.id) ?? null;
+  }
+
   return { data: sorted as ListingSummary[], error: null };
 }
 
@@ -139,6 +148,13 @@ export async function getProjectsForProduct(
   const normalized = (listings ?? []).map((r) => normalizeListingCardRow(r as Record<string, unknown>));
   const order = new Map(projectIds.map((id, i) => [id, i]));
   const sorted = normalized.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+
+  // Enrich with taxonomy slug_paths
+  const taxMap = await batchResolveTaxonomySlugPaths(sorted.map((r) => r.id));
+  for (const r of sorted) {
+    r.taxonomy_slug_path = taxMap.get(r.id) ?? null;
+  }
+
   return { data: sorted, error: null };
 }
 

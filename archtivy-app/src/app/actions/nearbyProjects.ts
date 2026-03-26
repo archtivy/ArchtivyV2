@@ -2,6 +2,7 @@
 
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getProfilesByClerkIds } from "@/lib/db/profiles";
+import { batchResolveTaxonomySlugPaths } from "@/lib/taxonomy/resolve";
 
 const LIMIT = 6;
 
@@ -16,6 +17,7 @@ export type NearbyProjectCard = {
   year: number | null;
   category: string | null;
   areaSqft: number | null;
+  taxonomy_slug_path?: string | null;
 };
 
 /**
@@ -98,6 +100,8 @@ export async function getNearbyProjects(
     nameByClerk[p.clerk_user_id] = name;
   }
 
+  const taxMap = await batchResolveTaxonomySlugPaths(uniq);
+
   const result: NearbyProjectCard[] = [];
   for (const r of rows as RawRow[]) {
     result.push({
@@ -111,6 +115,7 @@ export async function getNearbyProjects(
       year: r.year != null && !Number.isNaN(r.year) ? r.year : null,
       category: r.category?.trim() ?? null,
       areaSqft: r.area_sqft != null && !Number.isNaN(r.area_sqft) ? r.area_sqft : null,
+      taxonomy_slug_path: taxMap.get(r.id) ?? null,
     });
   }
   return result;

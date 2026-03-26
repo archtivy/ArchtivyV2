@@ -8,6 +8,7 @@
  */
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { getListingUrl } from "@/lib/canonical";
 import { MetricRow } from "./MetricRow";
 import type {
   ExploreIntelligenceData,
@@ -131,7 +132,7 @@ function MomentumSection({ products }: { products: ProductMomentum[] }) {
           countLabel="uses"
           growthPct={p.is_new_entry ? undefined : p.growth_pct}
           isNewEntry={p.is_new_entry}
-          href={p.product_slug ? `/products/${p.product_slug}` : undefined}
+          href={p.product_slug ? getListingUrl({ id: p.product_id, type: "product", slug: p.product_slug, taxonomy_slug_path: p.taxonomy_slug_path }) : undefined}
         />
       ))}
     </div>

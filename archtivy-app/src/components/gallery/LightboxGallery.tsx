@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef } from "react";
 import type { GalleryImage } from "@/lib/db/gallery";
+import { getListingUrl } from "@/lib/canonical";
 import { LightboxImageZoom, type LightboxZoomControlsRef } from "./LightboxImageZoom";
 import { SaveToFolderModal } from "./SaveToFolderModal";
 import { LightboxNearbyProjects } from "./LightboxNearbyProjects";
@@ -15,6 +16,7 @@ export type RelatedItem = {
   title: string;
   subtitle?: string | null;
   thumbnail?: string;
+  taxonomy_slug_path?: string | null;
 };
 
 /** Optional overlay shown above the image (project title, by studio, meta line). */
@@ -477,7 +479,7 @@ export function LightboxGallery({
                 return (
                   <Link
                     key={item.id}
-                    href={`/products/${item.slug}`}
+                    href={getListingUrl({ id: item.id, type: "product", slug: item.slug, taxonomy_slug_path: item.taxonomy_slug_path })}
                     className="flex w-full min-w-full shrink-0 snap-start gap-3 rounded border border-zinc-700/80 bg-zinc-800/40 p-3 transition-[border-color] hover:border-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-0 focus:ring-offset-[#252528]"
                     style={{ borderRadius: "4px" }}
                     onClick={onClose}

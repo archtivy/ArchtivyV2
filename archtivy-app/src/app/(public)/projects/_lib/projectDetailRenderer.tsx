@@ -150,6 +150,7 @@ export async function ProjectDetailRenderer({
       title: string;
       description?: string | null;
       brands_used?: { name?: string }[];
+      taxonomy_slug_path?: string | null;
     };
     const brand = row.brands_used?.[0]?.name?.trim() ?? null;
     return {
@@ -158,6 +159,7 @@ export async function ProjectDetailRenderer({
       title: row.title,
       brand: brand || null,
       thumbnail: thumbnailMap[row.id] ?? null,
+      taxonomy_slug_path: row.taxonomy_slug_path ?? null,
     };
   });
 
@@ -307,7 +309,7 @@ export async function ProjectDetailRenderer({
       getSelectedPhotoMatchesByImageIds(imageIds),
     ]);
     const tags = tagsResult.data ?? [];
-    const tagsByImageId: Record<string, { id: string; x: number; y: number; product_id: string; product_title?: string; product_slug?: string; product_thumbnail?: string; product_owner_name?: string }[]> = {};
+    const tagsByImageId: Record<string, { id: string; x: number; y: number; product_id: string; product_title?: string; product_slug?: string; product_thumbnail?: string; product_owner_name?: string; taxonomy_slug_path?: string | null }[]> = {};
     for (const t of tags) {
       const key =
         typeof t.listing_image_id === "string"
@@ -326,6 +328,7 @@ export async function ProjectDetailRenderer({
         product_slug: product?.slug ?? undefined,
         product_thumbnail: product?.thumbnail ?? undefined,
         product_owner_name: product?.brand ?? undefined,
+        taxonomy_slug_path: product?.taxonomy_slug_path ?? null,
       });
     }
     const photoMatches = photoMatchesResult.data ?? [];

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { batchResolveTaxonomySlugPaths } from "@/lib/taxonomy/resolve";
 
 /**
  * GET /api/explore/network?listingId=<uuid>&type=project|product|brand|designer
@@ -168,6 +169,13 @@ export async function GET(request: Request) {
           avatarUrl: ownerRow.avatar_url,
         };
       }
+    }
+
+    // Enrich with taxonomy slug_paths
+    const allProductIds2 = usedProducts.map((p) => p.id);
+    const taxMap = allProductIds2.length > 0 ? await batchResolveTaxonomySlugPaths(allProductIds2) : new Map();
+    for (const p of usedProducts) {
+      (p as Record<string, unknown>).taxonomy_slug_path = taxMap.get(p.id) ?? null;
     }
 
     return NextResponse.json({
@@ -361,6 +369,13 @@ export async function GET(request: Request) {
         );
         relatedDesignerIds = Array.from(designerSet).slice(0, 10);
       }
+    }
+
+    // Enrich popular products with taxonomy slug_paths
+    const popProductIds = popularProducts.map((p) => p.id);
+    const popTaxMap = popProductIds.length > 0 ? await batchResolveTaxonomySlugPaths(popProductIds) : new Map();
+    for (const p of popularProducts) {
+      (p as Record<string, unknown>).taxonomy_slug_path = popTaxMap.get(p.id) ?? null;
     }
 
     return NextResponse.json({

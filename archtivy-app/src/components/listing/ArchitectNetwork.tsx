@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { getListingUrl } from "@/lib/canonical";
 
 export interface ArchitectProjectCard {
   id: string;
@@ -11,6 +12,7 @@ export interface ArchitectProjectCard {
   location_city: string | null;
   location_country: string | null;
   year: string | null;
+  taxonomy_slug_path?: string | null;
 }
 
 export interface ArchitectNetworkProps {
@@ -32,7 +34,7 @@ export function ArchitectNetwork({ displayName, profileHref, projects }: Archite
       </h2>
       <div className="space-y-2">
         {projects.map((p) => {
-          const href = `/projects/${p.slug ?? p.id}`;
+          const href = getListingUrl({ id: p.id, type: "project", slug: p.slug, taxonomy_slug_path: p.taxonomy_slug_path });
           const loc = [p.location_city, p.location_country].filter(Boolean).join(", ");
           return (
             <Link

@@ -1,4 +1,5 @@
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { batchResolveTaxonomySlugPaths } from "@/lib/taxonomy/resolve";
 
 export type DbResult<T> =
   | { data: T; error: null }
@@ -44,6 +45,7 @@ export interface TeamMemberProjectItem {
   slug: string | null;
   title: string;
   cover_image_url: string | null;
+  taxonomy_slug_path?: string | null;
 }
 
 export interface TeamMemberWithProjects {
@@ -105,6 +107,15 @@ export async function getTeamMemberOtherProjects(
     }
   }
 
+  // Enrich with taxonomy slug_paths
+  const allIds = Object.values(map).flat().map((p) => p.id);
+  const taxMap = await batchResolveTaxonomySlugPaths(allIds);
+  for (const items of Object.values(map)) {
+    for (const item of items) {
+      item.taxonomy_slug_path = taxMap.get(item.id) ?? null;
+    }
+  }
+
   return { data: map, error: null };
 }
 
@@ -152,6 +163,7 @@ export interface CountryProjectItem {
   year: number | string | null;
   owner_display_name: string | null;
   owner_username: string | null;
+  taxonomy_slug_path?: string | null;
 }
 
 /**
@@ -191,20 +203,25 @@ export async function getProjectsByCountry(
     profiles: { display_name: string | null; username: string | null } | null;
   };
   const rows = (data ?? []) as unknown as Row[];
-  return {
-    data: rows.map((r) => ({
-      id: r.id,
-      slug: r.slug,
-      title: r.title,
-      cover_image_url: r.cover_image_url,
-      location_city: r.location_city,
-      location_country: r.location_country,
-      year: r.year,
-      owner_display_name: r.profiles?.display_name ?? null,
-      owner_username: r.profiles?.username ?? null,
-    })),
-    error: null,
-  };
+  const items: CountryProjectItem[] = rows.map((r) => ({
+    id: r.id,
+    slug: r.slug,
+    title: r.title,
+    cover_image_url: r.cover_image_url,
+    location_city: r.location_city,
+    location_country: r.location_country,
+    year: r.year,
+    owner_display_name: r.profiles?.display_name ?? null,
+    owner_username: r.profiles?.username ?? null,
+  }));
+
+  // Enrich with taxonomy slug_paths
+  const taxMap = await batchResolveTaxonomySlugPaths(items.map((i) => i.id));
+  for (const item of items) {
+    item.taxonomy_slug_path = taxMap.get(item.id) ?? null;
+  }
+
+  return { data: items, error: null };
 }
 
 export interface CountryDesignerItem {

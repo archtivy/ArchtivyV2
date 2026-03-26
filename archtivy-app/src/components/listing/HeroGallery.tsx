@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { GalleryImage } from "@/lib/db/gallery";
+import { getListingUrl } from "@/lib/canonical";
 
 const HERO_SIZES = "(max-width: 768px) 100vw, 700px";
 const STACK_SIZES = "(max-width: 768px) 100vw, 360px";
@@ -44,7 +45,7 @@ export function HeroGallery({ images, onImageClick, tileLabels }: HeroGalleryPro
           return (
             <Link
               key={`${tag.product_id}-${i}`}
-              href={`/products/${tag.product_slug ?? tag.product_id}`}
+              href={getListingUrl({ id: tag.product_id, type: "product", slug: tag.product_slug, taxonomy_slug_path: tag.taxonomy_slug_path })}
               className="pointer-events-auto absolute z-10 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-archtivy-primary/90 text-white shadow-md transition hover:bg-archtivy-primary focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 dark:border-zinc-800 dark:focus:ring-zinc-500"
               style={{ left: `${tag.x * 100}%`, top: `${tag.y * 100}%` }}
               aria-label={`View product: ${label}`}

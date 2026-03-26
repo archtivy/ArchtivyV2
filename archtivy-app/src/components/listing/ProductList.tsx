@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { getListingUrl } from "@/lib/canonical";
 
 export interface ProductListItem {
   id: string;
@@ -9,6 +10,7 @@ export interface ProductListItem {
   title: string;
   brand?: string | null;
   thumbnail?: string | null;
+  taxonomy_slug_path?: string | null;
 }
 
 export interface ProductListProps {
@@ -24,7 +26,7 @@ export function ProductList({ items, className = "" }: ProductListProps) {
       {items.map((p) => (
         <li key={p.id}>
           <Link
-            href={"/products/" + p.slug}
+            href={getListingUrl({ id: p.id, type: "product", slug: p.slug, taxonomy_slug_path: p.taxonomy_slug_path })}
             className="flex items-center gap-3 rounded-md transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-1"
           >
             <span className="relative h-[42px] w-14 shrink-0 overflow-hidden rounded bg-zinc-100 dark:bg-zinc-800">
