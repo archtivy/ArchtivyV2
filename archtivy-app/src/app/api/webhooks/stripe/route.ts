@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { stripe } from "@/lib/stripe/server";
+import { getStripe } from "@/lib/stripe/server";
 import { activateCampaign } from "@/lib/promote/campaigns";
 
 /**
@@ -21,6 +21,11 @@ export async function POST(request: Request) {
   if (!webhookSecret) {
     console.error("[stripe-webhook] STRIPE_WEBHOOK_SECRET is not set");
     return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
+  }
+
+  const stripe = getStripe();
+  if (!stripe) {
+    return NextResponse.json({ error: "Stripe is not configured" }, { status: 500 });
   }
 
   let event;

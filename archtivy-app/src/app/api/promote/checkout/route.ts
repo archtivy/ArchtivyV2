@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { stripe } from "@/lib/stripe/server";
+import { getStripe } from "@/lib/stripe/server";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getPrice, PLACEMENT_LABELS, type PlacementType, type DurationDays } from "@/lib/promote/config";
@@ -79,6 +79,11 @@ export async function POST(request: Request) {
   const label = PLACEMENT_LABELS[placementType];
 
   // Create Stripe Checkout session
+  const stripe = getStripe();
+  if (!stripe) {
+    return NextResponse.json({ error: "Stripe is not configured" }, { status: 500 });
+  }
+
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: [
