@@ -1,8 +1,13 @@
 import { AdminPage } from "@/components/admin/AdminPage";
+import { isFeatureListingEnabled } from "@/lib/db/siteSettings";
+import { FeatureListingToggle } from "./FeatureListingToggle";
 
-export default function AdminSettingsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminSettingsPage() {
   const allow = (process.env.ARCHTIVY_ADMIN_CLERK_IDS ?? "").trim();
   const isProd = process.env.NODE_ENV === "production";
+  const featureListingOn = await isFeatureListingEnabled();
 
   return (
     <AdminPage title="Settings">
@@ -23,17 +28,16 @@ export default function AdminSettingsPage() {
         </div>
 
         <div className="rounded-xl border border-zinc-200 bg-white p-4">
-          <div className="text-sm font-semibold text-zinc-900">Defaults</div>
-          <div className="mt-2 text-sm text-zinc-600">
-            Default locations / years will live here once we add a lightweight config table.
+          <div className="text-sm font-semibold text-zinc-900">Feature flags</div>
+          <div className="mt-3">
+            <FeatureListingToggle initialEnabled={featureListingOn} />
           </div>
         </div>
 
         <div className="rounded-xl border border-zinc-200 bg-white p-4">
-          <div className="text-sm font-semibold text-zinc-900">Admin-only flags</div>
+          <div className="text-sm font-semibold text-zinc-900">Defaults</div>
           <div className="mt-2 text-sm text-zinc-600">
-            Feature / hide / indexability flags require DB columns. The admin UI is structured to
-            accommodate them without redesign.
+            Default locations / years will live here once we add a lightweight config table.
           </div>
         </div>
 
@@ -47,4 +51,3 @@ export default function AdminSettingsPage() {
     </AdminPage>
   );
 }
-

@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getListingUrl } from "@/lib/canonical";
 import { batchResolveTaxonomySlugPaths } from "@/lib/taxonomy/resolve";
+import { getMapSpotlightListingIds } from "@/lib/promote/campaigns";
 import { ExploreMapView, type MapPin } from "@/components/explore/ExploreMapView";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,17 @@ export const metadata: Metadata = {
   description:
     "Explore architecture projects, designers, and brands around the world on an interactive map. Discover built work by location on Archtivy.",
   alternates: { canonical: "/explore" },
+  openGraph: {
+    title: "Explore — Architecture Map | Archtivy",
+    description: "Explore architecture projects, designers, and brands around the world on an interactive map.",
+    images: [{ url: "/og", width: 1200, height: 630, alt: "Archtivy Explore" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Explore — Architecture Map | Archtivy",
+    description: "Explore architecture projects, designers, and brands on an interactive map.",
+    images: ["/og"],
+  },
 };
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
@@ -80,10 +92,13 @@ export default async function ExplorePage({
       .limit(2000),
   ]);
 
-  // Batch resolve taxonomy paths for canonical URLs
+  // Batch resolve taxonomy paths for canonical URLs + promoted spotlight pins
   const projectRows = projectsRes.data ?? [];
   const projectIds = projectRows.map((r) => r.id);
-  const taxMap = projectIds.length > 0 ? await batchResolveTaxonomySlugPaths(projectIds) : new Map<string, string>();
+  const [taxMap, promotedSpotlightIds] = await Promise.all([
+    projectIds.length > 0 ? batchResolveTaxonomySlugPaths(projectIds) : Promise.resolve(new Map<string, string>()),
+    getMapSpotlightListingIds(),
+  ]);
 
   const pins: MapPin[] = [];
   const projectPins: MapPin[] = [];
@@ -109,6 +124,7 @@ export default async function ExplorePage({
       ownerName: ownerProfile?.display_name ?? null,
       ownerProfileId: (r.owner_profile_id as string | null) ?? null,
       entityId: r.id,
+      isPromoted: promotedSpotlightIds.has(r.id),
     };
     pins.push(pin);
     projectPins.push(pin);

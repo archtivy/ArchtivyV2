@@ -8,6 +8,7 @@ import { ProjectCardPremium } from "@/components/listing/ProjectCardPremium";
 import { ProductCardPremium } from "@/components/listing/ProductCardPremium";
 import { HomeHeroSearch } from "@/components/search/HomeHeroSearch";
 import { ShareWorkTrigger } from "@/components/ShareWorkTrigger";
+import { getHomepagePromotedListingIds } from "@/lib/promote/campaigns";
 import { LiveActivityStrip } from "@/components/home/LiveActivityStrip";
 import { NetworkFeedSection } from "@/components/home/NetworkFeedSection";
 import { getBaseUrl } from "@/lib/canonical";
@@ -22,12 +23,14 @@ export const metadata: Metadata = {
     description:
       "Explore architecture projects, building products, designers, and brands. Document work, credit specifications, and connect across cities.",
     type: "website",
+    images: [{ url: "/og", width: 1200, height: 630, alt: "Archtivy" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Archtivy — The Intelligence Layer of Architecture",
     description:
       "Explore architecture projects, building products, designers, and brands.",
+    images: ["/og"],
   },
   alternates: {
     canonical: "/",
@@ -38,10 +41,21 @@ const FEATURED_PROJECTS_LIMIT = 6;
 const FEATURED_PRODUCTS_LIMIT = 8;
 
 export default async function Home() {
-  const [projects, products] = await Promise.all([
+  const [projects, products, promotedIds] = await Promise.all([
     getProjectsCanonical(FEATURED_PROJECTS_LIMIT),
     getProductsCanonical(FEATURED_PRODUCTS_LIMIT),
+    getHomepagePromotedListingIds(),
   ]);
+
+  // Surface promoted listings at the front of each section
+  const promotedSet = new Set(promotedIds);
+  const sortPromoted = <T extends { id: string }>(items: T[]): T[] => {
+    const promoted = items.filter((i) => promotedSet.has(i.id));
+    const rest = items.filter((i) => !promotedSet.has(i.id));
+    return [...promoted, ...rest];
+  };
+  const sortedProjects = sortPromoted(projects);
+  const sortedProducts = sortPromoted(products);
 
   const baseUrl = getBaseUrl();
   const jsonLdItems = buildHomepageJsonLd(baseUrl);
@@ -101,7 +115,7 @@ export default async function Home() {
             View all →
           </Link>
         </div>
-        {projects.length === 0 ? (
+        {sortedProjects.length === 0 ? (
           <p className="rounded-lg border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
             No projects yet.{" "}
             <Link
@@ -114,7 +128,7 @@ export default async function Home() {
           </p>
         ) : (
           <ul className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Featured projects">
-            {projects.map((p) => (
+            {sortedProjects.map((p) => (
               <li key={p.id} className="h-full">
                 <ProjectCardPremium project={p} />
               </li>
@@ -136,7 +150,7 @@ export default async function Home() {
             View all →
           </Link>
         </div>
-        {products.length === 0 ? (
+        {sortedProducts.length === 0 ? (
           <p className="rounded-lg border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
             No products yet.{" "}
             <Link
@@ -149,7 +163,7 @@ export default async function Home() {
           </p>
         ) : (
           <ul className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Featured products">
-            {products.map((p) => (
+            {sortedProducts.map((p) => (
               <li key={p.id} className="h-full">
                 <ProductCardPremium product={p} />
               </li>

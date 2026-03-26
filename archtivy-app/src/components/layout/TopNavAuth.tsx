@@ -91,6 +91,7 @@ interface TopNavAuthProps {
   displayName?: string | null;
   role?: ProfileRole | undefined;
   locationCity?: string | null;
+  featureListingEnabled?: boolean;
 }
 
 // ─── Shared classes ───────────────────────────────────────────────────────────
@@ -128,7 +129,7 @@ function DropdownPanel({ children }: { children: React.ReactNode }) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function TopNavAuth({ displayName, role, locationCity }: TopNavAuthProps) {
+export function TopNavAuth({ displayName, role, locationCity, featureListingEnabled }: TopNavAuthProps) {
   const { user } = useUser();
   const { signOut } = useClerk();
   const [open, setOpen] = useState(false);
@@ -317,6 +318,13 @@ export function TopNavAuth({ displayName, role, locationCity }: TopNavAuthProps)
                   <IconFollowing className={iconCls} />
                   Following
                 </Link>
+
+                {showListings && featureListingEnabled && (
+                  <Link role="menuitem" href="/me/promote" className={itemCls} onClick={close}>
+                    <svg className={iconCls} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 2l2.09 6.26L20.18 9l-4.91 4.12L16.54 20 12 16.27 7.46 20l1.27-6.88L3.82 9l6.09-.74L12 2z" /></svg>
+                    Feature Listing
+                  </Link>
+                )}
 
                 <Link role="menuitem" href="/me/settings" className={itemCls} onClick={close}>
                   <IconSliders className={iconCls} />

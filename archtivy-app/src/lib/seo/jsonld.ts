@@ -1,5 +1,6 @@
 import { getAbsoluteUrl } from "@/lib/canonical";
 import type { ProjectCanonical, ProductCanonical } from "@/lib/canonical-models";
+import { SITE_NAME, SITE_DESCRIPTION, SOCIAL_PROFILES, FOUNDING_DATE } from "./siteConfig";
 
 /**
  * Serializes a JSON-LD object to a string safe for inline <script> tags.
@@ -81,6 +82,10 @@ export function buildProjectJsonLd(
 /**
  * JSON-LD builder for product detail pages.
  * Schema: Product — covers building materials, furniture, lighting, etc.
+ *
+ * Includes a minimal Offer stub so Google treats the page as a valid Product
+ * rich result candidate. No price is set because Archtivy is a specification
+ * platform, not a store — pricing is handled by brands directly.
  */
 export function buildProductJsonLd(
   product: ProductCanonical,
@@ -101,6 +106,11 @@ export function buildProductJsonLd(
 
   if (product.cover?.startsWith("http")) ld.image = product.cover;
 
+  // Category from taxonomy label or legacy field
+  const categoryLabel = product.taxonomy_label ?? product.category ?? product.material_type;
+  if (categoryLabel?.trim()) ld.category = categoryLabel.trim();
+
+  // Brand
   if (brandName) {
     const brandUrl = brandHref ? getAbsoluteUrl(brandHref) : undefined;
     ld.brand = {
@@ -108,7 +118,32 @@ export function buildProductJsonLd(
       name: brandName,
       ...(brandUrl ? { url: brandUrl } : {}),
     };
+    ld.manufacturer = ld.brand;
   }
+
+  // Material
+  const materialNames = product.materials
+    ?.map((m) => m.name?.trim())
+    .filter(Boolean);
+  if (materialNames?.length) {
+    ld.material = materialNames.length === 1 ? materialNames[0] : materialNames;
+  } else if (product.material_type?.trim()) {
+    ld.material = product.material_type.trim();
+  }
+
+  // Color
+  if (product.color?.trim()) {
+    ld.color = product.color.trim();
+  }
+
+  // Offer — minimal stub for rich result eligibility.
+  // No price because Archtivy does not sell products directly.
+  // availability uses a generic value signaling the product exists and is contactable.
+  ld.offers = {
+    "@type": "Offer",
+    url,
+    availability: "https://schema.org/InStock",
+  };
 
   return ld;
 }
@@ -163,14 +198,33 @@ export function buildBreadcrumbJsonLd(
  * Combines WebSite (for sitelinks search) and Organization schemas.
  */
 export function buildHomepageJsonLd(baseUrl: string): Record<string, unknown>[] {
+  const org: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SITE_NAME,
+    url: baseUrl,
+    logo: {
+      "@type": "ImageObject",
+      url: `${baseUrl}/logo`,
+      width: 512,
+      height: 512,
+    },
+    description: SITE_DESCRIPTION,
+    foundingDate: FOUNDING_DATE,
+  };
+
+  if (SOCIAL_PROFILES.length > 0) {
+    org.sameAs = SOCIAL_PROFILES;
+  }
+
   return [
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
-      name: "Archtivy",
+      name: SITE_NAME,
       url: baseUrl,
-      description:
-        "The platform where architectural work is documented, products are credited, and professionals connect across cities.",
+      description: SITE_DESCRIPTION,
+      publisher: { "@type": "Organization", name: SITE_NAME, url: baseUrl },
       potentialAction: {
         "@type": "SearchAction",
         target: {
@@ -180,14 +234,7 @@ export function buildHomepageJsonLd(baseUrl: string): Record<string, unknown>[] 
         "query-input": "required name=search_term_string",
       },
     },
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      name: "Archtivy",
-      url: baseUrl,
-      logo: `${baseUrl}/logo.png`,
-      sameAs: [],
-    },
+    org,
   ];
 }
 

@@ -15,11 +15,27 @@ import { Analytics } from "@vercel/analytics/react"; // ✅ bunu ekle
 
 export const runtime = "nodejs";
 
+const OG_IMAGE = {
+  url: "/og",
+  width: 1200,
+  height: 630,
+  alt: "Archtivy — Projects, products, designers & brands for architecture",
+};
+
 export const metadata: Metadata = {
   title: "Archtivy",
   description: "Projects, products, credits & files for architecture",
   verification: {
     google: "p9zsrg-G8wu-5q_DLHfCVOevAN9VQimmXZ6AC-ynPb4",
+  },
+  openGraph: {
+    siteName: "Archtivy",
+    type: "website",
+    images: [OG_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: [OG_IMAGE.url],
   },
 };
 

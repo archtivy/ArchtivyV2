@@ -86,12 +86,12 @@ export async function generateMetadata({
   if (segments.length === 1) {
     const archiveData = await fetchProjectArchive(segments[0]);
     if (archiveData) {
-      const { node } = archiveData;
+      const { node, total } = archiveData;
       return {
         title: node.seo_title || `${node.label} Projects | Archtivy`,
         description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} architecture projects on Archtivy.`,
         alternates: { canonical: `/projects/${node.slug_path}` },
-        robots: { index: true, follow: true },
+        robots: { index: total > 0, follow: true },
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
       };
     }
@@ -101,12 +101,12 @@ export async function generateMetadata({
     const fullSlug = segments.join("/");
     const archiveData = await fetchProjectArchive(fullSlug);
     if (archiveData) {
-      const { node } = archiveData;
+      const { node, total } = archiveData;
       return {
         title: node.seo_title || `${node.label} Projects | Archtivy`,
         description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} architecture projects on Archtivy.`,
         alternates: { canonical: `/projects/${node.slug_path}` },
-        robots: { index: true, follow: true },
+        robots: { index: total > 0, follow: true },
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
       };
     }

@@ -32,6 +32,8 @@ export interface MapPin {
   ownerName: string | null;
   ownerProfileId: string | null;
   entityId: string | null;
+  /** True when this listing has an active paid map spotlight campaign. */
+  isPromoted?: boolean;
 }
 
 interface Props {

@@ -59,6 +59,12 @@ export async function generateMetadata({
       url: getAbsoluteUrl(path),
       ...(imageUrl && { images: [{ url: imageUrl, width: 200, height: 200, alt: title }] }),
     },
+    twitter: {
+      card: imageUrl ? "summary" : "summary_large_image",
+      title,
+      description,
+      ...(imageUrl && { images: [imageUrl] }),
+    },
   };
 }
 

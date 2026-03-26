@@ -44,6 +44,17 @@ export const metadata: Metadata = {
   description:
     "Explore architecture projects by category: residential, hospitality, commercial, cultural, and more. Discover built work on Archtivy.",
   alternates: { canonical: "/projects" },
+  openGraph: {
+    title: "Architecture Projects — Browse by Category | Archtivy",
+    description: "Explore architecture projects by category: residential, hospitality, commercial, cultural, and more.",
+    images: [{ url: "/og", width: 1200, height: 630, alt: "Archtivy Projects" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Architecture Projects — Browse by Category | Archtivy",
+    description: "Explore architecture projects by category on Archtivy.",
+    images: ["/og"],
+  },
 };
 
 export default async function ProjectsHubPage() {

@@ -18,6 +18,7 @@ interface ProfileData {
   role: ProfileRole | undefined;
   displayName: string | null;
   locationCity: string | null;
+  featureListingEnabled: boolean;
 }
 
 // Desktop nav — used by TopNavLinks (unchanged)
@@ -46,6 +47,7 @@ export function TopNav() {
     role: undefined,
     displayName: null,
     locationCity: null,
+    featureListingEnabled: false,
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -53,7 +55,7 @@ export function TopNav() {
 
   useEffect(() => {
     if (!isLoaded || !user?.id) {
-      setProfile({ userId: null, role: undefined, displayName: null, locationCity: null });
+      setProfile({ userId: null, role: undefined, displayName: null, locationCity: null, featureListingEnabled: false });
       return;
     }
     let cancelled = false;
@@ -66,11 +68,12 @@ export function TopNav() {
           role: data.role,
           displayName: data.displayName ?? null,
           locationCity: data.locationCity ?? null,
+          featureListingEnabled: data.featureListingEnabled === true,
         });
       })
       .catch(() => {
         if (!cancelled) {
-          setProfile({ userId: user.id, role: undefined, displayName: null, locationCity: null });
+          setProfile({ userId: user.id, role: undefined, displayName: null, locationCity: null, featureListingEnabled: false });
         }
       });
     return () => {
@@ -126,6 +129,7 @@ export function TopNav() {
                 displayName={profile.displayName}
                 role={profile.role}
                 locationCity={profile.locationCity}
+                featureListingEnabled={profile.featureListingEnabled}
               />
               <ThemeToggle />
             </div>
