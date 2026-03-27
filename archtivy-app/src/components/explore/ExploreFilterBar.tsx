@@ -1,19 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState, useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
-import { FilterPillDropdown } from "@/components/explore/filters/FilterPillDropdown";
-import { TaxonomyBreadcrumbPill } from "@/components/explore/filters/TaxonomyBreadcrumbPill";
+import { useCallback } from "react";
+import { CategoryMegaPanel } from "@/components/explore/filters/CategoryMegaPanel";
+import { SearchableFilterPanel } from "@/components/explore/filters/SearchableFilterPanel";
 import { FacetFilterPills } from "@/components/explore/filters/FacetFilterPills";
 import { FollowFilterAction } from "@/components/follow/FollowFilterAction";
 import type { ExploreFilters } from "@/lib/explore/filters/schema";
-import { filtersToQueryString, countActiveFilters, buildExploreUrl } from "@/lib/explore/filters/query";
+import { filtersToQueryString, buildExploreUrl } from "@/lib/explore/filters/query";
 import type { ExploreFilterOptions } from "@/lib/explore/filters/options";
-import { EXPLORE_SORT_PROJECTS, EXPLORE_SORT_PRODUCTS } from "@/lib/explore/filters/schema";
-
-const FILTERS_PANEL_Z = 1000;
-const FILTERS_BACKDROP_Z = 999;
 
 /** Facet slugs shown as inline pills alongside other primary filters. */
 const PRIMARY_FACET_SLUGS = new Set(["design-style"]);
@@ -23,7 +18,6 @@ export interface ExploreFilterBarProps {
   currentFilters: ExploreFilters;
   options: ExploreFilterOptions;
   sort: string;
-  /** When true, hides the sort control inside the Filters panel (sort is shown externally). */
   hideSort?: boolean;
 }
 
@@ -31,28 +25,12 @@ export function ExploreFilterBar({
   type,
   currentFilters,
   options,
-  sort,
-  hideSort = false,
 }: ExploreFilterBarProps) {
   const router = useRouter();
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [filtersPanelPos, setFiltersPanelPos] = useState({ top: 0, left: 0, right: 0 });
-  const filtersTriggerRef = useRef<HTMLButtonElement>(null);
-  const filtersPanelRef = useRef<HTMLDivElement>(null);
 
-  const updateFiltersPanelPos = useCallback(() => {
-    const el = filtersTriggerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    setFiltersPanelPos({ top: rect.bottom + 4, left: rect.left, right: window.innerWidth - rect.right });
-  }, []);
-
-  /** Navigate preserving taxonomy in route path and filters as query params. */
   const navigate = useCallback(
-    (filters: ExploreFilters, newSort?: string) => {
-      const filtersWithSort = newSort ? { ...filters, sort: newSort } : filters;
-      const url = buildExploreUrl(type, filtersWithSort.taxonomy, filtersWithSort);
-      router.push(url);
+    (filters: ExploreFilters) => {
+      router.push(buildExploreUrl(type, filters.taxonomy, filters));
     },
     [type, router]
   );
@@ -64,183 +42,58 @@ export function ExploreFilterBar({
     [currentFilters, navigate]
   );
 
-  const clearAll = useCallback(() => {
-    setFiltersOpen(false);
-    const basePath = type === "products" ? "/explore/products" : "/explore/projects";
-    router.push(basePath);
-  }, [type, router]);
-
-  useEffect(() => {
-    if (!filtersOpen) return;
-    updateFiltersPanelPos();
-    const onScrollOrResize = () => updateFiltersPanelPos();
-    window.addEventListener("scroll", onScrollOrResize, true);
-    window.addEventListener("resize", onScrollOrResize);
-    return () => {
-      window.removeEventListener("scroll", onScrollOrResize, true);
-      window.removeEventListener("resize", onScrollOrResize);
-    };
-  }, [filtersOpen, updateFiltersPanelPos]);
-
-  useEffect(() => {
-    const onMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        filtersOpen &&
-        filtersTriggerRef.current &&
-        !filtersTriggerRef.current.contains(target) &&
-        filtersPanelRef.current &&
-        !filtersPanelRef.current.contains(target)
-      ) {
-        setFiltersOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onMouseDown);
-    return () => document.removeEventListener("mousedown", onMouseDown);
-  }, [filtersOpen]);
-
-  useEffect(() => {
-    if (!filtersOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setFiltersOpen(false);
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [filtersOpen]);
-
-  const activeCount = countActiveFilters(currentFilters, type);
-  const sortOptions = type === "projects" ? EXPLORE_SORT_PROJECTS : EXPLORE_SORT_PRODUCTS;
-
-  // Split facets into primary (inline pills) and advanced (inside Filters panel)
+  // Split facets
   const primaryFacets = options.facets.filter((f) => PRIMARY_FACET_SLUGS.has(f.slug));
-  const advancedFacets = options.facets.filter((f) => !PRIMARY_FACET_SLUGS.has(f.slug));
 
   // Build query string for the taxonomy pill (filters minus taxonomy)
   const taxonomyPillQs = filtersToQueryString(currentFilters, type).toString();
 
-  const filtersPanelContent =
-    filtersOpen && typeof document !== "undefined" ? (
-      <>
-        <div
-          className="fixed inset-0 md:hidden"
-          style={{ zIndex: FILTERS_BACKDROP_Z, backgroundColor: "rgba(0,0,0,0.3)" }}
-          aria-hidden
-          onClick={() => setFiltersOpen(false)}
-        />
-        <div
-          ref={filtersPanelRef}
-          className="w-60 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
-          style={{
-            position: "fixed",
-            top: filtersPanelPos.top,
-            right: filtersPanelPos.right,
-            left: "auto",
-            zIndex: FILTERS_PANEL_Z,
-          }}
-        >
-          <div className="flex items-center justify-between gap-2 border-b border-zinc-100 pb-2 dark:border-zinc-700">
-            <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Active filters</span>
-            {activeCount > 0 && (
-              <button
-                type="button"
-                onClick={clearAll}
-                className="text-sm font-medium text-[#002abf] hover:underline"
-              >
-                Clear all
-              </button>
-            )}
-          </div>
-          {activeCount === 0 && advancedFacets.length === 0 && (
-            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">No filters applied</p>
-          )}
-          {/* Advanced facet filters inside the panel */}
-          {advancedFacets.length > 0 && (
-            <div className="mt-2 space-y-2">
-              {advancedFacets.map((facet) => {
-                const selected = currentFilters.facets[facet.slug] ?? [];
-                return (
-                  <div key={facet.slug}>
-                    <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                      {facet.label}
-                    </label>
-                    <select
-                      value={selected[0] ?? ""}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        update({
-                          facets: {
-                            ...currentFilters.facets,
-                            [facet.slug]: val ? [val] : [],
-                          },
-                        });
-                      }}
-                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                    >
-                      <option value="">All</option>
-                      {facet.values.map((v) => (
-                        <option key={v.slug} value={v.slug}>
-                          {v.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {!hideSort && sortOptions.length > 1 && (
-            <div className="mt-3 pt-2 border-t border-zinc-100 dark:border-zinc-700">
-              <label className="mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                Sort
-              </label>
-              <select
-                value={sort}
-                onChange={(e) => {
-                  setFiltersOpen(false);
-                  navigate(currentFilters, e.target.value);
-                }}
-                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-              >
-                {sortOptions.map((s) => (
-                  <option key={s} value={s}>
-                    {s === "newest"
-                      ? "Newest"
-                      : s === "year_desc"
-                        ? "Year (newest first)"
-                        : s === "area_desc"
-                          ? "Largest area"
-                          : s}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-      </>
-    ) : null;
+  // Collect active filter tags for display below the bar
+  const activeTags: { key: string; label: string; onRemove: () => void }[] = [];
+
+  if (currentFilters.city || currentFilters.country) {
+    const loc = [currentFilters.city, currentFilters.country].filter(Boolean).join(", ");
+    activeTags.push({ key: "location", label: loc, onRemove: () => update({ city: null, country: null }) });
+  }
+  for (const d of currentFilters.designers) {
+    const opt = options.designers.find((o) => o.value === d);
+    activeTags.push({ key: `designer-${d}`, label: opt?.label ?? d, onRemove: () => update({ designers: currentFilters.designers.filter((v) => v !== d) }) });
+  }
+  for (const m of currentFilters.materials) {
+    const opt = options.materials.find((o) => o.value === m);
+    activeTags.push({ key: `material-${m}`, label: opt?.label ?? m, onRemove: () => update({ materials: currentFilters.materials.filter((v) => v !== m) }) });
+  }
+  if (currentFilters.year != null) {
+    activeTags.push({ key: "year", label: String(currentFilters.year), onRemove: () => update({ year: null }) });
+  }
+  if (currentFilters.area_bucket) {
+    const opt = options.areas.find((o) => o.value === currentFilters.area_bucket);
+    activeTags.push({ key: "area", label: opt?.label ?? currentFilters.area_bucket, onRemove: () => update({ area_bucket: null }) });
+  }
+  for (const b of currentFilters.brands) {
+    const opt = options.brands.find((o) => o.value === b);
+    activeTags.push({ key: `brand-${b}`, label: opt?.label ?? b, onRemove: () => update({ brands: currentFilters.brands.filter((v) => v !== b) }) });
+  }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-nowrap items-center gap-2 overflow-x-auto overflow-y-visible pb-2 scrollbar-thin md:flex-wrap">
-        {/* Taxonomy breadcrumb pill — replaces flat categories when tree exists */}
-        {options.taxonomyTree.length > 0 ? (
-          <TaxonomyBreadcrumbPill
+    <div className="space-y-2">
+      {/* Filter buttons row */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {/* Primary filters */}
+
+        {/* Category — mega panel */}
+        {options.taxonomyTree.length > 0 && (
+          <CategoryMegaPanel
             type={type}
             tree={options.taxonomyTree}
             currentSlugPath={currentFilters.taxonomy}
             queryString={taxonomyPillQs}
           />
-        ) : options.categories.length > 0 ? (
-          <FilterPillDropdown
-            label="Categories"
-            options={options.categories}
-            selected={currentFilters.category}
-            onChange={(values) => update({ category: values })}
-            data-testid="filter-categories"
-          />
-        ) : null}
+        )}
+
+        {/* Location — searchable */}
         {options.locations.length > 0 && (
-          <FilterPillDropdown
+          <SearchableFilterPanel
             label="Location"
             options={options.locations}
             selected={
@@ -265,58 +118,30 @@ export function ExploreFilterBar({
               }
             }}
             multi={false}
-            data-testid="filter-location"
+            placeholder="Search city or country..."
           />
         )}
+
+        {/* Professionals — searchable */}
         {options.designers.length > 0 && type === "projects" && (
-          <FilterPillDropdown
-            label="Designers"
+          <SearchableFilterPanel
+            label="Professionals"
             options={options.designers}
             selected={currentFilters.designers}
             onChange={(values) => update({ designers: values })}
-            data-testid="filter-designers"
+            placeholder="Search professionals..."
           />
         )}
-        {options.brands.length > 0 && (
-          <FilterPillDropdown
-            label="Brands"
-            options={options.brands}
-            selected={currentFilters.brands}
-            onChange={(values) => update({ brands: values })}
-            data-testid="filter-brands"
-          />
-        )}
-        {options.years.length > 0 && (
-          <FilterPillDropdown
-            label="Year"
-            options={options.years}
-            selected={
-              currentFilters.year != null
-                ? [String(currentFilters.year)]
-                : currentFilters.year_min != null || currentFilters.year_max != null
-                  ? []
-                  : []
-            }
-            onChange={(values) => {
-              const v = values[0];
-              if (!v) update({ year: null, year_min: null, year_max: null });
-              else {
-                const n = parseInt(v, 10);
-                update({ year: Number.isNaN(n) ? null : n, year_min: null, year_max: null });
-              }
-            }}
-            multi={false}
-            data-testid="filter-year"
-          />
-        )}
+
+        {/* Materials — searchable + multi-select */}
         {options.materials.length > 0 && (
-          <div className="flex shrink-0 items-center">
-            <FilterPillDropdown
+          <div className="flex items-center">
+            <SearchableFilterPanel
               label="Materials"
               options={options.materials}
               selected={currentFilters.materials}
               onChange={(values) => update({ materials: values })}
-              data-testid="filter-materials"
+              placeholder="Search materials..."
             />
             {currentFilters.materials.length === 1 && (
               <FollowFilterAction
@@ -327,67 +152,117 @@ export function ExploreFilterBar({
             )}
           </div>
         )}
+
+        {/* Secondary filters — compact style */}
+
+        {/* Year */}
+        {options.years.length > 0 && (
+          <SearchableFilterPanel
+            label="Year"
+            options={options.years}
+            selected={currentFilters.year != null ? [String(currentFilters.year)] : []}
+            onChange={(values) => {
+              const v = values[0];
+              if (!v) update({ year: null, year_min: null, year_max: null });
+              else {
+                const n = parseInt(v, 10);
+                update({ year: Number.isNaN(n) ? null : n, year_min: null, year_max: null });
+              }
+            }}
+            multi={false}
+            placeholder="Search year..."
+          />
+        )}
+
+        {/* Area */}
         {options.areas.length > 0 && type === "projects" && (
-          <FilterPillDropdown
+          <SearchableFilterPanel
             label="Area"
             options={options.areas}
             selected={currentFilters.area_bucket ? [currentFilters.area_bucket] : []}
             onChange={(values) => update({ area_bucket: values[0] ? (values[0] as ExploreFilters["area_bucket"]) : null })}
             multi={false}
-            data-testid="filter-area"
+            placeholder="Select area range..."
           />
         )}
+
+        {/* Brands (products) */}
+        {options.brands.length > 0 && (
+          <SearchableFilterPanel
+            label="Brands"
+            options={options.brands}
+            selected={currentFilters.brands}
+            onChange={(values) => update({ brands: values })}
+            placeholder="Search brands..."
+          />
+        )}
+
+        {/* Color (products) */}
         {options.colors.length > 0 && type === "products" && (
-          <FilterPillDropdown
+          <SearchableFilterPanel
             label="Color"
             options={options.colors}
             selected={currentFilters.color}
             onChange={(values) => update({ color: values })}
-            data-testid="filter-color"
+            placeholder="Search colors..."
           />
         )}
+
+        {/* Material type (products) */}
         {options.materialTypes.length > 0 && type === "products" && (
-          <FilterPillDropdown
+          <SearchableFilterPanel
             label="Material type"
             options={options.materialTypes}
             selected={currentFilters.material_type}
             onChange={(values) => update({ material_type: values })}
-            data-testid="filter-material-type"
+            placeholder="Search material types..."
           />
         )}
 
-        {/* Primary facet pills (e.g. Style) — shown inline */}
+        {/* Primary facets (e.g. Design Style) */}
         <FacetFilterPills
           facets={primaryFacets}
           currentFacets={currentFilters.facets}
           onFacetChange={(facetSlug, values) => {
-            update({
-              facets: { ...currentFilters.facets, [facetSlug]: values },
-            });
+            update({ facets: { ...currentFilters.facets, [facetSlug]: values } });
           }}
         />
-
-        <div className="relative shrink-0">
-          <button
-            ref={filtersTriggerRef}
-            type="button"
-            onClick={() => {
-              setFiltersOpen((prev) => !prev);
-              if (!filtersOpen) setTimeout(updateFiltersPanelPos, 0);
-            }}
-            className={`flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition ${
-              activeCount > 0
-                ? "border-[#002abf] bg-[#002abf]/10 text-[#002abf] dark:bg-[#002abf]/20"
-                : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-            }`}
-            aria-expanded={filtersOpen}
-            aria-label={`Filters, ${activeCount} active`}
-          >
-            Filters {activeCount > 0 ? `(${activeCount})` : ""}
-          </button>
-          {filtersPanelContent && createPortal(filtersPanelContent, document.body)}
-        </div>
       </div>
+
+      {/* Active filter tags */}
+      {activeTags.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {activeTags.map((tag) => (
+            <span
+              key={tag.key}
+              className="inline-flex items-center gap-1 rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+              style={{ borderRadius: 3 }}
+            >
+              {tag.label}
+              <button
+                type="button"
+                onClick={tag.onRemove}
+                className="text-zinc-400 transition hover:text-zinc-600 dark:hover:text-zinc-200"
+                aria-label={`Remove ${tag.label}`}
+              >
+                &times;
+              </button>
+            </span>
+          ))}
+          {activeTags.length > 1 && (
+            <button
+              type="button"
+              onClick={() => {
+                const base = type === "products" ? "/explore/products" : "/explore/projects";
+                router.push(base);
+              }}
+              className="text-xs text-zinc-400 transition hover:text-zinc-600 dark:hover:text-zinc-200"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
