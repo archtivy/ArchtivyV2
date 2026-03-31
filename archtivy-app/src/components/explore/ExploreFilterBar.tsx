@@ -4,14 +4,14 @@ import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 import { CategoryMegaPanel } from "@/components/explore/filters/CategoryMegaPanel";
 import { SearchableFilterPanel } from "@/components/explore/filters/SearchableFilterPanel";
+import { RangeFilterPanel } from "@/components/explore/filters/RangeFilterPanel";
 import { FacetFilterPills } from "@/components/explore/filters/FacetFilterPills";
 import { FollowFilterAction } from "@/components/follow/FollowFilterAction";
 import type { ExploreFilters } from "@/lib/explore/filters/schema";
 import { filtersToQueryString, buildExploreUrl } from "@/lib/explore/filters/query";
 import type { ExploreFilterOptions } from "@/lib/explore/filters/options";
 
-/** Facet slugs shown as inline pills alongside other primary filters. */
-const PRIMARY_FACET_SLUGS = new Set(["design-style"]);
+const STYLE_FACET_SLUGS = new Set(["design-style"]);
 
 export interface ExploreFilterBarProps {
   type: "projects" | "products";
@@ -42,15 +42,28 @@ export function ExploreFilterBar({
     [currentFilters, navigate]
   );
 
-  // Split facets
-  const primaryFacets = options.facets.filter((f) => PRIMARY_FACET_SLUGS.has(f.slug));
+  const clearAll = useCallback(() => {
+    router.push(type === "products" ? "/explore/products" : "/explore/projects");
+  }, [type, router]);
 
-  // Build query string for the taxonomy pill (filters minus taxonomy)
+  const styleFacets = options.facets.filter((f) => STYLE_FACET_SLUGS.has(f.slug));
   const taxonomyPillQs = filtersToQueryString(currentFilters, type).toString();
 
-  // Collect active filter tags for display below the bar
+  // Derive popular locations (top 6 by frequency — they appear first in the sorted options array)
+  const popularLocationValues = options.locations.slice(0, 6).map((l) => l.value);
+
+  // ── Active filter tags ─────────────────────────────────────────────────────
+
   const activeTags: { key: string; label: string; onRemove: () => void }[] = [];
 
+  if (currentFilters.taxonomy) {
+    const label = currentFilters.taxonomy.split("/").pop()?.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) ?? currentFilters.taxonomy;
+    activeTags.push({ key: "taxonomy", label, onRemove: () => {
+      const base = type === "products" ? "/explore/products" : "/explore/projects";
+      const qs = taxonomyPillQs ? `?${taxonomyPillQs}` : "";
+      router.push(`${base}${qs}`);
+    }});
+  }
   if (currentFilters.city || currentFilters.country) {
     const loc = [currentFilters.city, currentFilters.country].filter(Boolean).join(", ");
     activeTags.push({ key: "location", label: loc, onRemove: () => update({ city: null, country: null }) });
@@ -63,25 +76,41 @@ export function ExploreFilterBar({
     const opt = options.materials.find((o) => o.value === m);
     activeTags.push({ key: `material-${m}`, label: opt?.label ?? m, onRemove: () => update({ materials: currentFilters.materials.filter((v) => v !== m) }) });
   }
-  if (currentFilters.year != null) {
-    activeTags.push({ key: "year", label: String(currentFilters.year), onRemove: () => update({ year: null }) });
-  }
   if (currentFilters.area_bucket) {
     const opt = options.areas.find((o) => o.value === currentFilters.area_bucket);
-    activeTags.push({ key: "area", label: opt?.label ?? currentFilters.area_bucket, onRemove: () => update({ area_bucket: null }) });
+    activeTags.push({ key: "area", label: `Area: ${opt?.label ?? currentFilters.area_bucket}`, onRemove: () => update({ area_bucket: null }) });
+  }
+  if (currentFilters.year != null) {
+    activeTags.push({ key: "year", label: `${currentFilters.year}`, onRemove: () => update({ year: null, year_min: null, year_max: null }) });
+  } else if (currentFilters.year_min != null || currentFilters.year_max != null) {
+    const parts = [];
+    if (currentFilters.year_min != null) parts.push(`From ${currentFilters.year_min}`);
+    if (currentFilters.year_max != null) parts.push(`To ${currentFilters.year_max}`);
+    activeTags.push({ key: "year-range", label: parts.join(" – "), onRemove: () => update({ year: null, year_min: null, year_max: null }) });
+  }
+  for (const facet of styleFacets) {
+    const selected = currentFilters.facets[facet.slug] ?? [];
+    for (const val of selected) {
+      const fv = facet.values.find((v) => v.slug === val);
+      activeTags.push({
+        key: `facet-${facet.slug}-${val}`,
+        label: fv?.label ?? val,
+        onRemove: () => update({ facets: { ...currentFilters.facets, [facet.slug]: selected.filter((v) => v !== val) } }),
+      });
+    }
   }
   for (const b of currentFilters.brands) {
     const opt = options.brands.find((o) => o.value === b);
     activeTags.push({ key: `brand-${b}`, label: opt?.label ?? b, onRemove: () => update({ brands: currentFilters.brands.filter((v) => v !== b) }) });
   }
 
-  return (
-    <div className="space-y-2">
-      {/* Filter buttons row */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {/* Primary filters */}
+  // ── Render ─────────────────────────────────────────────────────────────────
 
-        {/* Category — mega panel */}
+  return (
+    <div className="space-y-2.5">
+      {/* Filter row — exact order: Category, Location, Professional, Materials, Area, Year, Design Style */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {/* 1. Category */}
         {options.taxonomyTree.length > 0 && (
           <CategoryMegaPanel
             type={type}
@@ -91,7 +120,7 @@ export function ExploreFilterBar({
           />
         )}
 
-        {/* Location — searchable */}
+        {/* 2. Location — wide panel with popular suggestions */}
         {options.locations.length > 0 && (
           <SearchableFilterPanel
             label="Location"
@@ -119,21 +148,24 @@ export function ExploreFilterBar({
             }}
             multi={false}
             placeholder="Search city or country..."
+            wide
+            popularValues={popularLocationValues}
           />
         )}
 
-        {/* Professionals — searchable */}
+        {/* 3. Professional — wide searchable panel */}
         {options.designers.length > 0 && type === "projects" && (
           <SearchableFilterPanel
-            label="Professionals"
+            label="Professional"
             options={options.designers}
             selected={currentFilters.designers}
             onChange={(values) => update({ designers: values })}
             placeholder="Search professionals..."
+            wide
           />
         )}
 
-        {/* Materials — searchable + multi-select */}
+        {/* 4. Materials — searchable multi-select */}
         {options.materials.length > 0 && (
           <div className="flex items-center">
             <SearchableFilterPanel
@@ -153,41 +185,70 @@ export function ExploreFilterBar({
           </div>
         )}
 
-        {/* Secondary filters — compact style */}
+        {/* 5. Area — range input */}
+        {options.areas.length > 0 && type === "projects" && (
+          <RangeFilterPanel
+            label="Area"
+            minLabel="Min sqft"
+            maxLabel="Max sqft"
+            minValue={currentFilters.area_bucket === "<500" ? "" : currentFilters.area_bucket?.split("-")[0] ?? ""}
+            maxValue={currentFilters.area_bucket === "8000+" ? "" : currentFilters.area_bucket?.split("-")[1] ?? ""}
+            onChange={(min, max) => {
+              // Map back to the closest area bucket
+              if (!min && !max) { update({ area_bucket: null }); return; }
+              const minN = parseInt(min, 10) || 0;
+              const maxN = parseInt(max, 10) || 999999;
+              const buckets = ["<500", "500-1000", "1000-2000", "2000-4000", "4000-8000", "8000+"] as const;
+              const match = buckets.find((b) => {
+                if (b === "<500") return maxN <= 500;
+                if (b === "8000+") return minN >= 8000;
+                const [lo, hi] = b.split("-").map(Number);
+                return minN >= lo && maxN <= hi;
+              });
+              update({ area_bucket: (match as ExploreFilters["area_bucket"]) ?? null });
+            }}
+            placeholder={["0", "10000"]}
+          />
+        )}
 
-        {/* Year */}
+        {/* 6. Year — range input */}
         {options.years.length > 0 && (
-          <SearchableFilterPanel
+          <RangeFilterPanel
             label="Year"
-            options={options.years}
-            selected={currentFilters.year != null ? [String(currentFilters.year)] : []}
-            onChange={(values) => {
-              const v = values[0];
-              if (!v) update({ year: null, year_min: null, year_max: null });
-              else {
-                const n = parseInt(v, 10);
-                update({ year: Number.isNaN(n) ? null : n, year_min: null, year_max: null });
+            minLabel="From"
+            maxLabel="To"
+            minValue={currentFilters.year_min != null ? String(currentFilters.year_min) : currentFilters.year != null ? String(currentFilters.year) : ""}
+            maxValue={currentFilters.year_max != null ? String(currentFilters.year_max) : currentFilters.year != null ? String(currentFilters.year) : ""}
+            onChange={(min, max) => {
+              const minN = parseInt(min, 10);
+              const maxN = parseInt(max, 10);
+              if (!min && !max) {
+                update({ year: null, year_min: null, year_max: null });
+              } else if (min === max && !Number.isNaN(minN)) {
+                update({ year: minN, year_min: null, year_max: null });
+              } else {
+                update({
+                  year: null,
+                  year_min: Number.isNaN(minN) ? null : minN,
+                  year_max: Number.isNaN(maxN) ? null : maxN,
+                });
               }
             }}
-            multi={false}
-            placeholder="Search year..."
+            placeholder={["2000", "2026"]}
           />
         )}
 
-        {/* Area */}
-        {options.areas.length > 0 && type === "projects" && (
-          <SearchableFilterPanel
-            label="Area"
-            options={options.areas}
-            selected={currentFilters.area_bucket ? [currentFilters.area_bucket] : []}
-            onChange={(values) => update({ area_bucket: values[0] ? (values[0] as ExploreFilters["area_bucket"]) : null })}
-            multi={false}
-            placeholder="Select area range..."
-          />
-        )}
+        {/* 7. Design Style — compact facet */}
+        <FacetFilterPills
+          facets={styleFacets}
+          currentFacets={currentFilters.facets}
+          onFacetChange={(facetSlug, values) => {
+            update({ facets: { ...currentFilters.facets, [facetSlug]: values } });
+          }}
+        />
 
-        {/* Brands (products) */}
-        {options.brands.length > 0 && (
+        {/* Brands — products only */}
+        {options.brands.length > 0 && type === "products" && (
           <SearchableFilterPanel
             label="Brands"
             options={options.brands}
@@ -197,36 +258,25 @@ export function ExploreFilterBar({
           />
         )}
 
-        {/* Color (products) */}
+        {/* Color — products only */}
         {options.colors.length > 0 && type === "products" && (
           <SearchableFilterPanel
             label="Color"
             options={options.colors}
             selected={currentFilters.color}
             onChange={(values) => update({ color: values })}
-            placeholder="Search colors..."
           />
         )}
 
-        {/* Material type (products) */}
+        {/* Material type — products only */}
         {options.materialTypes.length > 0 && type === "products" && (
           <SearchableFilterPanel
             label="Material type"
             options={options.materialTypes}
             selected={currentFilters.material_type}
             onChange={(values) => update({ material_type: values })}
-            placeholder="Search material types..."
           />
         )}
-
-        {/* Primary facets (e.g. Design Style) */}
-        <FacetFilterPills
-          facets={primaryFacets}
-          currentFacets={currentFilters.facets}
-          onFacetChange={(facetSlug, values) => {
-            update({ facets: { ...currentFilters.facets, [facetSlug]: values } });
-          }}
-        />
       </div>
 
       {/* Active filter tags */}
@@ -235,28 +285,27 @@ export function ExploreFilterBar({
           {activeTags.map((tag) => (
             <span
               key={tag.key}
-              className="inline-flex items-center gap-1 rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+              className="inline-flex items-center gap-1 border border-zinc-200 bg-white px-2 py-0.5 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
               style={{ borderRadius: 3 }}
             >
               {tag.label}
               <button
                 type="button"
                 onClick={tag.onRemove}
-                className="text-zinc-400 transition hover:text-zinc-600 dark:hover:text-zinc-200"
+                className="ml-0.5 text-zinc-400 transition hover:text-zinc-700 dark:hover:text-zinc-100"
                 aria-label={`Remove ${tag.label}`}
               >
-                &times;
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
+                  <path d="M3 3l6 6M9 3l-6 6" />
+                </svg>
               </button>
             </span>
           ))}
           {activeTags.length > 1 && (
             <button
               type="button"
-              onClick={() => {
-                const base = type === "products" ? "/explore/products" : "/explore/projects";
-                router.push(base);
-              }}
-              className="text-xs text-zinc-400 transition hover:text-zinc-600 dark:hover:text-zinc-200"
+              onClick={clearAll}
+              className="text-[11px] text-zinc-400 transition hover:text-zinc-600 dark:hover:text-zinc-300"
             >
               Clear all
             </button>

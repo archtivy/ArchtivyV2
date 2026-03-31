@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { FilterTrigger } from "./FilterTrigger";
 
 interface Option {
   value: string;
@@ -15,6 +16,10 @@ interface SearchableFilterPanelProps {
   onChange: (values: string[]) => void;
   multi?: boolean;
   placeholder?: string;
+  /** Use a wider panel with popular suggestions section. */
+  wide?: boolean;
+  /** Popular option values to show at the top of the panel. */
+  popularValues?: string[];
 }
 
 const Z_PANEL = 1000;
@@ -27,6 +32,8 @@ export function SearchableFilterPanel({
   onChange,
   multi = true,
   placeholder = "Search...",
+  wide = false,
+  popularValues,
 }: SearchableFilterPanelProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -97,73 +104,112 @@ export function SearchableFilterPanel({
 
   if (options.length === 0) return null;
 
+  // Popular options (only shown when not searching)
+  const popularSet = new Set(popularValues ?? []);
+  const popularOptions = popularValues?.length
+    ? options.filter((o) => popularSet.has(o.value))
+    : [];
+  const showPopular = popularOptions.length > 0 && !query.trim();
+
+  const panelWidth = wide ? "w-96" : "w-72";
+
+  const renderOption = (opt: Option) => {
+    const active = selectedSet.has(opt.value);
+    return (
+      <li key={opt.value}>
+        <button
+          type="button"
+          onClick={() => toggle(opt.value)}
+          className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] transition ${
+            active
+              ? "bg-zinc-50 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
+              : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800/60"
+          }`}
+        >
+          {multi && (
+            <span
+              className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center border text-[8px] ${
+                active
+                  ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+                  : "border-zinc-300 dark:border-zinc-600"
+              }`}
+              style={{ borderRadius: 2 }}
+            >
+              {active && (
+                <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 6l3 3 5-5" />
+                </svg>
+              )}
+            </span>
+          )}
+          {!multi && active && (
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-900 dark:bg-zinc-100" />
+          )}
+          <span className="truncate">{opt.label}</span>
+        </button>
+      </li>
+    );
+  };
+
   const panel = open && typeof document !== "undefined" ? createPortal(
     <>
       <div className="fixed inset-0" style={{ zIndex: Z_BACKDROP }} aria-hidden onClick={() => setOpen(false)} />
       <div
         ref={panelRef}
-        className="w-72 border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
-        style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: Z_PANEL, borderRadius: 6 }}
+        className={`${panelWidth} border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900`}
+        style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: Z_PANEL, borderRadius: 4, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}
       >
         {/* Search input */}
-        <div className="border-b border-zinc-100 px-3 py-2 dark:border-zinc-800">
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={placeholder}
-            className="w-full bg-transparent text-sm text-zinc-900 placeholder-zinc-400 outline-none dark:text-zinc-100 dark:placeholder-zinc-500"
-          />
+        <div className="px-3.5 pt-3 pb-2">
+          <div className="flex items-center gap-2 border-b border-zinc-100 pb-2 dark:border-zinc-800">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-zinc-300 dark:text-zinc-600" aria-hidden>
+              <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={placeholder}
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-zinc-900 placeholder-zinc-400 outline-none dark:text-zinc-100 dark:placeholder-zinc-500"
+            />
+          </div>
         </div>
 
-        {/* Options */}
-        <ul className="max-h-56 overflow-auto py-1">
+        {/* Popular section */}
+        {showPopular && (
+          <div className="px-1 pb-1">
+            <p className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Popular</p>
+            <ul>{popularOptions.map(renderOption)}</ul>
+            <div className="mx-3.5 mt-1 border-t border-zinc-100 dark:border-zinc-800" />
+          </div>
+        )}
+
+        {/* All options */}
+        <ul className="max-h-60 overflow-auto px-1 pb-2">
           {filtered.length === 0 ? (
-            <li className="px-3 py-2 text-xs text-zinc-400 dark:text-zinc-500">No results</li>
+            <li className="px-3.5 py-3 text-xs text-zinc-400 dark:text-zinc-500">No results</li>
           ) : (
-            filtered.map((opt) => {
-              const active = selectedSet.has(opt.value);
-              return (
-                <li key={opt.value}>
-                  <button
-                    type="button"
-                    onClick={() => toggle(opt.value)}
-                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition ${
-                      active
-                        ? "text-[#002abf] dark:text-blue-400"
-                        : "text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                    }`}
-                  >
-                    {multi && (
-                      <span
-                        className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border text-[9px] ${
-                          active
-                            ? "border-[#002abf] bg-[#002abf] text-white"
-                            : "border-zinc-300 dark:border-zinc-600"
-                        }`}
-                      >
-                        {active ? "✓" : ""}
-                      </span>
-                    )}
-                    <span className="truncate">{opt.label}</span>
-                  </button>
-                </li>
-              );
-            })
+            filtered.map(renderOption)
           )}
         </ul>
 
-        {/* Selected tags */}
+        {/* Selected tags footer */}
         {multi && selected.length > 0 && (
-          <div className="flex flex-wrap gap-1 border-t border-zinc-100 px-3 py-2 dark:border-zinc-800">
+          <div className="flex flex-wrap gap-1 border-t border-zinc-100 px-3.5 py-2.5 dark:border-zinc-800">
             {selected.map((v) => {
               const opt = options.find((o) => o.value === v);
               return (
-                <span key={v} className="inline-flex items-center gap-1 rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                <span
+                  key={v}
+                  className="inline-flex items-center gap-1 border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                  style={{ borderRadius: 2 }}
+                >
                   {opt?.label ?? v}
-                  <button type="button" onClick={() => toggle(v)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200" aria-label={`Remove ${opt?.label}`}>
-                    &times;
+                  <button type="button" onClick={() => toggle(v)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200" aria-label={`Remove ${opt?.label}`}>
+                    <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
+                      <path d="M3 3l6 6M9 3l-6 6" />
+                    </svg>
                   </button>
                 </span>
               );
@@ -177,22 +223,13 @@ export function SearchableFilterPanel({
 
   return (
     <>
-      <button
+      <FilterTrigger
         ref={triggerRef}
-        type="button"
+        label={displayLabel}
+        active={hasSelection}
+        open={open}
         onClick={() => { setOpen((p) => !p); setQuery(""); }}
-        className={`flex items-center gap-1 rounded border px-2.5 py-1.5 text-xs font-medium transition ${
-          hasSelection
-            ? "border-[#002abf]/30 bg-[#002abf]/5 text-[#002abf] dark:border-[#002abf]/40 dark:bg-[#002abf]/10"
-            : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
-        }`}
-        style={{ borderRadius: 4 }}
-      >
-        {displayLabel}
-        <svg width="8" height="8" viewBox="0 0 12 12" fill="none" aria-hidden className={`text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`}>
-          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+      />
       {panel}
     </>
   );

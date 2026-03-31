@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
+import { FilterTrigger } from "./FilterTrigger";
 import type { TaxonomyTreeNode } from "@/lib/explore/filters/schema";
 
 interface CategoryMegaPanelProps {
@@ -71,15 +72,10 @@ export function CategoryMegaPanel({ type, tree, currentSlugPath, queryString }: 
     router.push(`${base}${qs}`);
   };
 
-  // Find the currently selected node label for display
-  const currentLabel = currentSlugPath
-    ? findNodeLabel(tree, currentSlugPath)
-    : null;
-
+  const currentLabel = currentSlugPath ? findNodeLabel(tree, currentSlugPath) : null;
   const hasSelection = !!currentSlugPath;
   const displayLabel = currentLabel ?? "Category";
 
-  // Which parent is actively showing children
   const activeParent = hoveredParent ?? (tree.length > 0 ? tree[0].id : null);
   const activeChildren = tree.find((n) => n.id === activeParent)?.children ?? [];
 
@@ -90,16 +86,16 @@ export function CategoryMegaPanel({ type, tree, currentSlugPath, queryString }: 
       <div className="fixed inset-0" style={{ zIndex: Z_BACKDROP }} aria-hidden onClick={() => setOpen(false)} />
       <div
         ref={panelRef}
-        className="flex border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
-        style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: Z_PANEL, borderRadius: 6, minWidth: 420, maxWidth: 560 }}
+        className="flex border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900"
+        style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: Z_PANEL, borderRadius: 4, minWidth: 440, maxWidth: 580, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}
       >
         {/* Left: parent categories */}
-        <div className="w-44 shrink-0 border-r border-zinc-100 py-2 dark:border-zinc-800">
+        <div className="w-48 shrink-0 border-r border-zinc-100 py-2 dark:border-zinc-800">
           {hasSelection && (
             <button
               type="button"
               onClick={clearCategory}
-              className="mb-1 flex w-full items-center px-3 py-1.5 text-left text-xs text-[#002abf] transition hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              className="mb-1 flex w-full items-center px-3.5 py-2 text-left text-[13px] text-zinc-400 transition hover:bg-zinc-50 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
             >
               All categories
             </button>
@@ -113,7 +109,7 @@ export function CategoryMegaPanel({ type, tree, currentSlugPath, queryString }: 
                 type="button"
                 onMouseEnter={() => setHoveredParent(node.id)}
                 onClick={() => navigate(node.slug_path)}
-                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm transition ${
+                className={`flex w-full items-center justify-between px-3.5 py-2 text-left text-[13px] transition ${
                   isActive
                     ? "bg-zinc-50 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
                     : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
@@ -121,8 +117,8 @@ export function CategoryMegaPanel({ type, tree, currentSlugPath, queryString }: 
               >
                 <span className="truncate">{node.label}</span>
                 {node.children.length > 0 && (
-                  <svg width="6" height="10" viewBox="0 0 6 10" fill="none" className="shrink-0 text-zinc-300 dark:text-zinc-600" aria-hidden>
-                    <path d="M1 1l4 4-4 4" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+                  <svg width="5" height="9" viewBox="0 0 5 9" fill="none" className="shrink-0 text-zinc-300 dark:text-zinc-600" aria-hidden>
+                    <path d="M1 1l3 3.5L1 8" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
               </button>
@@ -133,7 +129,7 @@ export function CategoryMegaPanel({ type, tree, currentSlugPath, queryString }: 
         {/* Right: subcategories */}
         <div className="min-w-0 flex-1 py-2">
           {activeChildren.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-zinc-400 dark:text-zinc-500">No subcategories</p>
+            <p className="px-3.5 py-3 text-xs text-zinc-400 dark:text-zinc-500">No subcategories</p>
           ) : (
             <div className="grid grid-cols-2 gap-x-1">
               {activeChildren.map((child) => {
@@ -143,9 +139,9 @@ export function CategoryMegaPanel({ type, tree, currentSlugPath, queryString }: 
                     key={child.id}
                     type="button"
                     onClick={() => navigate(child.slug_path)}
-                    className={`px-3 py-1.5 text-left text-sm transition hover:bg-zinc-50 dark:hover:bg-zinc-800 ${
+                    className={`px-3.5 py-2 text-left text-[13px] transition hover:bg-zinc-50 dark:hover:bg-zinc-800 ${
                       isCurrent
-                        ? "font-medium text-[#002abf] dark:text-blue-400"
+                        ? "font-medium text-zinc-900 dark:text-zinc-100"
                         : "text-zinc-600 dark:text-zinc-400"
                     }`}
                   >
@@ -163,22 +159,13 @@ export function CategoryMegaPanel({ type, tree, currentSlugPath, queryString }: 
 
   return (
     <>
-      <button
+      <FilterTrigger
         ref={triggerRef}
-        type="button"
+        label={displayLabel}
+        active={hasSelection}
+        open={open}
         onClick={() => setOpen((p) => !p)}
-        className={`flex items-center gap-1 rounded border px-2.5 py-1.5 text-xs font-medium transition ${
-          hasSelection
-            ? "border-[#002abf]/30 bg-[#002abf]/5 text-[#002abf] dark:border-[#002abf]/40 dark:bg-[#002abf]/10"
-            : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
-        }`}
-        style={{ borderRadius: 4 }}
-      >
-        {displayLabel}
-        <svg width="8" height="8" viewBox="0 0 12 12" fill="none" aria-hidden className={`text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`}>
-          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+      />
       {panel}
     </>
   );

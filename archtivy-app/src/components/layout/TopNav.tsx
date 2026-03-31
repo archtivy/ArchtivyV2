@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useUser, useClerk, SignedIn, SignedOut } from "@clerk/nextjs";
 import { useEffect, useState, useCallback } from "react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { Container } from "@/components/layout/Container";
 import { TopNavAuth } from "@/components/layout/TopNavAuth";
 import { ShareCTA } from "@/components/layout/ShareCTA";
 import { TopNavLinks } from "@/components/layout/TopNavLinks";
@@ -101,9 +100,9 @@ export function TopNav() {
         className="sticky top-0 z-50 border-b bg-[#ffffff] dark:border-zinc-800 dark:bg-zinc-950/95 dark:supports-[backdrop-filter]:bg-zinc-950/80"
         style={{ borderBottomColor: "#e5e7eb" }}
       >
-        <Container className="flex items-center justify-between gap-2 py-4 sm:py-5">
-          {/* Left: Logo only on mobile; logo + divider + nav on desktop */}
-          <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5 sm:px-8 md:px-10 lg:px-14 xl:px-16">
+          {/* Left: Logo + nav */}
+          <div className="flex shrink-0 items-center gap-3 sm:gap-4">
             <Link
               href="/"
               className="shrink-0 rounded px-1 py-0.5 text-xl font-semibold tracking-[0.08em] text-[#002abf] transition-colors focus:outline-none focus-visible:bg-[#002abf]/10 focus-visible:ring-0 dark:text-[#002abf]"
@@ -111,18 +110,25 @@ export function TopNav() {
               archtivy
             </Link>
             <span
-              className="hidden h-5 w-px shrink-0 bg-zinc-300 dark:bg-zinc-600 md:block"
+              className="hidden h-4 w-px shrink-0 bg-zinc-200 dark:bg-zinc-700 md:block"
               aria-hidden
             />
-            <nav className="hidden items-center gap-1 text-sm md:flex md:gap-4" aria-label="Main">
+            <nav className="hidden items-center gap-1 text-sm md:flex" aria-label="Main">
               <TopNavLinks />
             </nav>
           </div>
-          {/* Right: Search + desktop controls + hamburger */}
-          <div className="flex shrink-0 items-center gap-2">
+          {/* Center: Search — fluid within limits */}
+          <div className="hidden min-w-0 flex-1 justify-center px-6 md:flex lg:px-10">
             <HeaderSearch />
-            {/* Desktop only: CTA + auth + theme */}
-            <div className="hidden items-center gap-2 md:flex md:gap-4">
+          </div>
+          {/* Right: Actions — protected width */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {/* Mobile: search icon */}
+            <div className="flex items-center md:hidden">
+              <HeaderSearch />
+            </div>
+            {/* Desktop: CTA + auth + theme */}
+            <div className="hidden items-center gap-2 md:flex">
               <NotificationBell />
               <ShareCTA userId={userId} role={profile.role} />
               <TopNavAuth
@@ -151,7 +157,7 @@ export function TopNav() {
               </button>
             </div>
           </div>
-        </Container>
+        </div>
       </header>
 
       {/* Mobile drawer */}
