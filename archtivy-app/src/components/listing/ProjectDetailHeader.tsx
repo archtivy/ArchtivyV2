@@ -166,15 +166,6 @@ export function ProjectDetailHeader({
           <ShareIcon className="h-4 w-4 shrink-0" />
           Share
         </button>
-        {mapHref?.trim() && (
-          <Link
-            href={mapHref}
-            className={ctaClass}
-            style={btnRadius}
-          >
-            Explore on Map
-          </Link>
-        )}
         {shareToast && (
           <span role="status" className="text-sm text-zinc-500 dark:text-zinc-400">
             Link copied

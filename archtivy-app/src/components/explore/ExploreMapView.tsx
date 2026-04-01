@@ -8,6 +8,7 @@ import { MapDetailSidebar } from "./MapDetailSidebar";
 import { MapPinPreview } from "./MapPinPreview";
 import { FloatingAISearch } from "./FloatingAISearch";
 import { SpotlightCallout } from "./SpotlightCallout";
+import { MapControls } from "./MapControls";
 import { parseSearchIntent, type EntityType } from "@/lib/explore/parseSearchIntent";
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -125,7 +126,9 @@ export function ExploreMapView({ pins, initialCenter, spotlight, recentPins = []
 
   const [selected, setSelected] = useState<MapPin | null>(null);
   const [showSpotlight, setShowSpotlight] = useState(false);
+  const [contextSpotlight, setContextSpotlight] = useState<MapPin | null>(null);
   const [feedIndex, setFeedIndex] = useState(0);
+  const spotlightTypeRef = useRef<number>(0); // 0=project, 1=brand, 2=designer
 
   const [hoveredPin, setHoveredPin] = useState<MapPin | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
@@ -257,6 +260,72 @@ export function ExploreMapView({ pins, initialCenter, spotlight, recentPins = []
     const t = setTimeout(() => setShowSpotlight(true), 2000);
     return () => clearTimeout(t);
   }, [spotlight]);
+
+  /* ── Context-aware spotlight: pick from visible pins ─────────────────── */
+
+  const pickContextSpotlight = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const bounds = map.getBounds();
+    if (!bounds) return;
+
+    const types: PinType[] = ["project", "brand", "designer"];
+    const targetType = types[spotlightTypeRef.current % types.length];
+    spotlightTypeRef.current++;
+
+    const visible = pins.filter((p) =>
+      p.type === targetType &&
+      p.lat >= bounds.getSouth() &&
+      p.lat <= bounds.getNorth() &&
+      p.lng >= bounds.getWest() &&
+      p.lng <= bounds.getEast()
+    );
+
+    if (visible.length === 0) {
+      // Fallback: try any type in view
+      const fallback = pins.filter((p) =>
+        p.lat >= bounds.getSouth() && p.lat <= bounds.getNorth() &&
+        p.lng >= bounds.getWest() && p.lng <= bounds.getEast()
+      );
+      if (fallback.length > 0) {
+        setContextSpotlight(fallback[Math.floor(Math.random() * fallback.length)]);
+      }
+      return;
+    }
+
+    setContextSpotlight(visible[Math.floor(Math.random() * visible.length)]);
+  }, [pins]);
+
+  // Pick on map move (debounced)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    let timeout: ReturnType<typeof setTimeout>;
+    const onMoveEnd = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(pickContextSpotlight, 600);
+    };
+    map.on("moveend", onMoveEnd);
+
+    // Initial pick
+    const initialTimeout = setTimeout(pickContextSpotlight, 3000);
+
+    return () => {
+      map.off("moveend", onMoveEnd);
+      clearTimeout(timeout);
+      clearTimeout(initialTimeout);
+    };
+  }, [mapReady, pickContextSpotlight]);
+
+  // Rotate every 15 seconds when idle
+  useEffect(() => {
+    if (selected) return;
+    const iv = setInterval(pickContextSpotlight, 15000);
+    return () => clearInterval(iv);
+  }, [selected, pickContextSpotlight]);
+
+  const activeSpotlight = contextSpotlight ?? spotlight ?? null;
 
   /* ── URL-driven focus: auto-center and select a pin ──────────────────── */
 
@@ -688,6 +757,22 @@ export function ExploreMapView({ pins, initialCenter, spotlight, recentPins = []
     setHighlightedPinIds(ids);
   }, []);
 
+  const handleLocateMe = useCallback(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        mapRef.current?.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 10, duration: 1200 });
+      },
+      () => { /* silently fail */ },
+      { timeout: 8000 }
+    );
+  }, []);
+
+  const handleResetView = useCallback(() => {
+    const center = initialCenter ?? { lat: 30, lng: 10 };
+    mapRef.current?.flyTo({ center: [center.lng, center.lat], zoom: 2, duration: 1000 });
+  }, [initialCenter]);
+
   const handleFilterByOwner = useCallback((ownerName: string) => {
     // Future: pipe owner filter into AI search context
     void ownerName;
@@ -910,16 +995,21 @@ export function ExploreMapView({ pins, initialCenter, spotlight, recentPins = []
         searchLabel={searchLabel}
         resultCount={searchResultCount}
         onClear={handleClearSearch}
+        totalPins={pins.length}
       />
 
-      {/* ── Spotlight callout — anchored to featured pin ─────────────────── */}
-      {spotlight && (
+      {/* ── Context-aware spotlight — top right ──────────────────────────── */}
+      {activeSpotlight && (
         <SpotlightCallout
-          pin={spotlight}
-          position={spotlightPos}
+          pin={activeSpotlight}
           visible={showSpotlight && !selected}
-          onClick={flyToSpotlight}
+          onClick={() => { if (activeSpotlight) selectPin(activeSpotlight); }}
         />
+      )}
+
+      {/* ── Map controls — right side ────────────────────────────────────── */}
+      {!selected && (
+        <MapControls onLocateMe={handleLocateMe} onResetView={handleResetView} />
       )}
 
       {/* ── Micro activity strip — lower left ──────────────────────────── */}

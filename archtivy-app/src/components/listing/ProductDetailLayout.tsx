@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import Image from "next/image";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
@@ -216,15 +214,6 @@ export function ProductDetailLayout({
                   <ShareIcon className="h-4 w-4" />
                   Share
                 </button>
-                {mapHref?.trim() && (
-                  <Link
-                    href={mapHref}
-                    className={ctaClass}
-                    style={btnRadius}
-                  >
-                    Explore on Map
-                  </Link>
-                )}
                 {shareToast && (
                   <span role="status" className="text-sm text-zinc-500 dark:text-zinc-400">Link copied</span>
                 )}
