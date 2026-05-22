@@ -4,10 +4,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function AppLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return <>{children}</>;
+export default function SignUpLayout({ children }: { children: React.ReactNode }) {
+  return children;
 }

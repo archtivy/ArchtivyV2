@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 import { getBaseUrl } from "@/lib/canonical";
 
 /**
- * Robots.txt: allow crawling of public pages; noindex,nofollow for admin and app (dashboard) routes.
- * Per-page noindex (e.g. /u/id/* unclaimed) is set in generateMetadata.
+ * Robots.txt: disallow private routes (admin, dashboard, auth, add flows).
+ * Per-page robots meta is set in route layouts and generateMetadata (e.g. hidden profiles).
  */
 export default function robots(): MetadataRoute.Robots {
   const base = getBaseUrl();

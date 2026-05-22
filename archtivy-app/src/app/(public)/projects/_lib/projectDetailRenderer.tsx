@@ -15,6 +15,7 @@ import {
 } from "@/lib/db/listingImages";
 import { getPhotoProductTagsByImageIds } from "@/lib/db/photoProductTags";
 import { getSelectedPhotoMatchesByImageIds, photoMatchesExistForImages } from "@/lib/db/photoMatches";
+import { getRegionsByImageIds } from "@/lib/db/imageRegions";
 import { getListingDocumentsServer } from "@/lib/db/listingDocuments";
 import { resolveMentionedProducts } from "@/lib/db/mentionedProducts";
 import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
@@ -304,9 +305,10 @@ export async function ProjectDetailRenderer({
       }
     }
 
-    const [tagsResult, photoMatchesResult] = await Promise.all([
+    const [tagsResult, photoMatchesResult, regionsMap] = await Promise.all([
       getPhotoProductTagsByImageIds(imageIds),
       getSelectedPhotoMatchesByImageIds(imageIds),
+      getRegionsByImageIds(imageIds),
     ]);
     const tags = tagsResult.data ?? [];
     const tagsByImageId: Record<string, { id: string; x: number; y: number; product_id: string; product_title?: string; product_slug?: string; product_thumbnail?: string; product_owner_name?: string; taxonomy_slug_path?: string | null }[]> = {};
@@ -347,14 +349,38 @@ export async function ProjectDetailRenderer({
     }
     images = imagesWithIds
       .filter((img) => sanitizeListingImageUrl(img.image_url) !== null)
-      .map((img) => ({
-        id: img.id,
-        src: sanitizeListingImageUrl(img.image_url) as string,
-        alt: img.alt ?? "Image",
-        sort_order: img.sort_order,
-        photoTags: tagsByImageId[img.id] ?? [],
-        matchedProducts: matchesByImageId[img.id] ?? [],
-      }));
+      .map((img) => {
+        // Map image_regions rows to ImageRegionMarker shape for frontend
+        const rawRegions = regionsMap.get(img.id) ?? [];
+        const regions = rawRegions.map((r) => {
+          const candidates = Array.isArray(r.match_candidates) ? r.match_candidates : [];
+          const matchedProduct = r.selected_mode === "matched" && r.matched_listing_id
+            ? candidates.find((c) => c.listing_id === r.matched_listing_id) ?? null
+            : null;
+          return {
+            id: r.id,
+            label: r.label,
+            object_type: r.object_type,
+            keywords: Array.isArray(r.keywords) ? r.keywords : [],
+            confidence: r.confidence,
+            x: r.x,
+            y: r.y,
+            selected_mode: r.selected_mode,
+            matched_product: matchedProduct ? { ...matchedProduct, score: r.match_score ?? matchedProduct.score } : null,
+            similar_products: candidates.filter((c) => c.listing_id !== r.matched_listing_id),
+          };
+        });
+
+        return {
+          id: img.id,
+          src: sanitizeListingImageUrl(img.image_url) as string,
+          alt: img.alt ?? "Image",
+          sort_order: img.sort_order,
+          photoTags: tagsByImageId[img.id] ?? [],
+          matchedProducts: matchesByImageId[img.id] ?? [],
+          regions: regions.length > 0 ? regions : undefined,
+        };
+      });
   } else {
     images = canonicalGalleryToGalleryImages(project.gallery);
   }

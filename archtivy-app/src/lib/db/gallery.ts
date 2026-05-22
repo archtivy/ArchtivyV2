@@ -26,6 +26,34 @@ export type MatchedProductMarker = {
   selected_mode: "manual" | "auto" | "keyword";
 };
 
+/** AI-detected product region in an image (from image_regions table). */
+export type ImageRegionMarker = {
+  id: string;
+  label: string;
+  object_type: string;
+  keywords: string[];
+  confidence: number;
+  x: number;       // center x as % (0-100)
+  y: number;       // center y as % (0-100)
+  selected_mode: "matched" | "similar" | "none";
+  matched_product?: {
+    listing_id: string;
+    title: string;
+    slug: string | null;
+    cover: string | null;
+    brand: string | null;
+    score: number;
+  } | null;
+  similar_products: {
+    listing_id: string;
+    title: string;
+    slug: string | null;
+    cover: string | null;
+    brand: string | null;
+    score: number;
+  }[];
+};
+
 export type GalleryImage = {
   id: string;
   src: string;
@@ -35,6 +63,8 @@ export type GalleryImage = {
   photoTags?: PhotoTagMarker[];
   /** Optional AI-matched products for this image (from photo_matches, is_selected=true). */
   matchedProducts?: MatchedProductMarker[];
+  /** AI-detected product regions / hotspots (from image_regions table). */
+  regions?: ImageRegionMarker[];
 };
 export type ProjectRecord = { id: string; slug: string; title: string; description: string | null; created_at: string };
 export type ProductRecord = { id: string; slug: string; title: string; subtitle: string | null; created_at: string };

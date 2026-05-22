@@ -4,11 +4,13 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef } from "react";
-import type { GalleryImage } from "@/lib/db/gallery";
+import type { GalleryImage, ImageRegionMarker } from "@/lib/db/gallery";
 import { getListingUrl } from "@/lib/canonical";
 import { LightboxImageZoom, type LightboxZoomControlsRef } from "./LightboxImageZoom";
 import { SaveToFolderModal } from "./SaveToFolderModal";
 import { LightboxNearbyProjects } from "./LightboxNearbyProjects";
+import { ImageHotspotsOverlay } from "./ImageHotspotsOverlay";
+import { RegionDetailPanel } from "./RegionDetailPanel";
 
 export type RelatedItem = {
   id: string;
@@ -71,12 +73,19 @@ export function LightboxGallery({
   const [shareToast, setShareToast] = React.useState(false);
   const [relatedOpen, setRelatedOpen] = React.useState(false);
   const [saveModalOpen, setSaveModalOpen] = React.useState(false);
+  const [activeRegionId, setActiveRegionId] = React.useState<string | null>(null);
   const trapRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<LightboxZoomControlsRef>(null);
 
   useEffect(() => {
     setIndex(initialIndex);
+    setActiveRegionId(null);
   }, [initialIndex, open]);
+
+  // Clear active region when image changes
+  useEffect(() => {
+    setActiveRegionId(null);
+  }, [index]);
 
   useEffect(() => {
     setSaved(initialSaved);
@@ -237,6 +246,21 @@ export function LightboxGallery({
     return result;
   }, [context, activeTags, activeMatches, relatedItems]);
 
+  // ── Region / hotspot data for active image ──────────────────────────────
+  const activeRegions: ImageRegionMarker[] = activeImage?.regions ?? [];
+  const activeRegion = activeRegionId
+    ? activeRegions.find((r) => r.id === activeRegionId) ?? null
+    : null;
+  const hasRegionPanel = activeRegion !== null;
+
+  const handleSelectRegion = React.useCallback((region: ImageRegionMarker) => {
+    setActiveRegionId((prev) => (prev === region.id ? null : region.id));
+  }, []);
+
+  const handleCloseRegionPanel = React.useCallback(() => {
+    setActiveRegionId(null);
+  }, []);
+
   if (!open) return null;
 
   const currentImage = images[index];
@@ -299,6 +323,14 @@ export function LightboxGallery({
                 unoptimized={currentImage.src.startsWith("http")}
                 renderControls={false}
               />
+              {/* AI-detected product hotspots */}
+              {activeRegions.length > 0 && (
+                <ImageHotspotsOverlay
+                  regions={activeRegions}
+                  onSelectRegion={handleSelectRegion}
+                  activeRegionId={activeRegionId}
+                />
+              )}
             </div>
           ) : null}
           {images.length > 1 && (
@@ -374,7 +406,17 @@ export function LightboxGallery({
       />
 
       {/* Right sidebar — 360px, flex column; hidden on mobile */}
-      <aside className="archtivy-pswp-sidebar hidden h-full w-[360px] min-w-0 shrink-0 flex-col border-l border-zinc-800/80 bg-[#252528] backdrop-blur-md lg:flex">
+      {/* When a region hotspot is active, show the region detail panel instead */}
+      {hasRegionPanel && activeRegion && (
+        <div className="hidden lg:block">
+          <RegionDetailPanel
+            region={activeRegion}
+            onClose={handleCloseRegionPanel}
+            mode="desktop"
+          />
+        </div>
+      )}
+      <aside className={`archtivy-pswp-sidebar h-full w-[360px] min-w-0 shrink-0 flex-col border-l border-zinc-800/80 bg-[#252528] backdrop-blur-md ${hasRegionPanel ? "hidden" : "hidden lg:flex"}`}>
         <div className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
           <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-400">
             {relatedTitle}
@@ -517,6 +559,17 @@ export function LightboxGallery({
           </div>
         )}
       </aside>
+
+      {/* Mobile: Region detail bottom sheet */}
+      {hasRegionPanel && activeRegion && (
+        <div className="lg:hidden">
+          <RegionDetailPanel
+            region={activeRegion}
+            onClose={handleCloseRegionPanel}
+            mode="mobile"
+          />
+        </div>
+      )}
 
       {/* Mobile: Related drawer */}
       <div className="flex shrink-0 border-t border-zinc-800 lg:hidden">

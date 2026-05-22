@@ -87,12 +87,12 @@ export async function generateMetadata({
   if (segments.length === 1) {
     const archiveData = await fetchProductArchive(segments[0]);
     if (archiveData) {
-      const { node, total } = archiveData;
+      const { node } = archiveData;
       return {
         title: node.seo_title || `${node.label} Products | Archtivy`,
         description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} products on Archtivy.`,
         alternates: { canonical: `/products/${node.slug_path}` },
-        robots: { index: total > 0, follow: true },
+        robots: { index: true, follow: true },
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
       };
     }
@@ -102,12 +102,12 @@ export async function generateMetadata({
     const fullSlug = segments.join("/");
     const archiveData = await fetchProductArchive(fullSlug);
     if (archiveData) {
-      const { node, total } = archiveData;
+      const { node } = archiveData;
       return {
         title: node.seo_title || `${node.label} Products | Archtivy`,
         description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} products on Archtivy.`,
         alternates: { canonical: `/products/${node.slug_path}` },
-        robots: { index: total > 0, follow: true },
+        robots: { index: true, follow: true },
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
       };
     }

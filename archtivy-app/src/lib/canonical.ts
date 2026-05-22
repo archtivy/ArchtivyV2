@@ -1,4 +1,4 @@
-const DEFAULT_BASE = "https://archtivy.com";
+const DEFAULT_BASE = "https://www.archtivy.com";
 const LOCALHOST = "http://localhost:3000";
 
 /**

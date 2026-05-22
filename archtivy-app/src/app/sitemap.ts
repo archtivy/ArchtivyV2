@@ -7,8 +7,14 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
  * Dynamic sitemap: static pages + all approved projects/products + all public profiles.
  * Uses updated_at for lastModified so Search Console sees meaningful change timestamps.
  */
+/** Sitemap always uses the www canonical origin in production. */
+function getSitemapBaseUrl(): string {
+  const raw = getBaseUrl();
+  return raw.replace(/^https:\/\/archtivy\.com(?=\/|$)/, "https://www.archtivy.com");
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = getBaseUrl();
+  const base = getSitemapBaseUrl();
   const supabase = getSupabaseServiceClient();
   const now = new Date();
 
@@ -132,15 +138,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     };
   });
 
-  const profileUrls: MetadataRoute.Sitemap = profileRows.slice(0, MAX).map((p) => {
-    const username = p.username?.trim();
-    return {
-      url: username ? `${base}/u/${encodeURIComponent(username)}` : `${base}/u/id/${p.id}`,
+  // Only username-based profile URLs; exclude /u/id/* (UUID fallback routes).
+  const profileUrls: MetadataRoute.Sitemap = profileRows
+    .filter((p) => Boolean(p.username?.trim()))
+    .slice(0, MAX)
+    .map((p) => ({
+      url: `${base}/u/${encodeURIComponent(p.username!.trim())}`,
       lastModified: p.updated_at ? new Date(p.updated_at) : now,
-      changeFrequency: "weekly",
-      priority: username ? 0.6 : 0.4,
-    };
-  });
+      changeFrequency: "weekly" as const,
+      priority: 0.6,
+    }));
 
   // Archive taxonomy URLs — canonical archive pages (not explore)
   const taxonomyUrls: MetadataRoute.Sitemap = taxonomyRows

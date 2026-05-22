@@ -76,13 +76,6 @@ export async function generateMetadata({
   if (!profile || profile.is_hidden === true) {
     return { robots: { index: false, follow: false } };
   }
-  if (profile.claim_status === "unclaimed") {
-    return {
-      robots: { index: false, follow: true },
-      title: profile.display_name?.trim() || profile.username || "Profile",
-      alternates: { canonical: getAbsoluteUrl(`/u/id/${profileId}`) },
-    };
-  }
   const path = `/u/id/${profileId}`;
   const title = profile.display_name?.trim() || profile.username || "Profile";
   const description = `${title} on Archtivy. Projects, products & credits for architecture.`;

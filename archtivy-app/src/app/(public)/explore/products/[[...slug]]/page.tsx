@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getProductsCanonicalFiltered } from "@/lib/db/explore";
 import { EXPLORE_PAGE_SIZE } from "@/lib/db/explore";
 import { parseExploreFilters } from "@/lib/explore/filters/parse";
-import { exploreFiltersToProductFilters, countActiveFilters } from "@/lib/explore/filters/query";
+import { exploreFiltersToProductFilters } from "@/lib/explore/filters/query";
 import { getExploreFilterOptions } from "@/lib/explore/filters/options";
 import { getProfilesForStrip } from "@/lib/db/profiles";
 import { getTaxonomyNodeBySlugPath } from "@/lib/taxonomy/taxonomyDb";
@@ -20,19 +20,13 @@ import { Container } from "@/components/layout/Container";
 import { getBaseUrl } from "@/lib/canonical";
 import { buildCollectionPageJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
 
-/** Taxonomy pages are indexable with per-node SEO; filtered views are noindex,follow. */
 export async function generateMetadata({
   params,
-  searchParams,
 }: {
   params: Promise<{ slug?: string[] }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const sp = await searchParams;
   const taxonomySlug = slug?.length ? slug.join("/") : null;
-  const filters = parseExploreFilters(sp, "products", taxonomySlug);
-  const hasFilters = countActiveFilters(filters, "products") > 0;
 
   // Taxonomy slug page — use node SEO fields when available
   if (taxonomySlug) {
@@ -44,15 +38,13 @@ export async function generateMetadata({
         n.meta_description ||
         n.description ||
         `Browse ${n.label.toLowerCase()} building products on Archtivy.`;
-      const meta: Metadata = {
+      return {
         title,
         description,
         // Canonical points to the archive page; explore is a filtered view
         alternates: { canonical: `/products/${n.slug_path}` },
-        robots: { index: false, follow: true },
         ...(n.featured_image ? { openGraph: { images: [n.featured_image] } } : {}),
       };
-      return meta;
     }
   }
 
@@ -63,9 +55,6 @@ export async function generateMetadata({
       "Discover building products, materials, furniture, and specifications for architecture projects on Archtivy.",
     alternates: { canonical: "/explore/products" },
   };
-  if (hasFilters) {
-    return { ...base, robots: { index: false, follow: true } };
-  }
   return base;
 }
 

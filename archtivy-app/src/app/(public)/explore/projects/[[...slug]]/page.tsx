@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getProjectsCanonicalFiltered, getExploreNetworkCounts } from "@/lib/db/explore";
 import { EXPLORE_PAGE_SIZE } from "@/lib/db/explore";
 import { parseExploreFilters } from "@/lib/explore/filters/parse";
-import { exploreFiltersToProjectFilters, countActiveFilters } from "@/lib/explore/filters/query";
+import { exploreFiltersToProjectFilters } from "@/lib/explore/filters/query";
 import { getExploreFilterOptions } from "@/lib/explore/filters/options";
 import { getPlatformStats } from "@/lib/db/platformActivity";
 import { getProfilesForStrip } from "@/lib/db/profiles";
@@ -17,21 +17,13 @@ import { Container } from "@/components/layout/Container";
 import { getBaseUrl } from "@/lib/canonical";
 import { buildCollectionPageJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
 
-/** Taxonomy pages are indexable with per-node SEO; filtered views are noindex,follow. */
 export async function generateMetadata({
   params,
-  searchParams,
 }: {
   params: Promise<{ slug?: string[] }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const sp = await searchParams;
   const taxonomySlug = slug?.length ? slug.join("/") : null;
-  const options = await getExploreFilterOptions("projects");
-  const facetSlugs = options.facets.map((f) => f.slug);
-  const filters = parseExploreFilters(sp, "projects", taxonomySlug, facetSlugs);
-  const hasFilters = countActiveFilters(filters, "projects") > 0;
 
   // Taxonomy slug page — use node SEO fields when available
   if (taxonomySlug) {
@@ -43,15 +35,13 @@ export async function generateMetadata({
         n.meta_description ||
         n.description ||
         `Browse ${n.label.toLowerCase()} architecture projects on Archtivy.`;
-      const meta: Metadata = {
+      return {
         title,
         description,
         // Canonical points to the archive page; explore is a filtered view
         alternates: { canonical: `/projects/${n.slug_path}` },
-        robots: { index: false, follow: true },
         ...(n.featured_image ? { openGraph: { images: [n.featured_image] } } : {}),
       };
-      return meta;
     }
   }
 
@@ -62,9 +52,6 @@ export async function generateMetadata({
       "Browse architecture projects from around the world. Filter by category, location, materials, and more on Archtivy.",
     alternates: { canonical: "/explore/projects" },
   };
-  if (hasFilters) {
-    return { ...base, robots: { index: false, follow: true } };
-  }
   return base;
 }
 

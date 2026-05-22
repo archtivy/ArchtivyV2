@@ -7,6 +7,7 @@ import { AdminShell } from "@/components/admin/AdminShell";
 
 export const metadata = {
   title: "Admin • Archtivy",
+  robots: { index: false, follow: false },
 };
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {

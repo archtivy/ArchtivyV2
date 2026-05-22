@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { getCachedPlatformMetrics } from "@/lib/db/footer-metrics";
 import { Container } from "@/components/layout/Container";
 import { FooterNewsletter } from "@/components/layout/FooterNewsletter";
 
@@ -50,72 +49,15 @@ const LEGAL_LINKS = [
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
 
-export async function Footer() {
-  const metrics = await getCachedPlatformMetrics();
+export function Footer() {
   const year = new Date().getFullYear();
-
-  const METRICS = [
-    { value: metrics.projects, label: "Projects" },
-    { value: metrics.products, label: "Products" },
-    { value: metrics.professionals, label: "Professionals" },
-    { value: metrics.countries, label: "Countries" },
-  ];
 
   return (
     <footer
       role="contentinfo"
       className="relative left-1/2 w-screen -translate-x-1/2 overflow-x-clip border-t border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950"
     >
-      {/* ── 1. Top positioning block ──────────────────────────────────── */}
-      <div className="border-b border-zinc-200 dark:border-zinc-800">
-        <Container className="py-16 sm:py-20">
-          <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 lg:items-start lg:gap-20">
-
-            {/* Left: headline + paragraph + CTAs */}
-            <div className="space-y-6">
-              <h2 className="max-w-lg text-3xl font-semibold leading-tight tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
-                The Permanent Record of Global Architecture.
-              </h2>
-              <p className="max-w-md text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-                Every project, every product, every credit — connected through
-                one structured intelligence system. Built for professionals and
-                brands who shape the built environment.
-              </p>
-              <div className="flex flex-wrap gap-3 pt-1">
-                <Link
-                  href="/add/project"
-                  className="inline-flex items-center justify-center rounded-[4px] bg-[#002abf] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 focus:ring-offset-zinc-50 dark:focus:ring-offset-zinc-950"
-                >
-                  Submit Your Work
-                </Link>
-                <Link
-                  href="/explore/projects"
-                  className="inline-flex items-center justify-center rounded-[4px] border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:border-zinc-400 hover:text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 focus:ring-offset-zinc-50 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:text-zinc-100 dark:focus:ring-offset-zinc-950"
-                >
-                  Explore the Platform
-                </Link>
-              </div>
-            </div>
-
-            {/* Right: metrics strip */}
-            <div className="grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-              {METRICS.map(({ value, label }) => (
-                <div key={label} className="space-y-1">
-                  <div className="font-mono text-3xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">
-                    {value > 0 ? value.toLocaleString() : "—"}
-                  </div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
-                    {label}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-          </div>
-        </Container>
-      </div>
-
-      {/* ── 2. Five-column link grid ──────────────────────────────────── */}
+      {/* ── 1. Five-column link grid ──────────────────────────────────── */}
       {/*
         Alignment fix: every column has a fixed min-h-[52px] header zone
         containing a label + one-line descriptor. This ensures all link lists
@@ -254,7 +196,7 @@ export async function Footer() {
         </Container>
       </div>
 
-      {/* ── 3. Intelligence Briefing / Newsletter ─────────────────────── */}
+      {/* ── 2. Intelligence Briefing / Newsletter ─────────────────────── */}
       <div className="border-b border-zinc-200 dark:border-zinc-800">
         <Container className="py-10 sm:py-12">
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-center lg:gap-16">
@@ -284,7 +226,7 @@ export async function Footer() {
         </Container>
       </div>
 
-      {/* ── 4. Bottom strip ───────────────────────────────────────────── */}
+      {/* ── 3. Bottom strip ───────────────────────────────────────────── */}
       <Container className="py-6 sm:py-7">
         <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:gap-4 sm:text-left">
           <p className="text-[11px] text-zinc-400 dark:text-zinc-600">
