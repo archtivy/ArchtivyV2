@@ -1,11 +1,16 @@
 import { Footer } from "@/components/layout/Footer";
 import { ConditionalFooter } from "@/components/layout/ConditionalFooter";
+import { isProductionMaintenance } from "@/lib/maintenance";
 
 export default function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  if (isProductionMaintenance()) {
+    return <>{children}</>;
+  }
+
   return (
     <>
       {children}

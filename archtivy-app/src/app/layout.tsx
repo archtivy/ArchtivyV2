@@ -11,6 +11,7 @@ const lato = Lato({
 });
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { SiteShell } from "@/components/layout/SiteShell";
+import { isProductionMaintenance } from "@/lib/maintenance";
 import { Analytics } from "@vercel/analytics/react"; // ✅ bunu ekle
 
 export const runtime = "nodejs";
@@ -49,16 +50,24 @@ const themeScript = `
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const maintenance = isProductionMaintenance();
+
   return (
     <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up">
       <html lang="en" suppressHydrationWarning className={lato.variable}>
         <head>
-          <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+          {!maintenance && (
+            <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+          )}
         </head>
         <body className="min-h-screen bg-white text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
-          <ThemeProvider>
-            <SiteShell>{children}</SiteShell>
-          </ThemeProvider>
+          {maintenance ? (
+            children
+          ) : (
+            <ThemeProvider>
+              <SiteShell>{children}</SiteShell>
+            </ThemeProvider>
+          )}
 
           {/* ✅ BURAYA EKLE */}
           <Analytics />

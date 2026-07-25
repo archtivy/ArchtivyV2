@@ -70,11 +70,13 @@ export function SiteShell({ children }: SiteShellProps) {
     );
   }
 
+  const isHome = pathname === "/";
+
   return (
     <>
       <TopNav />
       <main>
-        <PageContainer>{children}</PageContainer>
+        <PageContainer className={isHome ? "!pt-0" : undefined}>{children}</PageContainer>
       </main>
     </>
   );
