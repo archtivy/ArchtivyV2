@@ -90,15 +90,27 @@ export function buildProjectSecondaryKeywords(p: ProjectSeoInput): string[] {
 
 // ─── PROJECT: title + meta ────────────────────────────────────────────────────
 
+/**
+ * Entity-first project title: "{Title} — {Category} in {Location} | Archtivy".
+ *
+ * The previous ordering pushed category first and fell through to a leading
+ * preposition whenever category was null — which is the common case now that
+ * categorisation lives in the taxonomy tables rather than the legacy `category`
+ * column. That shipped titles like "in Canada — Everden Residence | Archtivy",
+ * wasting the highest-value characters in the SERP headline.
+ * See TECHNICAL_SEO_AUDIT.md C-8.
+ */
 export function buildProjectSeoTitle(p: ProjectSeoInput): string {
   const location = joinParts([p.location_city, p.location_country]);
-  const parts: string[] = [];
 
-  if (p.category) parts.push(p.category);
-  if (location) parts.push(`in ${location}`);
-  parts.push(`— ${p.title}`);
+  // "Title — Category in Location" when both are known; "Title in Location"
+  // (no dangling dash) when only the location is; plain "Title" when neither.
+  const category = p.category?.trim() || null;
+  let head = p.title;
+  if (category) head = `${p.title} — ${category}`;
+  if (location) head = `${head} in ${location}`;
 
-  const full = `${parts.join(" ")} | Archtivy`;
+  const full = `${head} | Archtivy`;
   if (full.length <= 70) return full;
 
   const short = `${p.title} | Archtivy`;

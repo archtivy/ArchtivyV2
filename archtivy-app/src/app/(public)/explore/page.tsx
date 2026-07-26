@@ -9,11 +9,20 @@ import { ExploreMapView, type MapPin } from "@/components/explore/ExploreMapView
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+/**
+ * The map is an interactive tool, not a document: its server-rendered HTML is ~184
+ * characters with zero crawlable entity links (all content is a client-side Mapbox
+ * canvas). Indexing it produces a thin/soft-404 page, so it is `noindex, follow` and
+ * excluded from sitemap.ts. The content-bearing siblings — /explore/projects,
+ * /explore/products, /explore/designers, /explore/brands — remain indexable.
+ * Reversible in two lines. See TECHNICAL_SEO_AUDIT.md C-6.
+ */
 export const metadata: Metadata = {
   title: "Explore — Architecture Map | Archtivy",
   description:
     "Explore architecture projects, designers, and brands around the world on an interactive map. Discover built work by location on Archtivy.",
   alternates: { canonical: "/explore" },
+  robots: { index: false, follow: true },
   openGraph: {
     title: "Explore — Architecture Map | Archtivy",
     description: "Explore architecture projects, designers, and brands around the world on an interactive map.",

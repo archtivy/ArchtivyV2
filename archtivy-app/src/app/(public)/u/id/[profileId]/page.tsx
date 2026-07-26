@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getProfileByIdForPublicPage } from "@/lib/db/profiles";
 import { getOwnedListingsForProfile } from "@/lib/db/listings";
@@ -65,6 +65,19 @@ function canShowClaimButton(profile: ProfileRow): boolean {
   return true;
 }
 
+/**
+ * UUID fallback profile route.
+ *
+ * When the profile has a username, /u/id/{uuid} is a straight duplicate of
+ * /u/{username} — the page below 308-redirects to it, so the only metadata that
+ * ever renders here is for username-less profiles.
+ *
+ * Username-less profiles are auto-created stubs (someone credited on a project;
+ * 157 of 206 profiles have neither username nor bio). They are marked
+ * `noindex, follow`: kept crawlable so their outbound project credits still pass
+ * link equity, but kept out of the index as auto-generated thin pages.
+ * See TECHNICAL_SEO_AUDIT.md C-7 / P-1.
+ */
 export async function generateMetadata({
   params,
 }: {
@@ -76,13 +89,24 @@ export async function generateMetadata({
   if (!profile || profile.is_hidden === true) {
     return { robots: { index: false, follow: false } };
   }
+
+  const username = profile.username?.trim();
+  if (username) {
+    // The page redirects; point the canonical at the destination regardless.
+    return {
+      robots: { index: false, follow: true },
+      alternates: { canonical: getAbsoluteUrl(`/u/${encodeURIComponent(username)}`) },
+    };
+  }
+
   const path = `/u/id/${profileId}`;
-  const title = profile.display_name?.trim() || profile.username || "Profile";
+  const title = profile.display_name?.trim() || "Profile";
   const description = `${title} on Archtivy. Projects, products & credits for architecture.`;
   const imageUrl = profile.avatar_url?.startsWith("http") ? profile.avatar_url : undefined;
   return {
     title,
     description,
+    robots: { index: false, follow: true },
     alternates: { canonical: getAbsoluteUrl(path) },
     openGraph: {
       title,
@@ -104,6 +128,13 @@ export default async function ProfileByIdPage({
   const profile = profileResult.data;
   if (!profile) notFound();
   if ((profile as { is_hidden?: boolean }).is_hidden === true) notFound();
+
+  // Collapse the duplicate: /u/id/{uuid} and /u/{username} render the same profile.
+  // See TECHNICAL_SEO_AUDIT.md C-7.
+  const canonicalUsername = profile.username?.trim();
+  if (canonicalUsername) {
+    permanentRedirect(`/u/${encodeURIComponent(canonicalUsername)}`);
+  }
 
   const ownerClerkIds = [
     profile.clerk_user_id,

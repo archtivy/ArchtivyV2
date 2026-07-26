@@ -3,13 +3,22 @@ const LOCALHOST = "http://localhost:3000";
 
 /**
  * Base URL for the site (no trailing slash). Always returns a valid absolute URL with protocol.
- * Used for canonical URLs, Open Graph, and server-side fetch (e.g. matches API).
- * Prefer: NEXT_PUBLIC_SITE_URL → VERCEL_URL (with https) → localhost.
+ * Used for canonical URLs, Open Graph, sitemap entries, and server-side fetch (e.g. matches API).
+ *
+ * Order: NEXT_PUBLIC_SITE_URL → DEFAULT_BASE (production only) → VERCEL_URL → localhost.
+ *
+ * DEFAULT_BASE is checked ahead of VERCEL_URL in production because VERCEL_URL is the
+ * *deployment-specific* host (archtivy-v2-abc123.vercel.app), never the production alias.
+ * Without this guard, a missing NEXT_PUBLIC_SITE_URL would silently publish canonicals,
+ * sitemap <loc> values and the robots.txt Sitemap: line on a throwaway hostname, with no
+ * build error. See TECHNICAL_SEO_AUDIT.md C-4.
  */
 export function getBaseUrl(): string {
   const site = process.env.NEXT_PUBLIC_SITE_URL;
   const siteTrimmed = typeof site === "string" ? site.trim().replace(/\/$/, "") : "";
   if (siteTrimmed) return siteTrimmed;
+
+  if (process.env.VERCEL_ENV === "production") return DEFAULT_BASE;
 
   const vercel = process.env.VERCEL_URL;
   const vercelTrimmed = typeof vercel === "string" ? vercel.trim() : "";

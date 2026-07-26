@@ -12,10 +12,10 @@ import { MaintenanceLanding } from "@/components/home/MaintenanceLanding";
 import { getHomepagePromotedListingIds } from "@/lib/promote/campaigns";
 import { NetworkFeedSection } from "@/components/home/NetworkFeedSection";
 import { getBaseUrl } from "@/lib/canonical";
-import { isProductionMaintenance } from "@/lib/maintenance";
+import { isMaintenanceMode } from "@/lib/maintenance";
 import { buildHomepageJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
 
-const MAINTENANCE = isProductionMaintenance();
+const MAINTENANCE = isMaintenanceMode();
 
 export const metadata: Metadata = MAINTENANCE
   ? {
@@ -23,6 +23,8 @@ export const metadata: Metadata = MAINTENANCE
       description:
         "Archtivy is preparing the intelligence layer of architecture. Check back soon.",
       openGraph: {
+        siteName: "Archtivy",
+        url: "/",
         title: "Archtivy — Coming Soon",
         description:
           "Archtivy is preparing the intelligence layer of architecture. Check back soon.",
@@ -39,16 +41,18 @@ export const metadata: Metadata = MAINTENANCE
       alternates: {
         canonical: "/",
       },
-      robots: {
-        index: true,
-        follow: false,
-      },
+      // No `follow: false` here: nofollow on the only reachable page during
+      // maintenance stops Google discovering anything at all. C-5.
     }
   : {
       title: "Archtivy — The Intelligence Layer of Architecture",
       description:
         "The platform where architectural work is documented, products are credited, and professionals connect across cities. Explore projects, products, designers, and brands.",
       openGraph: {
+        // Page-level openGraph fully replaces the root layout's object, so
+        // siteName and url must be restated here or they are dropped.
+        siteName: "Archtivy",
+        url: "/",
         title: "Archtivy — The Intelligence Layer of Architecture",
         description:
           "Explore architecture projects, building products, designers, and brands. Document work, credit specifications, and connect across cities.",

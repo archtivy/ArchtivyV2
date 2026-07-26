@@ -24,10 +24,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     : new Date("2026-03-01");
 
   const staticEntries: MetadataRoute.Sitemap = [
+    // No trailing slash: Next resolves the homepage canonical ("/") against
+    // metadataBase to exactly `${base}`, and the sitemap <loc> must match the
+    // canonical byte-for-byte. Verified against a production build. C-9.
     { url: base,                         lastModified: staticLastMod, changeFrequency: "daily",   priority: 1.0 },
     { url: `${base}/projects`,           lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.9 },
     { url: `${base}/products`,           lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.9 },
-    { url: `${base}/explore`,            lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.9 },
+    // /explore (the map tool) is intentionally absent: noindex, ~184 chars of
+    // server-rendered content, no crawlable entity links. See C-6.
     { url: `${base}/explore/projects`,   lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
     { url: `${base}/explore/products`,   lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
     { url: `${base}/explore/designers`,  lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },

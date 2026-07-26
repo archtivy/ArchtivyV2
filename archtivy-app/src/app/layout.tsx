@@ -11,7 +11,8 @@ const lato = Lato({
 });
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { SiteShell } from "@/components/layout/SiteShell";
-import { isProductionMaintenance } from "@/lib/maintenance";
+import { isMaintenanceMode } from "@/lib/maintenance";
+import { getBaseUrl } from "@/lib/canonical";
 import { Analytics } from "@vercel/analytics/react"; // ✅ bunu ekle
 
 export const runtime = "nodejs";
@@ -24,6 +25,11 @@ const OG_IMAGE = {
 };
 
 export const metadata: Metadata = {
+  // Without metadataBase, Next.js emits every `alternates.canonical` as a RELATIVE
+  // URL (<link rel="canonical" href="/projects">), which makes every host and
+  // query-param variant self-canonical and disables canonicalisation entirely.
+  // See TECHNICAL_SEO_AUDIT.md C-3.
+  metadataBase: new URL(getBaseUrl()),
   title: "Archtivy",
   description: "Projects, products, credits & files for architecture",
   verification: {
@@ -50,7 +56,7 @@ const themeScript = `
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const maintenance = isProductionMaintenance();
+  const maintenance = isMaintenanceMode();
 
   return (
     <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up">

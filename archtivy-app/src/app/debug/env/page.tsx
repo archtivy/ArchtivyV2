@@ -1,8 +1,21 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+
 /**
  * TEMP debug page: proof that NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN is loaded.
  * Remove this route when done debugging (delete src/app/debug/ folder).
+ *
+ * Development-only. robots.txt disallows /debug/, but Disallow prevents crawling,
+ * not indexing — a linked URL can still be indexed URL-only. This returns a real
+ * 404 outside development. See TECHNICAL_SEO_AUDIT.md C-11.
  */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default function DebugEnvPage() {
+  if (process.env.NODE_ENV === "production") notFound();
+
   const raw = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
   const tokenExists = Boolean(raw);
   const tokenPrefix = raw ? raw.slice(0, 3) : "";

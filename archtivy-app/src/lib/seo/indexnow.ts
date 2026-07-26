@@ -1,13 +1,13 @@
 /**
- * IndexNow + Sitemap Ping — fire-and-forget notifications to search engines
+ * IndexNow — fire-and-forget notifications to search engines
  * when a listing becomes publicly visible (approved/created).
  *
  * Environment variables:
  *   INDEXNOW_KEY          — your IndexNow API key (required to enable IndexNow)
  *   NEXT_PUBLIC_SITE_URL  — canonical site URL (already used elsewhere)
  *
- * If INDEXNOW_KEY is not set, IndexNow calls are silently skipped.
- * Sitemap pings always fire when a valid base URL is available.
+ * If INDEXNOW_KEY is not set, IndexNow calls are silently skipped — which is the
+ * current production state, so this module is presently a no-op.
  */
 
 import { getBaseUrl } from "@/lib/canonical";
@@ -16,8 +16,12 @@ const INDEXNOW_ENDPOINT = "https://api.indexnow.org/indexnow";
 
 /**
  * Notify search engines that one or more URLs have changed.
- * Calls IndexNow (Bing/Yandex/others) and pings Google + Bing sitemaps.
- * All calls are fire-and-forget — errors are logged but never thrown.
+ * Calls IndexNow (Bing/Yandex/others). Fire-and-forget — errors are logged, never thrown.
+ *
+ * Google has no equivalent push API: the sitemap-ping endpoint
+ * (google.com/ping?sitemap=) was retired in 2023 and now 404s, so calling it gave a
+ * false impression that Google was being notified. Google discovery comes from
+ * sitemap.xml being registered in Search Console. See TECHNICAL_SEO_AUDIT.md C-12.
  */
 export async function notifySearchEngines(paths: string[]): Promise<void> {
   const baseUrl = getBaseUrl();
@@ -25,10 +29,7 @@ export async function notifySearchEngines(paths: string[]): Promise<void> {
 
   const urls = paths.map((p) => `${baseUrl}${p.startsWith("/") ? p : `/${p}`}`);
 
-  await Promise.allSettled([
-    submitIndexNow(baseUrl, urls),
-    pingSitemap(baseUrl),
-  ]);
+  await Promise.allSettled([submitIndexNow(baseUrl, urls)]);
 }
 
 async function submitIndexNow(baseUrl: string, urls: string[]): Promise<void> {
@@ -56,20 +57,3 @@ async function submitIndexNow(baseUrl: string, urls: string[]): Promise<void> {
   }
 }
 
-async function pingSitemap(baseUrl: string): Promise<void> {
-  const sitemapUrl = encodeURIComponent(`${baseUrl}/sitemap.xml`);
-  const endpoints = [
-    `https://www.google.com/ping?sitemap=${sitemapUrl}`,
-    `https://www.bing.com/ping?sitemap=${sitemapUrl}`,
-  ];
-
-  await Promise.allSettled(
-    endpoints.map(async (url) => {
-      try {
-        await fetch(url, { method: "GET", signal: AbortSignal.timeout(10000) });
-      } catch (err) {
-        console.warn(`[SitemapPing] failed for ${url}:`, err instanceof Error ? err.message : err);
-      }
-    })
-  );
-}

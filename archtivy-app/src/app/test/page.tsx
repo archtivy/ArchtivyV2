@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
+/** Development-only Supabase connectivity check. Gated to non-production by ./layout.tsx. */
 export default function Test() {
   const [msg, setMsg] = useState("Checking Supabase...");
 
