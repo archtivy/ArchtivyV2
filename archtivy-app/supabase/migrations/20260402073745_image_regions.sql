@@ -32,13 +32,19 @@ create table if not exists image_regions (
 );
 
 -- Fast lookup by image
-create index idx_image_regions_image on image_regions (listing_image_id, region_index);
+create index if not exists idx_image_regions_image on image_regions (listing_image_id, region_index);
 
 -- Find all regions for a listing (join through listing_images)
-create index idx_image_regions_confidence on image_regions (confidence desc) where confidence >= 0.7;
+create index if not exists idx_image_regions_confidence on image_regions (confidence desc) where confidence >= 0.7;
 
 -- RLS: public read (regions are shown on public detail pages), writes via service_role
 alter table image_regions enable row level security;
+
+-- `drop policy if exists` guard: Postgres has no `create policy if not exists`,
+-- and this migration is already applied to production while Supabase's ledger
+-- has no record of it. Without the guard, a replay fails on the duplicate
+-- policy. Dropping and recreating an identical policy is a no-op in effect.
+drop policy if exists "Public can read image regions" on image_regions;
 
 create policy "Public can read image regions"
   on image_regions for select
