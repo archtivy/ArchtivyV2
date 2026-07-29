@@ -388,53 +388,48 @@ export async function createAdminProductFull(
   const baseSlug = slugFromTitle(title || "product");
   const slug = await ensureUniqueSlug(supabase, baseSlug);
 
-  const { data: listing, error: insertError } = await supabase
-    .from("listings")
-    .insert({
-      type: "product",
-      listing_type: "product",
-      status: "APPROVED",
-      title,
-      description: description || null,
-      slug,
-      product_type: resolvedProductType || null,
-      product_category: resolvedProductCategory || null,
-      product_subcategory: resolvedProductSubcategory || null,
-      material_or_finish: material_or_finish || null,
-      dimensions: dimensions || null,
-      year: year || null,
-      team_members,
-      location: null,
-      category: null,
-      area_sqft: null,
-      brands_used: [],
-      owner_clerk_user_id: null,
-      owner_profile_id: ownerProfileId,
-      cover_image_url: null,
-      product_stage: product_stage || null,
-      product_collaboration_status: product_collaboration_status || null,
-      product_looking_for: product_looking_for.length > 0 ? product_looking_for : [],
-    })
-    .select("id")
-    .maybeSingle();
-
-  if (insertError) return { error: insertError.message };
-  if (!listing?.id) return { error: "Failed to create product." };
-  const listingId = listing.id as string;
-  const { data: check } = await supabase.from("listings").select("type").eq("id", listingId).maybeSingle();
-  if (!check?.type) return { error: "Listing created but type is missing (data integrity)." };
-
-  const { error: productRowError } = await supabase.from("products").insert({
-    id: listingId,
-    slug,
-    title,
-    subtitle: description?.trim() || null,
-    color_options: [],
-  });
-  if (productRowError) {
-    await supabase.from("listings").delete().eq("id", listingId);
-    return { error: `Failed to create product record: ${productRowError.message}` };
+  // `year` arrives from FormData as a string and used to be passed straight into
+  // an integer column, so a non-numeric value raised a database error and failed
+  // the whole submission. It is now coerced to null instead — but warn, so the
+  // coercion shows up in server logs rather than disappearing silently.
+  let parsedYear: number | null = null;
+  if (year) {
+    if (/^\d+$/.test(year)) {
+      parsedYear = Number(year);
+    } else {
+      console.warn(
+        `[admin createProduct] non-numeric year ${JSON.stringify(year)} for slug "${slug}" — storing null`
+      );
+    }
   }
+
+  // Atomic: the listings row and its products sidecar commit together inside a
+  // single transaction, or neither is written. Replaces two sequential PostgREST
+  // requests whose compensating delete covered only one of six failure paths and
+  // left orphaned sidecar rows behind.
+  const { data: newListingId, error: rpcError } = await supabase.rpc(
+    "create_product_with_sidecar",
+    {
+      p_title: title,
+      p_description: description || null,
+      p_slug: slug,
+      p_owner_profile_id: ownerProfileId,
+      p_product_type: resolvedProductType || null,
+      p_product_category: resolvedProductCategory || null,
+      p_product_subcategory: resolvedProductSubcategory || null,
+      p_material_or_finish: material_or_finish || null,
+      p_dimensions: dimensions || null,
+      p_year: parsedYear,
+      p_team_members: team_members,
+      p_product_stage: product_stage || null,
+      p_product_collaboration_status: product_collaboration_status || null,
+      p_product_looking_for: product_looking_for.length > 0 ? product_looking_for : [],
+    }
+  );
+
+  if (rpcError) return { error: rpcError.message };
+  if (!newListingId) return { error: "Failed to create product." };
+  const listingId = newListingId as string;
 
   // Set taxonomy node (new DB taxonomy system)
   if (taxonomy_node_id) {

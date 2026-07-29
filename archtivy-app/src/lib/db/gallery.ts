@@ -230,7 +230,17 @@ export async function getFeaturedProducts(limit: number): Promise<ProductRecord[
   return (data ?? []) as ProductRecord[];
 }
 
-function slugFromTitle(title: string): string {
+/**
+ * Slugify a title for the public submission path.
+ *
+ * Exported so createProductCanonical() can reuse it verbatim. Note this differs
+ * from the copies in _actions/listings.ts and createProject.ts: those convert
+ * every non-alphanumeric run to a hyphen ("Serie 47.3" -> "serie-47-3"), while
+ * this one strips them after collapsing whitespace ("Serie 47.3" -> "serie-473").
+ * Existing public product slugs were generated with THIS variant, so it is kept
+ * as-is to avoid changing slug shapes for future submissions.
+ */
+export function slugFromTitle(title: string): string {
   return title
     .trim()
     .toLowerCase()

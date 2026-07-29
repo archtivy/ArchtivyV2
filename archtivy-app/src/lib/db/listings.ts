@@ -132,6 +132,35 @@ export async function getListingsByIds(
 }
 
 /**
+ * Return `baseSlug`, or the first `baseSlug-N` not already taken in `listings`.
+ *
+ * `listings` is the table that owns the public URL space — /products/[...segments]
+ * and /projects/[...segments] both resolve against it, as does sitemap.ts. Slug
+ * uniqueness must therefore be established here, not against the `products`
+ * sidecar (which lib/db/gallery.ts:ensureUniqueSlug checked, allowing a slug
+ * unique in `products` to collide with a live listing).
+ *
+ * This narrows the window but does not close it: two concurrent submissions can
+ * both pass the check. The partial unique index idx_listings_slug_unique and the
+ * guard inside create_product_with_sidecar() are the actual enforcement.
+ */
+export async function ensureUniqueListingSlug(baseSlug: string): Promise<string> {
+  const sup = getSupabaseServiceClient();
+  let slug = baseSlug;
+  let n = 1;
+  for (;;) {
+    const { data } = await sup
+      .from(LISTINGS)
+      .select("id")
+      .eq("slug", slug)
+      .limit(1)
+      .maybeSingle();
+    if (!data) return slug;
+    slug = `${baseSlug}-${++n}`;
+  }
+}
+
+/**
  * Fetch listing slug by id (for revalidation paths). Returns slug or null.
  */
 export async function getListingSlugById(id: string): Promise<string | null> {

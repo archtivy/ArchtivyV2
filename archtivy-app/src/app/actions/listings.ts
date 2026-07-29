@@ -6,6 +6,7 @@ import { CACHE_TAGS } from "@/lib/cache-tags";
 import {
   createListing as dbCreateListing,
   deleteListing as dbDeleteListing,
+  ensureUniqueListingSlug,
   getListingById,
   updateListingCoverImage,
   upsertListingForProduct,
@@ -23,13 +24,13 @@ import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getProductCanonicalBySlug } from "@/lib/db/explore";
 import {
   createProjectRow,
-  createProductRow,
   addProjectImages,
   addProductImages,
   deleteProjectRow,
   deleteProductRow,
   getProductBySlug,
   getProductImages,
+  slugFromTitle,
 } from "@/lib/db/gallery";
 import type { TeamMember, BrandUsed } from "@/lib/types/listings";
 import type { ActionResult } from "./types";
@@ -528,9 +529,6 @@ export async function createProductCanonical(
   }
 
   const imageFiles = getImageFiles(formData);
-  const row = await createProductRow({ title, subtitle: subtitle || null });
-  if (!row) return { error: "Failed to create product." };
-  const { id: productId, slug } = row;
 
   const colorOptionsRaw = formData.get("color_options");
   let colorOptions: string[] = [];
@@ -539,19 +537,13 @@ export async function createProductCanonical(
       const arr = JSON.parse(colorOptionsRaw) as unknown;
       if (Array.isArray(arr)) colorOptions = arr.map((x) => String(x).trim()).filter(Boolean);
     } catch {
-      // ignore
+      // ignore — a malformed colour payload should not fail the submission
     }
   }
-  const supabaseForProduct = getSupabaseServiceClient();
-  await supabaseForProduct
-    .from("products")
-    .update({
-      color_options: colorOptions,
-      color: colorOptions.length > 0 ? colorOptions[0] : null,
-    })
-    .eq("id", productId);
 
-  // Derive legacy fields from taxonomy node when taxonomy is selected but legacy fields are empty
+  // Derive legacy fields from taxonomy node when taxonomy is selected but legacy
+  // fields are empty. Must happen BEFORE the insert now: there is no longer a
+  // follow-up update to fill them in.
   let resolvedProductType2: string | null = productType;
   let resolvedProductCategory2: string | null = productCategory;
   let resolvedProductSubcategory2: string | null = productSubcategory;
@@ -564,22 +556,40 @@ export async function createProductCanonical(
     }
   }
 
-  const listingPayload = {
-    slug,
-    title,
-    description: description ?? null,
-    owner_clerk_user_id: userId,
-    owner_profile_id: profile.id ?? null,
-    status: "PENDING" as const,
-    product_type: resolvedProductType2 ?? null,
-    product_category: resolvedProductCategory2 ?? null,
-    product_subcategory: resolvedProductSubcategory2 ?? null,
-  };
-  const listingErr = await upsertListingForProduct(productId, listingPayload);
-  if (listingErr.error) {
-    await deleteProductRow(productId);
-    return { error: `Failed to create listing: ${listingErr.error}` };
-  }
+  const supabaseForProduct = getSupabaseServiceClient();
+
+  // Uniqueness is established against `listings`, the table that resolves
+  // /products/[...segments] and feeds sitemap.ts. This previously ran against
+  // the `products` sidecar, so a slug unique there could still collide with a
+  // live listing. slugFromTitle keeps the public path's existing slug shape.
+  const slug = await ensureUniqueListingSlug(slugFromTitle(title));
+
+  // Atomic: the listings row and its products sidecar commit together, or
+  // neither is written. Replaces a three-step sequence (products insert →
+  // products colour update → listings upsert) that left an orphaned products
+  // row — with colours already set — whenever it failed partway.
+  const { data: newProductId, error: rpcError } = await supabaseForProduct.rpc(
+    "create_product_with_sidecar",
+    {
+      p_title: title,
+      p_description: description ?? null,
+      p_slug: slug,
+      p_owner_profile_id: profile.id ?? null,
+      p_product_type: resolvedProductType2 ?? null,
+      p_product_category: resolvedProductCategory2 ?? null,
+      p_product_subcategory: resolvedProductSubcategory2 ?? null,
+      // Explicit, never defaulted: public submissions await review. Relying on
+      // the function's 'APPROVED' default here would silently auto-publish
+      // every public submission.
+      p_status: "PENDING",
+      p_owner_clerk_user_id: userId,
+      p_color_options: colorOptions,
+    }
+  );
+
+  if (rpcError) return { error: `Failed to create product: ${rpcError.message}` };
+  if (!newProductId) return { error: "Failed to create product." };
+  const productId = newProductId as string;
 
   // Set taxonomy node (new DB taxonomy system)
   if (taxonomyNodeId) {
