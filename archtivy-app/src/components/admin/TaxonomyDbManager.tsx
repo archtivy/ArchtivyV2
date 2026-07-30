@@ -4,6 +4,11 @@ import { useState, useTransition, useCallback } from "react";
 import type { TaxonomyNode, FacetWithValues } from "@/lib/taxonomy/taxonomyDb";
 import type { BackfillStats } from "@/lib/taxonomy/backfill";
 import {
+  TAXONOMY_DOMAINS,
+  TAXONOMY_DOMAIN_LABELS,
+  type TaxonomyDomain,
+} from "@/lib/taxonomy/domains";
+import {
   getTaxonomyData,
   seedTaxonomyNodes,
   seedFacets,
@@ -98,7 +103,7 @@ export function TaxonomyDbManager() {
   const [state, setState] = useState<TaxonomyDbManagerState | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>("tree");
-  const [domainFilter, setDomainFilter] = useState<"product" | "project" | "material">("product");
+  const [domainFilter, setDomainFilter] = useState<TaxonomyDomain>("project");
   const [seedLog, setSeedLog] = useState<string[]>([]);
   const [backfillResult, setBackfillResult] = useState<BackfillStats | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -286,12 +291,14 @@ export function TaxonomyDbManager() {
           <div className="flex items-center gap-3 border-b border-zinc-200 px-4 py-3">
             <select
               value={domainFilter}
-              onChange={(e) => setDomainFilter(e.target.value as "product" | "project" | "material")}
+              onChange={(e) => setDomainFilter(e.target.value as TaxonomyDomain)}
               className="rounded border border-zinc-200 px-2 py-1 text-sm"
             >
-              <option value="product">Product</option>
-              <option value="project">Project</option>
-              <option value="material">Material</option>
+              {TAXONOMY_DOMAINS.map((d) => (
+                <option key={d} value={d}>
+                  {TAXONOMY_DOMAIN_LABELS[d]}
+                </option>
+              ))}
             </select>
             <span className="text-xs text-zinc-500">
               {filteredNodes.length} nodes ({rootNodes.length} root)

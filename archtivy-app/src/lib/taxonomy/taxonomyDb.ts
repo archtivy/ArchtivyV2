@@ -4,6 +4,7 @@
  */
 
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import type { TaxonomyDomain } from "@/lib/taxonomy/domains";
 
 const supa = () => getSupabaseServiceClient();
 
@@ -33,6 +34,12 @@ export interface TaxonomyNode {
   meta_description?: string | null;
   intro_text?: string | null;
   featured_image?: string | null;
+  /* Phase 6 §A.1 node fields — added by 20260728200000_phase6_taxonomy_dimensions */
+  synonyms?: string[];
+  inclusion_criteria?: string | null;
+  exclusion_criteria?: string | null;
+  replaced_by_id?: string | null;
+  applies_to?: string[];
 }
 
 export interface Facet {
@@ -78,11 +85,11 @@ type DbResult<T> = { data: T; error: null } | { data: null; error: string };
 // ─── Taxonomy Nodes ──────────────────────────────────────────────────────────
 
 const NODE_SELECT =
-  "id, domain, parent_id, depth, slug, slug_path, label, label_plural, description, icon_key, sort_order, is_active, legacy_product_type, legacy_product_category, legacy_product_subcategory, legacy_project_category, created_at, updated_at";
+  "id, domain, parent_id, depth, slug, slug_path, label, label_plural, description, icon_key, sort_order, is_active, legacy_product_type, legacy_product_category, legacy_product_subcategory, legacy_project_category, created_at, updated_at, seo_title, meta_description, intro_text, featured_image, synonyms, inclusion_criteria, exclusion_criteria, replaced_by_id, applies_to";
 
 /** Get all taxonomy nodes for a domain, ordered by depth then sort_order. */
 export async function getTaxonomyTree(
-  domain: "product" | "project" | "material" | "style"
+  domain: TaxonomyDomain
 ): Promise<DbResult<TaxonomyNode[]>> {
   const { data, error } = await supa()
     .from("taxonomy_nodes")
