@@ -1,8 +1,41 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 import { isMaintenanceMode, MAINTENANCE_RETRY_AFTER_SECONDS } from "@/lib/maintenance";
+import {
+  isComingSoonMode,
+  isComingSoonBypass,
+  COMING_SOON_PATH,
+} from "@/lib/comingSoon";
 
-const clerk = clerkMiddleware();
+/**
+ * Clerk middleware, with the pre-launch gate running inside the handler.
+ *
+ * The gate must live here rather than before clerkMiddleware because deciding
+ * whether a visitor is signed in requires Clerk's `auth()`, which only exists
+ * inside this callback.
+ *
+ * Order matters: the mode and bypass checks run BEFORE `await auth()`, so
+ * bypassed paths (webhooks, /api/revalidate, /og) skip the session lookup
+ * entirely, and the gate costs nothing at all while COMING_SOON_MODE is off.
+ *
+ * Returning undefined hands control back to Clerk, which is what lets it
+ * complete its own session handshake normally.
+ *
+ * REWRITE, not a direct response: the gate renders live platform totals, which
+ * need the Supabase service client and unstable_cache — both Node-only, and
+ * this runs on the edge. Rewriting to /coming-soon lets that Route Handler
+ * render it. The visitor's URL is preserved and the handler's 503 passes
+ * through, neither of which a redirect would do.
+ */
+const clerk = clerkMiddleware(async (auth, req) => {
+  if (!isComingSoonMode()) return;
+  if (isComingSoonBypass(req.nextUrl.pathname)) return;
+
+  const { userId } = await auth();
+  if (userId) return;
+
+  return NextResponse.rewrite(new URL(COMING_SOON_PATH, req.url));
+});
 
 /** Paths that must remain reachable during maintenance. */
 function isMaintenancePassthrough(pathname: string): boolean {

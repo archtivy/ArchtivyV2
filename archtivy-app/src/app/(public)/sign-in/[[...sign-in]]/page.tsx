@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useSignIn } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { OAuthStrategy } from "@clerk/types";
@@ -235,12 +234,15 @@ export default function SignInPage() {
             LinkedIn
           </button>
         </div>
-        <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 dark:text-zinc-400">
-          Don&apos;t have an account?{" "}
-          <Link href="/sign-up" className="font-medium text-archtivy-primary hover:opacity-90 hover:underline">
-            Sign up
-          </Link>
-        </p>
+        {/* The "Don't have an account? Sign up" prompt is removed while the
+            pre-launch gate is up: /sign-up is deliberately NOT in the gate's
+            bypass list, so the link would have led to a 503.
+
+            RESTORE THIS WHEN COMING_SOON_MODE IS RETIRED — without it there is
+            no path from sign-in to registration. It is not conditional because
+            this is a client component and COMING_SOON_MODE is a server-only
+            env var; exposing a NEXT_PUBLIC_ copy would create a second source
+            of truth that can silently disagree with the middleware. */}
       </form>
     </AuthSplitLayout>
   );
