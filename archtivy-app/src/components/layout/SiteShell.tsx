@@ -30,6 +30,7 @@ const EDITORIAL_ROUTES = new Set([
   // the legacy zinc TopNav it read as a blue admin form bolted onto an
   // editorial product — the exact mismatch the brief was written against.
   "/add/project",
+  "/add/product",
 ]);
 
 // Routes that show TopNav but skip PageContainer (full-width content).

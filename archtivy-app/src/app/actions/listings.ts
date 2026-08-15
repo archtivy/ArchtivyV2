@@ -20,6 +20,7 @@ import {
   uploadGalleryImagesForProduct,
 } from "@/lib/storage/gallery";
 import { uploadListingDocumentsServer } from "@/lib/storage/documents";
+import { normaliseInstagramHandle } from "@/lib/publish/instagram";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getProductCanonicalBySlug } from "@/lib/db/explore";
 import {
@@ -581,7 +582,12 @@ export async function createProductCanonical(
       // Explicit, never defaulted: public submissions await review. Relying on
       // the function's 'APPROVED' default here would silently auto-publish
       // every public submission.
-      p_status: "PENDING",
+      //
+      // DRAFT is now a real state (migration 20260810). A saved draft must not
+      // enter the review queue — it is not finished and nobody has asked for it
+      // to be looked at. Verified that products.status accepts DRAFT, so no
+      // schema change was needed for this.
+      p_status: isDraft ? "DRAFT" : "PENDING",
       p_owner_clerk_user_id: userId,
       p_color_options: colorOptions,
     }
@@ -590,6 +596,32 @@ export async function createProductCanonical(
   if (rpcError) return { error: `Failed to create product: ${rpcError.message}` };
   if (!newProductId) return { error: "Failed to create product." };
   const productId = newProductId as string;
+
+  // Publish-flow columns. create_product_with_sidecar has no parameters for
+  // these, and widening its signature would mean a migration for four nullable
+  // text fields — so they are patched onto the row the RPC just created,
+  // inside the same action.
+  const metaDescription = (formData.get("meta_description") as string)?.trim() || null;
+  const websiteUrl = (formData.get("website") as string)?.trim() || null;
+  const videoUrl = (formData.get("video_url") as string)?.trim() || null;
+  const instagramRaw = (formData.get("instagram") as string)?.trim() || "";
+  const instagramHandle = normaliseInstagramHandle(instagramRaw);
+  if (metaDescription || websiteUrl || videoUrl || instagramHandle) {
+    const { error: metaErr } = await supabaseForProduct
+      .from("listings")
+      .update({
+        meta_description: metaDescription,
+        website: websiteUrl,
+        instagram: instagramHandle,
+        video_url: videoUrl,
+      })
+      .eq("id", productId);
+    if (metaErr) {
+      // Non-fatal: the product exists and is usable. Logged rather than
+      // swallowed, so a constraint rejection is visible.
+      console.error("[createProduct] publish-flow fields failed:", metaErr.code, metaErr.message);
+    }
+  }
 
   // Set taxonomy node (new DB taxonomy system)
   if (taxonomyNodeId) {

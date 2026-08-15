@@ -1,98 +1,64 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { AddProductForm } from "./AddProductForm";
-import { Button } from "@/components/ui/Button";
+import type { Metadata } from "next";
 import { getProfileByClerkId } from "@/lib/db/profiles";
-import { getListingsByOwner } from "@/lib/db/listings";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
-import { OnboardingSteps } from "@/components/onboarding/OnboardingSteps";
-import { getTaxonomyTree, getFacetsForDomain } from "@/lib/taxonomy/taxonomyDb";
-import type { MemberTitleRow } from "../project/TeamMembersField";
-import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
+import { getTaxonomyTree } from "@/lib/taxonomy/taxonomyDb";
+import {
+  ProductWizard,
+  type ProductTaxonomyOption,
+  type ProductMaterialOption,
+} from "./ProductWizard";
 
-async function getActiveBrandMemberTitles(): Promise<MemberTitleRow[]> {
-  const supabase = getSupabaseServiceClient();
-  const { data, error } = await supabase
-    .from("member_titles")
-    .select("label, maps_to_role, sort_order")
-    .eq("is_active", true)
-    .eq("maps_to_role", "brand")
-    .order("sort_order", { ascending: true });
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Add a product | Archtivy",
+  robots: { index: false, follow: false },
+};
+
+/**
+ * /add/product — the product publish wizard.
+ *
+ * Server half loads reference data only; the write path stays in
+ * createProductCanonical (create_product_with_sidecar RPC), unchanged.
+ */
+
+async function getCategories(): Promise<ProductTaxonomyOption[]> {
+  const res = await getTaxonomyTree("product");
+  return (res.data ?? [])
+    .filter((n) => !n.slug_path.includes("/"))
+    .map((n) => ({ id: n.id, label: n.label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+async function getMaterials(): Promise<ProductMaterialOption[]> {
+  const sup = getSupabaseServiceClient();
+  const { data, error } = await sup.from("materials").select("id, name").order("name");
   if (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn("[member_titles] brand fetch error:", error.message);
-    }
+    console.error("[add/product] materials failed:", error.message);
     return [];
   }
-  return (data ?? []) as MemberTitleRow[];
+  return ((data ?? []) as { id: string; name: string }[]).map((m) => ({ id: m.id, label: m.name }));
 }
 
 export default async function AddProductPage() {
   const { userId } = await auth();
-  if (!userId) {
-    redirect("/sign-in?redirect_url=" + encodeURIComponent("/add/product"));
-  }
+  if (!userId) redirect("/sign-in?redirect_url=/add/product");
+
   const profileResult = await getProfileByClerkId(userId);
-  const profile = profileResult.data;
-  if (!profile?.username) {
-    redirect("/onboarding");
-  }
+  const profile = profileResult.data as { username?: string; display_name?: string | null } | null;
+  if (!profile?.username) redirect("/onboarding");
 
-  const { data: listings } = await getListingsByOwner(userId);
-  const listingsCount = listings?.length ?? 0;
-  const showOnboarding = listingsCount === 0;
-
-  const [memberTitles, productTaxRes, materialTaxRes, facetsRes] = await Promise.all([
-    getActiveBrandMemberTitles(),
-    getTaxonomyTree("product"),
-    getTaxonomyTree("material"),
-    getFacetsForDomain("product"),
-  ]);
-  const productTaxonomyNodes = (productTaxRes.data ?? []).map((n) => ({
-    id: n.id,
-    parent_id: n.parent_id,
-    depth: n.depth,
-    label: n.label,
-    legacy_product_type: n.legacy_product_type ?? null,
-    legacy_product_category: n.legacy_product_category ?? null,
-    legacy_product_subcategory: n.legacy_product_subcategory ?? null,
-  }));
-  const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
-    id: n.id,
-    parent_id: n.parent_id,
-    depth: n.depth,
-    label: n.label,
-  }));
-  const facets: FacetForForm[] = (facetsRes.data ?? []).map((f) => ({
-    id: f.id,
-    slug: f.slug,
-    label: f.label,
-    values: f.values.map((v) => ({ id: v.id, slug: v.slug, label: v.label })),
-  }));
+  const [categories, materials] = await Promise.all([getCategories(), getMaterials()]);
 
   return (
-    <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950/50">
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <div className="space-y-8">
-      {showOnboarding && (
-        <OnboardingSteps />
-      )}
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-          Add product
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Create a new product listing. Save draft anytime or publish when ready.
-        </p>
-        <p className="mt-2">
-          <Button as="link" href="/explore/products" variant="link">
-            ← Back to products
-          </Button>
-        </p>
-      </div>
-      <AddProductForm memberTitles={memberTitles} taxonomyNodes={productTaxonomyNodes} materialNodes={materialNodes} facets={facets} />
-        </div>
-      </div>
-    </div>
+    <ProductWizard
+      categories={categories}
+      materials={materials}
+      // The brand is the submitting profile — there is nothing to choose, so it
+      // is shown as confirmed context rather than asked for.
+      brandName={profile.display_name?.trim() || profile.username || null}
+    />
   );
 }

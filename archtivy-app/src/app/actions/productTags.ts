@@ -45,7 +45,10 @@ async function assertCanEditImage(
   listingImageId: string,
   profileId: string,
   isAdmin: boolean
-): Promise<{ ok: true; listingId: string; slug: string | null; type: string } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; listingId: string; slug: string | null; type: string; isOwner: boolean }
+  | { ok: false; error: string }
+> {
   const sup = getSupabaseServiceClient();
 
   const { data: image, error } = await sup
@@ -74,7 +77,16 @@ async function assertCanEditImage(
   if (!isAdmin && l.owner_profile_id !== profileId) {
     return { ok: false, error: "You do not own this listing." };
   }
-  return { ok: true, listingId: l.id, slug: l.slug, type: l.type };
+  // isOwner is returned separately from the permission decision: an admin may
+  // edit a listing they do not own, and a pin they place is not a first-party
+  // statement from the owner. See createPin.
+  return {
+    ok: true,
+    listingId: l.id,
+    slug: l.slug,
+    type: l.type,
+    isOwner: l.owner_profile_id === profileId,
+  };
 }
 
 async function writeAuditRow(params: {
@@ -136,10 +148,22 @@ export async function createPin(input: unknown): Promise<PinResult> {
       x_percent: v.xPercent,
       y_percent: v.yPercent,
       tag_source: "owner",
-      // An owner tagging their own project is a first-party statement, not a
-      // guess — so it is `official` on creation. AI-sourced pins are inserted
-      // by the suggestion job as `unverified` and must be confirmed.
-      verification_status: "official",
+      /*
+       * AUTO-APPROVAL, and only for the actual owner.
+       *
+       * The listing's own owner placing a pin on their own photo is a
+       * first-party statement about their own project — there is nothing for a
+       * moderator to add, so it goes straight to `official` with no review step.
+       *
+       * An ADMIN placing a pin on someone else's listing is a different claim.
+       * It is still a human placement, so it lands `verified` (a moderator
+       * confirmed it) rather than `official` (the owner stated it). Both are
+       * publicly visible; the distinction preserves who said it.
+       *
+       * AI-sourced pins are unaffected: they are inserted by the suggestion job
+       * as `unverified` and still require confirmation.
+       */
+      verification_status: access.isOwner ? "official" : "verified",
       created_by: profile.id,
     })
     .select("id")
@@ -154,9 +178,9 @@ export async function createPin(input: unknown): Promise<PinResult> {
   await writeAuditRow({
     productTagId: id,
     action: "created",
-    toStatus: "official",
+    toStatus: access.isOwner ? "official" : "verified",
     actorProfileId: profile.id,
-    metadata: { x: v.xPercent, y: v.yPercent, source: "owner" },
+    metadata: { x: v.xPercent, y: v.yPercent, source: "owner", byOwner: access.isOwner },
   });
   bust(access.type, access.slug, access.listingId);
   return { ok: true, id };
