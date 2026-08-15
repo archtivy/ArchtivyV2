@@ -133,3 +133,7 @@ Recorded elsewhere, repeated here so one document covers the taxonomy backlog:
 - **3 `slugFromTitle` variants** not unified (`"Serie 47.3"` → `serie-473` vs `serie-47-3`)
 - **3 approved listings with `slug IS NULL`**
 - **non-www → www is 307, not 308** — Vercel dashboard setting
+
+Non-taxonomy schema and row-level defects are tracked separately in
+**`DATA_INTEGRITY_LOG.md`** — currently the missing FKs on `project_material_links` and the
+duplicated `Faulkner Architects` profile.
