@@ -24,8 +24,8 @@ interface ProfileData {
 const navLinks = [
   { href: "/explore/projects", label: "Projects" },
   { href: "/explore/products", label: "Products" },
-  { href: "/explore/designers", label: "Designers" },
-  { href: "/explore/brands", label: "Brands" },
+  { href: "/designers", label: "Designers" },
+  { href: "/brands", label: "Brands" },
   { href: "/explore", label: "Explore" },
 ];
 
@@ -33,8 +33,8 @@ const navLinks = [
 const mobileNavLinks = [
   { href: "/explore/projects", label: "Projects" },
   { href: "/explore/products", label: "Products" },
-  { href: "/explore/designers", label: "Designers" },
-  { href: "/explore/brands", label: "Brands" },
+  { href: "/designers", label: "Designers" },
+  { href: "/brands", label: "Brands" },
   { href: "/explore", label: "Explore" },
 ];
 

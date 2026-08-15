@@ -79,7 +79,7 @@ export function NetworkFeedSection() {
               Explore the network
             </Link>
             <Link
-              href="/explore/designers"
+              href="/designers"
               className="inline-block rounded-[20px] border border-zinc-300 bg-transparent px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 focus:outline-none dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               Browse designers

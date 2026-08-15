@@ -184,7 +184,7 @@ function ListingCard({
   imageUrl?: string;
   /** views_count from listings table (server-maintained counter). */
   liveViewCount: number;
-  /** save_count from saved_listings table (live SQL-aggregated on server). */
+  /** save_count from listing_saves (live SQL-aggregated on server). */
   liveSaveCount: number;
 }) {
   return (
@@ -226,7 +226,15 @@ function ListingCard({
           <span>{liveSaveCount} saves</span>
         </div>
       </div>
-      <div className="shrink-0">
+      <div className="flex shrink-0 items-center gap-2">
+        {/* Entry point to the per-listing management page. Without this the
+            route exists but nothing links to it. */}
+        <Link
+          href={`/me/listings/${listing.id}`}
+          className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm text-zinc-900 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+        >
+          Manage
+        </Link>
         <ListingRowActions
           listingId={listing.id}
           listingType={listing.type}

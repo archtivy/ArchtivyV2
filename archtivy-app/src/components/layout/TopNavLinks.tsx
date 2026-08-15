@@ -12,8 +12,8 @@ export function TopNavLinks() {
   const isExploreMap = pathname === "/explore";
   const isProjects = pathname?.startsWith("/explore/projects") ?? false;
   const isProducts = pathname?.startsWith("/explore/products") ?? false;
-  const isDesigners = pathname?.startsWith("/explore/designers") ?? false;
-  const isBrands = pathname?.startsWith("/explore/brands") ?? false;
+  const isDesigners = pathname?.startsWith("/designers") ?? false;
+  const isBrands = pathname?.startsWith("/brands") ?? false;
 
   return (
     <>
@@ -37,13 +37,13 @@ export function TopNavLinks() {
         Products
       </Link>
       <Link
-        href="/explore/designers"
+        href="/designers"
         className={`${baseClass} ${isDesigners ? activeClass : ""}`}
       >
         Designers
       </Link>
       <Link
-        href="/explore/brands"
+        href="/brands"
         className={`${baseClass} ${isBrands ? activeClass : ""}`}
       >
         Brands

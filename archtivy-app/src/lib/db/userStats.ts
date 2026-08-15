@@ -3,7 +3,7 @@
  *
  * Rules enforced here:
  *  - Only APPROVED + non-deleted listings count.
- *  - Saves are counted live from `saved_listings`, not the denormalized column.
+ *  - Saves are counted live from `listing_saves`, not the denormalized column.
  *  - Connections counted once per pair (each row = one connection).
  *  - Service-role client bypasses RLS for accurate, trustworthy aggregation.
  *  - No client-side (browser) aggregation — runs only in Server Components.
@@ -24,7 +24,7 @@ export interface UserListingStats {
  * SQL approach:
  *   total_listings   — server-side count of deduplicated IDs after two indexed lookups.
  *   total_views      — SUM of views_count column (fetched as a single narrow column, summed server-side).
- *   total_saves      — COUNT(*) from saved_listings WHERE listing_id IN (...) — pure SQL COUNT via Supabase head query.
+ *   total_saves      — COUNT(*) from listing_saves WHERE listing_id IN (...) — pure SQL COUNT via Supabase head query.
  *   total_connections — COUNT(*) from connections WHERE (requester_id = ? OR addressee_id = ?) AND status = 'ACCEPTED'.
  */
 export async function getUserListingStats(
@@ -70,12 +70,16 @@ export async function getUserListingStats(
 
   // ── 2. Live save count — SQL COUNT via head query ─────────────────────────
   // No rows are returned; Supabase sends COUNT(*) as the response header.
+  // REPOINTED 2026-08-08: was `saved_listings`, which has never existed, so this
+  // count was silently 0 for every profile. The real table is `listing_saves`.
+  // See DATA_INTEGRITY_LOG.md item 6.
   let totalSaves = 0;
   if (listingIds.length > 0) {
-    const { count } = await supa
-      .from("saved_listings")
+    const { count, error } = await supa
+      .from("listing_saves")
       .select("*", { count: "exact", head: true })
       .in("listing_id", listingIds);
+    if (error) console.error(`[userStats] save count failed: ${error.code ?? "?"} ${error.message}`);
     totalSaves = count ?? 0;
   }
 
@@ -97,21 +101,30 @@ export async function getUserListingStats(
 }
 
 /**
- * Fetch live per-listing save counts from the `saved_listings` table.
+ * Fetch live per-listing save counts from the `listing_saves` table.
  * Returns listing_id → count map. Runs server-side only.
  *
  * Fetches only the `listing_id` column, then counts occurrences — a single
  * narrow query replaces N individual count queries.
+ *
+ * REPOINTED 2026-08-08 from `saved_listings` (never existed). The error was
+ * previously destructured away entirely, so /me/listings showed "0 saves" for
+ * everything with nothing to indicate the query had failed.
  */
 export async function getLiveSaveCountsByListingIds(
   listingIds: string[]
 ): Promise<Record<string, number>> {
   if (listingIds.length === 0) return {};
 
-  const { data } = await getSupabaseServiceClient()
-    .from("saved_listings")
+  const { data, error } = await getSupabaseServiceClient()
+    .from("listing_saves")
     .select("listing_id")
     .in("listing_id", listingIds);
+
+  if (error) {
+    console.error(`[userStats] live save counts failed: ${error.code ?? "?"} ${error.message}`);
+    return {};
+  }
 
   const counts: Record<string, number> = {};
   for (const row of data ?? []) {

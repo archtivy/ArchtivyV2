@@ -13,6 +13,25 @@ const AUTH_PATH_PREFIXES = ["/sign-in", "/sign-up", "/onboarding", "/complete-pr
 // Routes that show a minimal tool header (no main site nav).
 const TOOL_PATHS = ["/explore"];
 
+/**
+ * Routes on the editorial cream palette that render their own HomeNav and
+ * HomeFooter instead of the global TopNav/Footer. Keep in sync with
+ * FOOTERLESS_ROUTES in ConditionalFooter, or a page gets two footers.
+ */
+const EDITORIAL_ROUTES = new Set([
+  "/",
+  "/projects",
+  "/products",
+  "/designers",
+  "/brands",
+  "/magazine",
+  "/inspiration",
+  // The publish wizard renders its own HomeNav on the cream palette. Left on
+  // the legacy zinc TopNav it read as a blue admin form bolted onto an
+  // editorial product — the exact mismatch the brief was written against.
+  "/add/project",
+]);
+
 // Routes that show TopNav but skip PageContainer (full-width content).
 const FULL_WIDTH_PATHS: string[] = [];
 
@@ -61,6 +80,42 @@ export function SiteShell({ children }: SiteShellProps) {
     );
   }
 
+  // Editorial-palette routes supply their own navigation and footer (HomeNav /
+  // HomeFooter) on the cream/stone/ink tokens, so they render without TopNav,
+  // PageContainer or the global Footer.
+  //
+  // EXACT MATCHES ONLY. "/projects" is here but "/projects/residential" is not:
+  // the taxonomy archive routes under /projects/[...segments] still use the
+  // existing shell and palette. Widening this to a prefix would restyle every
+  // archive page unintentionally.
+  if (EDITORIAL_ROUTES.has(pathname ?? "")) {
+    return <>{children}</>;
+  }
+
+  // Everything under /projects/* and /products/* renders bare, because this client component
+  // cannot tell a project DETAIL page from a CATEGORY ARCHIVE — both are served
+  // by the same [...segments] catch-all, and only the server knows
+  // which resolved. So the decision is inverted: shell-less by default here,
+  // and the CategoryArchive components re-add TopNav/Footer for that branch.
+  // Archives therefore render exactly as before; detail pages get the cream
+  // editorial treatment. Note "/projects" itself is an exact match above.
+  if (pathname?.startsWith("/projects/") || pathname?.startsWith("/products/")) {
+    return <>{children}</>;
+  }
+
+  // /magazine/[slug] renders its own HomeNav/HomeFooter. Unlike the two above,
+  // there are no category archives under /magazine, so this prefix is
+  // unambiguous — every child route is an article.
+  if (pathname?.startsWith("/magazine/")) {
+    return <>{children}</>;
+  }
+
+  // /inspiration/[slug] collection landing pages, same reasoning as /magazine/:
+  // every child route is a collection, so the prefix is unambiguous.
+  if (pathname?.startsWith("/inspiration/")) {
+    return <>{children}</>;
+  }
+
   if (isFullWidthRoute(pathname)) {
     return (
       <>
@@ -70,13 +125,11 @@ export function SiteShell({ children }: SiteShellProps) {
     );
   }
 
-  const isHome = pathname === "/";
-
   return (
     <>
       <TopNav />
       <main>
-        <PageContainer className={isHome ? "!pt-0" : undefined}>{children}</PageContainer>
+        <PageContainer>{children}</PageContainer>
       </main>
     </>
   );

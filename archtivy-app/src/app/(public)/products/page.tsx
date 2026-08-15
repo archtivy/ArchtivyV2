@@ -1,43 +1,31 @@
 export const revalidate = 3600;
 
 import type { Metadata } from "next";
-import { unstable_cache } from "next/cache";
-import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getAbsoluteUrl } from "@/lib/canonical";
-import { getTaxonomyTree, getNodeListingCountsWithDescendants } from "@/lib/taxonomy/taxonomyDb";
-import { Container } from "@/components/layout/Container";
-import { ArchiveHeader } from "@/components/archive/ArchiveHeader";
-import { CategoryHubGrid, type CategoryHubItem } from "@/components/archive/CategoryHubGrid";
-import { ArchiveBreadcrumb } from "@/components/archive/ArchiveBreadcrumb";
+import { getProductsDirectory } from "@/lib/db/productsDirectory";
+import { HomeNav } from "@/components/home/HomeNav";
+import { HomeFooter } from "@/components/home/HomeFooter";
+import { ProductsHeaderBand } from "@/components/products/ProductsHeaderBand";
+import { ProductsDirectory } from "@/components/products/ProductsDirectory";
+import { ProductsTrustStrip } from "@/components/products/ProductsTrustStrip";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildCollectionPageJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
 
-const getCachedProductCategories = unstable_cache(
-  async (): Promise<CategoryHubItem[]> => {
-    const [treeRes, countsRes] = await Promise.all([
-      getTaxonomyTree("product"),
-      getNodeListingCountsWithDescendants("product"),
-    ]);
-    const nodes = treeRes.data ?? [];
-    const counts = countsRes.data ?? {};
-    const topLevel = nodes.filter((n) => n.depth === 0);
-    const childCountMap: Record<string, number> = {};
-    for (const n of nodes) {
-      if (n.parent_id) {
-        childCountMap[n.parent_id] = (childCountMap[n.parent_id] ?? 0) + 1;
-      }
-    }
-    return topLevel.map((n) => ({
-      label: n.label,
-      slug_path: n.slug_path,
-      description: n.description,
-      listing_count: counts[n.id] ?? 0,
-      child_count: childCountMap[n.id] ?? 0,
-    }));
-  },
-  ["archive:products:hub"],
-  { tags: [CACHE_TAGS.listings], revalidate: 3600 }
-);
+/**
+ * /products — Directory/Search Layout archetype (Blueprint §8), the same
+ * archetype as /projects: left filter rail + result grid/list, no right rail.
+ *
+ * Renders on the cream editorial palette with HomeNav/HomeFooter. "/products"
+ * is an exact member of EDITORIAL_ROUTES in SiteShell and FOOTERLESS_ROUTES in
+ * ConditionalFooter — sub-paths under /products/[...segments] keep the existing
+ * shell, exactly as the project archives do.
+ *
+ * The previous category-hub UI is replaced; category browsing still lives at
+ * /products/[...segments], which the Categories facet links into.
+ *
+ * SEO carried over unchanged: same canonical, same CollectionPage +
+ * BreadcrumbList JSON-LD, same revalidate window.
+ */
 
 export const metadata: Metadata = {
   title: "Architecture Products — Browse by Category | Archtivy",
@@ -46,7 +34,8 @@ export const metadata: Metadata = {
   alternates: { canonical: "/products" },
   openGraph: {
     title: "Architecture Products — Browse by Category | Archtivy",
-    description: "Explore architecture and design products by category: furniture, lighting, surfaces, and more.",
+    description:
+      "Explore architecture and design products by category: furniture, lighting, surfaces, and more.",
     images: [{ url: "/og", width: 1200, height: 630, alt: "Archtivy Products" }],
   },
   twitter: {
@@ -57,14 +46,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function ProductsHubPage() {
-  const categories = await getCachedProductCategories();
+export default async function ProductsIndexPage() {
+  const { products, facets, total } = await getProductsDirectory();
 
   const canonicalUrl = getAbsoluteUrl("/products");
   const collectionJsonLd = buildCollectionPageJsonLd({
     name: "Architecture Products",
-    description:
-      "Browse architecture and design products by category on Archtivy.",
+    description: "Browse architecture and design products by category on Archtivy.",
     url: canonicalUrl,
   });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
@@ -73,14 +61,26 @@ export default async function ProductsHubPage() {
   ]);
 
   return (
-    <Container className="py-8 sm:py-12">
+    <div className="min-h-screen bg-cream font-body text-ink">
       <JsonLd schemas={[collectionJsonLd, breadcrumbJsonLd]} />
-      <ArchiveBreadcrumb segments={[]} current="Products" />
-      <ArchiveHeader
-        title="Architecture Products"
-        intro="Browse architecture and design products by category. From furniture and lighting to surfaces and architectural systems."
-      />
-      <CategoryHubGrid baseSegment="products" categories={categories} />
-    </Container>
+      {/* solid: no dark hero behind the bar on this page. */}
+      <HomeNav variant="solid" />
+
+      <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
+        <ProductsHeaderBand total={total} facets={facets} />
+
+        <div className="mt-10">
+          <ProductsDirectory products={products} facets={facets} />
+        </div>
+
+        <ProductsTrustStrip
+          withDocuments={facets.withDocuments}
+          total={total}
+          brandsWithWebsite={facets.brandsWithWebsite}
+        />
+      </div>
+
+      <HomeFooter />
+    </div>
   );
 }

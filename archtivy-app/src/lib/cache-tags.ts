@@ -15,6 +15,10 @@ export const CACHE_TAGS = {
   profiles: "profiles",
   /** Invalidated after match computation completes. Use on relationship caches. */
   matches: "matches",
+  /** Magazine articles: index, detail and the admin review queue. */
+  articles: "articles",
+  /** Inspiration collections: index row, landing pages, daily refresh job. */
+  collections: "collections",
 } as const;
 
 export type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];

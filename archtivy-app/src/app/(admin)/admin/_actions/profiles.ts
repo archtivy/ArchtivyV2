@@ -176,8 +176,8 @@ export async function updateProfile(input: {
   revalidatePath("/u/id/[profileId]", "page");
   revalidatePath("/me/listings");
   revalidatePath("/explore");
-  revalidatePath("/explore/designers");
-  revalidatePath("/explore/brands");
+  revalidatePath("/designers");
+  revalidatePath("/brands");
   revalidateTag(CACHE_TAGS.profiles);
   revalidateTag(CACHE_TAGS.explore);
   return { ok: true as const };
@@ -209,8 +209,8 @@ export async function bulkUpdateProfiles(input: {
   revalidatePath("/admin/profiles");
   revalidatePath("/admin");
   revalidatePath("/u/[username]", "page");
-  revalidatePath("/explore/designers");
-  revalidatePath("/explore/brands");
+  revalidatePath("/designers");
+  revalidatePath("/brands");
   revalidateTag(CACHE_TAGS.profiles);
   revalidateTag(CACHE_TAGS.explore);
   return { ok: true as const };

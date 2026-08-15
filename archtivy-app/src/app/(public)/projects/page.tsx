@@ -1,43 +1,34 @@
 export const revalidate = 3600;
 
 import type { Metadata } from "next";
-import { unstable_cache } from "next/cache";
-import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getAbsoluteUrl } from "@/lib/canonical";
-import { getTaxonomyTree, getChildNodes, getNodeListingCountsWithDescendants } from "@/lib/taxonomy/taxonomyDb";
-import { Container } from "@/components/layout/Container";
-import { ArchiveHeader } from "@/components/archive/ArchiveHeader";
-import { CategoryHubGrid, type CategoryHubItem } from "@/components/archive/CategoryHubGrid";
-import { ArchiveBreadcrumb } from "@/components/archive/ArchiveBreadcrumb";
+import { getProjectsDirectory } from "@/lib/db/projectsDirectory";
+import { HomeNav } from "@/components/home/HomeNav";
+import { HomeFooter } from "@/components/home/HomeFooter";
+import { ProjectsHeaderBand } from "@/components/projects/ProjectsHeaderBand";
+import { ProjectsDirectory } from "@/components/projects/ProjectsDirectory";
+import { RequestProjectBand } from "@/components/projects/RequestProjectBand";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildCollectionPageJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
 
-const getCachedProjectCategories = unstable_cache(
-  async (): Promise<CategoryHubItem[]> => {
-    const [treeRes, countsRes] = await Promise.all([
-      getTaxonomyTree("project"),
-      getNodeListingCountsWithDescendants("project"),
-    ]);
-    const nodes = treeRes.data ?? [];
-    const counts = countsRes.data ?? {};
-    const topLevel = nodes.filter((n) => n.depth === 0);
-    const childCountMap: Record<string, number> = {};
-    for (const n of nodes) {
-      if (n.parent_id) {
-        childCountMap[n.parent_id] = (childCountMap[n.parent_id] ?? 0) + 1;
-      }
-    }
-    return topLevel.map((n) => ({
-      label: n.label,
-      slug_path: n.slug_path,
-      description: n.description,
-      listing_count: counts[n.id] ?? 0,
-      child_count: childCountMap[n.id] ?? 0,
-    }));
-  },
-  ["archive:projects:hub"],
-  { tags: [CACHE_TAGS.listings], revalidate: 3600 }
-);
+/**
+ * /projects — Directory/Search Layout archetype (Blueprint §8):
+ * left filter rail + result grid/list. Deliberately NO right rail; that pattern
+ * belongs to Search Results and Entity Detail pages (§21, and the brief's
+ * closing note).
+ *
+ * On the editorial cream palette, with HomeNav/HomeFooter, per the brief's
+ * recommendation to extend the homepage token scope across public discovery
+ * surfaces. SiteShell and ConditionalFooter both treat "/projects" the same way
+ * they treat "/".
+ *
+ * The previous category-hub UI (CategoryHubGrid) is replaced. Category browsing
+ * still exists at /projects/[...segments], which the tab row and taxonomy links
+ * feed into, so no navigation path is lost.
+ *
+ * SEO carried over unchanged from the hub version: same canonical, same
+ * CollectionPage + BreadcrumbList JSON-LD, same revalidate window.
+ */
 
 export const metadata: Metadata = {
   title: "Architecture Projects — Browse by Category | Archtivy",
@@ -46,7 +37,8 @@ export const metadata: Metadata = {
   alternates: { canonical: "/projects" },
   openGraph: {
     title: "Architecture Projects — Browse by Category | Archtivy",
-    description: "Explore architecture projects by category: residential, hospitality, commercial, cultural, and more.",
+    description:
+      "Explore architecture projects by category: residential, hospitality, commercial, cultural, and more.",
     images: [{ url: "/og", width: 1200, height: 630, alt: "Archtivy Projects" }],
   },
   twitter: {
@@ -57,14 +49,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function ProjectsHubPage() {
-  const categories = await getCachedProjectCategories();
+export default async function ProjectsIndexPage() {
+  const { projects, facets, total } = await getProjectsDirectory();
 
   const canonicalUrl = getAbsoluteUrl("/projects");
   const collectionJsonLd = buildCollectionPageJsonLd({
     name: "Architecture Projects",
-    description:
-      "Browse architecture projects by category on Archtivy.",
+    description: "Browse architecture projects by category on Archtivy.",
     url: canonicalUrl,
   });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
@@ -73,14 +64,22 @@ export default async function ProjectsHubPage() {
   ]);
 
   return (
-    <Container className="py-8 sm:py-12">
+    <div className="min-h-screen bg-cream font-body text-ink">
       <JsonLd schemas={[collectionJsonLd, breadcrumbJsonLd]} />
-      <ArchiveBreadcrumb segments={[]} current="Projects" />
-      <ArchiveHeader
-        title="Architecture Projects"
-        intro="Browse architecture projects by category. From residential homes to cultural landmarks — discover built work from designers around the world."
-      />
-      <CategoryHubGrid baseSegment="projects" categories={categories} />
-    </Container>
+      {/* solid: there is no dark hero behind the bar on this page. */}
+      <HomeNav variant="solid" />
+
+      <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
+        <ProjectsHeaderBand total={total} facets={facets} />
+
+        <div className="mt-10">
+          <ProjectsDirectory projects={projects} facets={facets} />
+        </div>
+
+        <RequestProjectBand />
+      </div>
+
+      <HomeFooter />
+    </div>
   );
 }

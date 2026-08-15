@@ -75,6 +75,11 @@ export async function getProfileDirectoryByRole(
     )
     .eq("role", role)
     .eq("is_hidden", false)
+    // Soft-deleted profiles were being listed publicly: this predicate was
+    // missing, so /explore/designers and /explore/brands both showed rows with
+    // deleted_at set. Found 2026-08-04 while building /designers, where three
+    // deleted designer profiles turned up in the directory.
+    .is("deleted_at", null)
     .not("username", "is", null)
     .order("display_name");
 

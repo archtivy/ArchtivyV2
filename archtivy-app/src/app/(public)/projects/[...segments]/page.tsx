@@ -13,10 +13,8 @@ import { getListingUrl } from "@/lib/canonical";
 import { fetchProjectArchive } from "@/lib/archive/fetchArchiveData";
 import { ProjectCategoryArchive } from "@/components/archive/ProjectCategoryArchive";
 import { getListingTaxonomyPath } from "@/lib/taxonomy/resolve";
-import {
-  ProjectDetailRenderer,
-  buildProjectDetailMetadata,
-} from "@/app/(public)/projects/_lib/projectDetailRenderer";
+import { buildProjectDetailMetadata } from "@/app/(public)/projects/_lib/projectDetailRenderer";
+import { ProjectDetailView } from "@/components/projects/ProjectDetailView";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -60,8 +58,21 @@ async function findProject(slug: string) {
   return getCachedProject(slug);
 }
 
+/**
+ * Statuses that are NOT publicly visible. A row in one of these renders only
+ * for its owner or an admin; everyone else gets a 404.
+ *
+ * DRAFT was added with the publish-flow migration (20260810). Before that this
+ * tested PENDING alone and returned early for anything else — so a DRAFT row
+ * would have fallen straight through and rendered publicly. These two guards
+ * (here and in the sibling route) are the only thing standing between a draft
+ * and the open web: every directory, sitemap, explore and related-rail query
+ * filters status = APPROVED explicitly, and neither detail route prerenders.
+ */
+const NON_PUBLIC_STATUSES = new Set(["PENDING", "DRAFT"]);
+
 async function authCheckPending(project: { status: string; owner_clerk_user_id?: string | null }) {
-  if (project.status !== "PENDING") return;
+  if (!NON_PUBLIC_STATUSES.has(project.status)) return;
   const { userId } = await auth();
   const profileRes = await getProfileByClerkId(userId ?? "");
   const profile = profileRes.data as { is_admin?: boolean } | null;
@@ -115,7 +126,9 @@ export async function generateMetadata({
   // Detail page metadata
   const project = await findProject(listingSlug);
   if (!project) return {};
-  if (project.status === "PENDING") return { title: "Project" };
+  // Non-public rows never emit real metadata — a draft must not leak its
+  // title, description or OG image to a crawler or a link unfurler.
+  if (NON_PUBLIC_STATUSES.has(project.status)) return { title: "Project", robots: { index: false, follow: false } };
   const { path: canonicalPath } = await resolveCanonicalPath(project.id, project.slug ?? project.id);
   return buildProjectDetailMetadata(project, canonicalPath);
 }
@@ -193,5 +206,8 @@ export default async function ProjectSegmentsPage({
   // so we don't lose the taxonomy prefix.
   const effectiveCanonical = (taxonomyPrefix && !hasTaxonomy) ? currentUrlPath : canonicalPath;
 
-  return <ProjectDetailRenderer project={project} canonicalPath={effectiveCanonical} taxonomySlugPath={taxonomyPrefix} />;
+  // Cream editorial detail page (Entity Detail Layout archetype). The previous
+  // renderer remains at _lib/projectDetailRenderer.tsx and still supplies
+  // buildProjectDetailMetadata() above, so metadata behaviour is unchanged.
+  return <ProjectDetailView project={project} canonicalPath={effectiveCanonical} />;
 }

@@ -2,15 +2,20 @@ import type { Metadata } from "next";
 
 export const revalidate = 3600; // ISR: revalidate every hour
 
-import Link from "next/link";
 import { getProjectsCanonical, getProductsCanonical } from "@/lib/db/explore";
-import { ProjectCardPremium } from "@/components/listing/ProjectCardPremium";
-import { ProductCardPremium } from "@/components/listing/ProductCardPremium";
-import { HomeHero } from "@/components/home/HomeHero";
-import { LiveNetworkSection } from "@/components/home/LiveNetworkSection";
+import { HomeNav } from "@/components/home/HomeNav";
+import { HeroBand } from "@/components/home/HeroBand";
+import { CategoryPillBar } from "@/components/home/CategoryPillBar";
+import { FeaturedProjects } from "@/components/home/FeaturedProjects";
+import { FindByConnection } from "@/components/home/FindByConnection";
+import { FeaturedDesigners } from "@/components/home/FeaturedDesigners";
+import { FeaturedBrands } from "@/components/home/FeaturedBrands";
+import { Showcase, type ShowcaseItem } from "@/components/home/Showcase";
+import { JoinArchtivy } from "@/components/home/JoinArchtivy";
+import { HomeFooter } from "@/components/home/HomeFooter";
 import { MaintenanceLanding } from "@/components/home/MaintenanceLanding";
 import { getHomepagePromotedListingIds } from "@/lib/promote/campaigns";
-import { NetworkFeedSection } from "@/components/home/NetworkFeedSection";
+import { getListingUrl } from "@/lib/canonical";
 import { getBaseUrl } from "@/lib/canonical";
 import { isMaintenanceMode } from "@/lib/maintenance";
 import { buildHomepageJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
@@ -71,35 +76,115 @@ export const metadata: Metadata = MAINTENANCE
       },
     };
 
-const FEATURED_PROJECTS_LIMIT = 6;
-const FEATURED_PRODUCTS_LIMIT = 8;
+/** Featured row (4) + showcase grid (up to 16 with load-more). */
+const PROJECTS_LIMIT = 20;
+const PRODUCTS_LIMIT = 20;
 
+/** Root taxonomy segment, used to drive the showcase filter pills. */
+function rootOf(slugPath: string | null | undefined): string | null {
+  if (!slugPath) return null;
+  return slugPath.split("/")[0] ?? null;
+}
+
+/**
+ * Homepage — editorial cream direction (Archtivy Design Blueprint + Homepage
+ * Build Brief).
+ *
+ * Renders WITHOUT SiteShell: SiteShell returns children bare for "/" and
+ * ConditionalFooter suppresses the global footer there, because this page
+ * supplies its own nav (HomeNav) and footer (HomeFooter) on the cream/ink
+ * palette. Every other route is untouched.
+ *
+ * Sections 6 (Inspiration by Materials) and 9-left (From the Magazine) from the
+ * brief are deliberately omitted from v1: material→project counts do not exist
+ * at any meaningful scale, and there is no CMS behind the magazine. Shipping
+ * either would mean fabricating figures or dead links.
+ */
 export default async function Home() {
   if (MAINTENANCE) {
     return <MaintenanceLanding />;
   }
 
   const [projects, products, promotedIds] = await Promise.all([
-    getProjectsCanonical(FEATURED_PROJECTS_LIMIT),
-    getProductsCanonical(FEATURED_PRODUCTS_LIMIT),
+    getProjectsCanonical(PROJECTS_LIMIT),
+    getProductsCanonical(PRODUCTS_LIMIT),
     getHomepagePromotedListingIds(),
   ]);
 
-  // Surface promoted listings at the front of each section
+  // Promoted listings surface first, as before.
   const promotedSet = new Set(promotedIds);
-  const sortPromoted = <T extends { id: string }>(items: T[]): T[] => {
-    const promoted = items.filter((i) => promotedSet.has(i.id));
-    const rest = items.filter((i) => !promotedSet.has(i.id));
-    return [...promoted, ...rest];
-  };
+  const sortPromoted = <T extends { id: string }>(items: T[]): T[] => [
+    ...items.filter((i) => promotedSet.has(i.id)),
+    ...items.filter((i) => !promotedSet.has(i.id)),
+  ];
+
   const sortedProjects = sortPromoted(projects);
   const sortedProducts = sortPromoted(products);
+
+  const projectItems: ShowcaseItem[] = sortedProjects.map((p) => ({
+    id: p.id,
+    href: getListingUrl({
+      id: p.id,
+      slug: p.slug,
+      type: "project",
+      taxonomySlugPath: p.taxonomy_slug_path ?? null,
+    }),
+    title: p.title,
+    subtitle: p.owner?.displayName ?? null,
+    location: p.location_text,
+    imageUrl: p.cover,
+    group: rootOf(p.taxonomy_slug_path),
+  }));
+
+  const productItems: ShowcaseItem[] = sortedProducts.map((p) => ({
+    id: p.id,
+    href: getListingUrl({
+      id: p.id,
+      slug: p.slug,
+      type: "product",
+      taxonomySlugPath: p.taxonomy_slug_path ?? null,
+    }),
+    title: p.title,
+    subtitle: p.owner?.displayName ?? null,
+    meta: p.taxonomy_label ?? p.category ?? null,
+    imageUrl: p.cover,
+    group: rootOf(p.taxonomy_slug_path),
+  }));
+
+  // Pills are built from the roots actually present in the data, so a filter
+  // can never return an empty grid.
+  const presentProjectRoots = new Set(
+    projectItems.map((i) => i.group).filter(Boolean) as string[]
+  );
+  const presentProductRoots = new Set(
+    productItems.map((i) => i.group).filter(Boolean) as string[]
+  );
+
+  const PROJECT_PILLS: { label: string; value: string | null }[] = [
+    { label: "All Projects", value: null },
+    { label: "Residential", value: "residential" },
+    { label: "Hospitality", value: "hospitality" },
+    { label: "Commercial", value: "commercial" },
+    { label: "Cultural", value: "cultural" },
+    { label: "Interior", value: "interior" },
+    { label: "Landscape", value: "landscape-urban" },
+  ].filter((f) => f.value === null || presentProjectRoots.has(f.value));
+
+  const PRODUCT_PILLS: { label: string; value: string | null }[] = [
+    { label: "All Products", value: null },
+    { label: "Furniture", value: "furniture" },
+    { label: "Lighting", value: "lighting" },
+    { label: "Surfaces", value: "walls-ceilings-facades" },
+    { label: "Bathroom", value: "bathroom" },
+    { label: "Decor", value: "decor-accessories" },
+    { label: "Outdoor", value: "outdoor" },
+  ].filter((f) => f.value === null || presentProductRoots.has(f.value));
 
   const baseUrl = getBaseUrl();
   const jsonLdItems = buildHomepageJsonLd(baseUrl);
 
   return (
-    <>
+    <div className="min-h-screen bg-cream font-body text-ink">
       {jsonLdItems.map((item, i) => (
         <script
           key={i}
@@ -107,82 +192,58 @@ export default async function Home() {
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(item) }}
         />
       ))}
-      <HomeHero />
-      <LiveNetworkSection />
-      <div className="space-y-16 pb-24 sm:space-y-20 sm:pb-28">
-        {/* Personalized network feed — client-side, only for signed-in users */}
-        <NetworkFeedSection />
 
-        {/* Featured Projects */}
-        <section className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-            Featured Projects
-          </h2>
-          <Link
-            href="/explore/projects"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[#eaeaea] bg-[#f6f6f6] px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-200/80 focus:outline-none focus:ring-2 focus:ring-archtivy-primary focus:ring-offset-2 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          >
-            View all →
-          </Link>
-        </div>
-        {sortedProjects.length === 0 ? (
-          <p className="rounded-lg border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
-            No projects yet.{" "}
-            <Link
-              href="/add/project"
-              className="text-archtivy-primary hover:underline dark:text-archtivy-primary dark:hover:opacity-90"
-            >
-              Add the first project
-            </Link>
-            .
-          </p>
-        ) : (
-          <ul className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Featured projects">
-            {sortedProjects.map((p) => (
-              <li key={p.id} className="h-full">
-                <ProjectCardPremium project={p} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <HomeNav />
+      <HeroBand />
+      <CategoryPillBar />
 
-      {/* Featured Products */}
-      <section className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-            Featured Products
-          </h2>
-          <Link
-            href="/explore/products"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[#eaeaea] bg-[#f6f6f6] px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-200/80 focus:outline-none focus:ring-2 focus:ring-archtivy-primary focus:ring-offset-2 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          >
-            View all →
-          </Link>
-        </div>
-        {sortedProducts.length === 0 ? (
-          <p className="rounded-lg border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
-            No products yet.{" "}
-            <Link
-              href="/add/product"
-              className="text-archtivy-primary hover:underline dark:text-archtivy-primary dark:hover:opacity-90"
-            >
-              Add the first product
-            </Link>
-            .
-          </p>
-        ) : (
-          <ul className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Featured products">
-            {sortedProducts.map((p) => (
-              <li key={p.id} className="h-full">
-                <ProductCardPremium product={p} />
-              </li>
-            ))}
-          </ul>
-        )}
+      <div className="mx-auto max-w-content px-4 md:px-12 lg:px-24">
+        {/* §4 — Featured Projects + Find by Connection (70/30) */}
+        <section className="mt-16 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-8">
+          <div className="min-w-0 lg:col-span-8">
+            <FeaturedProjects projects={sortedProjects.slice(0, 4)} />
+          </div>
+          <div className="min-w-0 lg:col-span-4">
+            <FindByConnection />
+          </div>
         </section>
+
+        {/* §5 — Featured Designers + Featured Brands (50/50) */}
+        <section className="mt-24 grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-8">
+          <FeaturedDesigners />
+          <FeaturedBrands />
+        </section>
+
+        {/* §7 — Projects Showcase */}
+        <div className="mt-24">
+          <Showcase
+            title="Projects Showcase"
+            viewAllHref="/projects"
+            viewAllLabel="View all projects"
+            items={projectItems}
+            filters={PROJECT_PILLS}
+          />
+        </div>
+
+        {/* §8 — Products Showcase */}
+        <div className="mt-24">
+          <Showcase
+            title="Products Showcase"
+            viewAllHref="/products"
+            viewAllLabel="View all products"
+            items={productItems}
+            filters={PRODUCT_PILLS}
+            ratio="1/1"
+          />
+        </div>
+
+        {/* §9 — Join Archtivy */}
+        <div className="mt-24">
+          <JoinArchtivy />
+        </div>
       </div>
-    </>
+
+      <HomeFooter />
+    </div>
   );
 }

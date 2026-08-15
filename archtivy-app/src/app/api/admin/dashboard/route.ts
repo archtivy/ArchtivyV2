@@ -47,7 +47,9 @@ export async function GET() {
     // Low word count: description shorter than 50 words approximated by < 300 chars
     supabase.from("listings").select("id", { count: "exact", head: true }).is("deleted_at", null).or("description.is.null,description.lt.50"),
     supabase.from("listings").select("id", { count: "exact", head: true }).is("deleted_at", null),
-    supabase.from("user_saves").select("id", { count: "exact", head: true }),
+    // REPOINTED 2026-08-08: was "user_saves", which has never existed — this
+    // count was silently 0 on the admin dashboard. See DATA_INTEGRITY_LOG.md item 6.
+    supabase.from("listing_saves").select("id", { count: "exact", head: true }),
     supabase.from("project_product_links").select("project_id", { count: "exact", head: true }),
   ]);
 

@@ -1,19 +1,17 @@
-import type { Metadata } from "next";
+import { permanentRedirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-export const metadata: Metadata = {
-  title: "Explore Brands — Building Product Manufacturers | Archtivy",
-  description:
-    "Discover building product manufacturers and brands on Archtivy. Browse ceramics, furniture, lighting, stone, and more from the architecture network.",
-  alternates: { canonical: "/explore/brands" },
-};
-
-import { getProfileDirectoryByRoleCached } from "@/lib/db/profileDirectory";
-import { ProfileDirectoryClient } from "@/components/explore/directory/ProfileDirectoryClient";
-
-export default async function ExploreBrandsPage() {
-  const items = await getProfileDirectoryByRoleCached("brand");
-  return <ProfileDirectoryClient variant="brands" items={items} />;
+/**
+ * /explore/brands -> /brands (308).
+ *
+ * Same move already made for /explore/designers: the directory is now a
+ * top-level route matching the nav, and one canonical URL beats two competing
+ * indexes. permanentRedirect passes the old URL's link equity forward.
+ *
+ * This retires the last caller of getProfileDirectoryByRoleCached in the public
+ * app. That fetcher and ProfileDirectoryClient are now unreferenced by any
+ * route — worth deleting, but left in place here so this change stays a pure
+ * routing swap. See DATA_INTEGRITY_LOG.md for the deleted_at fix it carries.
+ */
+export default function ExploreBrandsRedirect() {
+  permanentRedirect("/brands");
 }

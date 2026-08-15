@@ -1,97 +1,121 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { createProject } from "@/app/actions/createProject";
-import { AddProjectForm } from "./AddProjectForm";
-import { Button } from "@/components/ui/Button";
+import type { Metadata } from "next";
 import { getProfileByClerkId } from "@/lib/db/profiles";
-import { getListingsByOwner } from "@/lib/db/listings";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
-import { OnboardingSteps } from "@/components/onboarding/OnboardingSteps";
-import type { MemberTitleRow } from "./TeamMembersField";
-import { getTaxonomyTree, getFacetsForDomain } from "@/lib/taxonomy/taxonomyDb";
-import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
+import { getTaxonomyTree } from "@/lib/taxonomy/taxonomyDb";
+import {
+  ProjectWizard,
+  type TaxonomyOption,
+  type MaterialOption,
+  type ProductOption,
+  type MemberTitleOption,
+} from "./ProjectWizard";
 
-async function getActiveMemberTitles(): Promise<MemberTitleRow[]> {
-  const supabase = getSupabaseServiceClient();
-  const { data, error } = await supabase
-    .from("member_titles")
-    .select("label, maps_to_role, sort_order")
-    .eq("is_active", true)
-    .order("maps_to_role", { ascending: true })
-    .order("sort_order", { ascending: true });
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Share your work | Archtivy",
+  robots: { index: false, follow: false },
+};
+
+/**
+ * /add/project — the nine-step publish wizard (Build Brief §2).
+ *
+ * The server half only loads reference data. Everything else — validation,
+ * slug, taxonomy, geo, team, materials, rollback — stays in the existing
+ * createProject action, which the wizard posts the same FormData to. That was
+ * the constraint: restructure the surface, not the write path.
+ */
+
+async function getCategories(): Promise<TaxonomyOption[]> {
+  const res = await getTaxonomyTree("project");
+  const nodes = res.data ?? [];
+  return nodes
+    .filter((n) => !n.slug_path.includes("/"))
+    .map((n) => ({ id: n.id, label: n.label, slugPath: n.slug_path }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+async function getMaterials(): Promise<MaterialOption[]> {
+  const sup = getSupabaseServiceClient();
+  const { data, error } = await sup.from("materials").select("id, name").order("name");
   if (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn("[member_titles] fetch error:", error.message);
-    }
+    console.error("[add/project] materials failed:", error.message);
     return [];
   }
-  return (data ?? []) as MemberTitleRow[];
+  return ((data ?? []) as { id: string; name: string }[]).map((m) => ({ id: m.id, label: m.name }));
+}
+
+async function getProducts(): Promise<ProductOption[]> {
+  const sup = getSupabaseServiceClient();
+  const { data, error } = await sup
+    .from("listings")
+    .select("id, title, cover_image_url, owner_profile_id")
+    .eq("type", "product")
+    .eq("status", "APPROVED")
+    .is("deleted_at", null)
+    .order("title");
+  if (error) {
+    console.error("[add/project] products failed:", error.message);
+    return [];
+  }
+  const rows = (data ?? []) as {
+    id: string;
+    title: string;
+    cover_image_url: string | null;
+    owner_profile_id: string | null;
+  }[];
+  const ownerIds = [
+    ...new Set(rows.map((r) => r.owner_profile_id).filter((v): v is string => Boolean(v))),
+  ];
+  const brands = new Map<string, string>();
+  if (ownerIds.length > 0) {
+    const { data: profiles } = await sup.from("profiles").select("id, display_name").in("id", ownerIds);
+    for (const p of (profiles ?? []) as { id: string; display_name: string | null }[]) {
+      if (p.display_name) brands.set(p.id, p.display_name);
+    }
+  }
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    brand: r.owner_profile_id ? brands.get(r.owner_profile_id) ?? null : null,
+    cover: r.cover_image_url,
+  }));
+}
+
+async function getMemberTitles(): Promise<MemberTitleOption[]> {
+  const sup = getSupabaseServiceClient();
+  const { data, error } = await sup
+    .from("member_titles")
+    .select("label")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+  if (error) return [];
+  return ((data ?? []) as { label: string }[]).map((t) => ({ label: t.label }));
 }
 
 export default async function AddProjectPage() {
   const { userId } = await auth();
-  if (!userId) {
-    redirect("/sign-in?redirect_url=" + encodeURIComponent("/add/project"));
-  }
+  if (!userId) redirect("/sign-in?redirect_url=/add/project");
+
   const profileResult = await getProfileByClerkId(userId);
   const profile = profileResult.data;
-  if (!profile?.username) {
-    redirect("/onboarding");
-  }
+  if (!profile?.username) redirect("/onboarding");
 
-  const { data: listings } = await getListingsByOwner(userId);
-  const listingsCount = listings?.length ?? 0;
-  const showOnboarding = listingsCount === 0;
-
-  const [memberTitles, materialTaxRes, facetsRes, projectTaxRes] = await Promise.all([
-    getActiveMemberTitles(),
-    getTaxonomyTree("material"),
-    getFacetsForDomain("project"),
-    getTaxonomyTree("project"),
+  const [categories, materials, products, memberTitles] = await Promise.all([
+    getCategories(),
+    getMaterials(),
+    getProducts(),
+    getMemberTitles(),
   ]);
-  const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
-    id: n.id,
-    parent_id: n.parent_id,
-    depth: n.depth,
-    label: n.label,
-  }));
-  const facets: FacetForForm[] = (facetsRes.data ?? []).map((f) => ({
-    id: f.id,
-    slug: f.slug,
-    label: f.label,
-    values: f.values.map((v) => ({ id: v.id, slug: v.slug, label: v.label })),
-  }));
-  const projectTaxonomyNodes = (projectTaxRes.data ?? []).map((n) => ({
-    id: n.id,
-    parent_id: n.parent_id,
-    depth: n.depth,
-    label: n.label,
-    legacy_project_category: n.legacy_project_category,
-  }));
 
   return (
-    <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950/50">
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <div className="space-y-8">
-      {showOnboarding && (
-        <OnboardingSteps />
-      )}
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-          Add project
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Create a new project listing. Save draft anytime or publish when ready.
-        </p>
-        <p className="mt-2">
-          <Button as="link" href="/explore/projects" variant="link">
-            ← Back to projects
-          </Button>
-        </p>
-      </div>
-      <AddProjectForm memberTitles={memberTitles} materialNodes={materialNodes} facets={facets} projectTaxonomyNodes={projectTaxonomyNodes} />
-        </div>
-      </div>
-    </div>
+    <ProjectWizard
+      categories={categories}
+      materials={materials}
+      products={products}
+      memberTitles={memberTitles}
+    />
   );
 }

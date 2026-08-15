@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Lato } from "next/font/google";
+import { Lato, Inter } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 
@@ -7,6 +7,17 @@ const lato = Lato({
   subsets: ["latin"],
   weight: ["400", "700"],
   variable: "--font-lato",
+  display: "swap",
+});
+
+/**
+ * Body typeface for the homepage editorial direction (Design Tokens §2).
+ * Exposed as a CSS variable and consumed by the `font-body` Tailwind family, so
+ * it applies only where that class is used — every existing page is unaffected.
+ */
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
   display: "swap",
 });
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
@@ -60,7 +71,7 @@ export default function RootLayout({
 
   return (
     <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up">
-      <html lang="en" suppressHydrationWarning className={lato.variable}>
+      <html lang="en" suppressHydrationWarning className={`${lato.variable} ${inter.variable}`}>
         <head>
           {!maintenance && (
             <script dangerouslySetInnerHTML={{ __html: themeScript }} />

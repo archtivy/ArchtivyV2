@@ -34,8 +34,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // server-rendered content, no crawlable entity links. See C-6.
     { url: `${base}/explore/projects`,   lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
     { url: `${base}/explore/products`,   lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
-    { url: `${base}/explore/designers`,  lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
-    { url: `${base}/explore/brands`,     lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
+    { url: `${base}/designers`,  lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
+    { url: `${base}/brands`,     lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
 
     { url: `${base}/about`,              lastModified: staticLastMod, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/vision`,             lastModified: staticLastMod, changeFrequency: "monthly", priority: 0.6 },
@@ -96,6 +96,44 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .select("listing_id, taxonomy_node:taxonomy_nodes(slug_path)")
       .eq("is_primary", true),
   ]);
+
+  /*
+   * Magazine. Both the index and the articles are added ONLY when at least one
+   * article is actually published — the index carries `noindex` until then
+   * (derived at request time in its generateMetadata), and listing a noindex
+   * page in the sitemap is a contradiction Search Console reports as an error.
+   * A missing `articles` table (migration not yet applied) is treated the same
+   * as zero articles.
+   */
+  const magazineRes = await supabase
+    .from("articles")
+    .select("slug, updated_at")
+    .eq("status", "published")
+    .is("deleted_at", null)
+    .not("slug", "is", null)
+    .order("published_at", { ascending: false })
+    .limit(5000);
+
+  const articleRows = (magazineRes.data ?? []) as { slug: string | null; updated_at: string | null }[];
+  const magazineUrls: MetadataRoute.Sitemap =
+    articleRows.length === 0
+      ? []
+      : [
+          {
+            url: `${base}/magazine`,
+            lastModified: staticLastMod,
+            changeFrequency: "daily" as const,
+            priority: 0.7,
+          },
+          ...articleRows
+            .filter((r): r is { slug: string; updated_at: string | null } => Boolean(r.slug))
+            .map((r) => ({
+              url: `${base}/magazine/${r.slug}`,
+              lastModified: r.updated_at ? new Date(r.updated_at) : now,
+              changeFrequency: "monthly" as const,
+              priority: 0.7,
+            })),
+        ];
 
   const projectRows = (projectsRes.data ?? []) as { id: string; slug: string | null; updated_at: string | null }[];
   const productRows = (productsRes.data ?? []) as { id: string; slug: string | null; updated_at: string | null }[];
@@ -165,5 +203,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       };
     });
 
-  return [...staticEntries, ...taxonomyUrls, ...projectUrls, ...productUrls, ...profileUrls];
+  return [
+    ...staticEntries,
+    ...taxonomyUrls,
+    ...projectUrls,
+    ...productUrls,
+    ...profileUrls,
+    ...magazineUrls,
+  ];
 }

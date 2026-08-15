@@ -1,17 +1,40 @@
 import { supabase } from "@/lib/supabaseClient";
 
-const TABLE = "user_saves";
-// Table schema: clerk_user_id (text), listing_id (uuid), created_at (timestamptz default now()).
-// Unique on (clerk_user_id, listing_id). Create in Supabase if Saved page is used.
+/**
+ * Saved listings.
+ *
+ * ── REPOINTED 2026-08-08: user_saves -> listing_saves ───────────────────────
+ * This module wrote to `user_saves`, which has never existed. Every save
+ * therefore failed, on every card, across all five directory pages.
+ *
+ * `listing_saves` is the real table and was already correctly shaped — it just
+ * had nothing writing to it. Verified against production:
+ *
+ *   id             uuid  pk
+ *   listing_id     uuid  not null, FK -> listings.id
+ *   clerk_user_id  text  not null
+ *   created_at     timestamptz not null
+ *   unique (listing_id, clerk_user_id)   -- confirmed by probe
+ *
+ * The column names are identical to what this file already sent, so the fix is
+ * the table name and nothing else. Per Database Bible Single Source of Truth,
+ * `user_saves` and `saved_listings` are NOT created — one save table, and this
+ * is it. See DATA_INTEGRITY_LOG.md item 6.
+ */
+const TABLE = "listing_saves";
 
 export type DbResult<T> =
   | { data: T; error: null }
   | { data: null; error: string };
 
 /**
- * Get saved listing IDs for a user (order: recently saved first).
- * Requires table: user_saves (clerk_user_id, listing_id, created_at).
- * If table does not exist, returns { data: [], error: null } on read error.
+ * Saved listing ids for a user, most recently saved first.
+ *
+ * A read error is logged and returns an empty list rather than throwing: the
+ * saved page degrades to "nothing saved" instead of erroring. The previous
+ * version returned `{ data: [], error: null }` SILENTLY, which is part of why a
+ * completely missing table went unnoticed — an empty saved page looks identical
+ * to a broken one. The log line is the difference.
  */
 export async function getSavedListingIds(
   clerkUserId: string
@@ -23,6 +46,7 @@ export async function getSavedListingIds(
     .order("created_at", { ascending: false });
 
   if (error) {
+    console.error(`[userSaves] read failed: ${error.code ?? "?"} ${error.message}`);
     return { data: [], error: null };
   }
   const ids = (data ?? []).map((row: { listing_id: string }) => row.listing_id);
@@ -30,7 +54,11 @@ export async function getSavedListingIds(
 }
 
 /**
- * Add a listing to user's saved list.
+ * Add a listing to a user's saved list.
+ *
+ * Saving something already saved is a no-op, not an error: the unique index on
+ * (listing_id, clerk_user_id) makes a double-tap raise 23505, and surfacing
+ * "duplicate key" to someone who pressed Save twice would be nonsense.
  */
 export async function addSave(
   clerkUserId: string,
@@ -40,12 +68,15 @@ export async function addSave(
     clerk_user_id: clerkUserId,
     listing_id: listingId,
   });
-  if (error) return { data: null, error: error.message };
+  if (error) {
+    if (error.code === "23505") return { data: undefined, error: null };
+    return { data: null, error: error.message };
+  }
   return { data: undefined, error: null };
 }
 
 /**
- * Remove a listing from user's saved list.
+ * Remove a listing from a user's saved list.
  */
 export async function removeSave(
   clerkUserId: string,

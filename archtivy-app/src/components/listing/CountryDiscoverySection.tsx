@@ -144,7 +144,7 @@ export function CountryDesignersSection({ country, items }: CountryDesignersProp
           Popular Designers from {country}
         </h2>
         <Link
-          href={`/explore/designers?country=${encodeURIComponent(country)}`}
+          href={`/designers?country=${encodeURIComponent(country)}`}
           className="text-sm text-[#002abf] hover:underline"
         >
           View all &rarr;

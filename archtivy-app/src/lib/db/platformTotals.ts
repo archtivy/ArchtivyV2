@@ -19,6 +19,19 @@ import { unstable_cache } from "next/cache";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 
+/**
+ * Designer and brand counts are PUBLIC counts: a profile is counted only if it
+ * has a username (so it is reachable at /u/{username} and can be listed), is
+ * not hidden, and is not soft-deleted.
+ *
+ * This matters. `role = 'designer' AND is_hidden = false` returns 153, but 126
+ * of those are auto-created credit stubs from listing_team_members with no
+ * username, no location and no bio — mostly photographers, engineers and
+ * suppliers, and reachable only at the deliberately-noindexed /u/id/{uuid}.
+ * Reporting 153 above a directory that can list 24 is a number that does not
+ * describe anything a visitor can reach. Same for brands: 48 -> 18.
+ * Measured 2026-08-04; see lib/db/designersDirectory.ts for the full table.
+ */
 export interface PlatformTotals {
   projects: number;
   products: number;
@@ -54,16 +67,23 @@ async function fetchPlatformTotals(): Promise<PlatformTotals> {
           .eq("type", "product")
           .eq("status", "APPROVED")
           .is("deleted_at", null),
+        // PUBLIC profiles only — see the note above the interface. Counting
+        // `is_hidden = false` alone reported 153 designers and 48 brands, of
+        // which only 24 and 18 are actually reachable and listable.
         sup
           .from("profiles")
           .select("id", { count: "exact", head: true })
           .eq("role", "designer")
-          .eq("is_hidden", false),
+          .eq("is_hidden", false)
+          .is("deleted_at", null)
+          .not("username", "is", null),
         sup
           .from("profiles")
           .select("id", { count: "exact", head: true })
           .eq("role", "brand")
-          .eq("is_hidden", false),
+          .eq("is_hidden", false)
+          .is("deleted_at", null)
+          .not("username", "is", null),
         // Supabase JS has no SELECT DISTINCT COUNT; pull the column and reduce.
         // Same approach as getPlatformStats(). Bounded by approved project count.
         sup
@@ -103,6 +123,10 @@ async function fetchPlatformTotals(): Promise<PlatformTotals> {
  */
 export const getPlatformTotals = unstable_cache(
   fetchPlatformTotals,
-  ["home:platform-totals:v1"],
+  // v2: designer/brand counts narrowed to public profiles. The key is bumped
+  // rather than reused so the corrected figures take effect immediately —
+  // unstable_cache entries survive rebuilds in .next/cache, so a v1 key would
+  // keep serving 153/48 until the 3600s window expired.
+  ["home:platform-totals:v2"],
   { tags: [CACHE_TAGS.listings, CACHE_TAGS.profiles], revalidate: 3600 }
 );

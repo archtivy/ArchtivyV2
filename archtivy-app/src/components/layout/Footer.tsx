@@ -17,7 +17,7 @@ const PLATFORM_LINKS = [
   { label: "Projects", href: "/explore/projects" },
   { label: "Products", href: "/explore/products" },
   { label: "Professionals", href: "/explore/professionals" },
-  { label: "Brands", href: "/explore/brands" },
+  { label: "Brands", href: "/brands" },
   { label: "Locations", href: "/explore/locations" },
   { label: "Categories", href: "/explore/categories" },
 ];

@@ -5,6 +5,11 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
  * POST /api/track-view
  * Body: { listingId: string } (uuid)
  * Calls increment_listing_views(listing_id) RPC to bump listings.views_count.
+ *
+ * PARAM NAME: `listing_id`, not `p_listing_id`. This called it with `p_listing_id`
+ * and every view therefore 500d with PGRST202 "could not find the function" —
+ * the function exists, the argument name did not match. Postgres resolves
+ * named RPC args exactly, so a rename here is a breaking change to the caller.
  * No auth required; call once per listing detail view (client guards duplicate).
  */
 export async function POST(request: NextRequest) {
@@ -15,7 +20,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "Invalid listingId" }, { status: 400 });
     }
     const sup = getSupabaseServiceClient();
-    const { error } = await sup.rpc("increment_listing_views", { p_listing_id: listingId });
+    const { error } = await sup.rpc("increment_listing_views", { listing_id: listingId });
     if (error) {
       console.warn("[track-view] RPC error:", error.message);
       return Response.json({ error: "Failed to record view" }, { status: 500 });

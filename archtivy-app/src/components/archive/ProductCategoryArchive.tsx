@@ -3,6 +3,8 @@ import { getArchiveHubUrl, getArchiveCategoryUrl, buildArchiveBreadcrumbSegments
 import type { TaxonomyNode } from "@/lib/taxonomy/taxonomyDb";
 import type { ProductCanonical } from "@/lib/canonical-models";
 import { Container } from "@/components/layout/Container";
+import { TopNav } from "@/components/layout/TopNav";
+import { Footer } from "@/components/layout/Footer";
 import { ArchiveHeader } from "./ArchiveHeader";
 import { ArchiveBreadcrumb } from "./ArchiveBreadcrumb";
 import { SubcategoryLinks, type SubcategoryLinkItem } from "./SubcategoryLinks";
@@ -56,20 +58,32 @@ export function ProductCategoryArchive({
   ];
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
 
+  /*
+   * Renders its own TopNav and Footer — SiteShell and ConditionalFooter treat
+   * everything under /products/* as shell-less, because that catch-all serves
+   * both category archives and product detail pages and only this server
+   * branch knows which resolved. Keeps archives pixel-identical to before.
+   */
   return (
-    <Container className="py-8 sm:py-12">
+    <>
+      <TopNav />
+      <main>
+        <Container className="py-8 sm:py-12">
       <JsonLd schemas={[collectionJsonLd, breadcrumbJsonLd]} />
-      <ArchiveBreadcrumb segments={breadcrumbSegments} current={node.label} />
-      <ArchiveHeader title={title} intro={intro} count={total} />
-      {!isSubcategory && childNodes.length > 0 && (
-        <SubcategoryLinks baseSegment="products" items={childNodes} />
-      )}
-      <ArchiveListingGrid type="product" items={listings} />
-      <ArchivePagination
-        currentPage={page}
-        totalPages={totalPages}
-        basePath={archivePath}
-      />
-    </Container>
+          <ArchiveBreadcrumb segments={breadcrumbSegments} current={node.label} />
+          <ArchiveHeader title={title} intro={intro} count={total} />
+          {!isSubcategory && childNodes.length > 0 && (
+            <SubcategoryLinks baseSegment="products" items={childNodes} />
+          )}
+          <ArchiveListingGrid type="product" items={listings} />
+          <ArchivePagination
+            currentPage={page}
+            totalPages={totalPages}
+            basePath={archivePath}
+          />
+        </Container>
+      </main>
+      <Footer />
+    </>
   );
 }

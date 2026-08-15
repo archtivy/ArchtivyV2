@@ -87,8 +87,8 @@ export async function updateProfileAction(
   revalidatePath("/me");
   revalidatePath("/");
   revalidatePath(`/u/id/${profileId}`);
-  revalidatePath("/explore/designers");
-  revalidatePath("/explore/brands");
+  revalidatePath("/designers");
+  revalidatePath("/brands");
   revalidatePath("/explore");
   if (result.data?.username) {
     revalidatePath(`/u/${encodeURIComponent(result.data.username)}`);

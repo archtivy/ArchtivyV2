@@ -12,6 +12,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { label: "SEO", href: "/admin/seo" },
   { label: "Featured & Sponsors", href: "/admin/featured" },
   { label: "Taxonomies", href: "/admin/taxonomies" },
+  { label: "Magazine", href: "/admin/magazine" },
   { label: "Claims", href: "/admin/claims" },
   { label: "Leads", href: "/admin/leads" },
   { label: "Notifications", href: "/admin/notifications" },

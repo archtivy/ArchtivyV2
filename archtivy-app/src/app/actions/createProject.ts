@@ -6,6 +6,7 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { parseGalleryJson, type UploadedGalleryItem } from "@/lib/storage/types";
 import { uploadListingDocumentsServer } from "@/lib/storage/documents";
 import { addDocuments } from "@/lib/db/listingDocuments";
+import { normaliseInstagramHandle } from "@/lib/publish/instagram";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import type { ActionResult } from "@/app/actions/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -205,6 +206,20 @@ export async function createProject(
   const project_collaboration_status = (formData.get("project_collaboration_status") as string)?.trim() || null;
   const project_looking_for = parseMaterialIds(formData.get("project_looking_for"));
 
+  // Publish-flow fields (columns added 2026-08-10).
+  const meta_description = (formData.get("meta_description") as string)?.trim() || null;
+  const website = (formData.get("website") as string)?.trim() || null;
+  const video_url = (formData.get("video_url") as string)?.trim() || null;
+  // Stored as a normalised bare handle — the DB CHECK rejects '@' and URLs, so
+  // normalise here rather than let a paste of a profile URL fail the insert.
+  const instagramRaw = (formData.get("instagram") as string)?.trim() || "";
+  const instagram = normaliseInstagramHandle(instagramRaw);
+  if (instagramRaw && !instagram) {
+    return { error: "Instagram should be a handle like studioname, not a full URL." };
+  }
+  // Author-supplied slug (SEO step). Falls back to the title-derived one.
+  const slugInput = (formData.get("slug") as string)?.trim().toLowerCase() || "";
+
   const isDraft = formData.get("draft") === "1";
 
   if (!title) return { error: "Title is required." };
@@ -236,7 +251,10 @@ export async function createProject(
   }
 
   const supabase = getSupabaseServiceClient();
-  const baseSlug = slugFromTitle(title || "project");
+  // The SEO step lets the author edit the slug. Whatever they give is still run
+  // through the same slugify + uniqueness path, so a hand-typed value can never
+  // produce a URL the platform could not have generated itself.
+  const baseSlug = slugFromTitle(slugInput || title || "project");
   const slug = await ensureUniqueSlug(supabase, baseSlug);
   if (!slug || !String(slug).trim()) {
     return { error: "Unable to generate a valid slug for the project." };
@@ -247,7 +265,11 @@ export async function createProject(
     .insert({
       type: "project",
       listing_type: "project",
-      status: "APPROVED",
+      // DRAFT is a real status now, not a validation flag. Previously `draft=1`
+      // only relaxed required-field checks and the row still went in as
+      // APPROVED — so anything a user believed was saved-not-published was
+      // live, public and indexable immediately.
+      status: isDraft ? "DRAFT" : "APPROVED",
       deleted_at: null,
       views_count: 0,
       saves_count: 0,
@@ -274,6 +296,10 @@ export async function createProject(
       project_status: project_status || null,
       project_collaboration_status: project_collaboration_status || null,
       project_looking_for: project_looking_for.length > 0 ? project_looking_for : [],
+      meta_description,
+      website,
+      instagram,
+      video_url,
     })
     .select("id")
     .single();

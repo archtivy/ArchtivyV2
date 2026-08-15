@@ -32,8 +32,8 @@ function getHeaderMode(pathname: string): HeaderMode {
   if (
     pathname.startsWith("/explore/projects") ||
     pathname.startsWith("/explore/products") ||
-    pathname.startsWith("/explore/designers") ||
-    pathname.startsWith("/explore/brands") ||
+    pathname.startsWith("/designers") ||
+    pathname.startsWith("/brands") ||
     pathname.startsWith("/projects") ||
     pathname.startsWith("/products")
   ) return "inline";

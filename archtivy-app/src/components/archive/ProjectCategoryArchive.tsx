@@ -3,6 +3,8 @@ import { getArchiveHubUrl, getArchiveCategoryUrl, buildArchiveBreadcrumbSegments
 import type { TaxonomyNode } from "@/lib/taxonomy/taxonomyDb";
 import type { ProjectCanonical } from "@/lib/canonical-models";
 import { Container } from "@/components/layout/Container";
+import { TopNav } from "@/components/layout/TopNav";
+import { Footer } from "@/components/layout/Footer";
 import { ArchiveHeader } from "./ArchiveHeader";
 import { ArchiveBreadcrumb } from "./ArchiveBreadcrumb";
 import { SubcategoryLinks, type SubcategoryLinkItem } from "./SubcategoryLinks";
@@ -56,20 +58,36 @@ export function ProjectCategoryArchive({
   ];
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
 
+  /*
+   * Renders its own TopNav and Footer.
+   *
+   * SiteShell and ConditionalFooter treat everything under /projects/* as
+   * shell-less, because that catch-all serves BOTH category archives and
+   * project detail pages and a client component cannot tell them apart — only
+   * this server branch knows. Re-adding the shell here keeps archive pages
+   * pixel-identical to how they rendered before, while the detail branch is
+   * free to use the cream editorial palette.
+   */
   return (
-    <Container className="py-8 sm:py-12">
-      <JsonLd schemas={[collectionJsonLd, breadcrumbJsonLd]} />
-      <ArchiveBreadcrumb segments={breadcrumbSegments} current={node.label} />
-      <ArchiveHeader title={title} intro={intro} count={total} />
-      {!isSubcategory && childNodes.length > 0 && (
-        <SubcategoryLinks baseSegment="projects" items={childNodes} />
-      )}
-      <ArchiveListingGrid type="project" items={listings} />
-      <ArchivePagination
-        currentPage={page}
-        totalPages={totalPages}
-        basePath={archivePath}
-      />
-    </Container>
+    <>
+      <TopNav />
+      <main>
+        <Container className="py-8 sm:py-12">
+          <JsonLd schemas={[collectionJsonLd, breadcrumbJsonLd]} />
+          <ArchiveBreadcrumb segments={breadcrumbSegments} current={node.label} />
+          <ArchiveHeader title={title} intro={intro} count={total} />
+          {!isSubcategory && childNodes.length > 0 && (
+            <SubcategoryLinks baseSegment="projects" items={childNodes} />
+          )}
+          <ArchiveListingGrid type="project" items={listings} />
+          <ArchivePagination
+            currentPage={page}
+            totalPages={totalPages}
+            basePath={archivePath}
+          />
+        </Container>
+      </main>
+      <Footer />
+    </>
   );
 }

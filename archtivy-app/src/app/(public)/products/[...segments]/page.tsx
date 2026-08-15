@@ -14,10 +14,8 @@ import { getListingUrl } from "@/lib/canonical";
 import { fetchProductArchive } from "@/lib/archive/fetchArchiveData";
 import { ProductCategoryArchive } from "@/components/archive/ProductCategoryArchive";
 import { getListingTaxonomyPath } from "@/lib/taxonomy/resolve";
-import {
-  ProductDetailRenderer,
-  buildProductDetailMetadata,
-} from "@/app/(public)/products/_lib/productDetailRenderer";
+import { buildProductDetailMetadata } from "@/app/(public)/products/_lib/productDetailRenderer";
+import { ProductDetailView } from "@/components/products/ProductDetailView";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -61,8 +59,21 @@ async function findProduct(slug: string) {
   return (await getCachedProduct(slug)) ?? (await getProductForProductPage(slug));
 }
 
+/**
+ * Statuses that are NOT publicly visible. A row in one of these renders only
+ * for its owner or an admin; everyone else gets a 404.
+ *
+ * DRAFT was added with the publish-flow migration (20260810). Before that this
+ * tested PENDING alone and returned early for anything else — so a DRAFT row
+ * would have fallen straight through and rendered publicly. These two guards
+ * (here and in the sibling route) are the only thing standing between a draft
+ * and the open web: every directory, sitemap, explore and related-rail query
+ * filters status = APPROVED explicitly, and neither detail route prerenders.
+ */
+const NON_PUBLIC_STATUSES = new Set(["PENDING", "DRAFT"]);
+
 async function authCheckPending(product: { status: string; owner_clerk_user_id?: string | null }) {
-  if (product.status !== "PENDING") return;
+  if (!NON_PUBLIC_STATUSES.has(product.status)) return;
   const { userId } = await auth();
   const profileRes = await getProfileByClerkId(userId ?? "");
   const profile = profileRes.data as { is_admin?: boolean } | null;
@@ -116,7 +127,9 @@ export async function generateMetadata({
   // Detail page metadata
   const product = await findProduct(listingSlug);
   if (!product) return {};
-  if (product.status === "PENDING") return { title: "Product" };
+  // Non-public rows never emit real metadata — a draft must not leak its
+  // title, description or OG image to a crawler or a link unfurler.
+  if (NON_PUBLIC_STATUSES.has(product.status)) return { title: "Product", robots: { index: false, follow: false } };
   const { path: canonicalPath } = await resolveCanonicalPath(product.id, product.slug ?? product.id);
   return buildProductDetailMetadata(product, canonicalPath);
 }
@@ -194,5 +207,8 @@ export default async function ProductSegmentsPage({
   // so we don't lose the taxonomy prefix.
   const effectiveCanonical = (taxonomyPrefix && !hasTaxonomy) ? currentUrlPath : canonicalPath;
 
-  return <ProductDetailRenderer product={product} canonicalPath={effectiveCanonical} taxonomySlugPath={taxonomyPrefix} />;
+  // Cream editorial detail page (Entity Detail Layout archetype). The previous
+  // renderer remains at _lib/productDetailRenderer.tsx and still supplies
+  // buildProductDetailMetadata() above, so metadata behaviour is unchanged.
+  return <ProductDetailView product={product} canonicalPath={effectiveCanonical} />;
 }
