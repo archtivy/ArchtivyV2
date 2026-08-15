@@ -18,6 +18,16 @@ export const TAXONOMY_DOMAINS = [
   "professional_role",
   "organization_type",
   "sustainability",
+  // Phase 7 — atmosphere/feel, the dimension the Inspiration System has
+  // referenced since its spec without ever having an authoring surface.
+  //
+  // GATED ON A MIGRATION. taxonomy_nodes_domain_check does not yet permit
+  // 'mood'; until 20260815100000_taxonomy_mood_domain is applied, the Mood
+  // option appears in the admin domain picker but any insert fails with a
+  // 23514 that the Add-term form surfaces verbatim. Listing it here first is
+  // deliberate — it is the only consumer (verified: nothing else reads this
+  // constant), so the surface can be reviewed before the data lands.
+  "mood",
 ] as const;
 
 export type TaxonomyDomain = (typeof TAXONOMY_DOMAINS)[number];
@@ -37,4 +47,12 @@ export const TAXONOMY_DOMAIN_LABELS: Record<TaxonomyDomain, string> = {
   professional_role: "Professional Role",
   organization_type: "Organization Type",
   sustainability: "Sustainability",
+  mood: "Mood",
 };
+
+/**
+ * Domains whose CHECK constraint has not been widened in the live database yet.
+ * The admin surface uses this to say so plainly rather than letting an operator
+ * discover it through a raw Postgres error.
+ */
+export const PENDING_TAXONOMY_DOMAINS: readonly TaxonomyDomain[] = ["mood"];

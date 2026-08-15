@@ -22,7 +22,7 @@ export default async function AdminListingsPage({ searchParams }: { searchParams
 
   let query = supabase
     .from("listings")
-    .select("id,title,location,year,created_at,cover_image_url,category", { count: "exact" })
+    .select("id,title,status,location,year,created_at,cover_image_url,category", { count: "exact" })
     .eq("type", tab === "projects" ? "project" : "product")
     .order("created_at", { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1);
@@ -65,6 +65,7 @@ export default async function AdminListingsPage({ searchParams }: { searchParams
     title: (r.title as string | null) ?? null,
     location: (r.location as string | null) ?? null,
     year: (r.year as string | number | null) ?? null,
+    status: (r.status as string | null) ?? null,
     created_at: (r.created_at as string) ?? "",
     cover_image_url: (r.cover_image_url as string | null) ?? null,
     image_count: imageCount[r.id as string] ?? 0,

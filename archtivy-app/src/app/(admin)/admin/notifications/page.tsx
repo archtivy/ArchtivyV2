@@ -1,10 +1,16 @@
-import { AdminPage } from "@/components/admin/AdminPage";
+import { AdminPageShell } from "@/components/admin/ui/AdminPageShell";
 import { AdminNotificationsClient } from "./AdminNotificationsClient";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default function AdminNotificationsPage() {
   return (
-    <AdminPage title="Notifications">
+    <AdminPageShell
+      title="Notifications"
+      description="Send an announcement to one person, a role, or everyone."
+    >
       <AdminNotificationsClient />
-    </AdminPage>
+    </AdminPageShell>
   );
 }

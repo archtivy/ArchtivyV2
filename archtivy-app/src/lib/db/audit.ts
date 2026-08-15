@@ -38,7 +38,10 @@ export type AuditAction =
   | "listing.update"
   | "user.role_update"
   | "user.disable"
-  | "user.delete";
+  | "user.delete"
+  // Admin-authored notifications. A broadcast writes one row per recipient and
+  // has no undo, so the send itself is auditable.
+  | "notification.send";
 
 export type AuditResult = { ok: true } | { ok: false; error: string };
 

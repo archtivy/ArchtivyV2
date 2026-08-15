@@ -1,7 +1,10 @@
 import Link from "next/link";
-import { AdminPage } from "@/components/admin/AdminPage";
+import { AdminPageShell, Toolbar, SearchField, FilterChip, ErrorPanel } from "@/components/admin/ui/AdminPageShell";
 import { AdminListingsTable } from "@/components/admin/AdminListingsTable";
+import { ReviewQueue } from "@/components/admin/review/ReviewQueue";
+import { getListingsAwaitingReview } from "@/lib/admin/reviewRows";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { BTN_PRIMARY, BTN_SECONDARY, INPUT } from "@/components/admin/ui/tokens";
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -12,10 +15,11 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
   const q = toText(searchParams.q);
   const category = toText(searchParams.category);
   const neverUsed = toText(searchParams.neverUsed);
+  const hasFilters = !!(q || category || neverUsed === "1");
 
   let query = supabase
     .from("listings")
-    .select("id,title,location,year,created_at,cover_image_url,category,material_or_finish")
+    .select("id,title,status,location,year,created_at,cover_image_url,category,material_or_finish")
     .eq("type", "product")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
@@ -24,14 +28,19 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
   if (q) query = query.ilike("title", `%${q}%`);
   if (category) query = query.eq("category", category);
 
-  const { data: rows, error } = await query;
+  // Products are the flow that actually produces PENDING rows — the product
+  // wizard submits for review rather than publishing directly — so the queue
+  // matters more here than anywhere else.
+  const [{ data: rows, error }, reviewItems] = await Promise.all([
+    query,
+    getListingsAwaitingReview("product"),
+  ]);
+
   if (error) {
     return (
-      <AdminPage title="Products">
-        <div className="rounded-xl border border-red-200 bg-white p-4 text-sm text-red-700">
-          {error.message}
-        </div>
-      </AdminPage>
+      <AdminPageShell title="Products">
+        <ErrorPanel message={error.message} />
+      </AdminPageShell>
     );
   }
 
@@ -54,6 +63,7 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
     .map((r) => ({
       id: r.id as string,
       title: (r.title as string | null) ?? null,
+      status: (r.status as string | null) ?? null,
       location: (r.location as string | null) ?? null,
       year: (r.year as string | number | null) ?? null,
       created_at: r.created_at as string,
@@ -64,46 +74,48 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
     .filter((r) => (neverUsed === "1" ? r.linked_count === 0 : true));
 
   return (
-    <AdminPage
+    <AdminPageShell
       title="Products"
+      description="Review submissions, then browse and edit the published catalogue."
       actions={
-        <Link
-          href="/admin/products/new"
-          className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          + Create Product
+        <Link href="/admin/products/new" className={BTN_PRIMARY}>
+          Create product
         </Link>
       }
-    >
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <form className="flex flex-wrap items-center gap-2">
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Search title…"
-            className="h-9 w-64 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-900/20"
-          />
-          <input
-            name="category"
-            defaultValue={category}
-            placeholder="Category"
-            className="h-9 w-56 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-900/20"
-          />
-          <label className="flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700">
-            <input type="checkbox" name="neverUsed" value="1" defaultChecked={neverUsed === "1"} />
-            Never used in projects
-          </label>
-          <button
-            type="submit"
-            className="h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-          >
-            Apply
-          </button>
+      toolbar={
+        <form className="contents">
+          <Toolbar>
+            <SearchField name="q" defaultValue={q} placeholder="Search product titles…" />
+            <input
+              name="category"
+              defaultValue={category}
+              placeholder="Category"
+              aria-label="Filter by category"
+              className={`${INPUT} w-52`}
+            />
+            <FilterChip
+              name="neverUsed"
+              label="Never used in projects"
+              defaultChecked={neverUsed === "1"}
+            />
+            <button type="submit" className={BTN_SECONDARY}>
+              Apply
+            </button>
+            {hasFilters && (
+              <Link href="/admin/products" className={BTN_SECONDARY}>
+                Clear
+              </Link>
+            )}
+          </Toolbar>
         </form>
+      }
+    >
+      <div className="space-y-6">
+        {reviewItems.length > 0 && (
+          <ReviewQueue items={reviewItems} title="Products awaiting review" />
+        )}
+        <AdminListingsTable kind="product" rows={tableRows} filtered={hasFilters} />
       </div>
-
-      <AdminListingsTable kind="product" rows={tableRows} />
-    </AdminPage>
+    </AdminPageShell>
   );
 }
-

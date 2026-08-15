@@ -1,7 +1,10 @@
 import Link from "next/link";
-import { AdminPage } from "@/components/admin/AdminPage";
+import { AdminPageShell, Toolbar, SearchField, FilterChip, ErrorPanel } from "@/components/admin/ui/AdminPageShell";
 import { AdminListingsTable } from "@/components/admin/AdminListingsTable";
+import { ReviewQueue } from "@/components/admin/review/ReviewQueue";
+import { getListingsAwaitingReview } from "@/lib/admin/reviewRows";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { BTN_PRIMARY, BTN_SECONDARY, INPUT } from "@/components/admin/ui/tokens";
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -13,10 +16,11 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
   const year = toText(searchParams.year);
   const missing = toText(searchParams.missing);
   const noLinks = toText(searchParams.noLinks);
+  const hasFilters = !!(q || year || missing === "1" || noLinks === "1");
 
   let query = supabase
     .from("listings")
-    .select("id,title,location,year,created_at,cover_image_url")
+    .select("id,title,status,location,year,created_at,cover_image_url")
     .eq("type", "project")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
@@ -24,16 +28,21 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
 
   if (q) query = query.ilike("title", `%${q}%`);
   if (year) query = query.eq("year", year);
-  if (missing === "1") query = query.or("description.is.null,location.is.null,year.is.null,cover_image_url.is.null");
+  if (missing === "1")
+    query = query.or("description.is.null,location.is.null,year.is.null,cover_image_url.is.null");
 
-  const { data: rows, error } = await query;
+  // The review queue is loaded alongside the list so a pending submission is
+  // visible without a second navigation — approval is the time-critical action.
+  const [{ data: rows, error }, reviewItems] = await Promise.all([
+    query,
+    getListingsAwaitingReview("project"),
+  ]);
+
   if (error) {
     return (
-      <AdminPage title="Projects">
-        <div className="rounded-xl border border-red-200 bg-white p-4 text-sm text-red-700">
-          {error.message}
-        </div>
-      </AdminPage>
+      <AdminPageShell title="Projects">
+        <ErrorPanel message={error.message} />
+      </AdminPageShell>
     );
   }
 
@@ -56,6 +65,7 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
     .map((r) => ({
       id: r.id as string,
       title: (r.title as string | null) ?? null,
+      status: (r.status as string | null) ?? null,
       location: (r.location as string | null) ?? null,
       year: (r.year as string | number | null) ?? null,
       created_at: r.created_at as string,
@@ -66,50 +76,51 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
     .filter((r) => (noLinks === "1" ? r.linked_count === 0 : true));
 
   return (
-    <AdminPage
+    <AdminPageShell
       title="Projects"
+      description="Review submissions, then browse and edit the published catalogue."
       actions={
-        <Link
-          href="/admin/projects/new"
-          className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          + Create Project
+        <Link href="/admin/projects/new" className={BTN_PRIMARY}>
+          Create project
         </Link>
       }
-    >
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <form className="flex flex-wrap items-center gap-2">
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Search title…"
-            className="h-9 w-64 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-900/20"
-          />
-          <input
-            name="year"
-            defaultValue={year}
-            placeholder="Year"
-            className="h-9 w-28 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-900/20"
-          />
-          <label className="flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700">
-            <input type="checkbox" name="missing" value="1" defaultChecked={missing === "1"} />
-            Missing info
-          </label>
-          <label className="flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700">
-            <input type="checkbox" name="noLinks" value="1" defaultChecked={noLinks === "1"} />
-            No products linked
-          </label>
-          <button
-            type="submit"
-            className="h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-          >
-            Apply
-          </button>
+      toolbar={
+        <form className="contents">
+          <Toolbar>
+            <SearchField name="q" defaultValue={q} placeholder="Search project titles…" />
+            <input
+              name="year"
+              defaultValue={year}
+              placeholder="Year"
+              aria-label="Filter by year"
+              className={`${INPUT} w-28`}
+            />
+            <FilterChip name="missing" label="Missing info" defaultChecked={missing === "1"} />
+            <FilterChip
+              name="noLinks"
+              label="No products linked"
+              defaultChecked={noLinks === "1"}
+            />
+            <button type="submit" className={BTN_SECONDARY}>
+              Apply
+            </button>
+            {hasFilters && (
+              <Link href="/admin/projects" className={BTN_SECONDARY}>
+                Clear
+              </Link>
+            )}
+          </Toolbar>
         </form>
+      }
+    >
+      <div className="space-y-6">
+        {reviewItems.length > 0 && (
+          <ReviewQueue items={reviewItems} title="Projects awaiting review" />
+        )}
+        {/* showDelete stays off, as before — bulk delete was never enabled on
+            this page and turning it on is a scope change, not a redesign. */}
+        <AdminListingsTable kind="project" rows={tableRows} filtered={hasFilters} />
       </div>
-
-      <AdminListingsTable kind="project" rows={tableRows} />
-    </AdminPage>
+    </AdminPageShell>
   );
 }
-

@@ -2,45 +2,52 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { AdminSendNotification } from "@/components/admin/AdminSendNotification";
+import { Panel } from "@/components/admin/ui/AdminPageShell";
+import { StatusPill } from "@/components/admin/ui/StatusPill";
+import {
+  TableShell,
+  Table,
+  THead,
+  TH,
+  TBody,
+  TR,
+  TD,
+  TDNum,
+  CellStack,
+  TableEmpty,
+} from "@/components/admin/ui/DataTable";
+import { TYPE } from "@/components/admin/ui/tokens";
 
 interface SentNotification {
   id: string;
-  recipient_profile_id: string;
+  group_key: string | null;
+  recipient_count: number;
   recipient_display_name: string | null;
   recipient_username: string | null;
+  read_count: number;
   title: string | null;
   body: string | null;
   cta_label: string | null;
   cta_url: string | null;
   priority: string;
-  is_read: boolean;
   created_at: string;
 }
 
 function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const mins = Math.floor((now - then) / 60000);
+  const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
   if (mins < 1) return "Just now";
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  if (days < 30) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString();
 }
 
-function PriorityBadge({ priority }: { priority: string }) {
-  const cls =
-    priority === "high"
-      ? "bg-red-50 text-red-600 border-red-100"
-      : priority === "low"
-      ? "bg-zinc-50 text-zinc-400 border-zinc-100"
-      : "bg-zinc-50 text-zinc-500 border-zinc-100";
-  return (
-    <span className={`rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider ${cls}`}>
-      {priority}
-    </span>
-  );
+function PriorityPill({ priority }: { priority: string }) {
+  if (priority === "high") return <StatusPill tone="critical">High</StatusPill>;
+  if (priority === "low") return <StatusPill tone="neutral">Low</StatusPill>;
+  return <StatusPill tone="neutral">Normal</StatusPill>;
 }
 
 export function AdminNotificationsClient() {
@@ -61,65 +68,74 @@ export function AdminNotificationsClient() {
 
   return (
     <div className="space-y-8">
-      {/* Send form */}
-      <div className="rounded border border-zinc-200 bg-white p-5">
-        <h2 className="mb-4 text-sm font-semibold text-zinc-900 uppercase tracking-wider">
-          Send Notification
-        </h2>
+      <Panel
+        title="Compose"
+        description="Admin notifications appear in the recipient's bell alongside their normal activity."
+      >
         <AdminSendNotification onSent={fetchHistory} />
-      </div>
+      </Panel>
 
-      {/* History table */}
-      <div>
-        <h2 className="mb-3 text-sm font-semibold text-zinc-900 uppercase tracking-wider">
-          Recent Notifications
-        </h2>
+      <section className="space-y-4">
+        <div>
+          <h2 className={TYPE.sectionTitle}>Sent history</h2>
+          <p className={`mt-0.5 ${TYPE.pageSubtitle}`}>
+            Broadcasts are shown as one entry, not one row per recipient.
+          </p>
+        </div>
+
         {loading ? (
-          <p className="text-sm text-zinc-400">Loading...</p>
-        ) : history.length === 0 ? (
-          <p className="text-sm text-zinc-400">No admin notifications sent yet.</p>
+          <div className="h-32 animate-pulse rounded-2xl border border-hairline bg-white" />
         ) : (
-          <div className="overflow-x-auto rounded border border-zinc-200">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-zinc-100 bg-zinc-50">
-                  <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wider">Recipient</th>
-                  <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wider">Title</th>
-                  <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wider">Message</th>
-                  <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wider">Priority</th>
-                  <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wider">Read</th>
-                  <th className="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wider">Sent</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-50">
+          <TableShell>
+            <Table minWidth={880}>
+              <THead>
+                <TH>Message</TH>
+                <TH>Audience</TH>
+                <TH>Priority</TH>
+                <TH align="right">Read</TH>
+                <TH align="right">Sent</TH>
+              </THead>
+              <TBody>
                 {history.map((n) => (
-                  <tr key={n.id} className="hover:bg-zinc-50/50">
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="font-medium text-zinc-900">
-                        {n.recipient_display_name?.trim() || n.recipient_username || "—"}
-                      </span>
-                      {n.recipient_username && (
-                        <span className="ml-1.5 text-zinc-400 text-xs">@{n.recipient_username}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 max-w-[200px] truncate text-zinc-700">{n.title ?? "—"}</td>
-                    <td className="px-4 py-3 max-w-[260px] truncate text-zinc-500">{n.body ?? "—"}</td>
-                    <td className="px-4 py-3"><PriorityBadge priority={n.priority} /></td>
-                    <td className="px-4 py-3">
-                      {n.is_read ? (
-                        <span className="text-green-600 text-xs font-medium">Yes</span>
+                  <TR key={n.id}>
+                    <TD className="max-w-[380px]">
+                      <CellStack title={n.title ?? "—"} sub={n.body ?? undefined} />
+                    </TD>
+                    <TD>
+                      {n.recipient_count > 1 ? (
+                        <StatusPill tone="info">
+                          {n.recipient_count} recipients
+                        </StatusPill>
                       ) : (
-                        <span className="text-zinc-400 text-xs">No</span>
+                        <span className="font-body text-[14px] text-muted">
+                          {n.recipient_display_name?.trim() ||
+                            (n.recipient_username ? `@${n.recipient_username}` : "One person")}
+                        </span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-zinc-400 whitespace-nowrap">{timeAgo(n.created_at)}</td>
-                  </tr>
+                    </TD>
+                    <TD>
+                      <PriorityPill priority={n.priority} />
+                    </TD>
+                    <TDNum muted={n.read_count === 0}>
+                      {n.read_count}/{n.recipient_count}
+                    </TDNum>
+                    <TD align="right" className="text-muted">
+                      {timeAgo(n.created_at)}
+                    </TD>
+                  </TR>
                 ))}
-              </tbody>
-            </table>
-          </div>
+                {history.length === 0 && (
+                  <TableEmpty
+                    colSpan={5}
+                    title="Nothing sent yet"
+                    hint="Admin notifications you send will be listed here with their read counts."
+                  />
+                )}
+              </TBody>
+            </Table>
+          </TableShell>
         )}
-      </div>
+      </section>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/admin/guard";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { excerptFrom } from "@/lib/markdown/render";
+import { AdminPageShell } from "@/components/admin/ui/AdminPageShell";
 import { ReviewQueueClient, type QueueRow } from "./ReviewQueueClient";
 
 export const dynamic = "force-dynamic";
@@ -77,27 +78,23 @@ export default async function AdminMagazinePage() {
   const pendingCount = rows.filter((r) => r.status === "pending_review").length;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-          Magazine
-        </h1>
-        <p className="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400">
-          {pendingCount > 0
-            ? `${pendingCount} article${pendingCount === 1 ? "" : "s"} waiting for review.`
-            : "Review submitted articles and choose which appear as Featured Stories."}
-        </p>
-      </div>
-
+    <AdminPageShell
+      title="Magazine"
+      description={
+        pendingCount > 0
+          ? `${pendingCount} article${pendingCount === 1 ? "" : "s"} waiting for review.`
+          : "Review submitted articles and choose which appear as Featured Stories."
+      }
+    >
       {missingTable ? (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 px-5 py-4 font-body text-[14px] text-amber-800">
           The <code>articles</code> table does not exist yet. Apply{" "}
-          <code>supabase/migrations-review/20260806_magazine_articles.REVIEW.sql</code> to
+          <code>supabase/migrations/20260808101000_magazine_articles.sql</code> to
           enable the Magazine.
-        </p>
+        </div>
       ) : (
         <ReviewQueueClient rows={rows} />
       )}
-    </div>
+    </AdminPageShell>
   );
 }

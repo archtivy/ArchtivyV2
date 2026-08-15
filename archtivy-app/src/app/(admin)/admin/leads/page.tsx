@@ -1,5 +1,19 @@
 import Link from "next/link";
-import { AdminPage } from "@/components/admin/AdminPage";
+import { AdminPageShell, Toolbar, SegmentedLinks } from "@/components/admin/ui/AdminPageShell";
+import { RequestStatusPill } from "@/components/admin/ui/StatusPill";
+import {
+  TableShell,
+  Table,
+  THead,
+  TH,
+  TBody,
+  TR,
+  TD,
+  RowActions,
+  CellStack,
+  TableEmpty,
+} from "@/components/admin/ui/DataTable";
+import { BTN_ROW, TYPE } from "@/components/admin/ui/tokens";
 import { getLeads } from "@/lib/db/leads";
 
 const toText = (v: unknown) => (v == null ? "" : String(v).trim());
@@ -11,110 +25,94 @@ export default async function AdminLeadsPage({
 }) {
   const params = await searchParams;
   const statusParam = toText(params.status) as "pending" | "approved" | "rejected" | "";
-  const status = statusParam && ["pending", "approved", "rejected"].includes(statusParam)
-    ? statusParam
-    : ("pending" as const);
+  const status =
+    statusParam && ["pending", "approved", "rejected"].includes(statusParam)
+      ? statusParam
+      : ("pending" as const);
 
   const leads = await getLeads({ status, limit: 100 });
 
   return (
-    <AdminPage title="Leads">
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-zinc-700">Filter:</span>
-        <Link
-          href="/admin/leads"
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium ${!statusParam ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"}`}
-        >
-          Pending
-        </Link>
-        <Link
-          href="/admin/leads?status=approved"
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium ${statusParam === "approved" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"}`}
-        >
-          Approved
-        </Link>
-        <Link
-          href="/admin/leads?status=rejected"
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium ${statusParam === "rejected" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"}`}
-        >
-          Rejected
-        </Link>
-      </div>
+    <AdminPageShell
+      title="Leads"
+      description="Enquiries sent through a listing's contact form."
+      toolbar={
+        <Toolbar>
+          <SegmentedLinks
+            items={[
+              { label: "Pending", href: "/admin/leads", active: !statusParam },
+              {
+                label: "Approved",
+                href: "/admin/leads?status=approved",
+                active: statusParam === "approved",
+              },
+              {
+                label: "Rejected",
+                href: "/admin/leads?status=rejected",
+                active: statusParam === "rejected",
+              },
+            ]}
+          />
+        </Toolbar>
+      }
+    >
+      <TableShell>
+        <Table minWidth={860}>
+          <THead>
+            <TH>Listing</TH>
+            <TH>Sender</TH>
+            <TH>Status</TH>
+            <TH>Received</TH>
+            <TH align="right">
+              <span className="sr-only">Actions</span>
+            </TH>
+          </THead>
+          <TBody>
+            {leads.map((r) => (
+              <TR key={r.id}>
+                <TD className="max-w-[300px]">
+                  <CellStack
+                    title={r.listing_title}
+                    sub={r.listing_type ? r.listing_type : undefined}
+                  />
+                </TD>
+                <TD className="max-w-[280px]">
+                  <CellStack
+                    title={r.sender_name}
+                    sub={r.sender_email ? r.sender_email : undefined}
+                  />
+                </TD>
+                <TD>
+                  <RequestStatusPill status={r.status} />
+                </TD>
+                <TD className="text-muted">{new Date(r.created_at).toLocaleString()}</TD>
+                <RowActions>
+                  <Link href={`/admin/leads/${r.id}`} className={BTN_ROW}>
+                    Review
+                  </Link>
+                </RowActions>
+              </TR>
+            ))}
+            {leads.length === 0 && (
+              <TableEmpty
+                colSpan={5}
+                title={`No ${status} leads`}
+                hint={
+                  status === "pending"
+                    ? "New enquiries land here as soon as someone contacts a listing."
+                    : "Try another status filter."
+                }
+              />
+            )}
+          </TBody>
+        </Table>
+      </TableShell>
 
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-        <div className="w-full overflow-x-auto">
-          <table className="w-full min-w-[800px] border-collapse">
-            <thead>
-              <tr className="border-b border-zinc-200 bg-zinc-50">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Listing
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Sender
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Created
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {leads.map((r) => (
-                <tr key={r.id} className="border-b border-zinc-100 hover:bg-zinc-50">
-                  <td className="px-4 py-3">
-                    <span className="text-sm font-medium text-zinc-900">{r.listing_title}</span>
-                    {r.listing_type && (
-                      <span className="ml-1 text-xs text-zinc-500">({r.listing_type})</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-zinc-700">
-                    {r.sender_name}
-                    {r.sender_email && (
-                      <span className="text-zinc-500"> · {r.sender_email}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                        r.status === "pending"
-                          ? "bg-amber-50 text-amber-800"
-                          : r.status === "approved"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-zinc-100 text-zinc-700"
-                      }`}
-                    >
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-zinc-700">
-                    {new Date(r.created_at).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/admin/leads/${r.id}`}
-                      className="text-sm font-medium text-zinc-700 hover:underline"
-                    >
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-              {leads.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-zinc-500">
-                    No leads found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </AdminPage>
+      {leads.length > 0 && (
+        <p className={`mt-3 ${TYPE.meta}`}>
+          Showing {leads.length} {leads.length === 1 ? "lead" : "leads"}
+        </p>
+      )}
+    </AdminPageShell>
   );
 }

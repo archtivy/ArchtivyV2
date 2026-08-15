@@ -1,24 +1,28 @@
 import type { ReactNode } from "react";
+import { AdminPageShell } from "@/components/admin/ui/AdminPageShell";
 
+/**
+ * Kept as a thin alias over AdminPageShell.
+ *
+ * Routes outside this redesign's scope (SEO, Users, Connections, Media, Tools,
+ * Settings) import AdminPage. Delegating rather than deleting means they pick
+ * up the new header, spacing and type scale without being rewritten — and it
+ * leaves one obvious place to finish the migration later.
+ */
 export function AdminPage({
   title,
+  description,
   actions,
   children,
 }: {
   title: ReactNode;
+  description?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div className="px-6 py-6">
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-zinc-900">{title}</h1>
-        </div>
-        {actions ? <div className="shrink-0">{actions}</div> : null}
-      </div>
+    <AdminPageShell title={title} description={description} actions={actions}>
       {children}
-    </div>
+    </AdminPageShell>
   );
 }
-

@@ -1,11 +1,21 @@
 import Link from "next/link";
-import { AdminPage } from "@/components/admin/AdminPage";
+import {
+  AdminPageShell,
+  Toolbar,
+  SearchField,
+  SelectField,
+  ErrorPanel,
+} from "@/components/admin/ui/AdminPageShell";
 import { AdminProfilesTable } from "@/components/admin/AdminProfilesTable";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { BTN_PRIMARY, BTN_SECONDARY } from "@/components/admin/ui/tokens";
 
 const toText = (v: unknown) => (v == null ? "" : String(v).trim());
 
-function profileTypeLabel(p: any): string {
+function profileTypeLabel(p: {
+  role?: string | null;
+  designer_discipline?: string | null;
+}): string {
   if (p.role === "brand") return "Brand";
   const d = toText(p.designer_discipline).toLowerCase();
   if (d === "studio") return "Studio";
@@ -21,26 +31,26 @@ export default async function AdminProfilesPage({
   const supabase = getSupabaseServiceClient();
   const q = toText(searchParams.q);
   const role = toText(searchParams.role);
+  const hasFilters = !!(q || role);
 
   let query = supabase
     .from("profiles")
-    .select("id,clerk_user_id,role,display_name,username,location_city,location_country,designer_discipline,brand_type,updated_at")
+    .select(
+      "id,clerk_user_id,role,display_name,username,location_city,location_country,designer_discipline,brand_type,updated_at"
+    )
     .order("updated_at", { ascending: false })
     .limit(50);
 
   if (q) query = query.or(`display_name.ilike.%${q}%,username.ilike.%${q}%`);
   if (role) query = query.eq("role", role);
-  // Exclude soft-deleted profiles (requires profiles.deleted_at; see docs/profiles-deleted-at-migration.sql)
   query = query.is("deleted_at", null);
 
   const { data: profiles, error } = await query;
   if (error) {
     return (
-      <AdminPage title="Profiles">
-        <div className="rounded-xl border border-red-200 bg-white p-4 text-sm text-red-700">
-          {error.message}
-        </div>
-      </AdminPage>
+      <AdminPageShell title="Profiles">
+        <ErrorPanel message={error.message} />
+      </AdminPageShell>
     );
   }
 
@@ -58,69 +68,73 @@ export default async function AdminProfilesPage({
     if (row.type === "product") counts[key].products += 1;
   }
 
-  const rows = (profiles ?? []).map((p: any) => {
-    const name = toText(p.display_name) || toText(p.username) || "—";
-    const city = toText(p.location_city);
-    const country = toText(p.location_country);
-    const location = [city, country].filter(Boolean).join(", ") || "—";
-    const createdBy =
-      toText(p.clerk_user_id).startsWith("archtivy_internal_") ? ("Archtivy" as const) : ("User" as const);
-    const c = counts[p.clerk_user_id] ?? { projects: 0, products: 0 };
-    const status = p.username ? ("Live" as const) : ("Draft" as const);
+  const rows = (profiles ?? []).map((p) => {
+    const row = p as {
+      id: string;
+      clerk_user_id: string;
+      role: string | null;
+      display_name: string | null;
+      username: string | null;
+      location_city: string | null;
+      location_country: string | null;
+      designer_discipline: string | null;
+    };
+    const name = toText(row.display_name) || toText(row.username) || "Unnamed";
+    const location =
+      [toText(row.location_city), toText(row.location_country)].filter(Boolean).join(", ") || "—";
+    const createdBy = toText(row.clerk_user_id).startsWith("archtivy_internal_")
+      ? ("Archtivy" as const)
+      : ("User" as const);
+    const c = counts[row.clerk_user_id] ?? { projects: 0, products: 0 };
     return {
-      id: p.id as string,
+      id: row.id,
       name,
-      typeLabel: profileTypeLabel(p),
+      typeLabel: profileTypeLabel(row),
       location,
       createdBy,
       projectsCount: c.projects,
       productsCount: c.products,
-      status,
-      username: (p.username as string | null) ?? null,
+      status: row.username ? ("Live" as const) : ("Draft" as const),
+      username: row.username ?? null,
     };
   });
 
   return (
-    <AdminPage
+    <AdminPageShell
       title="Profiles"
+      description="Designers, studios and brands on the platform."
       actions={
-        <Link
-          href="/admin/profiles/new"
-          className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          + Create Profile
+        <Link href="/admin/profiles/new" className={BTN_PRIMARY}>
+          Create profile
         </Link>
       }
-    >
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <form className="flex flex-wrap items-center gap-2">
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Search name or username…"
-            className="h-9 w-64 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-900/20"
-          />
-          <select
-            name="role"
-            defaultValue={role}
-            className="h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-900/20"
-          >
-            <option value="">All roles</option>
-            <option value="designer">Designer</option>
-            <option value="brand">Brand</option>
-            <option value="reader">Reader</option>
-          </select>
-          <button
-            type="submit"
-            className="h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-          >
-            Apply
-          </button>
+      toolbar={
+        <form className="contents">
+          <Toolbar>
+            <SearchField name="q" defaultValue={q} placeholder="Search name or username…" />
+            <SelectField
+              name="role"
+              defaultValue={role}
+              options={[
+                { value: "", label: "All roles" },
+                { value: "designer", label: "Designer" },
+                { value: "brand", label: "Brand" },
+                { value: "reader", label: "Reader" },
+              ]}
+            />
+            <button type="submit" className={BTN_SECONDARY}>
+              Apply
+            </button>
+            {hasFilters && (
+              <Link href="/admin/profiles" className={BTN_SECONDARY}>
+                Clear
+              </Link>
+            )}
+          </Toolbar>
         </form>
-      </div>
-
-      <AdminProfilesTable rows={rows} />
-    </AdminPage>
+      }
+    >
+      <AdminProfilesTable rows={rows} filtered={hasFilters} />
+    </AdminPageShell>
   );
 }
-

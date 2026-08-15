@@ -4,6 +4,34 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { bulkUpdateProfiles } from "@/app/(admin)/admin/_actions/profiles";
+import { StatusPill } from "@/components/admin/ui/StatusPill";
+import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
+import {
+  TableShell,
+  TableBar,
+  Table,
+  THead,
+  TH,
+  TBody,
+  TR,
+  TD,
+  TDNum,
+  RowActions,
+  CellStack,
+  Checkbox,
+  TableEmpty,
+} from "@/components/admin/ui/DataTable";
+import { INPUT, BTN_ROW, BTN_SECONDARY, TYPE } from "@/components/admin/ui/tokens";
+
+/**
+ * Profiles table.
+ *
+ * Same data and same server actions as before; the finish now matches the rest
+ * of the admin area. The one substantive change is the "Created by" column,
+ * which used to print the bare words "Archtivy" and "User" — it is now a pill,
+ * because that column exists to spot internally-seeded records at a glance and
+ * plain text in a nine-column table does not achieve that.
+ */
 
 type Row = {
   id: string;
@@ -17,7 +45,13 @@ type Row = {
   username: string | null;
 };
 
-export function AdminProfilesTable({ rows }: { rows: Row[] }) {
+export function AdminProfilesTable({
+  rows,
+  filtered = false,
+}: {
+  rows: Row[];
+  filtered?: boolean;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -39,16 +73,18 @@ export function AdminProfilesTable({ rows }: { rows: Row[] }) {
     setSelected(next);
   };
 
-  const toggleOne = (id: string, checked: boolean) => {
+  const toggleOne = (id: string, checked: boolean) =>
     setSelected((s) => ({ ...s, [id]: checked }));
-  };
 
   const applyBulk = (patch: Record<string, unknown>) => {
     if (!anyChecked) return;
     startTransition(async () => {
       const res = await bulkUpdateProfiles({ ids: selectedIds, patch });
-      if (!res.ok) alert(res.error);
-      else router.refresh();
+      if (!res.ok) setBanner({ type: "error", message: res.error ?? "Update failed." });
+      else {
+        setBanner({ type: "success", message: `Updated ${selectedIds.length} profile(s).` });
+        router.refresh();
+      }
     });
   };
 
@@ -62,10 +98,12 @@ export function AdminProfilesTable({ rows }: { rows: Row[] }) {
       if (!res.ok) {
         setBanner({
           type: "error",
-          message: data?.error ?? "Cannot delete because there are related records. Remove/reassign them first.",
+          message:
+            data?.error ??
+            "Cannot delete because there are related records. Remove or reassign them first.",
         });
       } else {
-        setBanner({ type: "success", message: "Deleted" });
+        setBanner({ type: "success", message: "Deleted." });
         router.refresh();
       }
       setDeleteProfileId(null);
@@ -73,215 +111,175 @@ export function AdminProfilesTable({ rows }: { rows: Row[] }) {
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-      {banner && (
-        <div
-          className={
-            banner.type === "success"
-              ? "border-b border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
-              : "border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-          }
-          role="status"
-        >
-          {banner.message}
-          <button
-            type="button"
-            onClick={() => setBanner(null)}
-            className="ml-2 font-medium underline focus:outline-none"
-            aria-label="Dismiss"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-      {deleteProfileId && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-profile-title"
-        >
-          <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-lg">
-            <h2 id="delete-profile-title" className="text-lg font-semibold text-zinc-900">
-              Delete profile?
-            </h2>
-            <p className="mt-2 text-sm text-zinc-600">
-              This will delete the profile and may affect linked listings/connections. This action cannot be undone.
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
+    <>
+      <TableShell>
+        {banner && (
+          <TableBar tone={banner.type === "success" ? "positive" : "critical"}>
+            <span className="flex-1">{banner.message}</span>
+            <button
+              type="button"
+              onClick={() => setBanner(null)}
+              className="font-medium underline underline-offset-2 focus:outline-none"
+            >
+              Dismiss
+            </button>
+          </TableBar>
+        )}
+
+        {anyChecked && (
+          <TableBar tone="selection">
+            <span className="font-medium tabular-nums">{selectedIds.length} selected</span>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <input
+                value={bulkCity}
+                onChange={(e) => setBulkCity(e.target.value)}
+                placeholder="City"
+                aria-label="City to apply"
+                className={`${INPUT} w-36`}
+              />
+              <input
+                value={bulkCountry}
+                onChange={(e) => setBulkCountry(e.target.value)}
+                placeholder="Country"
+                aria-label="Country to apply"
+                className={`${INPUT} w-36`}
+              />
               <button
                 type="button"
-                onClick={() => setDeleteProfileId(null)}
-                className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+                disabled={isPending}
+                onClick={() =>
+                  applyBulk({
+                    location_city: bulkCity || null,
+                    location_country: bulkCountry || null,
+                  })
+                }
+                className={BTN_SECONDARY}
               >
-                Cancel
+                Set location
               </button>
               <button
                 type="button"
                 disabled={isPending}
-                onClick={runDeleteProfile}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                onClick={() => applyBulk({ location_city: null, location_country: null })}
+                className={BTN_ROW}
               >
-                {isPending ? "Deleting…" : "Delete"}
+                Clear location
               </button>
             </div>
-          </div>
-        </div>
-      )}
-      {anyChecked && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 bg-zinc-50 px-4 py-3">
-          <div className="text-sm font-medium text-zinc-900">
-            {selectedIds.length} selected
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              value={bulkCity}
-              onChange={(e) => setBulkCity(e.target.value)}
-              placeholder="City"
-              className="h-9 w-40 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-900/20"
-            />
-            <input
-              value={bulkCountry}
-              onChange={(e) => setBulkCountry(e.target.value)}
-              placeholder="Country"
-              className="h-9 w-40 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-zinc-900/20"
-            />
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() =>
-                applyBulk({
-                  location_city: bulkCity || null,
-                  location_country: bulkCountry || null,
-                })
-              }
-              className="h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-100 disabled:opacity-50"
-            >
-              Set location
-            </button>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => applyBulk({ location_city: null, location_country: null })}
-              className="h-9 rounded-lg border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-100 disabled:opacity-50"
-            >
-              Clear location
-            </button>
-          </div>
-        </div>
-      )}
+          </TableBar>
+        )}
 
-      <div className="w-full overflow-x-auto">
-        <table className="w-full min-w-[980px] border-collapse">
-          <thead>
-            <tr className="border-b border-zinc-200 bg-white">
-              <th className="w-10 px-4 py-3 text-left">
-                <input
-                  type="checkbox"
-                  checked={allChecked}
-                  onChange={(e) => toggleAll(e.target.checked)}
-                  aria-label="Select all"
-                />
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                Name
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                Type
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                Location
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                Created by
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                Linked projects
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                Linked products
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                Status
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table minWidth={1020}>
+          <THead>
+            <TH width="44px">
+              <Checkbox checked={allChecked} onChange={toggleAll} label="Select all" />
+            </TH>
+            <TH>Name</TH>
+            <TH>Type</TH>
+            <TH>Location</TH>
+            <TH>Source</TH>
+            <TH align="right">Projects</TH>
+            <TH align="right">Products</TH>
+            <TH>Status</TH>
+            <TH align="right">
+              <span className="sr-only">Actions</span>
+            </TH>
+          </THead>
+          <TBody>
             {rows.map((r) => (
-              <tr key={r.id} className="border-b border-zinc-100 hover:bg-zinc-50">
-                <td className="w-10 px-4 py-3">
-                  <input
-                    type="checkbox"
+              <TR key={r.id} selected={!!selected[r.id]}>
+                <TD>
+                  <Checkbox
                     checked={!!selected[r.id]}
-                    onChange={(e) => toggleOne(r.id, e.target.checked)}
-                    aria-label={`Select ${r.name}`}
+                    onChange={(c) => toggleOne(r.id, c)}
+                    label={`Select ${r.name}`}
                   />
-                </td>
-                <td className="px-4 py-3">
-                  <div className="text-sm font-medium text-zinc-900">{r.name}</div>
-                  {r.username ? (
-                    <div className="mt-0.5 text-xs text-zinc-500">@{r.username}</div>
-                  ) : null}
-                </td>
-                <td className="px-4 py-3 text-sm text-zinc-700">{r.typeLabel}</td>
-                <td className="px-4 py-3 text-sm text-zinc-700">{r.location}</td>
-                <td className="px-4 py-3 text-sm text-zinc-700">{r.createdBy}</td>
-                <td className="px-4 py-3 text-sm text-zinc-700">{r.projectsCount}</td>
-                <td className="px-4 py-3 text-sm text-zinc-700">{r.productsCount}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={[
-                      "inline-flex rounded-full px-2 py-1 text-xs font-semibold",
-                      r.status === "Live"
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-zinc-100 text-zinc-700",
-                    ].join(" ")}
-                  >
-                    {r.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-2">
-                    {r.username ? (
-                      <Link
-                        href={`/u/${r.username}`}
-                        className="text-sm font-medium text-zinc-700 hover:underline"
-                      >
-                        View
+                </TD>
+                <TD className="max-w-[280px]">
+                  <CellStack
+                    title={
+                      <Link href={`/admin/profiles/${r.id}`} className="hover:underline">
+                        {r.name}
                       </Link>
-                    ) : null}
+                    }
+                    sub={r.username ? `@${r.username}` : "No username yet"}
+                  />
+                </TD>
+                <TD className="text-muted">{r.typeLabel}</TD>
+                <TD className="text-muted">{r.location}</TD>
+                <TD>
+                  <StatusPill tone={r.createdBy === "Archtivy" ? "info" : "neutral"}>
+                    {r.createdBy === "Archtivy" ? "Seeded" : "Self-signup"}
+                  </StatusPill>
+                </TD>
+                <TDNum muted={r.projectsCount === 0}>{r.projectsCount}</TDNum>
+                <TDNum muted={r.productsCount === 0}>{r.productsCount}</TDNum>
+                <TD>
+                  {r.status === "Live" ? (
+                    <StatusPill tone="positive" dot>
+                      Live
+                    </StatusPill>
+                  ) : (
+                    <StatusPill tone="neutral" dot>
+                      Draft
+                    </StatusPill>
+                  )}
+                </TD>
+                <RowActions>
+                  {r.username && (
                     <Link
-                      href={`/admin/profiles/${r.id}`}
-                      className="text-sm font-medium text-zinc-700 hover:underline"
+                      href={`/u/${r.username}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={BTN_ROW}
                     >
-                      Edit
+                      View
                     </Link>
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() => setDeleteProfileId(r.id)}
-                      className="text-sm font-medium text-red-600 hover:text-red-700 hover:underline disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
+                  )}
+                  <Link href={`/admin/profiles/${r.id}`} className={BTN_ROW}>
+                    Edit
+                  </Link>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => setDeleteProfileId(r.id)}
+                    className={`${BTN_ROW} text-red-600 hover:bg-red-50 hover:text-red-700`}
+                  >
+                    Delete
+                  </button>
+                </RowActions>
+              </TR>
             ))}
             {rows.length === 0 && (
-              <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-sm text-zinc-500">
-                  No results
-                </td>
-              </tr>
+              <TableEmpty
+                colSpan={9}
+                title={filtered ? "No profiles match these filters" : "No profiles yet"}
+                hint={
+                  filtered
+                    ? "Clear or widen the filters above to see more."
+                    : "Create a profile, or wait for the first signup."
+                }
+              />
             )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          </TBody>
+        </Table>
+      </TableShell>
+
+      <ConfirmDialog
+        open={!!deleteProfileId}
+        title="Delete this profile?"
+        body="This deletes the profile and may affect linked listings and connections. This cannot be undone."
+        confirmLabel={isPending ? "Deleting…" : "Delete"}
+        pending={isPending}
+        onConfirm={runDeleteProfile}
+        onCancel={() => setDeleteProfileId(null)}
+      />
+
+      {rows.length > 0 && (
+        <p className={`mt-3 ${TYPE.meta}`}>
+          Showing {rows.length} {rows.length === 1 ? "profile" : "profiles"}
+        </p>
+      )}
+    </>
   );
 }
-
