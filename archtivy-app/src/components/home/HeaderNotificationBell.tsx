@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { Bell } from "lucide-react";
+import { Bell, Settings, ArrowRight, ChevronRight } from "lucide-react";
 import type { NotificationWithActor } from "@/lib/db/notifications";
 import {
   NOTIFICATION_TABS,
@@ -13,15 +13,26 @@ import {
 /**
  * Notification bell for the editorial header (HomeNav).
  *
- * Separate from components/notifications/NotificationBell, which is the legacy
- * zinc-palette bell still used by TopNav. This is not a fork of it: the panel
- * here has tabs, cream/ink styling, and a transparent-over-hero state that the
- * old one has no concept of. The two share the API route and the tab
- * vocabulary, which is where the real logic lives.
+ * Styled to the supplied mockup: WHITE panel (not cream), underline tabs (not
+ * pills), 40px round avatar left, 48px rounded thumbnail right, unread dot on
+ * the far right, and a bordered full-width "View all notifications" button.
  *
- * Every notification it can show is one the platform genuinely creates —
- * follow events (the `follows` table is populated) and admin sends. Nothing
- * here fabricates activity to fill the panel.
+ * Separate from components/notifications/NotificationBell, which is the legacy
+ * zinc-palette bell still used by TopNav. Not a fork of it: this has tabs, a
+ * different layout, and a transparent-over-hero state the old one has no
+ * concept of. They share the API route and the tab vocabulary.
+ *
+ * ── ON THE MOCKUP'S CONTENT ─────────────────────────────────────────────────
+ * The mockup shows six notifications; only some correspond to event types the
+ * platform actually produces today. "saved to their collection", "added to 5
+ * new projects this week" and "Daily Digest / saved searches" are all
+ * save-triggered or aggregated — deferred, and listing_saves is empty. This
+ * component renders whatever the API returns and nothing else; it never
+ * synthesises a row to fill the panel out.
+ *
+ * The layout does support all six shapes, so when those generators exist they
+ * render correctly with no change here: the thumbnail, the digest chevron and
+ * the icon-avatar fallback are all driven by the notification's own fields.
  */
 
 const POLL_INTERVAL = 30_000;
@@ -29,12 +40,54 @@ const POLL_INTERVAL = 30_000;
 function timeAgo(iso: string): string {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
   if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m`;
+  if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
+  if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function initials(name: string | null | undefined): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+/** Left avatar: actor photo, actor initials, or a neutral bell for
+ *  platform-authored notifications with no actor. */
+function Avatar({ n }: { n: NotificationWithActor }) {
+  if (n.actor_avatar_url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={n.actor_avatar_url}
+        alt=""
+        className="h-10 w-10 shrink-0 rounded-full object-cover"
+      />
+    );
+  }
+  const label = initials(n.actor_display_name ?? n.actor_username);
+  if (label) {
+    return (
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone/60 font-body text-[12px] font-semibold leading-tight text-ink"
+        aria-hidden
+      >
+        {label}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone/40 text-muted"
+      aria-hidden
+    >
+      <Bell strokeWidth={1.5} className="h-4 w-4" />
+    </span>
+  );
 }
 
 export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
@@ -45,7 +98,6 @@ export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
   const [loading, setLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Unread badge — polled whether or not the panel is open.
   useEffect(() => {
     let cancelled = false;
     const fetchCount = () =>
@@ -63,7 +115,6 @@ export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
     };
   }, []);
 
-  // Panel contents — refetched per tab, server-side filtered.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -84,7 +135,6 @@ export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
     };
   }, [open, tab]);
 
-  // Click-outside and Escape.
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
@@ -121,8 +171,6 @@ export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
     }).catch(() => {});
   }, []);
 
-  const hasUnreadHere = items.some((n) => !n.is_read);
-
   return (
     <div ref={ref} className="relative">
       <button
@@ -151,55 +199,80 @@ export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-full z-[100] mt-2 w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-hairline bg-cream shadow-[0_12px_40px_rgba(22,22,22,0.12)]"
+          className="absolute right-0 top-full z-[100] mt-3 w-[min(440px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-[0_16px_48px_rgba(0,0,0,0.14)]"
         >
-          <div className="flex items-center justify-between gap-3 border-b border-hairline px-4 py-3">
-            <h2 className="font-body text-[15px] font-semibold text-ink">Notifications</h2>
-            {hasUnreadHere && (
+          {/* Header */}
+          <div className="flex items-center justify-between gap-3 px-5 pb-3 pt-4">
+            <h2 className="font-body text-[17px] font-semibold tracking-[-0.01em] text-ink">
+              Notifications
+            </h2>
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={markAllRead}
-                className="font-body text-[12px] text-muted underline underline-offset-2 transition-colors hover:text-ink"
+                className="font-body text-[13px] text-muted transition-colors hover:text-ink"
               >
-                Mark all read
+                Mark all as read
               </button>
-            )}
+              <Link
+                href="/me/settings"
+                onClick={() => setOpen(false)}
+                aria-label="Notification settings"
+                className="text-muted transition-colors hover:text-ink"
+              >
+                <Settings strokeWidth={1.5} className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
 
-          {/* Tabs */}
+          {/* Underline tabs */}
           <div
-            className="flex items-center gap-1 border-b border-hairline px-2 py-2"
+            className="flex items-center gap-6 border-b border-black/[0.07] px-5"
             role="tablist"
             aria-label="Notification categories"
           >
-            {NOTIFICATION_TABS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                aria-selected={tab === t}
-                onClick={() => setTab(t)}
-                className={[
-                  "rounded-full px-3 py-1.5 font-body text-[13px] transition-colors",
-                  tab === t
-                    ? "bg-ink font-medium text-cream"
-                    : "text-muted hover:bg-stone/50 hover:text-ink",
-                ].join(" ")}
-              >
-                {NOTIFICATION_TAB_LABELS[t]}
-              </button>
-            ))}
+            {NOTIFICATION_TABS.map((t) => {
+              const active = tab === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(t)}
+                  className={[
+                    "relative -mb-px pb-2.5 pt-1 font-body text-[14px] transition-colors",
+                    active ? "font-medium text-ink" : "text-muted hover:text-ink",
+                  ].join(" ")}
+                >
+                  {NOTIFICATION_TAB_LABELS[t]}
+                  {active && (
+                    <span
+                      className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-ink"
+                      aria-hidden
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          <div className="max-h-[380px] overflow-y-auto">
+          {/* List */}
+          <div className="max-h-[420px] overflow-y-auto">
             {loading ? (
-              <div className="space-y-3 p-4">
+              <div className="space-y-4 p-5">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="h-12 animate-pulse rounded-xl bg-stone/40" />
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-stone/40" />
+                    <div className="flex-1 space-y-2 pt-1">
+                      <div className="h-3 w-3/4 animate-pulse rounded bg-stone/40" />
+                      <div className="h-3 w-1/2 animate-pulse rounded bg-stone/30" />
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : items.length === 0 ? (
-              <p className="px-4 py-10 text-center font-body text-[14px] text-muted">
+              <p className="px-5 py-12 text-center font-body text-[14px] text-muted">
                 {tab === "all"
                   ? "Nothing yet. Follow designers and brands to see their work here."
                   : `No ${NOTIFICATION_TAB_LABELS[tab].toLowerCase()} yet.`}
@@ -207,34 +280,52 @@ export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
             ) : (
               <ul>
                 {items.map((n) => {
-                  const body = (
-                    <>
-                      <span className="flex items-start gap-2.5">
-                        {!n.is_read && (
-                          <span
-                            className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-archtivy-primary"
+                  const inner = (
+                    <div className="flex items-start gap-3 px-5 py-3.5">
+                      <Avatar n={n} />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="font-body text-[14px] leading-[1.45] text-ink">
+                          {n.actor_display_name && (
+                            <span className="font-semibold">{n.actor_display_name} </span>
+                          )}
+                          <span className={n.actor_display_name ? "" : "font-semibold"}>
+                            {n.title}
+                          </span>
+                        </p>
+                        {n.body && (
+                          <p className="mt-0.5 font-body text-[14px] leading-[1.45] text-muted">
+                            {n.body}
+                          </p>
+                        )}
+                        <p className="mt-1 font-body text-[12px] text-muted/80">
+                          {timeAgo(n.created_at)}
+                        </p>
+                      </div>
+
+                      {/* Unread marker, far right — matches the mockup's dot. */}
+                      <span className="flex shrink-0 items-center self-center pl-1">
+                        {n.is_read ? (
+                          <ChevronRight
+                            strokeWidth={1.5}
+                            className="h-4 w-4 text-muted/50"
                             aria-hidden
                           />
+                        ) : (
+                          <>
+                            <span
+                              className="h-[7px] w-[7px] rounded-full bg-ink"
+                              aria-hidden
+                            />
+                            <span className="sr-only">Unread</span>
+                          </>
                         )}
-                        <span className={n.is_read ? "min-w-0 pl-4" : "min-w-0"}>
-                          <span className="block font-body text-[14px] font-medium text-ink">
-                            {n.title ?? "Update"}
-                          </span>
-                          {n.body && (
-                            <span className="mt-0.5 block font-body text-[13px] leading-relaxed text-muted">
-                              {n.body}
-                            </span>
-                          )}
-                          <span className="mt-1 block font-body text-[12px] text-muted">
-                            {timeAgo(n.created_at)}
-                          </span>
-                        </span>
                       </span>
-                    </>
+                    </div>
                   );
 
                   return (
-                    <li key={n.id} className="border-b border-hairline/60 last:border-0">
+                    <li key={n.id} className="border-b border-black/[0.05] last:border-0">
                       {n.cta_url ? (
                         <Link
                           href={n.cta_url}
@@ -242,17 +333,17 @@ export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
                             if (!n.is_read) markRead(n.id);
                             setOpen(false);
                           }}
-                          className="block px-4 py-3 transition-colors hover:bg-stone/30"
+                          className="block transition-colors hover:bg-black/[0.02]"
                         >
-                          {body}
+                          {inner}
                         </Link>
                       ) : (
                         <button
                           type="button"
                           onClick={() => !n.is_read && markRead(n.id)}
-                          className="block w-full px-4 py-3 text-left transition-colors hover:bg-stone/30"
+                          className="block w-full text-left transition-colors hover:bg-black/[0.02]"
                         >
-                          {body}
+                          {inner}
                         </button>
                       )}
                     </li>
@@ -262,13 +353,15 @@ export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
             )}
           </div>
 
-          <div className="border-t border-hairline px-4 py-2.5">
+          {/* Footer button */}
+          <div className="p-3">
             <Link
               href="/me/notifications"
               onClick={() => setOpen(false)}
-              className="font-body text-[13px] text-ink underline-offset-4 hover:underline"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-black/[0.09] py-3 font-body text-[14px] font-medium text-ink transition-colors hover:bg-black/[0.02]"
             >
-              See all notifications
+              View all notifications
+              <ArrowRight strokeWidth={1.5} className="h-4 w-4" />
             </Link>
           </div>
         </div>

@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Settings,
   LogOut,
+  FolderDown,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,7 +34,8 @@ import {
  * edit UI arrives with the User Profile page — so this ships with a minimal
  * honest placeholder at that path rather than a 404.
  *
- * "Files" is deliberately absent pending the download-tracking investigation.
+ * "Files" links to /me/files — the download capability already existed (60
+ * listing_documents, sign-in gated); only the ledger was missing.
  */
 
 interface MenuItem {
@@ -49,6 +51,7 @@ const ITEMS: MenuItem[] = [
   // the menu does not need to know it.
   { label: "View Profile", href: "/me", icon: User },
   { label: "Edit Profile", href: "/me/profile", icon: Pencil },
+  { label: "Files", href: "/me/files", icon: FolderDown },
   { label: "Promote", icon: TrendingUp, disabledNote: "Coming soon" },
   { label: "Account Settings", href: "/me/settings", icon: Settings },
 ];

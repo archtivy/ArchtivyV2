@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Bookmark, Menu, X } from "lucide-react";
-import { SignedIn, SignedOut, useClerk } from "@clerk/nextjs";
+import { SignedIn, useAuth, useClerk } from "@clerk/nextjs";
 import { HeaderNotificationBell } from "@/components/home/HeaderNotificationBell";
 import { HeaderProfileMenu } from "@/components/home/HeaderProfileMenu";
 
@@ -37,6 +37,19 @@ const NAV_LINKS = [
  */
 export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid" }) {
   const { signOut } = useClerk();
+  // NOT <SignedOut>. Clerk's auth components render nothing during SSR in this
+  // app — verified against the pre-existing TopNav, whose signed-out "Sign in"
+  // link is also absent from server HTML. Wrapping the guest CTA in <SignedOut>
+  // therefore dropped "For Professionals" out of the server response entirely,
+  // which the brief explicitly required to stay unchanged.
+  //
+  // Keying off isLoaded instead means the guest CTA is the SSR default: server
+  // HTML is byte-identical to before, and no-JS and crawler requests still see
+  // it. A signed-in user sees it briefly until hydration swaps in the bell —
+  // the acceptable direction for this trade, since the alternative loses the
+  // CTA for everyone who matters most.
+  const { isLoaded, isSignedIn } = useAuth();
+  const showGuestCta = !isLoaded || !isSignedIn;
   const [scrolled, setScrolled] = useState(variant === "solid");
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -91,7 +104,7 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
         <div className="flex items-center gap-3">
           {/* Signed out: unchanged — the "For Professionals" CTA is the whole
               point of the logged-out header and stays exactly as it was. */}
-          <SignedOut>
+          {showGuestCta && (
             <Link
               href="/sign-up"
               className={[
@@ -103,7 +116,7 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
             >
               For Professionals
             </Link>
-          </SignedOut>
+          )}
 
           {/* Signed in: the CTA is replaced, not supplemented — an account
               holder has no use for a sign-up prompt. */}
@@ -155,7 +168,7 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
                 </Link>
               </li>
             ))}
-            <SignedOut>
+            {showGuestCta && (
               <li>
                 <Link
                   href="/sign-up"
@@ -165,7 +178,7 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
                   For Professionals
                 </Link>
               </li>
-            </SignedOut>
+            )}
 
             {/* Below lg the account actions live in the drawer rather than the
                 bar, so nothing is lost on small screens. */}
@@ -204,6 +217,15 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
                     Coming soon
                   </span>
                 </span>
+              </li>
+              <li>
+                <Link
+                  href="/me/files"
+                  onClick={() => setMenuOpen(false)}
+                  className="block py-3 font-body text-[16px] text-ink"
+                >
+                  Files
+                </Link>
               </li>
               <li>
                 <Link
