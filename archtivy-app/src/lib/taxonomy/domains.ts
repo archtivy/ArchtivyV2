@@ -20,13 +20,8 @@ export const TAXONOMY_DOMAINS = [
   "sustainability",
   // Phase 7 — atmosphere/feel, the dimension the Inspiration System has
   // referenced since its spec without ever having an authoring surface.
-  //
-  // GATED ON A MIGRATION. taxonomy_nodes_domain_check does not yet permit
-  // 'mood'; until 20260815100000_taxonomy_mood_domain is applied, the Mood
-  // option appears in the admin domain picker but any insert fails with a
-  // 23514 that the Add-term form surfaces verbatim. Listing it here first is
-  // deliberate — it is the only consumer (verified: nothing else reads this
-  // constant), so the surface can be reviewed before the data lands.
+  // Enabled by 20260815100000_taxonomy_mood_domain (applied 2026-08-15), which
+  // widened taxonomy_nodes_domain_check and seeded the ten terms.
   "mood",
 ] as const;
 
@@ -54,5 +49,9 @@ export const TAXONOMY_DOMAIN_LABELS: Record<TaxonomyDomain, string> = {
  * Domains whose CHECK constraint has not been widened in the live database yet.
  * The admin surface uses this to say so plainly rather than letting an operator
  * discover it through a raw Postgres error.
+ *
+ * Empty as of 2026-08-15: 'mood' was the only entry and its migration is
+ * applied. Kept rather than deleted — the next dimension will need exactly this
+ * again, and the admin surface already reads it.
  */
-export const PENDING_TAXONOMY_DOMAINS: readonly TaxonomyDomain[] = ["mood"];
+export const PENDING_TAXONOMY_DOMAINS: readonly TaxonomyDomain[] = [];

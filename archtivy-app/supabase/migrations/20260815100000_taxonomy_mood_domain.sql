@@ -1,8 +1,6 @@
 -- ============================================================================
 -- Mood taxonomy domain
 --
--- Review copy. NOT APPLIED.
---
 -- ── WHY A MIGRATION IS UNAVOIDABLE ──────────────────────────────────────────
 -- Mood cannot be authored through the admin UI alone. taxonomy_nodes.domain
 -- carries a CHECK constraint listing every permitted value, and 'mood' is not
@@ -27,7 +25,7 @@
 -- Inspiration mood filter — nothing is tagged yet, so a filter would return an
 -- empty result for every term. That stays deferred until listings carry moods.
 --
--- ── COMPANION CODE CHANGE (already written, ships with this) ────────────────
+-- ── COMPANION CODE CHANGE (gated on this migration actually applying) ───────
 -- src/lib/taxonomy/domains.ts already lists "mood" in TAXONOMY_DOMAINS and in
 -- PENDING_TAXONOMY_DOMAINS. On applying this, remove "mood" from
 -- PENDING_TAXONOMY_DOMAINS — that array is only there to make the admin surface
