@@ -399,8 +399,10 @@ export async function createProject(
       listingSlug: slug,
       listingType: "project",
       listingTitle: title || "Untitled",
-      locationCity: location_city,
-      locationCountry: location_country,
+      // Real coordinates, not city/country strings — the notifier now
+      // measures distance rather than matching place names.
+      locationLat: location_lat,
+      locationLng: location_lng,
       ownerProfileId: profile?.id ?? null,
       opportunity: projectOpportunities[0],
     }).catch(() => {});
