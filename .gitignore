@@ -1,2 +1,6 @@
 .vercel
 **/node_modules/
+
+# Stray build output at the repo root — the app builds in archtivy-app/,
+# which has its own ignore. A root-level `next` invocation leaves traces here.
+/.next/
