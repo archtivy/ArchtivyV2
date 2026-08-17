@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Bookmark, Menu, X } from "lucide-react";
+import { SignedIn, SignedOut, useClerk } from "@clerk/nextjs";
+import { HeaderNotificationBell } from "@/components/home/HeaderNotificationBell";
+import { HeaderProfileMenu } from "@/components/home/HeaderProfileMenu";
 
 /**
  * Global Primary Nav for the homepage (Build Brief §1).
@@ -33,6 +36,7 @@ const NAV_LINKS = [
  *   cream-on-cream and disappear entirely.
  */
 export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid" }) {
+  const { signOut } = useClerk();
   const [scrolled, setScrolled] = useState(variant === "solid");
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -85,17 +89,27 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
         </nav>
 
         <div className="flex items-center gap-3">
-          <Link
-            href="/sign-up"
-            className={[
-              "hidden rounded-full border px-4 py-2 font-body text-[13px] transition-colors sm:inline-flex",
-              onDark
-                ? "border-cream/40 text-cream hover:bg-cream/10"
-                : "border-ink/25 text-ink hover:bg-stone/50",
-            ].join(" ")}
-          >
-            For Professionals
-          </Link>
+          {/* Signed out: unchanged — the "For Professionals" CTA is the whole
+              point of the logged-out header and stays exactly as it was. */}
+          <SignedOut>
+            <Link
+              href="/sign-up"
+              className={[
+                "hidden rounded-full border px-4 py-2 font-body text-[13px] transition-colors sm:inline-flex",
+                onDark
+                  ? "border-cream/40 text-cream hover:bg-cream/10"
+                  : "border-ink/25 text-ink hover:bg-stone/50",
+              ].join(" ")}
+            >
+              For Professionals
+            </Link>
+          </SignedOut>
+
+          {/* Signed in: the CTA is replaced, not supplemented — an account
+              holder has no use for a sign-up prompt. */}
+          <SignedIn>
+            <HeaderNotificationBell onDark={onDark} />
+          </SignedIn>
 
           <Link
             href="/me/saved"
@@ -104,6 +118,10 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
           >
             <Bookmark strokeWidth={1.5} className="h-5 w-5" />
           </Link>
+
+          <SignedIn>
+            <HeaderProfileMenu onDark={onDark} />
+          </SignedIn>
 
           <button
             type="button"
@@ -137,15 +155,78 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
                 </Link>
               </li>
             ))}
-            <li>
-              <Link
-                href="/sign-up"
-                onClick={() => setMenuOpen(false)}
-                className="mt-2 inline-flex rounded-full border border-ink/25 px-4 py-2 font-body text-[13px] text-ink"
-              >
-                For Professionals
-              </Link>
-            </li>
+            <SignedOut>
+              <li>
+                <Link
+                  href="/sign-up"
+                  onClick={() => setMenuOpen(false)}
+                  className="mt-2 inline-flex rounded-full border border-ink/25 px-4 py-2 font-body text-[13px] text-ink"
+                >
+                  For Professionals
+                </Link>
+              </li>
+            </SignedOut>
+
+            {/* Below lg the account actions live in the drawer rather than the
+                bar, so nothing is lost on small screens. */}
+            <SignedIn>
+              <li className="mt-2 border-t border-hairline pt-2">
+                <Link
+                  href="/me/notifications"
+                  onClick={() => setMenuOpen(false)}
+                  className="block py-3 font-body text-[16px] text-ink"
+                >
+                  Notifications
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/me"
+                  onClick={() => setMenuOpen(false)}
+                  className="block py-3 font-body text-[16px] text-ink"
+                >
+                  View Profile
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/me/profile"
+                  onClick={() => setMenuOpen(false)}
+                  className="block py-3 font-body text-[16px] text-ink"
+                >
+                  Edit Profile
+                </Link>
+              </li>
+              <li>
+                <span className="flex items-center gap-2 py-3 font-body text-[16px] text-muted">
+                  Promote
+                  <span className="rounded-full bg-stone/60 px-2 py-0.5 text-[11px]">
+                    Coming soon
+                  </span>
+                </span>
+              </li>
+              <li>
+                <Link
+                  href="/me/settings"
+                  onClick={() => setMenuOpen(false)}
+                  className="block py-3 font-body text-[16px] text-ink"
+                >
+                  Account Settings
+                </Link>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void signOut({ redirectUrl: "/" });
+                  }}
+                  className="block w-full py-3 text-left font-body text-[16px] text-ink"
+                >
+                  Sign Out
+                </button>
+              </li>
+            </SignedIn>
           </ul>
         </div>
       )}
