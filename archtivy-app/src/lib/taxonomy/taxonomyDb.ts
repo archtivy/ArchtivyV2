@@ -129,6 +129,51 @@ export async function getTaxonomyNodeBySlugPath(
   return { data: (data as TaxonomyNode) ?? null, error: null };
 }
 
+/**
+ * Resolve many (domain, slug_path) pairs to node ids in ONE query.
+ *
+ * The per-pair alternative is getTaxonomyNodeBySlugPath in a loop, which is
+ * what the follow controls used to do — one round trip per active filter chip.
+ *
+ * Postgrest cannot express "(domain, slug_path) IN ((a,b),(c,d))", so this
+ * over-selects with two independent IN lists and then keeps only the exact
+ * pairs asked for. That over-select is bounded and harmless: callers pass a
+ * handful of chips, and the cross-product is discarded in JS below rather than
+ * being trusted.
+ *
+ * Returns a Map keyed by taxonomyNodePairKey(). Pairs with no matching node are
+ * simply absent — callers treat absence as "not followed".
+ */
+export function taxonomyNodePairKey(domain: string, slugPath: string): string {
+  // `|` cannot occur in either half: domain is a fixed enum of lowercase words,
+  // slug_path is url slugs joined by `/`.
+  return `${domain}|${slugPath}`;
+}
+
+export async function getTaxonomyNodeIdsBySlugPaths(
+  pairs: { domain: string; slugPath: string }[]
+): Promise<DbResult<Map<string, string>>> {
+  if (pairs.length === 0) return { data: new Map(), error: null };
+
+  const domains = [...new Set(pairs.map((p) => p.domain))];
+  const slugPaths = [...new Set(pairs.map((p) => p.slugPath))];
+  const wanted = new Set(pairs.map((p) => taxonomyNodePairKey(p.domain, p.slugPath)));
+
+  const { data, error } = await supa()
+    .from("taxonomy_nodes")
+    .select("id, domain, slug_path")
+    .in("domain", domains)
+    .in("slug_path", slugPaths);
+  if (error) return { data: null, error: error.message };
+
+  const out = new Map<string, string>();
+  for (const row of (data ?? []) as { id: string; domain: string; slug_path: string }[]) {
+    const key = taxonomyNodePairKey(row.domain, row.slug_path);
+    if (wanted.has(key)) out.set(key, row.id);
+  }
+  return { data: out, error: null };
+}
+
 /** Get a single taxonomy node by ID. */
 export async function getTaxonomyNodeById(
   id: string

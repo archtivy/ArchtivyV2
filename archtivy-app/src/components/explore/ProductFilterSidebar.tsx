@@ -4,6 +4,11 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ExploreFilters } from "@/lib/explore/filters/schema";
 import { FollowFilterAction } from "@/components/follow/FollowFilterAction";
+import { useTaxonomyFollowStates } from "@/lib/follows/useTaxonomyFollowStates";
+import {
+  taxonomyFollowKey,
+  type TaxonomyFollowTarget,
+} from "@/lib/follows/taxonomyFollowKeys";
 import type { ExploreFilterOptions } from "@/lib/explore/filters/options";
 import { buildExploreUrl, countActiveFilters } from "@/lib/explore/filters/query";
 
@@ -222,6 +227,29 @@ export function ProductFilterSidebar({ currentFilters, options }: ProductFilterS
 
   const activeCount = countActiveFilters(currentFilters, "products");
 
+  // Followable selections: the one category, plus every selected material.
+  // The sidebar has no active-chip row, so the controls sit under the section
+  // they belong to instead — but the rule is the same as the filter bar's:
+  // one affordance per active selection, never gated on it being the only one.
+  const followTargets: TaxonomyFollowTarget[] = [
+    ...(currentFilters.taxonomy
+      ? [
+          {
+            targetType: "category" as const,
+            slugPath: currentFilters.taxonomy,
+            domain: "product",
+          },
+        ]
+      : []),
+    ...(currentFilters.materials ?? []).map((m) => ({
+      targetType: "material" as const,
+      slugPath: m,
+      domain: "material",
+    })),
+  ];
+  const { states: followStates, setOne: setFollowState } =
+    useTaxonomyFollowStates(followTargets);
+
   // Build checkbox sets
   const brandsSet = new Set(currentFilters.brands ?? []);
   const materialsSet = new Set(currentFilters.materials ?? []);
@@ -298,12 +326,24 @@ export function ProductFilterSidebar({ currentFilters, options }: ProductFilterS
               app: the only follow control lived on the projects filter bar and
               covered materials alone. notifyFollowedCategoryNewListing had no
               way to ever acquire a subscriber. */}
-          {currentFilters.taxonomy && (
+          {currentFilters.taxonomy && followStates && (
             <div className="pb-3 pt-1">
               <FollowFilterAction
-                targetType="category"
-                slugPath={currentFilters.taxonomy}
-                domain="product"
+                target={{
+                  targetType: "category",
+                  slugPath: currentFilters.taxonomy,
+                  domain: "product",
+                }}
+                following={
+                  followStates[
+                    taxonomyFollowKey({
+                      targetType: "category",
+                      slugPath: currentFilters.taxonomy,
+                      domain: "product",
+                    })
+                  ] ?? false
+                }
+                onChange={setFollowState}
               />
             </div>
           )}
@@ -331,18 +371,37 @@ export function ProductFilterSidebar({ currentFilters, options }: ProductFilterS
             onToggle={(v) => toggleInSet("materials", v)}
             searchable
           />
-          {/* Single selection only — "following" an intersection of three
-              materials is not a thing the follows table can express, and the
-              projects filter bar applies the same rule. */}
-          {(currentFilters.materials?.length ?? 0) === 1 && (
-            <div className="pb-3 pt-1">
-              <FollowFilterAction
-                targetType="material"
-                slugPath={currentFilters.materials[0]}
-                domain="material"
-              />
-            </div>
-          )}
+          {/* One control per selected material.
+              The previous rule showed this only when exactly one material was
+              selected. That was never a data-model constraint — a follow row is
+              (follower, target_type, target_id), one node per row, so selecting
+              three materials is three independent follows, not an intersection
+              the table cannot express. The single-selection rule only avoided
+              deciding which chip one button referred to, and the cost was that
+              the affordance silently vanished the moment a second material was
+              ticked. */}
+          {followStates &&
+            (currentFilters.materials ?? []).map((m) => {
+              const target: TaxonomyFollowTarget = {
+                targetType: "material",
+                slugPath: m,
+                domain: "material",
+              };
+              const label = options.materials.find((o) => o.value === m)?.label ?? m;
+              return (
+                <div key={m} className="flex items-center gap-1 pb-1 pt-1 first:pt-2 last:pb-3">
+                  <span className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
+                    {label}
+                  </span>
+                  <FollowFilterAction
+                    target={target}
+                    following={followStates[taxonomyFollowKey(target)] ?? false}
+                    onChange={setFollowState}
+                    label={label}
+                  />
+                </div>
+              );
+            })}
         </FilterSection>
       )}
 

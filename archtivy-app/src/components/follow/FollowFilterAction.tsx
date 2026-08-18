@@ -1,59 +1,56 @@
 "use client";
 
-import { useState, useEffect, useTransition, useCallback } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useState, useTransition } from "react";
 import { toggleFollowTaxonomy } from "@/app/actions/follows";
+import type { TaxonomyFollowTarget } from "@/lib/follows/taxonomyFollowKeys";
 
 interface FollowFilterActionProps {
-  /** "category" or "material" */
-  targetType: "category" | "material";
-  /** The taxonomy slug_path for the selected filter (e.g. "furniture/seating" or "concrete") */
-  slugPath: string;
-  /** Taxonomy domain: "product", "project", or "material" */
-  domain: string;
+  target: TaxonomyFollowTarget;
+  /** Current follow state, owned by the parent (see useTaxonomyFollowStates). */
+  following: boolean;
+  /** Report the new state back so the parent's map stays in sync. */
+  onChange: (target: TaxonomyFollowTarget, following: boolean) => void;
+  /** Appended to the aria-label so several controls are distinguishable. */
+  label?: string;
 }
 
 /**
- * Compact follow/following toggle shown adjacent to an active Explore filter chip.
- * Only renders when the user is signed in. Fetches follow state on mount.
+ * Compact follow/following toggle for one active filter chip.
+ *
+ * CONTROLLED BY DESIGN. This used to fetch its own state on mount, which was
+ * fine while it appeared at most once per page — the old rule showed it only
+ * when exactly one category or material was selected. Now that there is one per
+ * active chip, self-fetching would issue a request per chip for what is a single
+ * question about a single user, so the parent resolves them all in one call and
+ * passes the answer down.
+ *
+ * Rendering is the parent's decision too: it omits the control entirely while
+ * state is unknown or the visitor is signed out.
  */
-export function FollowFilterAction({ targetType, slugPath, domain }: FollowFilterActionProps) {
-  const { isSignedIn } = useUser();
-  const [following, setFollowing] = useState<boolean | null>(null);
+export function FollowFilterAction({
+  target,
+  following,
+  onChange,
+  label,
+}: FollowFilterActionProps) {
   const [hovering, setHovering] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const fetchState = useCallback(() => {
-    if (!isSignedIn) return;
-    const params = new URLSearchParams({ targetType, slugPath, domain });
-    fetch(`/api/follows/taxonomy-check?${params}`)
-      .then((r) => r.json())
-      .then((json) => setFollowing(json.following ?? false))
-      .catch(() => setFollowing(false));
-  }, [isSignedIn, targetType, slugPath, domain]);
-
-  useEffect(() => {
-    fetchState();
-  }, [fetchState]);
-
-  // Don't render if not signed in or still loading
-  if (!isSignedIn || following === null) return null;
-
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     startTransition(async () => {
-      const result = await toggleFollowTaxonomy(targetType, slugPath, domain);
-      if (!result.error) {
-        setFollowing(result.following);
-      }
+      const result = await toggleFollowTaxonomy(
+        target.targetType,
+        target.slugPath,
+        target.domain
+      );
+      if (!result.error) onChange(target, result.following);
     });
   };
 
-  const label = following
-    ? hovering
-      ? "Unfollow"
-      : "Following"
-    : "Follow";
+  const text = following ? (hovering ? "Unfollow" : "Following") : "Follow";
+  const describes = label ? `${label} ${target.targetType}` : `this ${target.targetType}`;
 
   return (
     <button
@@ -61,17 +58,20 @@ export function FollowFilterAction({ targetType, slugPath, domain }: FollowFilte
       onClick={handleClick}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
+      onFocus={() => setHovering(true)}
+      onBlur={() => setHovering(false)}
       disabled={isPending}
-      className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition focus:outline-none disabled:opacity-50 ${
+      className={`shrink-0 rounded-full px-1.5 text-[10px] font-medium transition focus:outline-none focus:ring-1 focus:ring-[#173DED] disabled:opacity-50 ${
         following
           ? hovering
             ? "text-zinc-400 hover:text-zinc-500"
-            : "text-[#002abf] dark:text-[#5b7cff]"
-          : "text-zinc-400 hover:text-[#002abf] dark:hover:text-[#5b7cff]"
+            : "text-[#173DED] dark:text-[#5b7cff]"
+          : "text-zinc-400 hover:text-[#173DED] dark:hover:text-[#5b7cff]"
       }`}
-      aria-label={`${label} this ${targetType}`}
+      aria-pressed={following}
+      aria-label={`${text} ${describes}`}
     >
-      {label}
+      {text}
     </button>
   );
 }
