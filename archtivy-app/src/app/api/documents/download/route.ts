@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getDocumentById, getDocumentStoragePath } from "@/lib/db/listingDocuments";
+import { getProfileByClerkId } from "@/lib/db/profiles";
+import { recordDocumentDownload } from "@/lib/db/documentDownloads";
 
 const DOCUMENTS_BUCKET =
   process.env.NEXT_PUBLIC_SUPABASE_DOCS_BUCKET?.trim() || "listing-documents";
@@ -46,6 +48,16 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = getSupabaseServiceClient();
+
+  // Title for the download history entry. Not load-bearing for the download
+  // itself, so a failure here is silent and simply leaves the title null.
+  const { data: listingRow } = await supabase
+    .from("listings")
+    .select("title")
+    .eq("id", listingId)
+    .maybeSingle();
+  const listingTitle = (listingRow as { title: string | null } | null)?.title ?? null;
+
   const { data: signed, error: signError } = await supabase.storage
     .from(DOCUMENTS_BUCKET)
     .createSignedUrl(path, SIGNED_URL_EXPIRES_SEC);
@@ -60,6 +72,26 @@ export async function GET(request: NextRequest) {
       },
       { status: msg.toLowerCase().includes("object not found") ? 404 : 500 }
     );
+  }
+
+  // Record the download for /me/files.
+  //
+  // Deliberately AFTER the signed URL is created and awaited BEFORE the
+  // redirect: logging a download that then failed to produce a link would put
+  // a file in the user's history they never received. recordDocumentDownload
+  // never throws, so a logging failure cannot cost anyone their download.
+  const profileResult = await getProfileByClerkId(userId);
+  const profileId = profileResult.data?.id;
+  if (profileId) {
+    await recordDocumentDownload({
+      profileId,
+      listingDocumentId: doc.id,
+      listingId,
+      // Denormalised now so the entry stays readable if the document is
+      // later removed.
+      fileName: doc.file_name ?? null,
+      listingTitle: listingTitle ?? null,
+    });
   }
 
   return Response.redirect(signed.signedUrl, 302);

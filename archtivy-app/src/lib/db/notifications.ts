@@ -66,23 +66,46 @@ export interface CreateNotificationInput {
  */
 export async function getNotificationsForProfile(
   profileId: string,
-  { limit = 20, offset = 0 }: { limit?: number; offset?: number } = {}
+  {
+    limit = 20,
+    offset = 0,
+    eventTypes,
+  }: {
+    limit?: number;
+    offset?: number;
+    /**
+     * Restrict to these event types. Omit for no filter.
+     *
+     * Applied to BOTH the count and the page, so the total a caller reports
+     * matches the rows it received — filtering only the page would make the
+     * tab say "12" while showing 3.
+     */
+    eventTypes?: readonly NotificationEventType[];
+  } = {}
 ): Promise<DbResult<{ items: NotificationWithActor[]; total: number }>> {
   const sup = getSupabaseServiceClient();
 
   // Count total
-  const { count, error: countErr } = await sup
+  let countQuery = sup
     .from(TABLE)
     .select("id", { count: "exact", head: true })
     .eq("recipient_profile_id", profileId);
+  if (eventTypes && eventTypes.length > 0) {
+    countQuery = countQuery.in("event_type", eventTypes as string[]);
+  }
+  const { count, error: countErr } = await countQuery;
 
   if (countErr) return { data: null, error: countErr.message };
 
   // Fetch page
-  const { data, error } = await sup
+  let pageQuery = sup
     .from(TABLE)
     .select("*")
-    .eq("recipient_profile_id", profileId)
+    .eq("recipient_profile_id", profileId);
+  if (eventTypes && eventTypes.length > 0) {
+    pageQuery = pageQuery.in("event_type", eventTypes as string[]);
+  }
+  const { data, error } = await pageQuery
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

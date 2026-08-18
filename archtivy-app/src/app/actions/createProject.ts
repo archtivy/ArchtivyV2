@@ -13,7 +13,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TeamMember, BrandUsed } from "@/lib/types/listings";
 import { setProjectMaterials } from "@/lib/db/materials";
 import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets } from "@/lib/taxonomy/taxonomyDb";
-import { notifyDesignerPublishedProject, notifyNearbyUsersOfOpportunity } from "@/lib/notifications/create";
+import {
+  notifyDesignerPublishedProject,
+  notifyNearbyUsersOfOpportunity,
+  notifyFollowedCategoryNewListing,
+  notifyFollowedMaterialNewListing,
+} from "@/lib/notifications/create";
 import { detectProjectOpportunities } from "@/lib/lifecycle";
 import { notifySearchEngines } from "@/lib/seo/indexnow";
 
@@ -391,6 +396,32 @@ export async function createProject(
     notifyDesignerPublishedProject(profile.id, listingId, title || "Untitled", slug).catch(() => {});
   }
 
+  // Notify followers of this project's category and materials — fire and forget.
+  //
+  // These two notifiers already existed and had never been called from
+  // anywhere, because until now nothing in the UI could produce a category or
+  // material follow to receive them. Both are wired here rather than in the
+  // taxonomy helpers above so they fire once per publish, after the
+  // associations are actually persisted.
+  if (taxonomy_node_id) {
+    notifyFollowedCategoryNewListing(
+      taxonomy_node_id,
+      listingId,
+      title || "Untitled",
+      slug,
+      "project"
+    ).catch(() => {});
+  }
+  for (const materialNodeId of taxonomyMaterialIds) {
+    notifyFollowedMaterialNewListing(
+      materialNodeId,
+      listingId,
+      title || "Untitled",
+      slug,
+      "project"
+    ).catch(() => {});
+  }
+
   // Notify nearby users if this project is an opportunity — fire and forget
   const projectOpportunities = detectProjectOpportunities(project_status, project_collaboration_status);
   if (projectOpportunities.length > 0) {
@@ -399,8 +430,10 @@ export async function createProject(
       listingSlug: slug,
       listingType: "project",
       listingTitle: title || "Untitled",
-      locationCity: location_city,
-      locationCountry: location_country,
+      // Real coordinates, not city/country strings — the notifier now
+      // measures distance rather than matching place names.
+      locationLat: location_lat,
+      locationLng: location_lng,
       ownerProfileId: profile?.id ?? null,
       opportunity: projectOpportunities[0],
     }).catch(() => {});

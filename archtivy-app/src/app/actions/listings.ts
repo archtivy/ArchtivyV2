@@ -39,7 +39,12 @@ import { setProjectMaterials, setProductMaterials } from "@/lib/db/materials";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets, getTaxonomyNodeById } from "@/lib/taxonomy/taxonomyDb";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
-import { notifyBrandPublishedProduct, notifyNearbyUsersOfOpportunity } from "@/lib/notifications/create";
+import {
+  notifyBrandPublishedProduct,
+  notifyNearbyUsersOfOpportunity,
+  notifyFollowedCategoryNewListing,
+  notifyFollowedMaterialNewListing,
+} from "@/lib/notifications/create";
 import { detectProductOpportunities } from "@/lib/lifecycle";
 import { notifySearchEngines } from "@/lib/seo/indexnow";
 
@@ -400,8 +405,12 @@ export async function createProduct(
       listingSlug: resolvedSlug,
       listingType: "product",
       listingTitle: title,
-      locationCity: null,
-      locationCountry: null,
+      // Products carry no location of their own, so there is nothing to be
+      // "near". The notifier returns immediately on null coordinates; this
+      // call is left in place so the branch is visible rather than silently
+      // dropped if products ever gain a location.
+      locationLat: null,
+      locationLng: null,
       ownerProfileId: null,
       opportunity: productOpportunities[0],
     }).catch(() => {});
@@ -705,6 +714,28 @@ export async function createProductCanonical(
   // Notify followers of this brand — fire and forget
   if (profile?.id) {
     notifyBrandPublishedProduct(profile.id, productId, title, slug).catch(() => {});
+  }
+
+  // Notify followers of this product's category and materials — fire and
+  // forget. Mirrors the project path in createProject.ts; see the note there
+  // on why these had never been called before.
+  if (taxonomyNodeId) {
+    notifyFollowedCategoryNewListing(
+      taxonomyNodeId,
+      productId,
+      title,
+      slug,
+      "product"
+    ).catch(() => {});
+  }
+  for (const materialNodeId of taxonomyMaterialIds) {
+    notifyFollowedMaterialNewListing(
+      materialNodeId,
+      productId,
+      title,
+      slug,
+      "product"
+    ).catch(() => {});
   }
 
   revalidatePath("/");

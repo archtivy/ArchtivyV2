@@ -77,6 +77,17 @@ export function isComingSoonBypass(pathname: string): boolean {
   // Authenticates with a shared secret, not a session.
   if (pathname === "/api/revalidate") return true;
 
+  // Scheduled jobs. Vercel's cron invoker carries no Clerk session, so without
+  // this the gate answers 503 and the job silently never runs — which is
+  // exactly what happened: collections-refresh had not executed once between
+  // 2026-08-08 and 2026-08-17 despite CRON_SECRET being set, because the gate
+  // intercepted every scheduled request before the route could authenticate.
+  //
+  // Safe by the same rule as /api/revalidate above: every route under /api/cron
+  // verifies CRON_SECRET as a bearer token and FAILS CLOSED when the variable
+  // is unset, so this bypass exposes nothing to an unauthenticated caller.
+  if (pathname.startsWith("/api/cron/")) return true;
+
   // Crawler and social-scraper assets. Scrapers are unauthenticated, so gating
   // /og breaks every link preview.
   if (pathname === "/robots.txt" || pathname === "/sitemap.xml") return true;
