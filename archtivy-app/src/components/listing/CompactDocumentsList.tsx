@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { documentDownloadHref } from "@/lib/documents/downloadHref";
 
 export interface CompactDocumentItem {
   id: string;
@@ -43,7 +44,10 @@ function FileIcon({ className }: { className?: string }) {
 export function CompactDocumentsList({
   documents,
   listingId,
-  useDownloadApi = false,
+  // Defaults to TRUE. The raw file_url is a /object/public/ address on a
+  // private bucket and always fails with NoSuchBucket, so routing through the
+  // API must be what happens unless a caller deliberately opts out.
+  useDownloadApi = true,
   className = "",
 }: CompactDocumentsListProps) {
   if (documents.length === 0) return null;
@@ -55,26 +59,44 @@ export function CompactDocumentsList({
       </h3>
       <ul className="space-y-2">
         {documents.map((doc) => {
-          const href = useDownloadApi && listingId
-            ? `/api/documents/download?docId=${encodeURIComponent(doc.id)}&listingId=${encodeURIComponent(listingId)}`
+          // Never falls back to doc.file_url: that is a public-object URL on a
+          // private bucket and answers "Bucket not found".
+          const href = useDownloadApi
+            ? documentDownloadHref(doc, listingId)
             : doc.file_url;
           const ext = doc.file_name?.slice(doc.file_name.lastIndexOf(".") + 1).toUpperCase() || "FILE";
+          const label = (
+            <>
+              <FileIcon className="h-4 w-4 shrink-0 text-zinc-400 dark:text-zinc-500" />
+              <span className="truncate">{doc.file_name}</span>
+              {ext && (
+                <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
+                  {ext}
+                </span>
+              )}
+            </>
+          );
           return (
             <li key={doc.id}>
-              <Link
-                href={href}
-                target={href.startsWith("http") || href.startsWith("/") ? "_blank" : undefined}
-                rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-                className="flex items-center gap-2.5 text-sm text-zinc-700 transition-colors hover:text-[#002abf] dark:text-zinc-300 dark:hover:text-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-1 rounded"
-              >
-                <FileIcon className="h-4 w-4 shrink-0 text-zinc-400 dark:text-zinc-500" />
-                <span className="truncate">{doc.file_name}</span>
-                {ext && (
-                  <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
-                    {ext}
-                  </span>
-                )}
-              </Link>
+              {href ? (
+                <Link
+                  href={href}
+                  target={href.startsWith("http") || href.startsWith("/") ? "_blank" : undefined}
+                  rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+                  className="flex items-center gap-2.5 text-sm text-zinc-700 transition-colors hover:text-[#002abf] dark:text-zinc-300 dark:hover:text-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-1 rounded"
+                >
+                  {label}
+                </Link>
+              ) : (
+                // No resolvable id/listing — show the file, not a link that
+                // would 404 with a storage error.
+                <span
+                  className="flex items-center gap-2.5 text-sm text-zinc-400 dark:text-zinc-500"
+                  title="This file is unavailable"
+                >
+                  {label}
+                </span>
+              )}
             </li>
           );
         })}

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { documentDownloadHref } from "@/lib/documents/downloadHref";
 import type { ListingTeamMemberWithProfile } from "@/lib/db/listingTeamMembers";
 import type { ProjectDocumentItem } from "./ProjectDetailContent";
 import { projectExploreUrl } from "@/lib/exploreUrls";
@@ -387,14 +388,26 @@ export function ProjectOverviewSidebar({
             Documents
           </h3>
           <ul className="mt-3 space-y-2 text-sm text-[#374151] dark:text-zinc-400">
-            {documents.map((doc) => (
-              <li key={doc.id}>
-                <Link href={doc.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 hover:text-[#002abf] hover:underline dark:hover:text-[#002abf]">
-                  <span className="text-zinc-400 dark:text-zinc-500" aria-hidden>📄</span>
-                  {doc.file_name}
-                </Link>
-              </li>
-            ))}
+            {documents.map((doc) => {
+              // Was href={doc.file_url}; see DownloadsSection for why that
+              // always failed against the private bucket.
+              const href = documentDownloadHref(doc);
+              return (
+                <li key={doc.id}>
+                  {href ? (
+                    <Link href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 hover:text-[#002abf] hover:underline dark:hover:text-[#002abf]">
+                      <span className="text-zinc-400 dark:text-zinc-500" aria-hidden>📄</span>
+                      {doc.file_name}
+                    </Link>
+                  ) : (
+                    <span className="inline-flex items-center gap-2 text-zinc-400 dark:text-zinc-500">
+                      <span aria-hidden>📄</span>
+                      {doc.file_name}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

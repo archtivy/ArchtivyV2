@@ -4,6 +4,7 @@ import { SignedIn, SignedOut } from "@clerk/nextjs";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import type { ListingDocument } from "@/lib/types/listings";
+import { documentDownloadHref } from "@/lib/documents/downloadHref";
 
 export function DownloadsSection({
   documents = [],
@@ -40,21 +41,37 @@ export function DownloadsSection({
           </p>
         ) : (
           <ul className="mt-3 space-y-2">
-            {documents.map((doc) => (
-              <li key={doc.id}>
-                <Link
-                  href={doc.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-archtivy-primary underline hover:opacity-90"
-                >
+            {documents.map((doc) => {
+              // Was href={doc.file_url} — a /object/public/ URL on a private
+              // bucket, which always answered "Bucket not found".
+              const href = documentDownloadHref(doc);
+              const label = (
+                <>
                   <span>{doc.file_name}</span>
                   <span className="text-zinc-500 dark:text-zinc-400" aria-hidden>
                     ({doc.file_type.split("/").pop() ?? "file"})
                   </span>
-                </Link>
-              </li>
-            ))}
+                </>
+              );
+              return (
+                <li key={doc.id}>
+                  {href ? (
+                    <Link
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm text-archtivy-primary underline hover:opacity-90"
+                    >
+                      {label}
+                    </Link>
+                  ) : (
+                    <span className="inline-flex items-center gap-2 text-sm text-zinc-400 dark:text-zinc-500">
+                      {label}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </SignedIn>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { documentDownloadHref } from "@/lib/documents/downloadHref";
 
 /** Normalized file item for display. */
 export interface ProductFileItem {
@@ -86,7 +87,10 @@ export interface ProductFilesProps {
 export function ProductFiles({
   documents,
   listingId,
-  useDownloadApi = false,
+  // Defaults to TRUE. The raw file_url is a /object/public/ address on a
+  // private bucket and always fails with NoSuchBucket, so routing through the
+  // API must be what happens unless a caller deliberately opts out.
+  useDownloadApi = true,
   listingDocuments = [],
 }: ProductFilesProps) {
   let items: ProductFileItem[] = normalizeDocuments(documents);
@@ -110,10 +114,12 @@ export function ProductFiles({
       <ul className="space-y-0 divide-y divide-zinc-100 rounded dark:divide-zinc-800" role="list">
         {items.map((item, i) => {
           const docId = item.id ?? listingDocuments[i]?.id;
-          const href =
-            useDownloadApi && listingId && docId
-              ? `/api/documents/download?docId=${encodeURIComponent(docId)}&listingId=${encodeURIComponent(listingId)}`
-              : item.url || null;
+          // No fallback to item.url: for listing documents that is a
+          // /object/public/ address on a private bucket and answers
+          // "Bucket not found". Null renders as a non-link instead.
+          const href = useDownloadApi
+            ? documentDownloadHref({ id: docId, listing_id: listingId })
+            : item.url || null;
           const ext = getExtension(item.name);
           const sizeStr = formatSize(item.size);
 

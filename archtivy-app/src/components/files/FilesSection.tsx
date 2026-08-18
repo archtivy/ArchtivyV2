@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { documentDownloadHref } from "@/lib/documents/downloadHref";
 import { normalizeDocuments, type DocFile } from "@/lib/utils/normalizeDocuments";
 
 export interface FilesSectionProps {
@@ -92,7 +93,10 @@ export function FilesSection({
   raw,
   listingDocuments = [],
   listingId,
-  useDownloadApi = false,
+  // Defaults to TRUE. The raw file_url is a /object/public/ address on a
+  // private bucket and always fails with NoSuchBucket, so routing through the
+  // API must be what happens unless a caller deliberately opts out.
+  useDownloadApi = true,
   listingTitle,
 }: FilesSectionProps) {
   let items: (DocFile & { id?: string })[] = normalizeDocuments(raw);
@@ -120,10 +124,12 @@ export function FilesSection({
       <div className="flex flex-col gap-2">
         {items.map((item, i) => {
           const docId = "id" in item ? item.id : listingDocuments[i]?.id;
-          const href =
-            useDownloadApi && listingId && docId
-              ? `/api/documents/download?docId=${encodeURIComponent(docId)}&listingId=${encodeURIComponent(listingId)}`
-              : item.url;
+          // No fallback to item.url for listing documents — that is the
+          // public-object URL on a private bucket, i.e. the "Bucket not found"
+          // failure. The render below already handles a null href.
+          const href = useDownloadApi
+            ? documentDownloadHref({ id: docId, listing_id: listingId })
+            : item.url;
 
           const displayTitle = cleanDocumentTitle(item.name, listingTitle, i);
           const ext = getExt(item.name, item.url);
