@@ -112,12 +112,24 @@ export function ExploreFilterBar({
       <div className="flex flex-wrap items-center gap-1.5">
         {/* 1. Category */}
         {options.taxonomyTree.length > 0 && (
-          <CategoryMegaPanel
-            type={type}
-            tree={options.taxonomyTree}
-            currentSlugPath={currentFilters.taxonomy}
-            queryString={taxonomyPillQs}
-          />
+          <div className="flex items-center">
+            <CategoryMegaPanel
+              type={type}
+              tree={options.taxonomyTree}
+              currentSlugPath={currentFilters.taxonomy}
+              queryString={taxonomyPillQs}
+            />
+            {/* Category follow, matching the materials control below it. The
+                domain differs by explore type: a project category is a node in
+                the "project" domain, a product category in "product". */}
+            {currentFilters.taxonomy && (
+              <FollowFilterAction
+                targetType="category"
+                slugPath={currentFilters.taxonomy}
+                domain={type === "projects" ? "project" : "product"}
+              />
+            )}
+          </div>
         )}
 
         {/* 2. Location — wide panel with popular suggestions */}

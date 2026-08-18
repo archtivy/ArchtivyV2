@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ExploreFilters } from "@/lib/explore/filters/schema";
+import { FollowFilterAction } from "@/components/follow/FollowFilterAction";
 import type { ExploreFilterOptions } from "@/lib/explore/filters/options";
 import { buildExploreUrl, countActiveFilters } from "@/lib/explore/filters/query";
 
@@ -293,6 +294,19 @@ export function ProductFilterSidebar({ currentFilters, options }: ProductFilterS
             selected={currentFilters.taxonomy}
             onSelect={handleTaxonomySelect}
           />
+          {/* Following a category was previously unreachable anywhere in the
+              app: the only follow control lived on the projects filter bar and
+              covered materials alone. notifyFollowedCategoryNewListing had no
+              way to ever acquire a subscriber. */}
+          {currentFilters.taxonomy && (
+            <div className="pb-3 pt-1">
+              <FollowFilterAction
+                targetType="category"
+                slugPath={currentFilters.taxonomy}
+                domain="product"
+              />
+            </div>
+          )}
         </FilterSection>
       )}
 
@@ -317,6 +331,18 @@ export function ProductFilterSidebar({ currentFilters, options }: ProductFilterS
             onToggle={(v) => toggleInSet("materials", v)}
             searchable
           />
+          {/* Single selection only — "following" an intersection of three
+              materials is not a thing the follows table can express, and the
+              projects filter bar applies the same rule. */}
+          {(currentFilters.materials?.length ?? 0) === 1 && (
+            <div className="pb-3 pt-1">
+              <FollowFilterAction
+                targetType="material"
+                slugPath={currentFilters.materials[0]}
+                domain="material"
+              />
+            </div>
+          )}
         </FilterSection>
       )}
 
