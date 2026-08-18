@@ -1,0 +1,17 @@
+---
+alwaysApply: true
+---
+
+Design Authority
+
+The Design Project is the single source of truth for UX and UI.
+
+Never redesign approved interfaces.
+
+Never simplify layouts.
+
+Never replace interactions with easier implementations.
+
+If a design cannot be implemented exactly, stop and explain why before changing it.
+
+Engineering exists to faithfully implement the approved design.
