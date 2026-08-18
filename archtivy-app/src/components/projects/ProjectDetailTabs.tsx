@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { FileText, Download } from "lucide-react";
+import { documentDownloadHref } from "@/lib/documents/downloadHref";
 import type { ProjectDetail } from "@/lib/db/projectDetail";
 
 /**
@@ -196,22 +197,44 @@ function TeamPanel({ project }: { project: ProjectDetail }) {
 function DrawingsPanel({ project }: { project: ProjectDetail }) {
   return (
     <ul className="space-y-2">
-      {project.documents.map((d) => (
-        <li key={d.id}>
-          <a
-            href={d.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 rounded-lg border border-hairline px-4 py-3 transition-colors hover:bg-stone/40"
-          >
+      {project.documents.map((d) => {
+        // NOT d.url — same defect as the product Downloads tab: file_url is a
+        // /object/public/ address on a private bucket and always answers
+        // "Bucket not found". No project carries a document today, so this
+        // panel is invisible in production; fixing it now is what stops the
+        // bug reappearing the first time one is attached.
+        const href = documentDownloadHref({ id: d.id, listing_id: project.id });
+        const label = (
+          <>
             <FileText strokeWidth={1.5} className="h-4 w-4 shrink-0 text-muted" aria-hidden />
             <span className="min-w-0 flex-1 truncate font-body text-[14px] text-ink">
               {d.name}
             </span>
             <Download strokeWidth={1.5} className="h-4 w-4 shrink-0 text-muted" aria-hidden />
-          </a>
-        </li>
-      ))}
+          </>
+        );
+        return (
+          <li key={d.id}>
+            {href ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded-lg border border-hairline px-4 py-3 transition-colors hover:bg-stone/40"
+              >
+                {label}
+              </a>
+            ) : (
+              <span
+                className="flex items-center gap-3 rounded-lg border border-hairline px-4 py-3 opacity-60"
+                title="This file is unavailable"
+              >
+                {label}
+              </span>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
