@@ -17,14 +17,14 @@ export default function DataProcessingPage() {
       subheadline={`Last updated: ${LAST_UPDATED}. This document may be updated as the platform and applicable regulations evolve.`}
     >
       <MarketingSection heading="Overview">
-        <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <div className="space-y-4 text-sm leading-relaxed text-muted">
           <p>
             This document describes how Archtivy processes personal data, the
             legal bases on which we rely, how long we retain data, and the
             rights available to individuals. It should be read alongside our{" "}
             <Link
               href="/privacy"
-              className="text-[#002abf] hover:underline dark:text-[#4d6fff]"
+              className="text-archtivy-primary hover:underline dark:text-[#4d6fff]"
             >
               Privacy Policy
             </Link>
@@ -70,15 +70,15 @@ export default function DataProcessingPage() {
           ].map(({ category, data, basis }) => (
             <div
               key={category}
-              className="rounded-[4px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+              className="rounded-2xl border border-hairline bg-white p-5"
             >
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+              <h3 className="text-sm font-semibold text-ink">
                 {category}
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="mt-2 text-sm leading-relaxed text-muted">
                 {data}
               </p>
-              <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-600">
+              <p className="mt-2 text-xs text-muted">
                 Legal basis: {basis}
               </p>
             </div>
@@ -87,7 +87,7 @@ export default function DataProcessingPage() {
       </MarketingSection>
 
       <MarketingSection heading="Data sharing">
-        <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <div className="space-y-4 text-sm leading-relaxed text-muted">
           <p>
             We do not sell personal data. We share data only as necessary to
             operate the platform:
@@ -99,7 +99,7 @@ export default function DataProcessingPage() {
               "Vercel — hosting and analytics; processes anonymised usage data",
             ].map((item) => (
               <li key={item} className="flex items-start gap-3">
-                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-stone" />
                 {item}
               </li>
             ))}
@@ -113,7 +113,7 @@ export default function DataProcessingPage() {
       </MarketingSection>
 
       <MarketingSection heading="Data retention">
-        <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <div className="space-y-4 text-sm leading-relaxed text-muted">
           <p>
             Account data is retained for as long as your account is active. If
             you delete your account, we will delete or anonymise your personal
@@ -161,22 +161,22 @@ export default function DataProcessingPage() {
           ].map(({ right, desc }) => (
             <div
               key={right}
-              className="space-y-1 rounded-[4px] border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-900"
+              className="space-y-1 rounded-2xl border border-hairline bg-white px-5 py-4"
             >
-              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+              <p className="text-sm font-medium text-ink">
                 {right}
               </p>
-              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs leading-relaxed text-muted">
                 {desc}
               </p>
             </div>
           ))}
         </div>
-        <p className="mt-6 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="mt-6 text-sm leading-relaxed text-muted">
           To exercise any of these rights, contact{" "}
           <a
             href="mailto:info@archtivy.com"
-            className="text-[#002abf] hover:underline dark:text-[#4d6fff]"
+            className="text-archtivy-primary hover:underline dark:text-[#4d6fff]"
           >
             info@archtivy.com
           </a>
@@ -185,7 +185,7 @@ export default function DataProcessingPage() {
       </MarketingSection>
 
       <MarketingSection heading="International transfers">
-        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm leading-relaxed text-muted">
           Archtivy is operated from the United States. If you are located in
           the European Economic Area, United Kingdom, or another jurisdiction
           with data transfer restrictions, your data may be transferred to and
@@ -195,16 +195,16 @@ export default function DataProcessingPage() {
       </MarketingSection>
 
       <MarketingSection>
-        <div className="flex flex-wrap gap-4 text-xs text-zinc-400">
-          <Link href="/privacy" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+        <div className="flex flex-wrap gap-4 text-xs text-muted">
+          <Link href="/privacy" className="hover:text-ink/80">
             Privacy Policy
           </Link>
           <span>·</span>
-          <Link href="/terms" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+          <Link href="/terms" className="hover:text-ink/80">
             Terms of Use
           </Link>
           <span>·</span>
-          <Link href="/cookies" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+          <Link href="/cookies" className="hover:text-ink/80">
             Cookie Policy
           </Link>
         </div>

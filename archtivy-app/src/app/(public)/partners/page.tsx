@@ -42,12 +42,12 @@ export default function PartnersPage() {
           {PARTNER_TYPES.map(({ title, body }) => (
             <div
               key={title}
-              className="space-y-3 rounded-[4px] border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+              className="space-y-3 rounded-2xl border border-hairline bg-white p-6"
             >
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+              <h3 className="text-sm font-semibold text-ink">
                 {title}
               </h3>
-              <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm leading-relaxed text-muted">
                 {body}
               </p>
             </div>
@@ -58,7 +58,7 @@ export default function PartnersPage() {
       {/* How to apply */}
       <MarketingSection heading="How to apply">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <div className="space-y-5 text-sm leading-relaxed text-muted">
             <p>
               Partnership discussions begin with a brief introduction. Describe
               your organisation, what you are trying to achieve, and how you

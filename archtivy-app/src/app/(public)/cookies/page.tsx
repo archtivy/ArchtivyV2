@@ -16,7 +16,7 @@ export default function CookiesPage() {
       subheadline={`Last updated: ${LAST_UPDATED}. This document may be updated as the platform and applicable regulations evolve.`}
     >
       <MarketingSection heading="Overview">
-        <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <div className="space-y-4 text-sm leading-relaxed text-muted">
           <p>
             Archtivy uses cookies and similar technologies to operate the
             platform, maintain your session, understand how the service is used,
@@ -32,7 +32,7 @@ export default function CookiesPage() {
       </MarketingSection>
 
       <MarketingSection heading="What are cookies">
-        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm leading-relaxed text-muted">
           Cookies are small text files stored on your device when you visit a
           website. They allow the website to recognise your device on subsequent
           visits and remember certain information, such as your authentication
@@ -64,15 +64,15 @@ export default function CookiesPage() {
           ].map(({ type, purpose, retention }) => (
             <div
               key={type}
-              className="rounded-[4px] border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+              className="rounded-2xl border border-hairline bg-white p-6"
             >
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+              <h3 className="text-sm font-semibold text-ink">
                 {type}
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="mt-2 text-sm leading-relaxed text-muted">
                 {purpose}
               </p>
-              <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-600">
+              <p className="mt-3 text-xs text-muted">
                 Retention: {retention}
               </p>
             </div>
@@ -81,7 +81,7 @@ export default function CookiesPage() {
       </MarketingSection>
 
       <MarketingSection heading="Managing your preferences">
-        <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <div className="space-y-4 text-sm leading-relaxed text-muted">
           <p>
             Most browsers allow you to control cookies through their settings.
             You can typically block or delete cookies by accessing your
@@ -98,7 +98,7 @@ export default function CookiesPage() {
       </MarketingSection>
 
       <MarketingSection heading="Third-party services">
-        <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <div className="space-y-4 text-sm leading-relaxed text-muted">
           <p>
             Archtivy uses the following third-party services that may set their
             own cookies or use similar technologies:
@@ -110,7 +110,7 @@ export default function CookiesPage() {
               "Supabase — data storage (no client-side cookies)",
             ].map((item) => (
               <li key={item} className="flex items-start gap-3">
-                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-stone" />
                 {item}
               </li>
             ))}
@@ -123,7 +123,7 @@ export default function CookiesPage() {
       </MarketingSection>
 
       <MarketingSection heading="Changes to this policy">
-        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm leading-relaxed text-muted">
           We may update this cookie policy as the platform evolves or as
           applicable regulations change. The date at the top of this page
           indicates when it was last revised. Continued use of the platform
@@ -132,11 +132,11 @@ export default function CookiesPage() {
       </MarketingSection>
 
       <MarketingSection heading="Contact">
-        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm leading-relaxed text-muted">
           Questions about this policy can be sent to{" "}
           <a
             href="mailto:info@archtivy.com"
-            className="text-[#002abf] hover:underline dark:text-[#4d6fff]"
+            className="text-archtivy-primary hover:underline dark:text-[#4d6fff]"
           >
             info@archtivy.com
           </a>
@@ -145,16 +145,16 @@ export default function CookiesPage() {
       </MarketingSection>
 
       <MarketingSection>
-        <div className="flex flex-wrap gap-4 text-xs text-zinc-400">
-          <Link href="/privacy" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+        <div className="flex flex-wrap gap-4 text-xs text-muted">
+          <Link href="/privacy" className="hover:text-ink/80">
             Privacy Policy
           </Link>
           <span>·</span>
-          <Link href="/terms" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+          <Link href="/terms" className="hover:text-ink/80">
             Terms of Use
           </Link>
           <span>·</span>
-          <Link href="/data-processing" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+          <Link href="/data-processing" className="hover:text-ink/80">
             Data Processing
           </Link>
         </div>

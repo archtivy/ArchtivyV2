@@ -36,6 +36,38 @@ const EDITORIAL_ROUTES = new Set([
 // Routes that show TopNav but skip PageContainer (full-width content).
 const FULL_WIDTH_PATHS: string[] = [];
 
+/**
+ * Corporate / static pages, restyled onto the editorial tokens.
+ *
+ * These were built on the legacy zinc palette while the rest of the platform
+ * moved to cream/ink/hairline, so they read as a different product. The ground
+ * is set here rather than inside each page because a page rendered inside
+ * PageContainer cannot paint full-bleed behind the container it sits in.
+ */
+const STATIC_PAGE_ROUTES = new Set([
+  "/about",
+  "/vision",
+  "/how-it-works",
+  "/partners",
+  "/careers",
+  "/press",
+  "/press-kit",
+  "/contact",
+  "/faq",
+  "/guidelines",
+  "/privacy",
+  "/terms",
+  "/cookies",
+  "/data-processing",
+  "/api-docs",
+  "/data-intelligence",
+  "/brand-intelligence",
+]);
+
+function isStaticPageRoute(pathname: string | null): boolean {
+  return !!pathname && STATIC_PAGE_ROUTES.has(pathname);
+}
+
 function isAuthRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return AUTH_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -122,6 +154,17 @@ export function SiteShell({ children }: SiteShellProps) {
       <>
         <TopNav />
         <main>{children}</main>
+      </>
+    );
+  }
+
+  if (isStaticPageRoute(pathname)) {
+    return (
+      <>
+        <TopNav />
+        <main className="min-h-screen bg-cream font-body text-ink">
+          <PageContainer>{children}</PageContainer>
+        </main>
       </>
     );
   }

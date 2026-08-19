@@ -44,17 +44,17 @@ export default function ContactPage() {
           {DIRECT_LINES.map(({ category, description, email }) => (
             <div
               key={category}
-              className="space-y-3 rounded-[4px] border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+              className="space-y-3 rounded-2xl border border-hairline bg-white p-6"
             >
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500">
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted">
                 {category}
               </h3>
-              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs leading-relaxed text-muted">
                 {description}
               </p>
               <a
                 href={`mailto:${email}`}
-                className="block text-sm font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
+                className="block text-sm font-medium text-archtivy-primary hover:underline dark:text-[#4d6fff]"
               >
                 {email}
               </a>
@@ -66,7 +66,7 @@ export default function ContactPage() {
       {/* Form */}
       <MarketingSection heading="Send a message">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <div className="space-y-4 text-sm leading-relaxed text-muted">
             <p>
               Use this form for any inquiry. Select the category that most
               closely matches your message — it helps us route correctly and

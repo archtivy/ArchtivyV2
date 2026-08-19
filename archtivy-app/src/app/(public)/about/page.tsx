@@ -42,14 +42,14 @@ export default async function AboutPage() {
     <article className="space-y-16 sm:space-y-20">
       {/* Hero */}
       <header className="space-y-5 pt-4 sm:pt-8">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
           About
         </p>
-        <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
+        <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-ink sm:text-4xl">
           Architecture has always produced intelligence. It was never
           organised.
         </h1>
-        <p className="max-w-2xl text-base leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="max-w-2xl text-base leading-relaxed text-muted">
           Every completed project carries embedded knowledge — the products
           specified, the professionals credited, the decisions made across
           months of design. This information has always existed. What it has
@@ -63,7 +63,7 @@ export default async function AboutPage() {
       {/* Why Archtivy exists */}
       <MarketingSection heading="Why this exists">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <div className="space-y-5 text-sm leading-relaxed text-muted">
             <p>
               The architectural industry communicates through media, portfolios,
               and disconnected directories. These formats were built for
@@ -80,7 +80,7 @@ export default async function AboutPage() {
               without pulling from dozens of incompatible sources.
             </p>
           </div>
-          <div className="space-y-5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <div className="space-y-5 text-sm leading-relaxed text-muted">
             <p>
               Archtivy was built on a different logic. We are the infrastructure
               layer beneath global architecture — connecting every project to
@@ -102,12 +102,12 @@ export default async function AboutPage() {
           {INDEXED.map(({ title, body }) => (
             <div
               key={title}
-              className="space-y-3 rounded-[4px] border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+              className="space-y-3 rounded-2xl border border-hairline bg-white p-6"
             >
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+              <h3 className="text-sm font-semibold text-ink">
                 {title}
               </h3>
-              <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm leading-relaxed text-muted">
                 {body}
               </p>
             </div>
@@ -118,7 +118,7 @@ export default async function AboutPage() {
       {/* The intelligence layer */}
       <MarketingSection heading="The intelligence layer">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <div className="space-y-5 text-sm leading-relaxed text-muted">
             <p>
               When projects are submitted with structured credits — team
               members, products used, project type, location, year — the data
@@ -143,10 +143,10 @@ export default async function AboutPage() {
             ].map((item) => (
               <li
                 key={item}
-                className="flex items-start gap-4 rounded-[4px] border border-zinc-200 bg-white px-5 py-3.5 dark:border-zinc-800 dark:bg-zinc-900"
+                className="flex items-start gap-4 rounded-2xl border border-hairline bg-white px-5 py-3.5"
               >
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#002abf]" />
-                <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-archtivy-primary" />
+                <span className="text-sm text-muted">
                   {item}
                 </span>
               </li>
@@ -191,16 +191,16 @@ export default async function AboutPage() {
             },
           ].map(({ phase, items }) => (
             <div key={phase} className="space-y-4">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
                 {phase}
               </h3>
               <ul className="space-y-2">
                 {items.map((item) => (
                   <li
                     key={item}
-                    className="flex items-start gap-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400"
+                    className="flex items-start gap-3 text-sm leading-relaxed text-muted"
                   >
-                    <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                    <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-stone" />
                     {item}
                   </li>
                 ))}

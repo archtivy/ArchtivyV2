@@ -17,7 +17,7 @@ export default function TermsPage() {
       subheadline={`Last updated: ${LAST_UPDATED}. This document may be updated as the platform evolves.`}
     >
       <MarketingSection heading="1. Acceptance">
-        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm leading-relaxed text-muted">
           By accessing or using Archtivy (&quot;the platform&quot;), you agree to be
           bound by these Terms of Use. If you do not agree, do not use the
           platform. These terms apply to all users, including professionals,
@@ -26,7 +26,7 @@ export default function TermsPage() {
       </MarketingSection>
 
       <MarketingSection heading="2. Permitted use">
-        <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <div className="space-y-4 text-sm leading-relaxed text-muted">
           <p>
             You may use Archtivy to publish and explore projects, products, and
             professional profiles. You are responsible for the accuracy and
@@ -43,7 +43,7 @@ export default function TermsPage() {
               "Transmit malware, spam, or disruptive code",
             ].map((item) => (
               <li key={item} className="flex items-start gap-3">
-                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-stone" />
                 {item}
               </li>
             ))}
@@ -52,7 +52,7 @@ export default function TermsPage() {
       </MarketingSection>
 
       <MarketingSection heading="3. Your content">
-        <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <div className="space-y-4 text-sm leading-relaxed text-muted">
           <p>
             You retain ownership of the content you submit to Archtivy. By
             submitting content, you grant Archtivy a non-exclusive, worldwide,
@@ -69,7 +69,7 @@ export default function TermsPage() {
       </MarketingSection>
 
       <MarketingSection heading="4. Account responsibilities">
-        <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <div className="space-y-4 text-sm leading-relaxed text-muted">
           <p>
             You are responsible for maintaining the security of your account
             credentials. Do not share your password or allow others to access
@@ -85,7 +85,7 @@ export default function TermsPage() {
       </MarketingSection>
 
       <MarketingSection heading="5. Intellectual property">
-        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm leading-relaxed text-muted">
           The Archtivy platform, including its design, software, and structure,
           is owned by Archtivy Technologies, Inc. and protected by applicable
           intellectual property law. You may not reproduce, modify, or
@@ -95,7 +95,7 @@ export default function TermsPage() {
       </MarketingSection>
 
       <MarketingSection heading="6. Disclaimer">
-        <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <div className="space-y-4 text-sm leading-relaxed text-muted">
           <p>
             The platform is provided &quot;as is&quot; without warranties of any kind.
             We do not guarantee uninterrupted or error-free service. Content on
@@ -111,7 +111,7 @@ export default function TermsPage() {
       </MarketingSection>
 
       <MarketingSection heading="7. Governing law">
-        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm leading-relaxed text-muted">
           These terms are governed by the laws of the State of California,
           United States. Any disputes shall be resolved in the courts of Los
           Angeles County, California.
@@ -119,7 +119,7 @@ export default function TermsPage() {
       </MarketingSection>
 
       <MarketingSection heading="8. Changes to these terms">
-        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm leading-relaxed text-muted">
           We may update these terms from time to time. The date at the top of
           this page indicates when they were last revised. Continued use of the
           platform after changes constitutes acceptance of the updated terms.
@@ -128,16 +128,16 @@ export default function TermsPage() {
       </MarketingSection>
 
       <MarketingSection>
-        <div className="flex flex-wrap gap-4 text-xs text-zinc-400">
-          <Link href="/privacy" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+        <div className="flex flex-wrap gap-4 text-xs text-muted">
+          <Link href="/privacy" className="hover:text-ink/80">
             Privacy Policy
           </Link>
           <span>·</span>
-          <Link href="/cookies" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+          <Link href="/cookies" className="hover:text-ink/80">
             Cookie Policy
           </Link>
           <span>·</span>
-          <Link href="/data-processing" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+          <Link href="/data-processing" className="hover:text-ink/80">
             Data Processing
           </Link>
         </div>

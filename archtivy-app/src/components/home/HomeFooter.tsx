@@ -43,7 +43,9 @@ const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] =
       { label: "Why Archtivy", href: "/vision" },
       { label: "How it works", href: "/how-it-works" },
       { label: "Partners", href: "/partners" },
-      { label: "Opportunities", href: "/opportunities" },
+      // "Opportunities" removed from the footer by decision. The page at
+      // /opportunities still exists and still resolves; it is simply no longer
+      // linked from here, so it is now reachable only by direct URL.
     ],
   },
   {

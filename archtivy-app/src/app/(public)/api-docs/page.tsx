@@ -51,17 +51,17 @@ export default function ApiDocsPage() {
     >
       {/* Status notice */}
       <MarketingSection>
-        <div className="rounded-[4px] border border-zinc-200 bg-zinc-50 px-6 py-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+        <div className="rounded-2xl border border-hairline bg-stone/25 px-6 py-5">
+          <p className="text-sm font-medium text-ink">
             API access is not yet publicly available.
           </p>
-          <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 text-sm leading-relaxed text-muted">
             We are building toward a versioned, rate-limited REST API. Early
             access is available for qualified research institutions and brand
             intelligence partners. Contact{" "}
             <a
               href="mailto:info@archtivy.com"
-              className="text-[#002abf] hover:underline dark:text-[#4d6fff]"
+              className="text-archtivy-primary hover:underline dark:text-[#4d6fff]"
             >
               info@archtivy.com
             </a>{" "}
@@ -73,11 +73,11 @@ export default function ApiDocsPage() {
       {/* Authentication */}
       <MarketingSection heading="Authentication">
         <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <div className="space-y-4 text-sm leading-relaxed text-muted">
             <p>
               The Archtivy API uses bearer token authentication. All requests
               must include a valid API key in the{" "}
-              <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              <code className="rounded bg-stone/40 px-1.5 py-0.5 font-mono text-xs text-ink/80">
                 Authorization
               </code>{" "}
               header.
@@ -88,8 +88,8 @@ export default function ApiDocsPage() {
               early access period.
             </p>
           </div>
-          <div className="rounded-[4px] border border-zinc-200 bg-zinc-900 p-5">
-            <pre className="overflow-x-auto font-mono text-xs text-zinc-300">
+          <div className="rounded-2xl border border-hairline bg-zinc-900 p-5">
+            <pre className="overflow-x-auto font-mono text-xs text-muted/70">
               {`Authorization: Bearer arch_live_xxxxxxxxxxxxx
 
 GET /v1/projects HTTP/1.1
@@ -102,8 +102,8 @@ Accept: application/json`}
 
       {/* Endpoints */}
       <MarketingSection heading="Endpoints overview">
-        <div className="overflow-hidden rounded-[4px] border border-zinc-200 dark:border-zinc-800">
-          <div className="grid grid-cols-[80px_1fr_1fr_100px] border-b border-zinc-200 bg-zinc-50 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-500">
+        <div className="overflow-hidden rounded-2xl border border-hairline">
+          <div className="grid grid-cols-[80px_1fr_1fr_100px] border-b border-hairline bg-stone/25 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted 0">
             <span>Method</span>
             <span>Path</span>
             <span>Description</span>
@@ -112,18 +112,18 @@ Accept: application/json`}
           {ENDPOINTS.map(({ method, path, description, status }) => (
             <div
               key={path}
-              className="grid grid-cols-[80px_1fr_1fr_100px] items-start border-b border-zinc-100 px-5 py-4 last:border-0 dark:border-zinc-800/50"
+              className="grid grid-cols-[80px_1fr_1fr_100px] items-start border-b border-hairline px-5 py-4 last:border-0 /50"
             >
-              <span className="font-mono text-xs font-semibold text-[#002abf] dark:text-[#4d6fff]">
+              <span className="font-mono text-xs font-semibold text-archtivy-primary dark:text-[#4d6fff]">
                 {method}
               </span>
-              <span className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
+              <span className="font-mono text-xs text-muted">
                 {path}
               </span>
-              <span className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <span className="text-xs leading-relaxed text-muted">
                 {description}
               </span>
-              <span className="text-right text-[10px] text-zinc-400 dark:text-zinc-600">
+              <span className="text-right text-[10px] text-muted">
                 {status}
               </span>
             </div>
@@ -153,15 +153,15 @@ Accept: application/json`}
           ].map(({ tier, requests, note }) => (
             <div
               key={tier}
-              className="space-y-2 rounded-[4px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+              className="space-y-2 rounded-2xl border border-hairline bg-white p-5"
             >
-              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+              <p className="text-sm font-semibold text-ink">
                 {tier}
               </p>
-              <p className="font-mono text-xs text-[#002abf] dark:text-[#4d6fff]">
+              <p className="font-mono text-xs text-archtivy-primary dark:text-[#4d6fff]">
                 {requests}
               </p>
-              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs leading-relaxed text-muted">
                 {note}
               </p>
             </div>
@@ -171,12 +171,12 @@ Accept: application/json`}
 
       {/* Contact */}
       <MarketingSection>
-        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm leading-relaxed text-muted">
           For early API access, technical questions, or partnership
           discussions, contact{" "}
           <a
             href="mailto:info@archtivy.com"
-            className="font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
+            className="font-medium text-archtivy-primary hover:underline dark:text-[#4d6fff]"
           >
             info@archtivy.com
           </a>

@@ -17,7 +17,7 @@ export default function PrivacyPage() {
       subheadline={`Last updated: ${LAST_UPDATED}. This document may be updated as the platform evolves. We recommend reviewing it periodically.`}
     >
       <MarketingSection heading="Overview">
-        <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <div className="space-y-4 text-sm leading-relaxed text-muted">
           <p>
             Archtivy is operated by Archtivy Technologies, Inc. (&quot;Archtivy&quot;,
             &quot;we&quot;, &quot;us&quot;). This policy explains what personal data we collect
@@ -53,10 +53,10 @@ export default function PrivacyPage() {
             },
           ].map(({ heading, body }) => (
             <div key={heading} className="space-y-2">
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+              <h3 className="text-sm font-semibold text-ink">
                 {heading}
               </h3>
-              <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm leading-relaxed text-muted">
                 {body}
               </p>
             </div>
@@ -75,9 +75,9 @@ export default function PrivacyPage() {
           ].map((item) => (
             <li
               key={item}
-              className="flex items-start gap-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400"
+              className="flex items-start gap-3 text-sm leading-relaxed text-muted"
             >
-              <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+              <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-stone" />
               {item}
             </li>
           ))}
@@ -85,7 +85,7 @@ export default function PrivacyPage() {
       </MarketingSection>
 
       <MarketingSection heading="What is public">
-        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm leading-relaxed text-muted">
           Your profile and the projects or products you publish are visible to
           anyone who accesses the platform, including search engines. Do not
           post information you do not want to be publicly visible. You can
@@ -95,7 +95,7 @@ export default function PrivacyPage() {
       </MarketingSection>
 
       <MarketingSection heading="Third-party services">
-        <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <div className="space-y-4 text-sm leading-relaxed text-muted">
           <p>We use the following third-party services to operate the platform:</p>
           <ul className="space-y-2">
             {[
@@ -104,7 +104,7 @@ export default function PrivacyPage() {
               "Vercel — hosting and anonymised analytics",
             ].map((item) => (
               <li key={item} className="flex items-start gap-3">
-                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-stone" />
                 {item}
               </li>
             ))}
@@ -118,7 +118,7 @@ export default function PrivacyPage() {
       </MarketingSection>
 
       <MarketingSection heading="Data retention">
-        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm leading-relaxed text-muted">
           We retain your account data for as long as your account is active or
           as needed to provide the service. If you delete your account, we will
           delete or anonymise your personal data within 30 days, subject to any
@@ -128,7 +128,7 @@ export default function PrivacyPage() {
       </MarketingSection>
 
       <MarketingSection heading="Your rights">
-        <div className="space-y-4 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <div className="space-y-4 text-sm leading-relaxed text-muted">
           <p>
             Depending on your location, you may have the following rights
             regarding your personal data:
@@ -143,7 +143,7 @@ export default function PrivacyPage() {
               "Objection — object to processing based on legitimate interests",
             ].map((item) => (
               <li key={item} className="flex items-start gap-3">
-                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-stone" />
                 {item}
               </li>
             ))}
@@ -152,7 +152,7 @@ export default function PrivacyPage() {
             To exercise any of these rights, contact{" "}
             <a
               href="mailto:info@archtivy.com"
-              className="text-[#002abf] hover:underline dark:text-[#4d6fff]"
+              className="text-archtivy-primary hover:underline dark:text-[#4d6fff]"
             >
               info@archtivy.com
             </a>
@@ -162,7 +162,7 @@ export default function PrivacyPage() {
       </MarketingSection>
 
       <MarketingSection heading="Changes to this policy">
-        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm leading-relaxed text-muted">
           We may update this policy from time to time. The date at the top of
           this page indicates when it was last revised. Continued use of the
           platform after changes constitutes acceptance of the updated policy.
@@ -171,16 +171,16 @@ export default function PrivacyPage() {
       </MarketingSection>
 
       <MarketingSection>
-        <div className="flex flex-wrap gap-4 text-xs text-zinc-400">
-          <Link href="/terms" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+        <div className="flex flex-wrap gap-4 text-xs text-muted">
+          <Link href="/terms" className="hover:text-ink/80">
             Terms of Use
           </Link>
           <span>·</span>
-          <Link href="/cookies" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+          <Link href="/cookies" className="hover:text-ink/80">
             Cookie Policy
           </Link>
           <span>·</span>
-          <Link href="/data-processing" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+          <Link href="/data-processing" className="hover:text-ink/80">
             Data Processing
           </Link>
         </div>

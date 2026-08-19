@@ -148,19 +148,19 @@ export default async function FAQPage() {
         />
       )}
       <header className="space-y-6 pt-4 text-center sm:pt-8">
-        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted">
           FAQ
         </p>
-        <h1 className="font-serif text-3xl font-normal tracking-tight text-zinc-900 sm:text-4xl md:text-5xl dark:text-zinc-100">
+        <h1 className="font-serif text-3xl font-normal tracking-tight text-ink sm:text-4xl md:text-5xl">
           Frequently asked questions
         </h1>
-        <p className="mx-auto max-w-2xl text-lg leading-relaxed text-zinc-600 dark:text-zinc-400">
+        <p className="mx-auto max-w-2xl text-lg leading-relaxed text-muted">
           Platform usage, roles, discovery, Save & boards, and how collaboration works.
         </p>
 
         {/* Jump to section */}
         <nav aria-label="FAQ sections" className="mx-auto max-w-2xl pt-4">
-          <p className="mb-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <p className="mb-3 text-sm font-medium text-ink/80">
             Jump to section
           </p>
           <ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm">
@@ -168,7 +168,7 @@ export default async function FAQPage() {
               <li key={item.id}>
                 <a
                   href={`#${item.id}`}
-                  className="text-zinc-600 underline decoration-zinc-300 underline-offset-2 hover:text-[#002abf] hover:decoration-[#002abf] dark:text-zinc-400 dark:decoration-zinc-600 dark:hover:text-[#002abf]"
+                  className="text-muted underline decoration-zinc-300 underline-offset-2 hover:text-archtivy-primary hover:decoration-archtivy-primary dark:decoration-zinc-600 dark:hover:text-archtivy-primary"
                 >
                   {item.label}
                 </a>
@@ -179,8 +179,8 @@ export default async function FAQPage() {
       </header>
 
       {/* Top questions */}
-      <section className="border-t border-zinc-200 pt-12 dark:border-zinc-800">
-        <h2 className="mb-6 font-serif text-xl font-normal tracking-tight text-zinc-900 dark:text-zinc-100">
+      <section className="border-t border-hairline pt-12">
+        <h2 className="mb-6 font-serif text-xl font-normal tracking-tight text-ink">
           Top questions
         </h2>
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -188,7 +188,7 @@ export default async function FAQPage() {
             <li key={item.id}>
               <a
                 href={`#${item.id}`}
-                className="text-sm text-zinc-600 underline decoration-zinc-300 underline-offset-2 hover:text-[#002abf] hover:decoration-[#002abf] dark:text-zinc-400 dark:decoration-zinc-600 dark:hover:text-[#002abf]"
+                className="text-sm text-muted underline decoration-zinc-300 underline-offset-2 hover:text-archtivy-primary hover:decoration-archtivy-primary dark:decoration-zinc-600 dark:hover:text-archtivy-primary"
               >
                 {item.title}
               </a>
@@ -202,9 +202,9 @@ export default async function FAQPage() {
         <section
           key={section.sectionId}
           id={section.sectionId}
-          className="scroll-mt-8 border-t border-zinc-200 pt-12 dark:border-zinc-800"
+          className="scroll-mt-8 border-t border-hairline pt-12"
         >
-          <h2 className="mb-8 font-serif text-xl font-normal tracking-tight text-zinc-900 dark:text-zinc-100">
+          <h2 className="mb-8 font-serif text-xl font-normal tracking-tight text-ink">
             {section.title}
           </h2>
           <ul className="space-y-10">
@@ -212,19 +212,19 @@ export default async function FAQPage() {
               <li
                 key={i}
                 id={item.id}
-                className="scroll-mt-8 border-b border-zinc-100 pb-10 last:border-0 dark:border-zinc-800"
+                className="scroll-mt-8 border-b border-hairline pb-10 last:border-0"
               >
-                <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                <h3 className="text-base font-semibold text-ink">
                   {item.q}
                 </h3>
-                <p className="mt-2 leading-relaxed text-zinc-600 dark:text-zinc-400">
+                <p className="mt-2 leading-relaxed text-muted">
                   {item.a}
                 </p>
               </li>
             ))}
           </ul>
           {section.sectionId === "section-trust-credibility" && (
-            <p className="mt-6 text-sm italic text-zinc-500 dark:text-zinc-400">
+            <p className="mt-6 text-sm italic text-muted">
               {TRUST_DISCLAIMER}
             </p>
           )}
@@ -232,19 +232,19 @@ export default async function FAQPage() {
       ))}
 
       {/* Still need help? */}
-      <section className="border-t border-zinc-200 pt-12 dark:border-zinc-800">
-        <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-6 py-8 dark:border-zinc-800 dark:bg-zinc-900/50">
-          <h2 className="mb-2 font-serif text-lg font-normal tracking-tight text-zinc-900 dark:text-zinc-100">
+      <section className="border-t border-hairline pt-12">
+        <div className="rounded-lg border border-hairline bg-stone/25 px-6 py-8 /50">
+          <h2 className="mb-2 font-serif text-lg font-normal tracking-tight text-ink">
             Still need help?
           </h2>
-          <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-            Use the <Link href="/contact" className="font-medium text-[#002abf] underline underline-offset-2 hover:no-underline dark:text-[#002abf]">Contact</Link> link in the footer. Include the page URL and what you were trying to do so we can respond quickly.
+          <p className="text-sm leading-relaxed text-muted">
+            Use the <Link href="/contact" className="font-medium text-archtivy-primary underline underline-offset-2 hover:no-underline dark:text-archtivy-primary">Contact</Link> link in the footer. Include the page URL and what you were trying to do so we can respond quickly.
           </p>
         </div>
       </section>
 
-      <section className="border-t border-zinc-200 pt-16 text-center dark:border-zinc-800 sm:pt-20">
-        <p className="mb-6 text-zinc-600 dark:text-zinc-400">
+      <section className="border-t border-hairline pt-16 text-center sm:pt-20">
+        <p className="mb-6 text-muted">
           Ready to share your work or explore projects?
         </p>
         <PageCTA userId={userId} role={role} />
