@@ -65,13 +65,21 @@ function parseTeamMembers(value: FormDataEntryValue | null): TeamMember[] {
   try {
     const parsed = JSON.parse(value) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (x): x is TeamMember =>
-        typeof x === "object" &&
-        x !== null &&
-        typeof (x as TeamMember).name === "string" &&
-        typeof (x as TeamMember).role === "string"
-    );
+    return parsed
+      .filter(
+        (x): x is TeamMember =>
+          typeof x === "object" &&
+          x !== null &&
+          typeof (x as TeamMember).name === "string" &&
+          typeof (x as TeamMember).role === "string"
+      )
+      .map((x) => ({
+        name: x.name,
+        role: x.role,
+        // Only a string id survives; anything else falls back to free text
+        // rather than being passed to the DB unchecked.
+        profile_id: typeof x.profile_id === "string" && x.profile_id.trim() ? x.profile_id.trim() : null,
+      }));
   } catch {
     return [];
   }
@@ -139,19 +147,64 @@ export async function persistListingTeamMembers(
     .eq("listing_id", listingId);
   if (deleteError) throw new Error(`Failed to clear listing_team_members: ${deleteError.message}`);
 
+  /*
+   * profile_id arrives from the browser, so it is validated before it is
+   * trusted — otherwise a crafted request could attach a credit to any profile
+   * id, including a hidden or soft-deleted one the suggestions never offer.
+   * One query for all of them; anything that fails validation falls through to
+   * the RPC and becomes an ordinary free-text credit rather than an error.
+   */
+  const claimedIds = [
+    ...new Set(
+      teamMembers
+        .map((m) => m.profile_id?.trim())
+        .filter((id): id is string => !!id)
+    ),
+  ];
+  const validProfileIds = new Set<string>();
+  if (claimedIds.length > 0) {
+    const { data: okRows } = await supabase
+      .from("profiles")
+      .select("id")
+      .in("id", claimedIds)
+      .eq("is_hidden", false)
+      .is("deleted_at", null);
+    for (const r of (okRows ?? []) as { id: string }[]) validProfileIds.add(r.id);
+  }
+
   for (let i = 0; i < teamMembers.length; i++) {
     const { name, role } = teamMembers[i];
     const displayName = (name ?? "").trim() || null;
     const titleLabel = (role ?? "").trim() || null;
     if (!displayName && !titleLabel) continue;
 
-    const { data: profileId, error: rpcError } = await supabase.rpc("get_or_create_unclaimed_profile", {
-      p_display_name: displayName,
-      p_title: titleLabel,
-    });
-    if (rpcError) throw new Error(`get_or_create_unclaimed_profile: ${rpcError.message}`);
-    if (!profileId || typeof profileId !== "string") {
-      throw new Error("get_or_create_unclaimed_profile did not return a profile id");
+    /*
+     * A credit picked from the suggestions carries the real profile id, so use
+     * it directly and skip the RPC entirely.
+     *
+     * The RPC is what has been generating duplicates: it matches or creates an
+     * UNCLAIMED shell by name, so crediting "Schmidt Hammer Lassen" produced a
+     * second, username-less SHL rather than attaching to the real one. Live
+     * data: 230 of 232 linked credits point at a shell, only 2 at a real
+     * profile. It stays as the fallback for genuinely new names — crediting
+     * someone who has no profile yet is still valid — but it is no longer the
+     * only path.
+     */
+    const claimed = teamMembers[i].profile_id?.trim() || null;
+    const linkedProfileId = claimed && validProfileIds.has(claimed) ? claimed : null;
+    let profileId: string | null = linkedProfileId;
+
+    if (!profileId) {
+      const { data: rpcProfileId, error: rpcError } = await supabase.rpc(
+        "get_or_create_unclaimed_profile",
+        { p_display_name: displayName, p_title: titleLabel }
+      );
+      if (rpcError) throw new Error(`get_or_create_unclaimed_profile: ${rpcError.message}`);
+      profileId = typeof rpcProfileId === "string" ? rpcProfileId : null;
+    }
+
+    if (!profileId) {
+      throw new Error("Could not resolve a profile for this team member.");
     }
 
     const { error: insertError } = await supabase.from("listing_team_members").insert({

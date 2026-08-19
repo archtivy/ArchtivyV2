@@ -6,6 +6,12 @@ export type ListingType = "project" | "product";
 export interface TeamMember {
   name: string;
   role: string;
+  /**
+   * Real profile this credit points at, when the author picked one from the
+   * suggestions. Null/absent means free text, which still resolves through
+   * get_or_create_unclaimed_profile().
+   */
+  profile_id?: string | null;
 }
 
 export interface BrandUsed {
