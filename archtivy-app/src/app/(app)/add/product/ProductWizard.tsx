@@ -100,7 +100,6 @@ export function ProductWizard({
   const [colorDraft, setColorDraft] = useState("");
   const [materialIds, setMaterialIds] = useState<string[]>([]);
   const [website, setWebsite] = useState("");
-  const [instagram, setInstagram] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
   const [slug, setSlug] = useState("");
@@ -155,7 +154,7 @@ export function ProductWizard({
       title.trim().length > 0 && description.trim().length > 0,
       Boolean(taxonomyNodeId) || colorOptions.length > 0,
       materialIds.length > 0,
-      Boolean(website || instagram || videoUrl),
+      Boolean(website || videoUrl),
       seo.checks.find((c) => c.id === "meta")?.passed ?? false,
       false,
     ][i],
@@ -179,7 +178,6 @@ export function ProductWizard({
     fd.set("color_options", JSON.stringify(colorOptions));
     fd.set("meta_description", metaDescription);
     fd.set("website", website);
-    fd.set("instagram", instagram);
     fd.set("video_url", videoUrl);
     fd.set("slug", slug);
     if (draft) fd.set("draft", "1");
@@ -375,19 +373,9 @@ export function ProductWizard({
                     <Field label="Product page on your site">
                       <input value={website} onChange={(e) => setWebsite(e.target.value)} className={inputCls} placeholder="https://example.com/products/nena" />
                     </Field>
-                    <Field label="Instagram" hint="Just the handle — we build the link">
-                      <div className="relative">
-                        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-body text-[15px] text-muted">
-                          @
-                        </span>
-                        <input
-                          value={instagram}
-                          onChange={(e) => setInstagram(e.target.value.replace(/^@/, "").toLowerCase())}
-                          className={`${inputCls} pl-9`}
-                          placeholder="brandname"
-                        />
-                      </div>
-                    </Field>
+                    {/* Instagram is a PROFILE field, not a per-listing one. The
+                        listings.instagram column stays in the schema (migrated,
+                        harmless unused) but is no longer collected here. */}
                     <Field label="Video" hint="YouTube or Vimeo">
                       <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className={inputCls} placeholder="https://vimeo.com/123456789" />
                     </Field>
