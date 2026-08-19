@@ -7,6 +7,11 @@ import { SearchableFilterPanel } from "@/components/explore/filters/SearchableFi
 import { RangeFilterPanel } from "@/components/explore/filters/RangeFilterPanel";
 import { FacetFilterPills } from "@/components/explore/filters/FacetFilterPills";
 import { FollowFilterAction } from "@/components/follow/FollowFilterAction";
+import { useTaxonomyFollowStates } from "@/lib/follows/useTaxonomyFollowStates";
+import {
+  taxonomyFollowKey,
+  type TaxonomyFollowTarget,
+} from "@/lib/follows/taxonomyFollowKeys";
 import type { ExploreFilters } from "@/lib/explore/filters/schema";
 import { filtersToQueryString, buildExploreUrl } from "@/lib/explore/filters/query";
 import type { ExploreFilterOptions } from "@/lib/explore/filters/options";
@@ -54,15 +59,34 @@ export function ExploreFilterBar({
 
   // ── Active filter tags ─────────────────────────────────────────────────────
 
-  const activeTags: { key: string; label: string; onRemove: () => void }[] = [];
+  // `follow` is set on exactly the tags that name a taxonomy node — one
+  // category, and each selected material. Everything else (location, year,
+  // brands, facets) has nothing to follow.
+  const activeTags: {
+    key: string;
+    label: string;
+    onRemove: () => void;
+    follow?: TaxonomyFollowTarget;
+  }[] = [];
 
   if (currentFilters.taxonomy) {
     const label = currentFilters.taxonomy.split("/").pop()?.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) ?? currentFilters.taxonomy;
-    activeTags.push({ key: "taxonomy", label, onRemove: () => {
-      const base = type === "products" ? "/explore/products" : "/explore/projects";
-      const qs = taxonomyPillQs ? `?${taxonomyPillQs}` : "";
-      router.push(`${base}${qs}`);
-    }});
+    activeTags.push({
+      key: "taxonomy",
+      label,
+      onRemove: () => {
+        const base = type === "products" ? "/explore/products" : "/explore/projects";
+        const qs = taxonomyPillQs ? `?${taxonomyPillQs}` : "";
+        router.push(`${base}${qs}`);
+      },
+      // A project category is a node in the "project" domain, a product
+      // category in "product".
+      follow: {
+        targetType: "category",
+        slugPath: currentFilters.taxonomy,
+        domain: type === "projects" ? "project" : "product",
+      },
+    });
   }
   if (currentFilters.city || currentFilters.country) {
     const loc = [currentFilters.city, currentFilters.country].filter(Boolean).join(", ");
@@ -74,7 +98,12 @@ export function ExploreFilterBar({
   }
   for (const m of currentFilters.materials) {
     const opt = options.materials.find((o) => o.value === m);
-    activeTags.push({ key: `material-${m}`, label: opt?.label ?? m, onRemove: () => update({ materials: currentFilters.materials.filter((v) => v !== m) }) });
+    activeTags.push({
+      key: `material-${m}`,
+      label: opt?.label ?? m,
+      onRemove: () => update({ materials: currentFilters.materials.filter((v) => v !== m) }),
+      follow: { targetType: "material", slugPath: m, domain: "material" },
+    });
   }
   if (currentFilters.area_bucket) {
     const opt = options.areas.find((o) => o.value === currentFilters.area_bucket);
@@ -104,6 +133,13 @@ export function ExploreFilterBar({
     activeTags.push({ key: `brand-${b}`, label: opt?.label ?? b, onRemove: () => update({ brands: currentFilters.brands.filter((v) => v !== b) }) });
   }
 
+  // One batched lookup for every followable chip on screen.
+  const followTargets = activeTags
+    .map((t) => t.follow)
+    .filter((f): f is TaxonomyFollowTarget => !!f);
+  const { states: followStates, setOne: setFollowState } =
+    useTaxonomyFollowStates(followTargets);
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -119,16 +155,9 @@ export function ExploreFilterBar({
               currentSlugPath={currentFilters.taxonomy}
               queryString={taxonomyPillQs}
             />
-            {/* Category follow, matching the materials control below it. The
-                domain differs by explore type: a project category is a node in
-                the "project" domain, a product category in "product". */}
-            {currentFilters.taxonomy && (
-              <FollowFilterAction
-                targetType="category"
-                slugPath={currentFilters.taxonomy}
-                domain={type === "projects" ? "project" : "product"}
-              />
-            )}
+            {/* The follow control now lives on the active filter chip below,
+                alongside every other followable filter, rather than beside the
+                panel button. */}
           </div>
         )}
 
@@ -179,22 +208,13 @@ export function ExploreFilterBar({
 
         {/* 4. Materials — searchable multi-select */}
         {options.materials.length > 0 && (
-          <div className="flex items-center">
-            <SearchableFilterPanel
-              label="Materials"
-              options={options.materials}
-              selected={currentFilters.materials}
-              onChange={(values) => update({ materials: values })}
-              placeholder="Search materials..."
-            />
-            {currentFilters.materials.length === 1 && (
-              <FollowFilterAction
-                targetType="material"
-                slugPath={currentFilters.materials[0]}
-                domain="material"
-              />
-            )}
-          </div>
+          <SearchableFilterPanel
+            label="Materials"
+            options={options.materials}
+            selected={currentFilters.materials}
+            onChange={(values) => update({ materials: values })}
+            placeholder="Search materials..."
+          />
         )}
 
         {/* 5. Area — range input */}
@@ -301,6 +321,16 @@ export function ExploreFilterBar({
               style={{ borderRadius: 3 }}
             >
               {tag.label}
+              {/* Rendered only once the batched state is known, so the label
+                  never flips from "Follow" to "Following" after mount. */}
+              {tag.follow && followStates && (
+                <FollowFilterAction
+                  target={tag.follow}
+                  following={followStates[taxonomyFollowKey(tag.follow)] ?? false}
+                  onChange={setFollowState}
+                  label={tag.label}
+                />
+              )}
               <button
                 type="button"
                 onClick={tag.onRemove}
