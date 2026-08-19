@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import { Check, Search, X, Plus, ExternalLink, MapPin } from "lucide-react";
+import { TeamMemberNameInput } from "@/components/add/TeamMemberNameInput";
 import { computeSeoScore, countWords, SEO_THRESHOLDS } from "@/lib/publish/seoScore";
 
 /**
@@ -15,6 +16,15 @@ import { computeSeoScore, countWords, SEO_THRESHOLDS } from "@/lib/publish/seoSc
 export interface TeamMemberDraft {
   name: string;
   title: string;
+  /**
+   * Set when the author picked a real profile from the suggestions. Null means
+   * free text, which still publishes — it just falls through to
+   * get_or_create_unclaimed_profile() as before.
+   */
+  profileId?: string | null;
+  /** Kept only to render the linked chip; not submitted. */
+  profileUsername?: string | null;
+  profileAvatarUrl?: string | null;
 }
 export interface MemberTitleOption {
   label: string;
@@ -69,15 +79,66 @@ export function TeamStep({
     <div className="space-y-4">
       {team.map((m, i) => (
         <div key={i} className="flex items-end gap-3 rounded-2xl border border-hairline bg-cream p-4">
-          <label className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1">
             <span className="mb-1.5 block font-body text-[12px] text-muted">Name</span>
-            <input
+            {/* Picking a suggestion links the real profile_id. Typing free text
+                still works — it just creates the unclaimed shell it always did. */}
+            <TeamMemberNameInput
               value={m.name}
-              onChange={(e) => setTeam(team.map((t, idx) => (idx === i ? { ...t, name: e.target.value } : t)))}
-              className={inputCls}
               placeholder="Studio or person"
+              aria-label="Team member name"
+              linkedProfile={
+                m.profileId
+                  ? {
+                      display_name: m.name,
+                      username: m.profileUsername ?? null,
+                      avatar_url: m.profileAvatarUrl ?? null,
+                    }
+                  : null
+              }
+              onChange={(v) =>
+                setTeam(
+                  team.map((t, idx) =>
+                    // Editing the text after linking breaks the link: the name
+                    // would otherwise keep pointing at a profile it no longer
+                    // matches, which is worse than an honest free-text credit.
+                    idx === i
+                      ? { ...t, name: v, profileId: null, profileUsername: null, profileAvatarUrl: null }
+                      : t
+                  )
+                )
+              }
+              onSelect={(p) =>
+                setTeam(
+                  team.map((t, idx) =>
+                    idx === i
+                      ? {
+                          ...t,
+                          name: (p.display_name || p.username || "").trim(),
+                          profileId: p.id,
+                          profileUsername: p.username,
+                          profileAvatarUrl: p.avatar_url,
+                        }
+                      : t
+                  )
+                )
+              }
+              onClearLink={() =>
+                setTeam(
+                  team.map((t, idx) =>
+                    idx === i
+                      ? { ...t, profileId: null, profileUsername: null, profileAvatarUrl: null }
+                      : t
+                  )
+                )
+              }
             />
-          </label>
+            {m.profileId && (
+              <span className="mt-1 block font-body text-[11px] text-muted">
+                Linked to {m.profileUsername ? `@${m.profileUsername}` : "an existing profile"}
+              </span>
+            )}
+          </div>
           <label className="w-[38%] min-w-0">
             <span className="mb-1.5 block font-body text-[12px] text-muted">Role</span>
             <select

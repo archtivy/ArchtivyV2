@@ -213,7 +213,21 @@ export function ProjectWizard({
     if (location?.location_lat != null) fd.set("location_lat", String(location.location_lat));
     if (location?.location_lng != null) fd.set("location_lng", String(location.location_lng));
     fd.set("gallery", JSON.stringify(images));
-    fd.set("team_members", JSON.stringify(team.filter((t) => t.name.trim())));
+    // Map title -> role. parseTeamMembers() validates `role`, and the draft
+    // field is called `title`, so serialising the draft as-is meant every
+    // credit failed that check and was silently discarded on publish.
+    fd.set(
+      "team_members",
+      JSON.stringify(
+        team
+          .filter((t) => t.name.trim())
+          .map((t) => ({
+            name: t.name.trim(),
+            role: t.title ?? "",
+            profile_id: t.profileId ?? null,
+          }))
+      )
+    );
     fd.set("project_material_ids", JSON.stringify(materialIds));
     fd.set("mentioned_products", JSON.stringify(productIds));
     fd.set("meta_description", metaDescription);
