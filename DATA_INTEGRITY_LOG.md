@@ -248,6 +248,40 @@ have no `listing_taxonomy_node` row and are therefore counted-but-unreachable is
 
 ---
 
+### 8. `listings.instagram` and `profiles.instagram` store different formats, and the listing side is now unwritten
+
+**Found:** while removing the Instagram field from the publish wizard's Links step (the field
+belongs on a profile, not on each listing).
+
+**The inconsistency:** the two columns hold the same kind of value in two different shapes.
+
+| Column | Format | Enforced by |
+|---|---|---|
+| `listings.instagram` | bare lowercase handle, no `@`, no URL — e.g. `m.p.arquitetura` | CHECK constraint (migration 20260810) + `normaliseInstagramHandle()` |
+| `profiles.instagram` | whatever was pasted, in practice a full URL — e.g. `https://www.instagram.com/m.p.arquitetura/` | nothing |
+
+So the codebase has a normalisation helper and a CHECK on the column that is about to hold no
+data, and none on the column that does. Profile pages therefore have to normalise at **render**
+time (the decision taken for the User Profile build) rather than relying on the stored value.
+
+**What this change stranded:** the two wizards were the only writers of `listings.instagram`.
+`createProject.ts:220` and `listings.ts:616` still read an `instagram` form field and pass it
+through `normaliseInstagramHandle()`, but nothing posts that field any more, so it resolves to
+`null` on every publish. The code is correct and harmless — it is simply now unreachable in
+practice. Left in place deliberately: the column stays in the schema per the 2026-08-18
+decision, so a future admin or import path can still populate it without re-deriving the
+normalisation rules.
+
+**Not a bug today.** Existing `listings.instagram` values are untouched and still render
+wherever they are read. Logged because two formats for one concept will mislead whoever next
+touches either column, and because the helper now looks live but is not.
+
+**Resolving it is a data decision, not a code fix:** either migrate `profiles.instagram` to
+bare handles and add the matching CHECK, or accept render-time normalisation as permanent and
+drop the CHECK/helper on the listing side along with the column.
+
+---
+
 ## Separate notes
 
 - **`STATUS_PAGE_TRUST_ISSUE.md`** — `/status` reports all six services "operational" from a

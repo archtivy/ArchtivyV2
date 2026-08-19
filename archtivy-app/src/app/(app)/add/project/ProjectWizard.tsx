@@ -123,7 +123,6 @@ export function ProjectWizard({
   const country = location?.location_country ?? "";
   const locationText = location?.location_text ?? "";
   const [website, setWebsite] = useState("");
-  const [instagram, setInstagram] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
   const [slug, setSlug] = useState("");
@@ -182,7 +181,7 @@ export function ProjectWizard({
       productIds.length > 0,
       materialIds.length > 0,
       location?.location_lat != null && location?.location_lng != null,
-      Boolean(website || instagram || videoUrl),
+      Boolean(website || videoUrl),
       seo.checks.find((c) => c.id === "meta")?.passed ?? false,
       false,
     ][i],
@@ -218,7 +217,6 @@ export function ProjectWizard({
     fd.set("mentioned_products", JSON.stringify(productIds));
     fd.set("meta_description", metaDescription);
     fd.set("website", website);
-    fd.set("instagram", instagram);
     fd.set("video_url", videoUrl);
     fd.set("slug", slug);
     if (draft) fd.set("draft", "1");
@@ -368,12 +366,9 @@ export function ProjectWizard({
                 {step === 6 && (
                   <Card>
                     <Field label="Project website"><input value={website} onChange={(e) => setWebsite(e.target.value)} className={inputCls} placeholder="https://example.com" /></Field>
-                    <Field label="Instagram" hint="Just the handle — we build the link">
-                      <div className="relative">
-                        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-body text-[15px] text-muted">@</span>
-                        <input value={instagram} onChange={(e) => setInstagram(e.target.value.replace(/^@/, "").toLowerCase())} className={`${inputCls} pl-9`} placeholder="studioname" />
-                      </div>
-                    </Field>
+                    {/* Instagram is a PROFILE field, not a per-listing one. The
+                        listings.instagram column stays in the schema (migrated,
+                        harmless unused) but is no longer collected here. */}
                     <Field label="Video" hint="YouTube or Vimeo"><input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className={inputCls} placeholder="https://vimeo.com/123456789" /></Field>
                   </Card>
                 )}
