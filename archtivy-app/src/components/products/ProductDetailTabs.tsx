@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FileText, Download } from "lucide-react";
+import { documentDownloadHref } from "@/lib/documents/downloadHref";
 import type { ProductDetail } from "@/lib/db/productDetail";
 
 /**
@@ -148,20 +149,42 @@ function DetailsPanel({ product }: { product: ProductDetail }) {
 function DownloadsPanel({ product }: { product: ProductDetail }) {
   return (
     <ul className="max-w-[52ch] space-y-2">
-      {product.documents.map((d) => (
-        <li key={d.id}>
-          <a
-            href={d.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 rounded-lg border border-hairline px-4 py-3 transition-colors hover:bg-stone/40"
-          >
+      {product.documents.map((d) => {
+        // NOT d.url. That is listing_documents.file_url, stored in the
+        // /object/public/ form against a PRIVATE bucket, so it answers
+        // {"error":"Bucket not found","code":"NoSuchBucket"} every time. This
+        // panel is the live download surface for products, so that dead link
+        // was the whole reported bug.
+        const href = documentDownloadHref({ id: d.id, listing_id: product.id });
+        const label = (
+          <>
             <FileText strokeWidth={1.5} className="h-4 w-4 shrink-0 text-muted" aria-hidden />
             <span className="min-w-0 flex-1 truncate font-body text-[14px] text-ink">{d.name}</span>
             <Download strokeWidth={1.5} className="h-4 w-4 shrink-0 text-muted" aria-hidden />
-          </a>
-        </li>
-      ))}
+          </>
+        );
+        return (
+          <li key={d.id}>
+            {href ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded-lg border border-hairline px-4 py-3 transition-colors hover:bg-stone/40"
+              >
+                {label}
+              </a>
+            ) : (
+              <span
+                className="flex items-center gap-3 rounded-lg border border-hairline px-4 py-3 opacity-60"
+                title="This file is unavailable"
+              >
+                {label}
+              </span>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
