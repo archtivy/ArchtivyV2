@@ -64,18 +64,18 @@ export default function DataIntelligencePage() {
           ].map(({ title, items }) => (
             <div
               key={title}
-              className="space-y-4 rounded-[4px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+              className="space-y-4 rounded-2xl border border-hairline bg-white p-5"
             >
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+              <h3 className="text-sm font-semibold text-ink">
                 {title}
               </h3>
               <ul className="space-y-2">
                 {items.map((item) => (
                   <li
                     key={item}
-                    className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400"
+                    className="flex items-center gap-2 text-xs text-muted"
                   >
-                    <span className="h-1 w-1 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                    <span className="h-1 w-1 shrink-0 rounded-full bg-stone" />
                     {item}
                   </li>
                 ))}
@@ -88,7 +88,7 @@ export default function DataIntelligencePage() {
       {/* Intelligence outputs */}
       <MarketingSection heading="Intelligence outputs">
         <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <div className="space-y-5 text-sm leading-relaxed text-muted">
             <p>
               The structured data within Archtivy becomes actionable at two
               levels: individual and aggregate. At the individual level, a
@@ -113,10 +113,10 @@ export default function DataIntelligencePage() {
             ].map((item) => (
               <div
                 key={item}
-                className="flex items-start gap-4 rounded-[4px] border border-zinc-200 bg-white px-5 py-3.5 dark:border-zinc-800 dark:bg-zinc-900"
+                className="flex items-start gap-4 rounded-2xl border border-hairline bg-white px-5 py-3.5"
               >
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#002abf]" />
-                <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-archtivy-primary" />
+                <span className="text-sm text-muted">
                   {item}
                 </span>
               </div>
@@ -127,20 +127,20 @@ export default function DataIntelligencePage() {
 
       {/* Coming soon */}
       <MarketingSection heading="Intelligence features">
-        <div className="rounded-[4px] border border-zinc-200 bg-zinc-50 px-6 py-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+        <div className="rounded-2xl border border-hairline bg-stone/25 px-6 py-5">
+          <p className="text-sm font-medium text-ink">
             Advanced intelligence features are in development.
           </p>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
             Query dashboards, trend reports, and professional network
             visualisation are planned for a future release. The data is being
             collected now. The intelligence layer follows at scale.
           </p>
-          <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="mt-4 text-sm text-muted">
             For early access or research partnerships, contact{" "}
             <a
               href="mailto:info@archtivy.com"
-              className="text-[#002abf] hover:underline dark:text-[#4d6fff]"
+              className="text-archtivy-primary hover:underline dark:text-[#4d6fff]"
             >
               info@archtivy.com
             </a>

@@ -47,7 +47,7 @@ export default function PressPage() {
       {/* Boilerplate */}
       <MarketingSection heading="About Archtivy">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <div className="space-y-5 text-sm leading-relaxed text-muted">
             <p>
               Archtivy is building the structured record of global architecture
               — an intelligence infrastructure that connects every project to
@@ -71,16 +71,16 @@ export default function PressPage() {
             </p>
           </div>
 
-          <div className="divide-y divide-zinc-100 rounded-[4px] border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="divide-y divide-hairline rounded-2xl border border-hairline bg-white">
             {KEY_FACTS.map(({ label, value }) => (
               <div
                 key={label}
                 className="flex items-start justify-between gap-6 px-5 py-3.5"
               >
-                <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                <span className="text-xs text-muted">
                   {label}
                 </span>
-                <span className="text-right text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                <span className="text-right text-xs font-medium text-ink/80">
                   {value}
                 </span>
               </div>
@@ -92,49 +92,49 @@ export default function PressPage() {
       {/* Press contact */}
       <MarketingSection heading="Press contact">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-[4px] border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500">
+          <div className="rounded-2xl border border-hairline bg-white p-6">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted">
               Media inquiries
             </h3>
-            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="mt-3 text-sm text-muted">
               Editorial contact, interviews, data requests, and coverage
               coordination.
             </p>
             <a
               href="mailto:info@archtivy.com"
-              className="mt-4 block text-sm font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
+              className="mt-4 block text-sm font-medium text-archtivy-primary hover:underline dark:text-[#4d6fff]"
             >
               info@archtivy.com
             </a>
           </div>
 
-          <div className="rounded-[4px] border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500">
+          <div className="rounded-2xl border border-hairline bg-white p-6">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted">
               Press kit
             </h3>
-            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="mt-3 text-sm text-muted">
               Brand assets, logos, product screenshots, and founder
               information.
             </p>
             <a
               href="/press-kit"
-              className="mt-4 block text-sm font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
+              className="mt-4 block text-sm font-medium text-archtivy-primary hover:underline dark:text-[#4d6fff]"
             >
               Download press kit →
             </a>
           </div>
 
-          <div className="rounded-[4px] border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500">
+          <div className="rounded-2xl border border-hairline bg-white p-6">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted">
               General contact
             </h3>
-            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="mt-3 text-sm text-muted">
               Partnership discussions, platform questions, and general
               inquiries.
             </p>
             <a
               href="mailto:info@archtivy.com"
-              className="mt-4 block text-sm font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
+              className="mt-4 block text-sm font-medium text-archtivy-primary hover:underline dark:text-[#4d6fff]"
             >
               info@archtivy.com
             </a>
@@ -144,7 +144,7 @@ export default function PressPage() {
 
       {/* Coverage note */}
       <MarketingSection heading="Coverage">
-        <p className="max-w-xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="max-w-xl text-sm leading-relaxed text-muted">
           Coverage and feature articles will be listed here as they are
           published. For publication or broadcast enquiries, contact the press
           team directly.

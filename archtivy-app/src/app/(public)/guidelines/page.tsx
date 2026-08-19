@@ -39,25 +39,25 @@ export default async function GuidelinesPage() {
   return (
     <article className="space-y-20 sm:space-y-28">
       <header className="space-y-6 px-4 text-center pt-4 sm:px-0 sm:pt-8">
-        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted">
           Guidelines
         </p>
-        <h1 className="font-serif text-3xl font-normal tracking-tight text-zinc-900 sm:text-4xl md:text-5xl dark:text-zinc-100">
+        <h1 className="font-serif text-3xl font-normal tracking-tight text-ink sm:text-4xl md:text-5xl">
           Quality and conduct
         </h1>
-        <p className="mx-auto max-w-2xl text-lg leading-relaxed text-zinc-600 dark:text-zinc-400">
+        <p className="mx-auto max-w-2xl text-lg leading-relaxed text-muted">
           How we expect listings and behaviour on Archtivy so the platform stays useful for everyone.
         </p>
       </header>
 
-      <section className="space-y-8 border-t border-zinc-200 px-4 pt-8 dark:border-zinc-800 sm:px-0 sm:pt-12 md:space-y-10 md:pt-16">
+      <section className="space-y-8 border-t border-hairline px-4 pt-8 sm:px-0 sm:pt-12 md:space-y-10 md:pt-16">
         <div className="mx-auto max-w-2xl">
           <GuidelinesAccordion items={GUIDELINES_ITEMS} />
         </div>
       </section>
 
-      <section className="border-t border-zinc-200 pt-16 text-center dark:border-zinc-800 sm:pt-20">
-        <p className="mb-6 text-zinc-600 dark:text-zinc-400">
+      <section className="border-t border-hairline pt-16 text-center sm:pt-20">
+        <p className="mb-6 text-muted">
           Ready to share your work or explore projects?
         </p>
         <PageCTA userId={userId} role={role} />

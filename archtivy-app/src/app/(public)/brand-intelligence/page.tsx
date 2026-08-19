@@ -20,7 +20,7 @@ export default function BrandIntelligencePage() {
       {/* The opportunity */}
       <MarketingSection heading="The specification gap">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <div className="space-y-5 text-sm leading-relaxed text-muted">
             <p>
               Every year, architecture product brands invest in specification
               support — technical documentation, CPD presentations, showrooms,
@@ -45,10 +45,10 @@ export default function BrandIntelligencePage() {
             ].map((item) => (
               <div
                 key={item}
-                className="flex items-start gap-4 rounded-[4px] border border-zinc-200 bg-white px-5 py-3.5 dark:border-zinc-800 dark:bg-zinc-900"
+                className="flex items-start gap-4 rounded-2xl border border-hairline bg-white px-5 py-3.5"
               >
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#002abf]" />
-                <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-archtivy-primary" />
+                <span className="text-sm text-muted">
                   {item}
                 </span>
               </div>
@@ -78,13 +78,13 @@ export default function BrandIntelligencePage() {
             },
           ].map(({ step, title, body }) => (
             <div key={step} className="space-y-3">
-              <span className="font-mono text-xs text-zinc-300 dark:text-zinc-700">
+              <span className="font-mono text-xs text-muted/70">
                 {step}
               </span>
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+              <h3 className="text-sm font-semibold text-ink">
                 {title}
               </h3>
-              <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="text-sm leading-relaxed text-muted">
                 {body}
               </p>
             </div>
@@ -95,7 +95,7 @@ export default function BrandIntelligencePage() {
       {/* Why not advertising */}
       <MarketingSection heading="Why this is not advertising">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <div className="space-y-5 text-sm leading-relaxed text-muted">
             <p>
               Advertising decays when spend stops. Brand intelligence on
               Archtivy compounds with every new project that references your
@@ -112,7 +112,7 @@ export default function BrandIntelligencePage() {
               architecture product company.
             </p>
           </div>
-          <div className="divide-y divide-zinc-100 rounded-[4px] border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="divide-y divide-hairline rounded-2xl border border-hairline bg-white">
             {[
               ["Advertising", "Paid placement, decays on budget pause"],
               ["Directory listing", "Static presence, no specification context"],
@@ -123,10 +123,10 @@ export default function BrandIntelligencePage() {
               ],
             ].map(([type, desc]) => (
               <div key={type} className="flex gap-6 px-5 py-4">
-                <span className="w-28 shrink-0 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                <span className="w-28 shrink-0 text-xs font-medium text-ink/80">
                   {type}
                 </span>
-                <span className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+                <span className="text-xs leading-relaxed text-muted">
                   {desc}
                 </span>
               </div>
@@ -137,11 +137,11 @@ export default function BrandIntelligencePage() {
 
       {/* Coming soon */}
       <MarketingSection heading="Brand intelligence dashboard">
-        <div className="rounded-[4px] border border-zinc-200 bg-zinc-50 px-6 py-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+        <div className="rounded-2xl border border-hairline bg-stone/25 px-6 py-5">
+          <p className="text-sm font-medium text-ink">
             The brand intelligence dashboard is in development.
           </p>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
             The specification data is being collected now. The dashboard —
             providing queryable access to your brand&apos;s specification footprint
             — is planned for release to brand partners. Contact us to be
@@ -149,7 +149,7 @@ export default function BrandIntelligencePage() {
           </p>
           <a
             href="mailto:info@archtivy.com"
-            className="mt-4 inline-block text-sm font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
+            className="mt-4 inline-block text-sm font-medium text-archtivy-primary hover:underline dark:text-[#4d6fff]"
           >
             info@archtivy.com
           </a>

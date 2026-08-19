@@ -38,34 +38,34 @@ export default function PressKitPage() {
           ].map(({ title, format, note }) => (
             <div
               key={title}
-              className="space-y-3 rounded-[4px] border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+              className="space-y-3 rounded-2xl border border-hairline bg-white p-6"
             >
-              <div className="flex h-20 items-center justify-center rounded-[4px] bg-zinc-50 dark:bg-zinc-800">
-                <span className="text-xs text-zinc-300 dark:text-zinc-600">
+              <div className="flex h-20 items-center justify-center rounded-2xl bg-stone/25">
+                <span className="text-xs text-muted/70">
                   Asset placeholder
                 </span>
               </div>
               <div>
-                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                <p className="text-sm font-medium text-ink">
                   {title}
                 </p>
-                <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                <p className="text-xs text-muted">
                   {format}
                 </p>
               </div>
-              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs leading-relaxed text-muted">
                 {note}
               </p>
               <button
                 disabled
-                className="text-xs text-zinc-300 dark:text-zinc-700"
+                className="text-xs text-muted/70"
               >
                 Download (coming soon)
               </button>
             </div>
           ))}
         </div>
-        <p className="mt-6 text-xs text-zinc-400 dark:text-zinc-500">
+        <p className="mt-6 text-xs text-muted">
           Asset files are being prepared. Contact{" "}
           <a
             href="mailto:info@archtivy.com"
@@ -108,16 +108,16 @@ export default function PressKitPage() {
           ].map(({ name, hex, use, swatch }) => (
             <div
               key={name}
-              className="space-y-3 rounded-[4px] border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+              className="space-y-3 rounded-2xl border border-hairline bg-white p-5"
             >
-              <div className={`h-10 w-full rounded-[4px] ${swatch}`} />
+              <div className={`h-10 w-full rounded-2xl ${swatch}`} />
               <div>
-                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                <p className="text-sm font-medium text-ink">
                   {name}
                 </p>
-                <p className="font-mono text-xs text-zinc-400">{hex}</p>
+                <p className="font-mono text-xs text-muted">{hex}</p>
               </div>
-              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs leading-relaxed text-muted">
                 {use}
               </p>
             </div>
@@ -129,7 +129,7 @@ export default function PressKitPage() {
       <MarketingSection heading="Usage guidelines">
         <div className="grid gap-8 lg:grid-cols-2">
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+            <h3 className="text-sm font-semibold text-ink">
               Permitted uses
             </h3>
             <ul className="space-y-2">
@@ -141,16 +141,16 @@ export default function PressKitPage() {
               ].map((item) => (
                 <li
                   key={item}
-                  className="flex items-start gap-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400"
+                  className="flex items-start gap-3 text-sm leading-relaxed text-muted"
                 >
-                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-stone" />
                   {item}
                 </li>
               ))}
             </ul>
           </div>
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+            <h3 className="text-sm font-semibold text-ink">
               Not permitted
             </h3>
             <ul className="space-y-2">
@@ -162,9 +162,9 @@ export default function PressKitPage() {
               ].map((item) => (
                 <li
                   key={item}
-                  className="flex items-start gap-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400"
+                  className="flex items-start gap-3 text-sm leading-relaxed text-muted"
                 >
-                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-stone" />
                   {item}
                 </li>
               ))}
@@ -175,7 +175,7 @@ export default function PressKitPage() {
 
       {/* Contact */}
       <MarketingSection>
-        <p className="text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm leading-relaxed text-muted">
           For asset requests, high-resolution files, or questions about brand
           usage, contact{" "}
           <a
