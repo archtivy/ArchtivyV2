@@ -248,6 +248,38 @@ have no `listing_taxonomy_node` row and are therefore counted-but-unreachable is
 
 ---
 
+### 9. The old profile layout is stranded — delete in a separate pass
+
+**Found:** 2026-08-18, unifying `/u/[username]` and `/u/id/[profileId]` onto one component.
+
+The two routes were two ~420-line implementations of the same page. Because only 41 of 199
+profiles have a username, the id route was **not** a fallback — it served the majority of
+profiles with a different layout. Both now render `components/profile/ProfilePageView`.
+
+That leaves four modules with **zero consumers**:
+
+| File | Status |
+|---|---|
+| `components/profile/ProfileHero.tsx` | 0 consumers |
+| `components/profile/ProfileSidebar.tsx` | 0 consumers |
+| `components/profile/ProfileMobilePanel.tsx` | 0 consumers |
+| `lib/profileCardData.ts` | 0 consumers |
+
+**Deliberately not deleted in the same change**, for the reason already recorded under item 3:
+removing code in the commit that changes behaviour makes the behaviour change harder to review
+or revert on its own.
+
+**Why this one matters more than usual:** on 2026-08-18 a document-download bug was "fixed" in
+five components that turned out to be off the render path entirely, and the real defect sat
+untouched in the component the page actually used. Dead UI code that still looks live is what
+made that possible. These four should go before someone edits one expecting it to render.
+
+**Before deleting, check:** `ProfileSidebar` and `ProfileMobilePanel` both import `FollowButton`
+and `ProfileContactButton`, which ARE still live via `ProfilePageView` — delete the panels, not
+their dependencies.
+
+---
+
 ## Separate notes
 
 - **`STATUS_PAGE_TRUST_ISSUE.md`** — `/status` reports all six services "operational" from a
