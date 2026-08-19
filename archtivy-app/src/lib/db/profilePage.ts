@@ -44,6 +44,22 @@ export interface ProfileListingCard {
   /** Owner display name — the architect on a project, the brand on a product. */
   byline: string | null;
   taxonomySlugPath: string | null;
+  /* ── Card metadata line ────────────────────────────────────────────────
+   * Measured coverage across the 128 approved listings, which is why each
+   * piece is nullable and the card omits whatever is missing:
+   *   projects  location 51/51 · year 51/51 · area 43/51 · views 11/51
+   *   products  location  0/77 · year 26/77 · area  0/77 · views 13/77
+   * A product card is therefore often title-only, and that is correct —
+   * padding it with "—" would be inventing detail.
+   *
+   * saves_count is deliberately ABSENT from this type. The column exists but
+   * is 0 on all 128 rows, so a save count on a card would be a fabricated
+   * zero on every card on the platform. */
+  locationText: string | null;
+  year: number | null;
+  areaSqft: number | null;
+  categoryLabel: string | null;
+  views: number | null;
 }
 
 export interface ProfileMiniProfile {
@@ -80,21 +96,32 @@ export interface ProfilePageData {
   locations: string[];
   /** Brand: downloadable documents across their catalogue. */
   documents: ProfileDocument[];
+  /**
+   * Hero cover. `profiles` has NO cover/banner column, so this is derived from
+   * the profile's own work — first project cover, then first product cover.
+   * Null when they have published nothing, and the hero renders flat.
+   */
+  coverImage: string | null;
 }
 
 export const EMPTY_PROFILE_PAGE_DATA: ProfilePageData = {
   projects: [], products: [], brandsUsed: [], seenInProjects: [],
   specifiedBy: [], collaborators: [], styleTags: [], locations: [], documents: [],
+  coverImage: null,
 };
 
 type ListingRow = {
   id: string; type: string; title: string | null; slug: string | null;
   cover_image_url: string | null; owner_profile_id: string | null;
-  location_city: string | null; taxonomy_slug_path?: string | null;
+  location_city: string | null; location_country: string | null;
+  location: string | null; year: number | null; area_sqft: number | null;
+  views_count: number | null; taxonomy_slug_path?: string | null;
 };
 
+// One string literal, not a concatenation: supabase-js infers the row type from
+// the literal, and a `+` expression degrades it to GenericStringError[].
 const LISTING_COLS =
-  "id, type, title, slug, cover_image_url, owner_profile_id, location_city";
+  "id, type, title, slug, cover_image_url, owner_profile_id, location_city, location_country, location, year, area_sqft, views_count";
 
 /** Every (projectId, productId) pair, from both sources, de-duplicated. */
 async function getProjectProductPairs(opts: {
@@ -176,7 +203,15 @@ async function getProfilesByIds(ids: string[]): Promise<Map<string, ProfileMiniP
   return map;
 }
 
-function toCard(r: ListingRow, byline: string | null): ProfileListingCard {
+function toCard(
+  r: ListingRow,
+  byline: string | null,
+  categoryLabel: string | null = null
+): ProfileListingCard {
+  // location_city is set on only 7 of 51 projects while `location` is set on
+  // all of them, so the free-text field is the reliable one and the structured
+  // pair is the fallback rather than the other way round.
+  const structured = [r.location_city, r.location_country].filter(Boolean).join(", ");
   return {
     id: r.id,
     type: r.type === "product" ? "product" : "project",
@@ -185,7 +220,33 @@ function toCard(r: ListingRow, byline: string | null): ProfileListingCard {
     cover: r.cover_image_url,
     byline,
     taxonomySlugPath: r.taxonomy_slug_path ?? null,
+    locationText: r.location?.trim() || structured || null,
+    year: r.year ?? null,
+    areaSqft: r.area_sqft && r.area_sqft > 0 ? r.area_sqft : null,
+    categoryLabel,
+    views: r.views_count && r.views_count > 0 ? r.views_count : null,
   };
+}
+
+/** Primary category label per listing, for the card metadata line. */
+async function getCategoryLabels(listingIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (listingIds.length === 0) return out;
+  const { data } = await supa()
+    .from("listing_taxonomy_node")
+    .select("listing_id, is_primary, taxonomy_nodes:taxonomy_node_id(domain, label)")
+    .in("listing_id", listingIds);
+  for (const row of (data ?? []) as unknown as {
+    listing_id: string; is_primary: boolean;
+    taxonomy_nodes: { domain: string; label: string } | { domain: string; label: string }[] | null;
+  }[]) {
+    const n = Array.isArray(row.taxonomy_nodes) ? row.taxonomy_nodes[0] : row.taxonomy_nodes;
+    if (!n?.label) continue;
+    if (n.domain !== "project" && n.domain !== "product") continue;
+    // First primary wins; otherwise the first node of the right domain.
+    if (row.is_primary || !out.has(row.listing_id)) out.set(row.listing_id, n.label);
+  }
+  return out;
 }
 
 export async function getProfilePageData(
@@ -205,10 +266,19 @@ export async function getProfilePageData(
   const projectRows = owned.filter((l) => l.type === "project");
   const productRows = owned.filter((l) => l.type === "product");
 
-  const projects = projectRows.map((r) => toCard(r, null));
-  const products = productRows.map((r) => toCard(r, null));
+  const ownCategories = await getCategoryLabels(owned.map((l) => l.id));
+  const projects = projectRows.map((r) => toCard(r, null, ownCategories.get(r.id) ?? null));
+  const products = productRows.map((r) => toCard(r, null, ownCategories.get(r.id) ?? null));
 
-  const data: ProfilePageData = { ...EMPTY_PROFILE_PAGE_DATA, projects, products };
+  // No cover column on `profiles` — the hero image is the profile's own first
+  // piece of work, preferring a project because product shots are often
+  // cut-outs on white and read poorly full-bleed.
+  const coverImage =
+    projectRows.find((r) => r.cover_image_url)?.cover_image_url ??
+    productRows.find((r) => r.cover_image_url)?.cover_image_url ??
+    null;
+
+  const data: ProfilePageData = { ...EMPTY_PROFILE_PAGE_DATA, projects, products, coverImage };
 
   if (role === "brand") {
     // Aggregate "Seen in Projects" across the whole catalogue, plus who owns
@@ -219,8 +289,13 @@ export async function getProfilePageData(
     const ownerIds = [...listings.values()].map((l) => l.owner_profile_id).filter(Boolean) as string[];
     const owners = await getProfilesByIds(ownerIds);
 
+    const seenCategories = await getCategoryLabels([...listings.keys()]);
     data.seenInProjects = [...listings.values()].map((l) =>
-      toCard(l, l.owner_profile_id ? owners.get(l.owner_profile_id)?.displayName ?? null : null)
+      toCard(
+        l,
+        l.owner_profile_id ? owners.get(l.owner_profile_id)?.displayName ?? null : null,
+        seenCategories.get(l.id) ?? null
+      )
     );
     // A designer appears once however many of this brand's products they used.
     data.specifiedBy = [...new Map(
