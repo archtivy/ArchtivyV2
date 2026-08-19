@@ -90,11 +90,16 @@ export function PinEditor({
 
   return (
     <div className="space-y-6">
+      {/* This used to read "the product_tags table does not exist yet — apply
+          20260808_product_tags.REVIEW.sql". That migration has since been
+          applied (the table is live, with rows), so the message named a cause
+          that was no longer true. The flag it is driven by goes false on ANY
+          read failure, not only a missing table, so the copy no longer asserts
+          a specific reason it cannot actually know. */}
       {!tagsTableReady && (
         <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          The <code>product_tags</code> table does not exist yet. Apply{" "}
-          <code>supabase/migrations-review/20260808_product_tags.REVIEW.sql</code> to enable
-          tagging. Existing pins and placement are disabled until then.
+          Product tags couldn&rsquo;t be loaded, so tagging is unavailable right now. Existing
+          pins are safe — reload in a moment, and if it persists this is worth reporting.
         </p>
       )}
 
