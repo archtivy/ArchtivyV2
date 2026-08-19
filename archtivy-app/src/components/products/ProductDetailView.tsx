@@ -7,9 +7,10 @@ import { HomeNav } from "@/components/home/HomeNav";
 import { HomeFooter } from "@/components/home/HomeFooter";
 import { Gallery } from "@/components/entity/Gallery";
 import { RailPanel, RelatedPanel } from "@/components/entity/RelationshipRail";
-import { EntityCard, initialsOf } from "@/components/home/EntityCard";
+import { EntityCard } from "@/components/home/EntityCard";
 import { SaveToggle } from "@/components/home/SaveToggle";
 import { ProductDetailTabs } from "@/components/products/ProductDetailTabs";
+import { SeenInProjects } from "@/components/products/SeenInProjects";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildProductJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
@@ -262,28 +263,8 @@ export async function ProductDetailView({
           </aside>
         </div>
 
-        {/* ── Projects Featuring This Product ─────────────────────────── */}
-        {detail.projects.length > 0 && (
-          <section className="mt-20">
-            <h2 className="mb-6 font-display text-[24px] tracking-tight text-ink">
-              Projects Featuring This Product
-            </h2>
-            <div className="grid grid-cols-2 gap-x-5 gap-y-8 lg:grid-cols-4">
-              {detail.projects.map((p) => (
-                <EntityCard
-                  key={p.id}
-                  href={p.href}
-                  title={p.title}
-                  subtitle={p.architect}
-                  imageUrl={p.cover}
-                  imageCount={p.imageCount}
-                  avatarInitials={initialsOf(p.architect)}
-                  sizes="(max-width: 640px) 45vw, 22vw"
-                />
-              ))}
-            </div>
-          </section>
-        )}
+        {/* ── Seen in Projects ────────────────────────────────────────── */}
+        <SeenInProjects projects={detail.projects} />
       </div>
 
       <HomeFooter />

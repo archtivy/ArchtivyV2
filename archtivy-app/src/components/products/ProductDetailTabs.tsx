@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { FileText, Download } from "lucide-react";
-import { EntityCard, initialsOf } from "@/components/home/EntityCard";
 import { documentDownloadHref } from "@/lib/documents/downloadHref";
 import type { ProductDetail } from "@/lib/db/productDetail";
 
@@ -15,8 +13,10 @@ import type { ProductDetail } from "@/lib/db/productDetail";
  *   Details    always; rows omitted individually when their field is null
  *   Downloads  CONDITIONAL on this product having >= 1 document
  *              (listing_documents, real for 49 of 76 products)
- *   Projects   CONDITIONAL on this product being tagged in >= 1 project
- *              (project_product_links, real for 12 of 76)
+ *   Projects   MOVED OUT — the project credits are now the "Seen in Projects"
+ *              section on the product page itself, not a tab. Being specified
+ *              in built work is the most persuasive thing about a product and
+ *              was hidden behind a click. See components/products/SeenInProjects.
  *   Reviews    OMITTED PLATFORM-WIDE — no reviews/ratings table exists
  *   Q&A        OMITTED PLATFORM-WIDE — no table exists
  *
@@ -29,9 +29,6 @@ export function ProductDetailTabs({ product }: { product: ProductDetail }) {
     { key: "details", label: "Details", count: null as number | null },
     ...(product.documents.length > 0
       ? [{ key: "downloads", label: "Downloads", count: product.documents.length }]
-      : []),
-    ...(product.projects.length > 0
-      ? [{ key: "projects", label: "Projects", count: product.projects.length }]
       : []),
   ];
 
@@ -70,7 +67,6 @@ export function ProductDetailTabs({ product }: { product: ProductDetail }) {
         {active === "about" && <AboutPanel product={product} />}
         {active === "details" && <DetailsPanel product={product} />}
         {active === "downloads" && <DownloadsPanel product={product} />}
-        {active === "projects" && <ProjectsPanel product={product} />}
       </div>
     </div>
   );
@@ -193,31 +189,7 @@ function DownloadsPanel({ product }: { product: ProductDetail }) {
   );
 }
 
-/** Inverse of Project Detail's Products tab — same join, read the other way. */
-function ProjectsPanel({ product }: { product: ProductDetail }) {
-  return (
-    <div className="grid grid-cols-2 gap-x-5 gap-y-8 lg:grid-cols-3">
-      {product.projects.map((p) => (
-        <EntityCard
-          key={p.id}
-          href={p.href}
-          title={p.title}
-          subtitle={p.architect}
-          imageUrl={p.cover}
-          imageCount={p.imageCount}
-          avatarInitials={initialsOf(p.architect)}
-          sizes="(max-width: 640px) 45vw, 30vw"
-        />
-      ))}
-      {product.projects.length === 0 && (
-        <p className="font-body text-[14px] text-muted">
-          Not yet tagged in any project.{" "}
-          <Link href="/projects" className="text-ink underline underline-offset-4">
-            Browse projects
-          </Link>
-          .
-        </p>
-      )}
-    </div>
-  );
-}
+/* The Projects panel that used to live here is now the "Seen in Projects"
+   section on the product page itself — see components/products/SeenInProjects.
+   Its empty state was unreachable anyway: the tab only rendered when
+   product.projects.length > 0. */
