@@ -341,21 +341,40 @@ export async function getListingsByOwner(
  * OR owner_profile_id = profileId (admin-assigned to user's profile).
  * Does NOT include listing_team_members (tagged) — ownership only.
  */
+/** The owner's own listings carry `status` so DRAFT can be told from published. */
+export type OwnedListingSummary = ListingSummary & { status: string | null };
+
 export async function getOwnedListingsForClerkUser(
   clerkUserId: string,
   profileId: string | null
-): Promise<DbResult<ListingSummary[]>> {
+): Promise<DbResult<OwnedListingSummary[]>> {
+  // deleted_at IS NULL on both halves. Without it /me/listings showed rows the
+  // user had already deleted — 37 listings are soft-deleted platform-wide, 13
+  // of them with an owner_clerk_user_id — so Delete looked like it did nothing
+  // and the row came back on every refresh.
+  //
+  // Status is deliberately NOT filtered here: this is the owner's own view and
+  // it must include DRAFT, which is exactly what the Drafts tab is for. Public
+  // surfaces filter status themselves.
+  // `status` is appended because listingCardSelect omits it — it exists for
+  // public card fetches, which are already filtered to APPROVED and so never
+  // need the column. The owner's own list is the one place that must
+  // distinguish DRAFT from published, and without this the Drafts filter would
+  // silently match nothing while every row fell through to "Published".
+  const ownedSelect = `${listingCardSelect}, status`;
   const [byClerk, byProfile] = await Promise.all([
     supabase
       .from(LISTINGS)
-      .select(listingCardSelect)
+      .select(ownedSelect)
       .eq("owner_clerk_user_id", clerkUserId)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }),
     profileId
       ? supabase
           .from(LISTINGS)
-          .select(listingCardSelect)
+          .select(ownedSelect)
           .eq("owner_profile_id", profileId)
+          .is("deleted_at", null)
           .order("created_at", { ascending: false })
       : { data: [] as unknown[], error: null },
   ]);
@@ -374,7 +393,12 @@ export async function getOwnedListingsForClerkUser(
     const bAt = (b.created_at as string) ?? "";
     return bAt.localeCompare(aAt);
   });
-  const rows = merged.map((r) => normalizeListingCardRow(r as Record<string, unknown>));
+  // normalizeListingCardRow drops unknown keys, so status is re-attached from
+  // the raw row rather than being silently lost between query and caller.
+  const rows = merged.map((r) => ({
+    ...normalizeListingCardRow(r as Record<string, unknown>),
+    status: (r as { status?: string | null }).status ?? null,
+  }));
   return { data: rows, error: null };
 }
 

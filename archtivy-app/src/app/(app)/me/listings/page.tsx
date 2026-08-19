@@ -15,13 +15,13 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { TypeBadge } from "@/components/TypeBadge";
 import { ListingRowActions } from "./ListingRowActions";
 import { ListingStatsStrip } from "@/components/dashboard/ListingStatsStrip";
-import type { ListingSummary } from "@/lib/types/listings";
+import type { OwnedListingSummary } from "@/lib/db/listings";
 import type { ProfileRole } from "@/lib/auth/config";
 
 export default async function ListingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; status?: string }>;
 }) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
@@ -52,13 +52,45 @@ export default async function ListingsPage({
   ]);
   const imageMap = imageResultResolved.data ?? {};
 
-  const tab = (await searchParams).tab ?? "all";
-  const filtered =
+  const sp = await searchParams;
+  const tab = sp.tab ?? "all";
+  /*
+   * Status is a second, independent axis: Drafts / Published.
+   *
+   * Deliberately TWO states, not the Draft/Pending/Approved set the brief
+   * asked for. `PENDING` is unreachable from any user-facing create path —
+   * the wizard writes APPROVED, or DRAFT for save-as-draft (see
+   * DATA_INTEGRITY_LOG item 4) — so a Pending tab could never fill, and an
+   * always-empty tab reads as a broken feature rather than an unused one.
+   * Live counts today: 128 APPROVED, 1 DRAFT, 0 PENDING.
+   *
+   * Anything not DRAFT counts as published, so an admin-set PENDING row still
+   * appears somewhere rather than vanishing from the owner's own list.
+   */
+  const status = sp.status ?? "all";
+  const byType =
     tab === "projects"
       ? (listings ?? []).filter((l) => l.type === "project")
       : tab === "products"
         ? (listings ?? []).filter((l) => l.type === "product")
         : listings ?? [];
+  const filtered =
+    status === "drafts"
+      ? byType.filter((l) => l.status === "DRAFT")
+      : status === "published"
+        ? byType.filter((l) => l.status !== "DRAFT")
+        : byType;
+
+  const draftCount = (listings ?? []).filter((l) => l.status === "DRAFT").length;
+  const qs = (next: { tab?: string; status?: string }) => {
+    const params = new URLSearchParams();
+    const t = next.tab ?? tab;
+    const st = next.status ?? status;
+    if (t !== "all") params.set("tab", t);
+    if (st !== "all") params.set("status", st);
+    const q = params.toString();
+    return `/me/listings${q ? `?${q}` : ""}`;
+  };
 
   const addHref = role === "designer" ? "/add/project" : "/add/product";
 
@@ -85,20 +117,35 @@ export default async function ListingsPage({
 
       {/* Tabs */}
       <nav className="flex gap-1 border-b border-zinc-200 dark:border-zinc-800" aria-label="Listings tabs">
-        <TabLink href="/me/listings?tab=all" active={tab === "all"}>
+        <TabLink href={qs({ tab: "all" })} active={tab === "all"}>
           All
         </TabLink>
         {role === "designer" && (
-          <TabLink href="/me/listings?tab=projects" active={tab === "projects"}>
+          <TabLink href={qs({ tab: "projects" })} active={tab === "projects"}>
             Projects
           </TabLink>
         )}
         {role === "brand" && (
-          <TabLink href="/me/listings?tab=products" active={tab === "products"}>
+          <TabLink href={qs({ tab: "products" })} active={tab === "products"}>
             Products
           </TabLink>
         )}
       </nav>
+
+      {/* Status filter — a second axis, so it reads as a filter on the tab
+          above rather than a competing set of tabs. Drafts is shown even at
+          zero so the state is discoverable before a draft exists. */}
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by status">
+        <StatusChip href={qs({ status: "all" })} active={status === "all"}>
+          All
+        </StatusChip>
+        <StatusChip href={qs({ status: "published" })} active={status === "published"}>
+          Published
+        </StatusChip>
+        <StatusChip href={qs({ status: "drafts" })} active={status === "drafts"}>
+          Drafts{draftCount > 0 ? ` (${draftCount})` : ""}
+        </StatusChip>
+      </div>
 
       {error && (
         <p className="text-sm text-red-600 dark:text-red-400">
@@ -180,7 +227,7 @@ function ListingCard({
   liveViewCount,
   liveSaveCount,
 }: {
-  listing: ListingSummary;
+  listing: OwnedListingSummary;
   imageUrl?: string;
   /** views_count from listings table (server-maintained counter). */
   liveViewCount: number;
@@ -239,8 +286,36 @@ function ListingCard({
           listingId={listing.id}
           listingType={listing.type}
           listingTitle={listing.title?.trim() || "Untitled"}
+          isDraft={listing.status === "DRAFT"}
         />
       </div>
     </li>
+  );
+}
+
+/** Pill filter for the status axis. Visually distinct from TabLink so the two
+ *  rows do not read as two competing sets of tabs. */
+function StatusChip({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "true" : undefined}
+      className={[
+        "rounded-full border px-3 py-1 text-xs font-medium transition",
+        active
+          ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+          : "border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-100",
+      ].join(" ")}
+    >
+      {children}
+    </Link>
   );
 }

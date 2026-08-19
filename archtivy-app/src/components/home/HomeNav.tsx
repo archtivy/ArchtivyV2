@@ -6,6 +6,7 @@ import { Bookmark, Menu, X } from "lucide-react";
 import { SignedIn, useAuth, useClerk } from "@clerk/nextjs";
 import { HeaderNotificationBell } from "@/components/home/HeaderNotificationBell";
 import { HeaderProfileMenu } from "@/components/home/HeaderProfileMenu";
+import { HomeNavCreateButton } from "@/components/home/HomeNavCreateButton";
 
 /**
  * Global Primary Nav for the homepage (Build Brief §1).
@@ -121,6 +122,10 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
           {/* Signed in: the CTA is replaced, not supplemented — an account
               holder has no use for a sign-up prompt. */}
           <SignedIn>
+            {/* Primary action, ahead of the bell: publishing is what an account
+                holder is here to do, and until now this header had no route to
+                the wizard at all. */}
+            <HomeNavCreateButton onDark={onDark} />
             <HeaderNotificationBell onDark={onDark} />
           </SignedIn>
 
@@ -183,6 +188,27 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
             {/* Below lg the account actions live in the drawer rather than the
                 bar, so nothing is lost on small screens. */}
             <SignedIn>
+              {/* Two direct links rather than the chooser modal: opening a
+                  dialog on top of an open drawer stacks two overlays and traps
+                  focus in the wrong one. The destinations are identical. */}
+              <li className="mt-2 border-t border-hairline pt-2">
+                <Link
+                  href="/add/project"
+                  onClick={() => setMenuOpen(false)}
+                  className="block py-3 font-body text-[16px] font-medium text-ink"
+                >
+                  Share a Project
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/add/product"
+                  onClick={() => setMenuOpen(false)}
+                  className="block py-3 font-body text-[16px] font-medium text-ink"
+                >
+                  Share a Product
+                </Link>
+              </li>
               <li className="mt-2 border-t border-hairline pt-2">
                 <Link
                   href="/me/notifications"
