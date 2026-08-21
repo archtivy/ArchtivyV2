@@ -5,6 +5,15 @@ const archtivy = {
   dark: "#000029",
   "dark-alt": "#000051",
   primary: "#173DED",   // Primary button, links, active nav, focus ring
+  /*
+   * Jet Black — the confirmed brand primary (2026-08-20).
+   *
+   * ADDED, NOT SUBSTITUTED. `primary` above is left exactly as it is: it has
+   * 207 usages across 68 files, and repointing it would repaint the whole site
+   * in one commit. This token is scoped to components migrated deliberately,
+   * starting with ui/Button.
+   */
+  jet: "#0B0B0B",
   bg: "#DCDEE2",
   muted: "#BABABA",
 };
