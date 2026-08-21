@@ -81,11 +81,15 @@ export default function PressKitPage() {
       <MarketingSection heading="Brand colors">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
+            // Jet Black is the brand primary. This entry previously published
+            // #002ABF, which is not the brand colour and is not in the token
+            // set either — the swatch and the hex are corrected together so the
+            // square always renders exactly the value printed beside it.
             {
               name: "Primary",
-              hex: "#002ABF",
+              hex: "#0B0B0B",
               use: "CTAs, links, interactive elements",
-              swatch: "bg-[#002abf]",
+              swatch: "bg-[#0B0B0B]",
             },
             {
               name: "Foreground",
