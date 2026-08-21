@@ -26,7 +26,9 @@ const NAV_LINKS = [
   { label: "Brands", href: "/brands" },
   { label: "Products", href: "/products" },
   { label: "Inspiration", href: "/inspiration" },
-  { label: "Magazine", href: "/magazine" },
+  // Magazine moved out of the header to the footer. It is already listed in
+  // HomeFooter's Explore column, so nothing was added there — this is a
+  // removal from the primary nav, not a relocation of the only link.
 ];
 
 /**

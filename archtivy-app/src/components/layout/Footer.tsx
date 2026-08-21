@@ -20,6 +20,10 @@ const PLATFORM_LINKS = [
   { label: "Brands", href: "/brands" },
   { label: "Locations", href: "/explore/locations" },
   { label: "Categories", href: "/explore/categories" },
+  // Magazine belongs in the footer now that it is out of the primary nav.
+  // HomeFooter already carried it; this footer did not, so the two agreed on
+  // nothing here until now.
+  { label: "Magazine", href: "/magazine" },
 ];
 
 const PROFESSIONALS_LINKS = [
