@@ -456,62 +456,20 @@ export async function getListingsForProfile(
   return getOwnedListingsForProfile(profileId, ownerClerkUserIds);
 }
 
-/**
- * Create or replace listing row for a product (shared PK: listings.id === products.id).
- * Call after inserting into products so /products/[slug] resolves.
+/*
+ * ── REMOVED: upsertListingForProduct ────────────────────────────────────────
+ *
+ * It built a listings row for a product id with `status: payload.status ??
+ * "APPROVED"` and both owner columns nullable, and its only caller was the
+ * /products/[slug] backfill, which passed null for both. So its sole effect in
+ * practice was to publish an ownerless listing from an orphaned sidecar row.
+ *
+ * Products are created by the create_product_with_sidecar RPC, which writes the
+ * listings row and the products row in one transaction with a real owner and an
+ * explicit PENDING/DRAFT status. Nothing needs this function, and leaving a
+ * ready-made "publish a listing with no owner" helper in the file is how the
+ * same leak gets reintroduced by the next caller who finds it.
  */
-export async function upsertListingForProduct(
-  productId: string,
-  payload: {
-    slug: string;
-    title: string;
-    description: string | null;
-    owner_clerk_user_id: string | null;
-    owner_profile_id: string | null;
-    /** PENDING for new user submissions; APPROVED for backfill. */
-    status?: "PENDING" | "APPROVED";
-    /** Product taxonomy (PRODUCT_TAXONOMY ids/slugs). */
-    product_type?: string | null;
-    product_category?: string | null;
-    product_subcategory?: string | null;
-  }
-): Promise<DbResult<void>> {
-  const client = getSupabaseServiceClient();
-  const row = {
-    id: productId,
-    type: "product" as const,
-    listing_type: "product" as const,
-    status: payload.status ?? "APPROVED",
-    slug: payload.slug,
-    title: payload.title.trim(),
-    description: (payload.description?.trim() ?? null) || null,
-    owner_clerk_user_id: payload.owner_clerk_user_id ?? null,
-    owner_profile_id: payload.owner_profile_id ?? null,
-    cover_image_url: null,
-    location: null,
-    category: null,
-    area_sqft: null,
-    year: null,
-    product_type: payload.product_type ?? null,
-    product_category: payload.product_category ?? null,
-    product_subcategory: payload.product_subcategory ?? null,
-    feature_highlight: null,
-    material_or_finish: null,
-    dimensions: null,
-    team_members: [],
-    brands_used: [],
-    deleted_at: null,
-  };
-  const { error } = await client.from(LISTINGS).upsert(row, { onConflict: "id" });
-  if (error) {
-    return { data: null, error: error.message };
-  }
-  const check = await client.from(LISTINGS).select("type").eq("id", productId).maybeSingle();
-  if (check.error || !check.data?.type) {
-    return { data: null, error: "Listing created but type is missing (data integrity)." };
-  }
-  return { data: undefined, error: null };
-}
 
 /**
  * Update listing cover image URL (after first gallery image is uploaded).

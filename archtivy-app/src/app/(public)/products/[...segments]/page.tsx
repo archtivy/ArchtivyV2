@@ -8,7 +8,6 @@ import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getProductCanonicalBySlug } from "@/lib/db/explore";
-import { getProductForProductPage } from "@/app/actions/listings";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { canManageListing } from "@/lib/auth/listingOwnership";
 import { getListingUrl } from "@/lib/canonical";
@@ -56,8 +55,22 @@ async function resolveCanonicalPath(
   return { path: `/products/${slug}`, hasTaxonomy: false };
 }
 
+/**
+ * Cache first, then one uncached read.
+ *
+ * The second call used to be getProductForProductPage, a server action that ran
+ * a "safety backfill": on a miss it looked the slug up in the `products` sidecar
+ * and wrote the missing listings row from it, ownerless and APPROVED. That
+ * turned a data fault into a published, unmanageable listing. It is gone; see
+ * the note where it used to live in app/actions/listings.ts.
+ *
+ * The uncached retry is kept because unstable_cache also caches a null, and a
+ * product published seconds ago should not 404 for an hour on a cached miss.
+ * It now resolves through `listings` like every other read, so a `products` row
+ * with no listing is simply not found — which is the correct answer.
+ */
 async function findProduct(slug: string) {
-  return (await getCachedProduct(slug)) ?? (await getProductForProductPage(slug));
+  return (await getCachedProduct(slug)) ?? (await getProductCanonicalBySlug(slug));
 }
 
 /**
