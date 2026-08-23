@@ -379,18 +379,26 @@ export function ProjectWizard({
   return (
     <WizardFrame bare={Boolean(admin)}>
       <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-            {isEdit
-              ? initial?.status === "DRAFT"
-                ? "Editing draft"
-                : "Editing project"
-              : "New project"}
-          </p>
-          <h1 className="mt-2 font-display text-[34px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[42px]">
-            {isEdit ? title.trim() || "Edit project." : "Share your work."}
-          </h1>
-        </div>
+        {/* AdminPage already renders a title and an actions bar, so the
+            wizard's own display heading would be a second <h1> saying roughly
+            the same thing. The empty div keeps the action cluster right-aligned
+            under justify-between. */}
+        {admin ? (
+          <div />
+        ) : (
+          <div>
+            <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+              {isEdit
+                ? initial?.status === "DRAFT"
+                  ? "Editing draft"
+                  : "Editing project"
+                : "New project"}
+            </p>
+            <h1 className="mt-2 font-display text-[34px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[42px]">
+              {isEdit ? title.trim() || "Edit project." : "Share your work."}
+            </h1>
+          </div>
+        )}
         <div className="flex items-center gap-4">
           <SaveIndicator state={saveState} />
           <button

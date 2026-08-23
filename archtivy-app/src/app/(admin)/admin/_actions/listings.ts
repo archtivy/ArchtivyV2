@@ -1327,3 +1327,44 @@ export async function deleteAdminProjectAction(listingId: string) {
 export async function deleteAdminProductAction(listingId: string) {
   return deleteListing(listingId);
 }
+
+/* ── Wizard adapters ──────────────────────────────────────────────────────────
+ *
+ * WizardAdminContext asks for (FormData) and (id, FormData). The four actions
+ * above predate it and take useFormState's (prevState, FormData), with the
+ * listing id smuggled through a hidden _listingId field the wizard has no
+ * reason to know about.
+ *
+ * These four adapters own that mismatch. They exist as server actions rather
+ * than as closures in the routes because a client component can only receive a
+ * server action by reference — a wrapper defined in a server component is not
+ * serialisable and would fail at the boundary.
+ */
+
+export async function createAdminProjectFromWizard(
+  formData: FormData
+): Promise<AdminCreateResult> {
+  return createAdminProjectFull(null, formData);
+}
+
+export async function updateAdminProjectFromWizard(
+  listingId: string,
+  formData: FormData
+): Promise<AdminCreateResult> {
+  formData.set("_listingId", listingId);
+  return updateProjectAction(null, formData);
+}
+
+export async function createAdminProductFromWizard(
+  formData: FormData
+): Promise<AdminCreateResult> {
+  return createAdminProductFull(null, formData);
+}
+
+export async function updateAdminProductFromWizard(
+  listingId: string,
+  formData: FormData
+): Promise<AdminCreateResult> {
+  formData.set("_listingId", listingId);
+  return updateProductAction(null, formData);
+}

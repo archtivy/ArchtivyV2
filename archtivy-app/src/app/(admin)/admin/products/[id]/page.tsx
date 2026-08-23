@@ -3,41 +3,37 @@ import { notFound } from "next/navigation";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { getListingUrl } from "@/lib/canonical";
 import { duplicateProductAction } from "../actions";
-import { approveListingFormActionVoid, updateProductAction } from "../../_actions/listings";
-import { getProductListingBySlugOrId } from "@/lib/db/explore";
-import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
+import {
+  approveListingFormActionVoid,
+  createAdminProductFromWizard,
+  updateAdminProductFromWizard,
+} from "../../_actions/listings";
+import { getListingForEdit } from "@/lib/db/listingEdit";
 import { getProductMaterialOptions } from "@/lib/db/materials";
-import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getListingImagesWithIds, sanitizeListingImageUrl } from "@/lib/db/listingImages";
 import { getPhotoProductTagsByImageIds } from "@/lib/db/photoProductTags";
-import { AddProductForm, type ProductFormInitialData } from "@/app/(app)/add/product/AddProductForm";
+import { ProductWizard } from "@/app/(app)/add/product/ProductWizard";
 import { EditorialImageManager } from "@/components/listing/EditorialImageManager";
 import type { ImageTaggingItem } from "@/components/listing/ImageProductTaggingBlock";
-import type { MemberTitleRow } from "@/app/(app)/add/project/TeamMembersField";
-import { getTaxonomyTree, getFacetsForDomain, getListingMaterialNodeIds, getListingFacetValueIds } from "@/lib/taxonomy/taxonomyDb";
-import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
+import { getWizardOwnerOptions } from "@/lib/admin/wizardOwnerOptions";
+import {
+  getWizardCategories,
+  getWizardMaterials,
+  getWizardMemberTitles,
+} from "@/lib/publish/wizardReferenceData";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const toText = (v: unknown) => (v == null ? "" : String(v).trim());
 
-async function getActiveBrandMemberTitles(): Promise<MemberTitleRow[]> {
-  const supabase = getSupabaseServiceClient();
-  const { data, error } = await supabase
-    .from("member_titles")
-    .select("label, maps_to_role, sort_order")
-    .eq("is_active", true)
-    .eq("maps_to_role", "brand")
-    .order("sort_order", { ascending: true });
-  if (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn("[member_titles] brand fetch error:", error.message);
-    }
-    return [];
-  }
-  return (data ?? []) as MemberTitleRow[];
-}
-
 type SearchParams = { [key: string]: string | string[] | undefined };
 
+/**
+ * /admin/products/[id] — the publish wizard, prefilled, plus the admin-only
+ * surroundings. Mirrors the project edit route; see the note there for why
+ * photo tagging sits below the wizard rather than inside it.
+ */
 export default async function AdminProductEditPage({
   params,
   searchParams,
@@ -46,79 +42,40 @@ export default async function AdminProductEditPage({
   searchParams: SearchParams;
 }) {
   const { id } = await params;
-  const [productRow, teamResult, memberTitles, imagesWithIdsResult, productMaterialOptions, productTaxRes, materialTaxRes, facetsRes, existingMatNodeIdsRes, existingFacetValsRes] =
-    await Promise.all([
-      getProductListingBySlugOrId(id),
-      getListingTeamMembersWithProfiles(id),
-      getActiveBrandMemberTitles(),
-      getListingImagesWithIds(id),
-      getProductMaterialOptions(),
-      getTaxonomyTree("product"),
-      getTaxonomyTree("material"),
-      getFacetsForDomain("product"),
-      getListingMaterialNodeIds(id),
-      getListingFacetValueIds(id),
-    ]);
-  const productTaxonomyNodes = (productTaxRes.data ?? []).map((n) => ({
-    id: n.id,
-    parent_id: n.parent_id,
-    depth: n.depth,
-    label: n.label,
-    legacy_product_type: n.legacy_product_type ?? null,
-    legacy_product_category: n.legacy_product_category ?? null,
-    legacy_product_subcategory: n.legacy_product_subcategory ?? null,
-  }));
-  const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
-    id: n.id,
-    parent_id: n.parent_id,
-    depth: n.depth,
-    label: n.label,
-  }));
-  const facets: FacetForForm[] = (facetsRes.data ?? []).map((f) => ({
-    id: f.id,
-    slug: f.slug,
-    label: f.label,
-    values: f.values.map((v) => ({ id: v.id, slug: v.slug, label: v.label })),
-  }));
-  const existingMaterialNodeIds = existingMatNodeIdsRes.data ?? [];
-  const existingFacetValueIds = existingFacetValsRes.data ?? [];
 
-  if (!productRow || (productRow as { type?: string }).type !== "product") return notFound();
+  const listing = await getListingForEdit(id);
+  if (!listing || listing.type !== "product") return notFound();
 
-  // Build imageTaggingData for EditorialImageManager (same pattern as projects edit page)
+  const [
+    ownerOptions,
+    categories,
+    materials,
+    memberTitles,
+    imagesWithIdsResult,
+    productMaterialOptions,
+  ] = await Promise.all([
+    getWizardOwnerOptions("product"),
+    getWizardCategories("product"),
+    getWizardMaterials(),
+    getWizardMemberTitles(),
+    getListingImagesWithIds(id),
+    getProductMaterialOptions(),
+  ]);
+
   const imagesWithIds = imagesWithIdsResult.data ?? [];
-  const productMaterialsList = productMaterialOptions ?? [];
   let imageTaggingData: ImageTaggingItem[] = [];
   if (imagesWithIds.length > 0) {
-    const imageIds = imagesWithIds.map((i) => i.id);
-    const tagsResult = await getPhotoProductTagsByImageIds(imageIds);
-    const tags = tagsResult.data ?? [];
+    const tagsResult = await getPhotoProductTagsByImageIds(imagesWithIds.map((i) => i.id));
     type TagRow = {
       id: string; listing_image_id: string; product_id: string | null; x: number; y: number;
       product?: { id: string; slug: string; title: string | null } | null;
       product_type_id?: string | null; product_category_id?: string | null; product_subcategory_id?: string | null;
-      category_text?: string | null; color_text?: string | null; material_id?: string | null; feature_text?: string | null;
+      color_text?: string | null; material_id?: string | null; feature_text?: string | null;
     };
-    const tagsByImageId: Record<string, (TagRow & { product_title?: string; product_slug?: string })[]> = {};
-    for (const t of tags) {
+    const tagsByImageId: Record<string, TagRow[]> = {};
+    for (const t of tagsResult.data ?? []) {
       const tag = t as TagRow;
-      if (!tagsByImageId[tag.listing_image_id]) tagsByImageId[tag.listing_image_id] = [];
-      tagsByImageId[tag.listing_image_id].push({
-        id: tag.id,
-        listing_image_id: tag.listing_image_id,
-        product_id: tag.product_id ?? null,
-        x: tag.x,
-        y: tag.y,
-        product_type_id: tag.product_type_id ?? null,
-        product_category_id: tag.product_category_id ?? null,
-        product_subcategory_id: tag.product_subcategory_id ?? null,
-        category_text: tag.category_text ?? null,
-        color_text: tag.color_text ?? null,
-        material_id: tag.material_id ?? null,
-        feature_text: tag.feature_text ?? null,
-        product_title: tag.product?.title ?? undefined,
-        product_slug: tag.product?.slug ?? undefined,
-      });
+      (tagsByImageId[tag.listing_image_id] ??= []).push(tag);
     }
     imageTaggingData = imagesWithIds.map((img) => ({
       listingImageId: img.id,
@@ -132,8 +89,8 @@ export default async function AdminProductEditPage({
         product_id: t.product_id ?? "",
         x: t.x,
         y: t.y,
-        product_title: t.product_title,
-        product_slug: t.product_slug,
+        product_title: t.product?.title ?? undefined,
+        product_slug: t.product?.slug ?? undefined,
         product_type_id: t.product_type_id ?? null,
         product_category_id: t.product_category_id ?? null,
         product_subcategory_id: t.product_subcategory_id ?? null,
@@ -144,52 +101,16 @@ export default async function AdminProductEditPage({
     }));
   }
 
-  const listing = productRow as {
-    id: string;
-    title: string | null;
-    description: string | null;
-    product_type: string | null;
-    product_category: string | null;
-    product_subcategory: string | null;
-    taxonomy_node_id: string | null;
-    dimensions: string | null;
-    year: string | number | null;
-    team_members: unknown;
-  };
-
-  const teamWithProfiles = teamResult.data ?? [];
-  const memberTitlesList = memberTitles;
-
-  const initialData: ProductFormInitialData = {
-    listingId: id,
-    title: toText(listing.title),
-    description: toText(listing.description),
-    productType: toText(listing.product_type),
-    productCategory: toText(listing.product_category),
-    productSubcategory: toText(listing.product_subcategory),
-    taxonomyNodeId: listing.taxonomy_node_id ?? undefined,
-    dimensions: toText(listing.dimensions),
-    year: listing.year != null ? String(listing.year) : "",
-    teamRows: teamWithProfiles.map((m) => ({
-      name: (m.display_name ?? "").trim(),
-      role: (m.title ?? "").trim(),
-    })),
-    existingImageCount: imagesWithIds.length,
-    materialNodeIds: existingMaterialNodeIds,
-    facetValueIds: existingFacetValueIds,
-  };
-
-  const saved = toText(searchParams.saved) === "1";
   const errorMsg = toText(searchParams.error);
   const showError = Boolean(errorMsg);
-  const showSuccess = saved && !showError;
+  const showSuccess = toText(searchParams.saved) === "1" && !showError;
 
   return (
     <AdminPage
-      title={toText(listing.title) || "Product"}
+      title={listing.title || "Product"}
       actions={
         <div className="flex items-center gap-2">
-          {(productRow as { status?: string }).status === "PENDING" && (
+          {listing.status === "PENDING" && (
             <form action={approveListingFormActionVoid}>
               <input type="hidden" name="_listingId" value={id} />
               <button
@@ -228,47 +149,40 @@ export default async function AdminProductEditPage({
           {errorMsg}
         </div>
       )}
-      <div className="mb-6">
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Edit using the same form as user submission. Approve above if pending.
-        </p>
+
+      <ProductWizard
+        categories={categories}
+        materials={materials}
+        brandName={null}
+        initial={listing}
+        admin={{
+          ownerOptions,
+          ownerProfileId: listing.ownerProfileId,
+          memberTitles,
+          onCreate: createAdminProductFromWizard,
+          onUpdate: updateAdminProductFromWizard,
+          returnTo: `/admin/products/${id}`,
+        }}
+      />
+
+      <div className="mt-12 border-t border-zinc-200 pt-8">
+        <EditorialImageManager
+          listingId={id}
+          images={imageTaggingData.map((img, i) => ({
+            listingImageId: img.listingImageId,
+            imageUrl: img.imageUrl,
+            imageAlt: img.imageAlt,
+            imageTitle: img.imageTitle,
+            imageCaption: img.imageCaption,
+            sortOrder: i,
+            existingTags: img.existingTags.map((t) => ({
+              ...t,
+              product_id: t.product_id?.trim() || null,
+            })),
+          }))}
+          materialOptions={productMaterialOptions ?? []}
+        />
       </div>
-      <AddProductForm
-        memberTitles={memberTitlesList}
-        formMode="admin"
-        initialData={initialData}
-        updateAction={updateProductAction}
-        taxonomyNodes={productTaxonomyNodes}
-        materialNodes={materialNodes}
-        facets={facets}
-      />
-      <EditorialImageManager
-        listingId={id}
-        images={imageTaggingData.map((img, i) => ({
-          listingImageId: img.listingImageId,
-          imageUrl: img.imageUrl,
-          imageAlt: img.imageAlt,
-          imageTitle: img.imageTitle,
-          imageCaption: img.imageCaption,
-          sortOrder: i,
-          existingTags: img.existingTags.map((t) => ({
-            id: t.id,
-            listing_image_id: t.listing_image_id,
-            product_id: t.product_id?.trim() || null,
-            x: t.x,
-            y: t.y,
-            product_title: t.product_title,
-            product_slug: t.product_slug,
-            product_type_id: t.product_type_id ?? null,
-            product_category_id: t.product_category_id ?? null,
-            product_subcategory_id: t.product_subcategory_id ?? null,
-            color_text: t.color_text ?? null,
-            material_id: t.material_id ?? null,
-            feature_text: t.feature_text ?? null,
-          })),
-        }))}
-        materialOptions={productMaterialsList}
-      />
     </AdminPage>
   );
 }

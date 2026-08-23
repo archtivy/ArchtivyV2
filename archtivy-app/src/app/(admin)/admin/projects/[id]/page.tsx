@@ -3,43 +3,52 @@ import { notFound } from "next/navigation";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { getListingUrl } from "@/lib/canonical";
 import { duplicateProjectAction } from "../actions";
-import { approveListingFormActionVoid, updateProjectAction } from "../../_actions/listings";
-import { getProjectListingBySlugOrId } from "@/lib/db/explore";
-import { getListingTeamMembersWithProfiles } from "@/lib/db/listingTeamMembers";
+import {
+  approveListingFormActionVoid,
+  createAdminProjectFromWizard,
+  updateAdminProjectFromWizard,
+} from "../../_actions/listings";
+import { getListingForEdit } from "@/lib/db/listingEdit";
 import { getProductMaterialOptions } from "@/lib/db/materials";
-import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getListingImagesWithIds, sanitizeListingImageUrl } from "@/lib/db/listingImages";
 import { getPhotoProductTagsByImageIds } from "@/lib/db/photoProductTags";
-import { AddProjectForm, type ProjectFormInitialData } from "@/app/(app)/add/project/AddProjectForm";
-import { ImageProductTaggingBlock, type ImageTaggingItem } from "@/components/listing/ImageProductTaggingBlock";
+import { ProjectWizard } from "@/app/(app)/add/project/ProjectWizard";
 import { EditorialImageManager } from "@/components/listing/EditorialImageManager";
-import type { LocationValue } from "@/components/location/LocationPicker";
-import type { MemberTitleRow } from "@/app/(app)/add/project/TeamMembersField";
-import { getTaxonomyTree, getFacetsForDomain, getListingMaterialNodeIds, getListingFacetValueIds } from "@/lib/taxonomy/taxonomyDb";
-import type { MaterialNodeForForm, FacetForForm } from "@/components/add/AdvancedFiltersSection";
-import type { UploadedGalleryItem } from "@/lib/storage/types";
+import type { ImageTaggingItem } from "@/components/listing/ImageProductTaggingBlock";
+import { getWizardOwnerOptions } from "@/lib/admin/wizardOwnerOptions";
+import {
+  getWizardCategories,
+  getWizardMaterials,
+  getWizardProducts,
+  getWizardMemberTitles,
+} from "@/lib/publish/wizardReferenceData";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const toText = (v: unknown) => (v == null ? "" : String(v).trim());
 
-async function getActiveMemberTitles(): Promise<MemberTitleRow[]> {
-  const supabase = getSupabaseServiceClient();
-  const { data, error } = await supabase
-    .from("member_titles")
-    .select("label, maps_to_role, sort_order")
-    .eq("is_active", true)
-    .order("maps_to_role", { ascending: true })
-    .order("sort_order", { ascending: true });
-  if (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn("[member_titles] fetch error:", error.message);
-    }
-    return [];
-  }
-  return (data ?? []) as MemberTitleRow[];
-}
-
 type SearchParams = { [key: string]: string | string[] | undefined };
 
+/**
+ * /admin/projects/[id] — the publish wizard, prefilled, plus the admin-only
+ * surroundings that are not the wizard's job.
+ *
+ * ── WHAT THE WIZARD OWNS vs WHAT THIS PAGE OWNS ─────────────────────────────
+ * The wizard owns the listing's authored content, including the gallery: its
+ * Images step posts the full ordered set and updateProjectAction replaces it,
+ * matching rows by image_url so kept images keep their ids.
+ *
+ * This page owns what only an admin can do and what has no place in an author
+ * flow: approving a pending listing, duplicating it, previewing the public
+ * page, and EditorialImageManager's per-image product tagging. Tagging stays
+ * below the wizard rather than inside it because a tag is a coordinate on a
+ * specific stored image — it needs the listing_images row id, which only
+ * exists after the image is saved.
+ *
+ * That ordering is why replaceGallery had to stop deleting and re-inserting
+ * rows: it would have destroyed every tag placed here on each save.
+ */
 export default async function AdminProjectEditPage({
   params,
   searchParams,
@@ -48,77 +57,42 @@ export default async function AdminProjectEditPage({
   searchParams: SearchParams;
 }) {
   const { id } = await params;
-  const [listingRow, teamResult, memberTitles, imagesWithIdsResult, productMaterialOptions, materialTaxRes, facetsRes, existingMatNodeIdsRes, existingFacetValsRes, projectTaxRes] =
-    await Promise.all([
-      getProjectListingBySlugOrId(id),
-      getListingTeamMembersWithProfiles(id),
-      getActiveMemberTitles(),
-      getListingImagesWithIds(id),
-      getProductMaterialOptions(),
-      getTaxonomyTree("material"),
-      getFacetsForDomain("project"),
-      getListingMaterialNodeIds(id),
-      getListingFacetValueIds(id),
-      getTaxonomyTree("project"),
-    ]);
 
-  if (!listingRow || (listingRow as { type?: string }).type !== "project") return notFound();
+  const listing = await getListingForEdit(id);
+  if (!listing || listing.type !== "project") return notFound();
 
-  const materialNodes: MaterialNodeForForm[] = (materialTaxRes.data ?? []).map((n) => ({
-    id: n.id,
-    parent_id: n.parent_id,
-    depth: n.depth,
-    label: n.label,
-  }));
-  const facets: FacetForForm[] = (facetsRes.data ?? []).map((f) => ({
-    id: f.id,
-    slug: f.slug,
-    label: f.label,
-    values: f.values.map((v) => ({ id: v.id, slug: v.slug, label: v.label })),
-  }));
-  const existingMaterialNodeIds = existingMatNodeIdsRes.data ?? [];
-  const projectTaxonomyNodes = (projectTaxRes.data ?? []).map((n) => ({
-    id: n.id,
-    parent_id: n.parent_id,
-    depth: n.depth,
-    label: n.label,
-    legacy_project_category: n.legacy_project_category,
-  }));
-  const existingFacetValueIds = existingFacetValsRes.data ?? [];
+  const [
+    ownerOptions,
+    categories,
+    materials,
+    products,
+    memberTitles,
+    imagesWithIdsResult,
+    productMaterialOptions,
+  ] = await Promise.all([
+    getWizardOwnerOptions("project"),
+    getWizardCategories("project"),
+    getWizardMaterials(),
+    getWizardProducts(),
+    getWizardMemberTitles(),
+    getListingImagesWithIds(id),
+    getProductMaterialOptions(),
+  ]);
 
   const imagesWithIds = imagesWithIdsResult.data ?? [];
-  const productMaterialsList = productMaterialOptions ?? [];
   let imageTaggingData: ImageTaggingItem[] = [];
   if (imagesWithIds.length > 0) {
-    const imageIds = imagesWithIds.map((i) => i.id);
-    const tagsResult = await getPhotoProductTagsByImageIds(imageIds);
-    const tags = tagsResult.data ?? [];
+    const tagsResult = await getPhotoProductTagsByImageIds(imagesWithIds.map((i) => i.id));
     type TagRow = {
       id: string; listing_image_id: string; product_id: string | null; x: number; y: number;
       product?: { id: string; slug: string; title: string | null } | null;
       product_type_id?: string | null; product_category_id?: string | null; product_subcategory_id?: string | null;
-      category_text?: string | null; color_text?: string | null; material_id?: string | null; feature_text?: string | null;
+      color_text?: string | null; material_id?: string | null; feature_text?: string | null;
     };
-    const tagsByImageId: Record<string, (TagRow & { product_title?: string; product_slug?: string })[]> = {};
-    for (const t of tags) {
+    const tagsByImageId: Record<string, TagRow[]> = {};
+    for (const t of tagsResult.data ?? []) {
       const tag = t as TagRow;
-      if (!tagsByImageId[tag.listing_image_id]) tagsByImageId[tag.listing_image_id] = [];
-      tagsByImageId[tag.listing_image_id].push({
-        id: tag.id,
-        listing_image_id: tag.listing_image_id,
-        product_id: tag.product_id ?? null,
-        x: tag.x,
-        y: tag.y,
-        product_type_id: tag.product_type_id ?? null,
-        product_category_id: tag.product_category_id ?? null,
-        product_subcategory_id: tag.product_subcategory_id ?? null,
-        category_text: tag.category_text ?? null,
-        color_text: tag.color_text ?? null,
-        material_id: tag.material_id ?? null,
-        feature_text: tag.feature_text ?? null,
-        product_title: tag.product?.title ?? undefined,
-        product_slug: tag.product?.slug ?? undefined,
-      });
+      (tagsByImageId[tag.listing_image_id] ??= []).push(tag);
     }
     imageTaggingData = imagesWithIds.map((img) => ({
       listingImageId: img.id,
@@ -132,8 +106,8 @@ export default async function AdminProjectEditPage({
         product_id: t.product_id ?? "",
         x: t.x,
         y: t.y,
-        product_title: t.product_title,
-        product_slug: t.product_slug,
+        product_title: t.product?.title ?? undefined,
+        product_slug: t.product?.slug ?? undefined,
         product_type_id: t.product_type_id ?? null,
         product_category_id: t.product_category_id ?? null,
         product_subcategory_id: t.product_subcategory_id ?? null,
@@ -144,91 +118,16 @@ export default async function AdminProjectEditPage({
     }));
   }
 
-  const listing = listingRow as {
-    id: string;
-    title: string | null;
-    description: string | null;
-    location_text: string | null;
-    location_city: string | null;
-    location_country: string | null;
-    location_lat: number | null;
-    location_lng: number | null;
-    category: string | null;
-    area_sqft: number | null;
-    year: string | number | null;
-    material_or_finish: string | null;
-    team_members: unknown;
-    brands_used: { name?: string }[] | null;
-    mentioned_products: { brand_name_text: string; product_name_text: string }[] | null;
-    taxonomy_node_id: string | null;
-    project_status: string | null;
-    project_collaboration_status: string | null;
-    project_looking_for: string[] | null;
-  };
-
-  const teamWithProfiles = teamResult.data ?? [];
-  const memberTitlesList = memberTitles;
-
-  const locationValue: LocationValue | null =
-    listing.location_text || listing.location_city || listing.location_country
-      ? {
-          location_place_name: listing.location_text ?? "",
-          location_city: listing.location_city ?? null,
-          location_country: listing.location_country ?? null,
-          location_lat: listing.location_lat ?? null,
-          location_lng: listing.location_lng ?? null,
-          location_text: listing.location_text ?? "",
-        }
-      : null;
-
-  const initialData: ProjectFormInitialData = {
-    listingId: id,
-    title: toText(listing.title),
-    description: toText(listing.description),
-    locationValue,
-    category: toText(listing.category),
-    areaSqft: listing.area_sqft != null && !Number.isNaN(listing.area_sqft) ? String(listing.area_sqft) : "",
-    year: listing.year != null ? String(listing.year) : "",
-    teamRows: teamWithProfiles.length > 0
-      ? teamWithProfiles.map((m) => ({
-          name: (m.display_name ?? "").trim(),
-          role: (m.title ?? "").trim(),
-        }))
-      : [{ name: "", role: "" }],
-    mentionedRows: (listing.mentioned_products ?? []).length > 0
-      ? (listing.mentioned_products ?? []).map((p) => ({
-          brand_name_text: (p.brand_name_text ?? "").trim(),
-          product_name_text: (p.product_name_text ?? "").trim(),
-        }))
-      : [{ brand_name_text: "", product_name_text: "" }],
-    existingImageCount: imagesWithIds.length,
-    galleryItems: imagesWithIds
-      .filter((img) => sanitizeListingImageUrl(img.image_url) != null)
-      .map((img): UploadedGalleryItem => ({
-        path: img.image_url,
-        url: sanitizeListingImageUrl(img.image_url)!,
-        alt: img.alt ?? undefined,
-        caption: img.caption ?? undefined,
-      })),
-    materialNodeIds: existingMaterialNodeIds,
-    facetValueIds: existingFacetValueIds,
-    taxonomyNodeId: listing.taxonomy_node_id ?? null,
-    projectStatus: listing.project_status ?? "",
-    projectCollaborationStatus: listing.project_collaboration_status ?? "",
-    projectLookingFor: listing.project_looking_for ?? [],
-  };
-
-  const saved = toText(searchParams.saved) === "1";
   const errorMsg = toText(searchParams.error);
   const showError = Boolean(errorMsg);
-  const showSuccess = saved && !showError;
+  const showSuccess = toText(searchParams.saved) === "1" && !showError;
 
   return (
     <AdminPage
-      title={toText(listing.title) || "Project"}
+      title={listing.title || "Project"}
       actions={
         <div className="flex items-center gap-2">
-          {(listingRow as { status?: string }).status === "PENDING" && (
+          {listing.status === "PENDING" && (
             <form action={approveListingFormActionVoid}>
               <input type="hidden" name="_listingId" value={id} />
               <button
@@ -267,47 +166,44 @@ export default async function AdminProjectEditPage({
           {errorMsg}
         </div>
       )}
-      <div className="mb-6">
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Edit using the same form as user submission. Approve above if pending.
-        </p>
+
+      <ProjectWizard
+        categories={categories}
+        materials={materials}
+        products={products}
+        memberTitles={memberTitles}
+        initial={listing}
+        admin={{
+          ownerOptions,
+          ownerProfileId: listing.ownerProfileId,
+          // Entries naming a product that is not on the platform carry no id,
+          // so the picker cannot represent them. Passed through and resubmitted
+          // verbatim, or an admin save would delete them.
+          mentionedFreeText: listing.mentionedProductsFreeText,
+          onCreate: createAdminProjectFromWizard,
+          onUpdate: updateAdminProjectFromWizard,
+          returnTo: `/admin/projects/${id}`,
+        }}
+      />
+
+      <div className="mt-12 border-t border-zinc-200 pt-8">
+        <EditorialImageManager
+          listingId={id}
+          images={imageTaggingData.map((img, i) => ({
+            listingImageId: img.listingImageId,
+            imageUrl: img.imageUrl,
+            imageAlt: img.imageAlt,
+            imageTitle: img.imageTitle,
+            imageCaption: img.imageCaption,
+            sortOrder: i,
+            existingTags: img.existingTags.map((t) => ({
+              ...t,
+              product_id: t.product_id?.trim() || null,
+            })),
+          }))}
+          materialOptions={productMaterialOptions ?? []}
+        />
       </div>
-      <AddProjectForm
-        memberTitles={memberTitlesList}
-        formMode="admin"
-        initialData={initialData}
-        updateAction={updateProjectAction}
-        materialNodes={materialNodes}
-        facets={facets}
-        projectTaxonomyNodes={projectTaxonomyNodes}
-      />
-      <EditorialImageManager
-        listingId={id}
-        images={imageTaggingData.map((img, i) => ({
-          listingImageId: img.listingImageId,
-          imageUrl: img.imageUrl,
-          imageAlt: img.imageAlt,
-          imageTitle: img.imageTitle,
-          imageCaption: img.imageCaption,
-          sortOrder: i,
-          existingTags: img.existingTags.map((t) => ({
-            id: t.id,
-            listing_image_id: t.listing_image_id,
-            product_id: t.product_id?.trim() || null,
-            x: t.x,
-            y: t.y,
-            product_title: t.product_title,
-            product_slug: t.product_slug,
-            product_type_id: t.product_type_id ?? null,
-            product_category_id: t.product_category_id ?? null,
-            product_subcategory_id: t.product_subcategory_id ?? null,
-            color_text: t.color_text ?? null,
-            material_id: t.material_id ?? null,
-            feature_text: t.feature_text ?? null,
-          })),
-        }))}
-        materialOptions={productMaterialsList}
-      />
     </AdminPage>
   );
 }

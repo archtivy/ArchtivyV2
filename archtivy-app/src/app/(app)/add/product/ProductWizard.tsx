@@ -314,14 +314,19 @@ export function ProductWizard({
   return (
     <WizardFrame bare={Boolean(admin)}>
       <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-            {isEdit ? (initial?.status === "DRAFT" ? "Editing draft" : "Editing product") : "New product"}
-          </p>
-          <h1 className="mt-2 font-display text-[34px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[42px]">
-            {isEdit ? title.trim() || "Edit product." : "Add a product."}
-          </h1>
-        </div>
+        {/* Suppressed in admin: AdminPage supplies the title and actions bar. */}
+        {admin ? (
+          <div />
+        ) : (
+          <div>
+            <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+              {isEdit ? (initial?.status === "DRAFT" ? "Editing draft" : "Editing product") : "New product"}
+            </p>
+            <h1 className="mt-2 font-display text-[34px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[42px]">
+              {isEdit ? title.trim() || "Edit product." : "Add a product."}
+            </h1>
+          </div>
+        )}
         <div className="flex items-center gap-4">
           <SaveIndicator state={saveState} />
           <button
