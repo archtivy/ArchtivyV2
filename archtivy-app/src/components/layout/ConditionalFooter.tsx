@@ -1,45 +1,25 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { isShellLess } from "@/lib/layout/shellRoutes";
 
 /**
- * Exact routes where the global footer must not render.
- *   /explore   — tool-like fullscreen experience
- *   /          — renders its own editorial HomeFooter
- *   /projects  — same; the directory carries the cream palette
- * Without these exclusions those pages would end with two footers.
- * Keep in sync with EDITORIAL_ROUTES in SiteShell.
+ * Suppresses the global (zinc) Footer on any page that supplies its own.
+ *
+ * Every shell-less route renders SitePage, which either draws HomeFooter on the
+ * editorial tokens or deliberately ends without a footer — dashboards, the
+ * wizards and /explore are working surfaces. Either way the global Footer must
+ * not also render, or the page ends with two.
+ *
+ * The route list is shared with SiteShell rather than copied. /explore is the
+ * one addition: it keeps the ExploreToolHeader shell rather than SitePage, so
+ * it is not shell-less, but it is still footerless.
  */
-const FOOTERLESS_ROUTES = new Set([
-  "/explore",
-  "/",
-  "/projects",
-  "/products",
-  "/designers",
-  "/brands",
-  "/magazine",
-  "/inspiration",
-]);
-
-/**
- * Mirrors EDITORIAL_PREFIXES in SiteShell. Signed-in surfaces are working
- * surfaces rather than reading surfaces, so they carry no footer at all (as
- * /explore already does); the alternative was the zinc global Footer sitting
- * under a cream page.
- */
-const FOOTERLESS_PREFIXES = ["/me"];
+const EXTRA_FOOTERLESS_ROUTES = new Set(["/explore"]);
 
 export function ConditionalFooter({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  if (FOOTERLESS_ROUTES.has(pathname)) return null;
-  if (FOOTERLESS_PREFIXES.some((p) => pathname === p || pathname?.startsWith(`${p}/`))) {
-    return null;
-  }
-  // Mirrors the SiteShell rule: /projects/* and /products/* are shell-less by
-  // default because only the server can tell a detail page from an archive.
-  // The CategoryArchive components render the global Footer themselves.
-  if (pathname?.startsWith("/projects/") || pathname?.startsWith("/products/")) return null;
-  if (pathname?.startsWith("/magazine/")) return null;
-  if (pathname?.startsWith("/inspiration/")) return null;
+  if (isShellLess(pathname)) return null;
+  if (pathname && EXTRA_FOOTERLESS_ROUTES.has(pathname)) return null;
   return <>{children}</>;
 }

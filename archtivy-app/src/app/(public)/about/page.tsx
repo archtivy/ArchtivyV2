@@ -1,3 +1,4 @@
+import { SitePage } from "@/components/layout/SitePage";
 import { auth } from "@clerk/nextjs/server";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { AboutCTAs } from "./AboutCTAs";
@@ -39,185 +40,187 @@ export default async function AboutPage() {
   const role = profileResult.data?.role ?? undefined;
 
   return (
-    <article className="space-y-16 sm:space-y-20">
-      {/* Hero */}
-      <header className="space-y-5 pt-4 sm:pt-8">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
-          About
-        </p>
-        <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-ink sm:text-4xl">
-          Architecture has always produced intelligence. It was never
-          organised.
-        </h1>
-        <p className="max-w-2xl text-base leading-relaxed text-muted">
-          Every completed project carries embedded knowledge — the products
-          specified, the professionals credited, the decisions made across
-          months of design. This information has always existed. What it has
-          never had is structure.
-        </p>
-        <div className="flex flex-wrap gap-3 pt-1">
-          <AboutCTAs userId={userId} role={role} />
-        </div>
-      </header>
-
-      {/* Why Archtivy exists */}
-      <MarketingSection heading="Why this exists">
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-muted">
-            <p>
-              The architectural industry communicates through media, portfolios,
-              and disconnected directories. These formats were built for
-              attention, not accuracy. They capture the exceptional, not the
-              systemic. They reward editorial selection, not professional record.
-            </p>
-            <p>
-              The result is an industry that produces enormous amounts of
-              embedded knowledge and has no systematic way to access it. A
-              product brand cannot reliably know which firms specify their
-              products. A designer cannot demonstrate their specification
-              history without manually compiling a portfolio. A researcher
-              cannot query architectural production by material or region
-              without pulling from dozens of incompatible sources.
-            </p>
+    <SitePage width="narrow" footer>
+      <article className="space-y-16 sm:space-y-20">
+        {/* Hero */}
+        <header className="space-y-5 pt-4 sm:pt-8">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
+            About
+          </p>
+          <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-ink sm:text-4xl">
+            Architecture has always produced intelligence. It was never
+            organised.
+          </h1>
+          <p className="max-w-2xl text-base leading-relaxed text-muted">
+            Every completed project carries embedded knowledge — the products
+            specified, the professionals credited, the decisions made across
+            months of design. This information has always existed. What it has
+            never had is structure.
+          </p>
+          <div className="flex flex-wrap gap-3 pt-1">
+            <AboutCTAs userId={userId} role={role} />
           </div>
-          <div className="space-y-5 text-sm leading-relaxed text-muted">
-            <p>
-              Archtivy was built on a different logic. We are the infrastructure
-              layer beneath global architecture — connecting every project to
-              the products within it, every credit to the professional who
-              earned it, every specification to the brand that made it possible.
-            </p>
-            <p>
-              We do not curate. We do not select what deserves attention. We
-              provide infrastructure for the industry to record itself —
-              accurately, permanently, and at scale.
-            </p>
-          </div>
-        </div>
-      </MarketingSection>
+        </header>
 
-      {/* What gets indexed */}
-      <MarketingSection heading="What gets indexed">
-        <div className="grid gap-6 sm:grid-cols-2">
-          {INDEXED.map(({ title, body }) => (
-            <div
-              key={title}
-              className="space-y-3 rounded-2xl border border-hairline bg-white p-6"
-            >
-              <h3 className="text-sm font-semibold text-ink">
-                {title}
-              </h3>
-              <p className="text-sm leading-relaxed text-muted">
-                {body}
+        {/* Why Archtivy exists */}
+        <MarketingSection heading="Why this exists">
+          <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
+            <div className="space-y-5 text-sm leading-relaxed text-muted">
+              <p>
+                The architectural industry communicates through media, portfolios,
+                and disconnected directories. These formats were built for
+                attention, not accuracy. They capture the exceptional, not the
+                systemic. They reward editorial selection, not professional record.
+              </p>
+              <p>
+                The result is an industry that produces enormous amounts of
+                embedded knowledge and has no systematic way to access it. A
+                product brand cannot reliably know which firms specify their
+                products. A designer cannot demonstrate their specification
+                history without manually compiling a portfolio. A researcher
+                cannot query architectural production by material or region
+                without pulling from dozens of incompatible sources.
               </p>
             </div>
-          ))}
-        </div>
-      </MarketingSection>
-
-      {/* The intelligence layer */}
-      <MarketingSection heading="The intelligence layer">
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-muted">
-            <p>
-              When projects are submitted with structured credits — team
-              members, products used, project type, location, year — the data
-              becomes queryable. Patterns emerge. Specification trends become
-              visible. Professional networks become legible. Brand performance
-              inside architectural practice becomes measurable.
-            </p>
-            <p>
-              This is the intelligence layer. It does not require a radical
-              reinvention of how architecture is practised. It requires a
-              platform designed from the ground up to capture the intelligence
-              that already exists in every completed project.
-            </p>
-          </div>
-          <ul className="space-y-3">
-            {[
-              "Product-to-project traceability at global scale",
-              "Verifiable professional credit history",
-              "Specification trend data by region, typology, and material",
-              "Brand specification footprint across markets",
-              "Permanent, queryable record independent of media cycles",
-            ].map((item) => (
-              <li
-                key={item}
-                className="flex items-start gap-4 rounded-2xl border border-hairline bg-white px-5 py-3.5"
-              >
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-archtivy-primary" />
-                <span className="text-sm text-muted">
-                  {item}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </MarketingSection>
-
-      {/* Roadmap */}
-      <MarketingSection heading="What we are building toward">
-        <div className="grid gap-6 sm:grid-cols-3">
-          {[
-            {
-              phase: "Now",
-              items: [
-                "Structured project and product submissions",
-                "Team credit attribution",
-                "Product-to-project linking",
-                "Professional profiles",
-                "Global explore and search",
-              ],
-            },
-            {
-              phase: "Next",
-              items: [
-                "Brand specification analytics dashboard",
-                "API access for qualified partners",
-                "Institutional and school partnerships",
-                "Enhanced professional intelligence view",
-                "Specification trend reports",
-              ],
-            },
-            {
-              phase: "Long term",
-              items: [
-                "BIM and CMS integration layer",
-                "Global specification database",
-                "Research and academic data access",
-                "Multi-language support",
-                "Canonical architectural record",
-              ],
-            },
-          ].map(({ phase, items }) => (
-            <div key={phase} className="space-y-4">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
-                {phase}
-              </h3>
-              <ul className="space-y-2">
-                {items.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-3 text-sm leading-relaxed text-muted"
-                  >
-                    <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-stone" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
+            <div className="space-y-5 text-sm leading-relaxed text-muted">
+              <p>
+                Archtivy was built on a different logic. We are the infrastructure
+                layer beneath global architecture — connecting every project to
+                the products within it, every credit to the professional who
+                earned it, every specification to the brand that made it possible.
+              </p>
+              <p>
+                We do not curate. We do not select what deserves attention. We
+                provide infrastructure for the industry to record itself —
+                accurately, permanently, and at scale.
+              </p>
             </div>
-          ))}
-        </div>
-      </MarketingSection>
+          </div>
+        </MarketingSection>
 
-      <MarketingCTA
-        heading="Architecture deserves better infrastructure."
-        body="Submit your work. Every project, product, and credit makes the record more complete and more useful to the entire industry."
-        primaryLabel="Submit Your Work"
-        primaryHref="/add/project"
-        secondaryLabel="Explore the Platform"
-        secondaryHref="/explore/projects"
-      />
-    </article>
+        {/* What gets indexed */}
+        <MarketingSection heading="What gets indexed">
+          <div className="grid gap-6 sm:grid-cols-2">
+            {INDEXED.map(({ title, body }) => (
+              <div
+                key={title}
+                className="space-y-3 rounded-2xl border border-hairline bg-cream p-6"
+              >
+                <h3 className="text-sm font-semibold text-ink">
+                  {title}
+                </h3>
+                <p className="text-sm leading-relaxed text-muted">
+                  {body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </MarketingSection>
+
+        {/* The intelligence layer */}
+        <MarketingSection heading="The intelligence layer">
+          <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
+            <div className="space-y-5 text-sm leading-relaxed text-muted">
+              <p>
+                When projects are submitted with structured credits — team
+                members, products used, project type, location, year — the data
+                becomes queryable. Patterns emerge. Specification trends become
+                visible. Professional networks become legible. Brand performance
+                inside architectural practice becomes measurable.
+              </p>
+              <p>
+                This is the intelligence layer. It does not require a radical
+                reinvention of how architecture is practised. It requires a
+                platform designed from the ground up to capture the intelligence
+                that already exists in every completed project.
+              </p>
+            </div>
+            <ul className="space-y-3">
+              {[
+                "Product-to-project traceability at global scale",
+                "Verifiable professional credit history",
+                "Specification trend data by region, typology, and material",
+                "Brand specification footprint across markets",
+                "Permanent, queryable record independent of media cycles",
+              ].map((item) => (
+                <li
+                  key={item}
+                  className="flex items-start gap-4 rounded-2xl border border-hairline bg-cream px-5 py-3.5"
+                >
+                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-archtivy-primary" />
+                  <span className="text-sm text-muted">
+                    {item}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </MarketingSection>
+
+        {/* Roadmap */}
+        <MarketingSection heading="What we are building toward">
+          <div className="grid gap-6 sm:grid-cols-3">
+            {[
+              {
+                phase: "Now",
+                items: [
+                  "Structured project and product submissions",
+                  "Team credit attribution",
+                  "Product-to-project linking",
+                  "Professional profiles",
+                  "Global explore and search",
+                ],
+              },
+              {
+                phase: "Next",
+                items: [
+                  "Brand specification analytics dashboard",
+                  "API access for qualified partners",
+                  "Institutional and school partnerships",
+                  "Enhanced professional intelligence view",
+                  "Specification trend reports",
+                ],
+              },
+              {
+                phase: "Long term",
+                items: [
+                  "BIM and CMS integration layer",
+                  "Global specification database",
+                  "Research and academic data access",
+                  "Multi-language support",
+                  "Canonical architectural record",
+                ],
+              },
+            ].map(({ phase, items }) => (
+              <div key={phase} className="space-y-4">
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
+                  {phase}
+                </h3>
+                <ul className="space-y-2">
+                  {items.map((item) => (
+                    <li
+                      key={item}
+                      className="flex items-start gap-3 text-sm leading-relaxed text-muted"
+                    >
+                      <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-stone" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </MarketingSection>
+
+        <MarketingCTA
+          heading="Architecture deserves better infrastructure."
+          body="Submit your work. Every project, product, and credit makes the record more complete and more useful to the entire industry."
+          primaryLabel="Submit Your Work"
+          primaryHref="/add/project"
+          secondaryLabel="Explore the Platform"
+          secondaryHref="/explore/projects"
+        />
+      </article>
+    </SitePage>
   );
 }

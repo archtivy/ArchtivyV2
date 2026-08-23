@@ -1,3 +1,4 @@
+import { SitePage } from "@/components/layout/SitePage";
 import { auth } from "@clerk/nextjs/server";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import {
@@ -47,136 +48,138 @@ export default async function HowItWorksPage() {
   const role = profileResult.data?.role ?? undefined;
 
   return (
-    <article className="space-y-16 sm:space-y-20">
-      {/* Hero */}
-      <header className="space-y-5 pt-4 sm:pt-8">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
-          How It Works
-        </p>
-        <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-ink sm:text-4xl">
-          Five layers. One permanent record.
-        </h1>
-        <p className="max-w-2xl text-base leading-relaxed text-muted">
-          Archtivy is not a publishing platform. It is a structured intelligence
-          system. Understanding it means understanding its five interconnected
-          layers — from profile creation to global discoverability.
-        </p>
-      </header>
+    <SitePage width="narrow" footer>
+      <article className="space-y-16 sm:space-y-20">
+        {/* Hero */}
+        <header className="space-y-5 pt-4 sm:pt-8">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
+            How It Works
+          </p>
+          <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-ink sm:text-4xl">
+            Five layers. One permanent record.
+          </h1>
+          <p className="max-w-2xl text-base leading-relaxed text-muted">
+            Archtivy is not a publishing platform. It is a structured intelligence
+            system. Understanding it means understanding its five interconnected
+            layers — from profile creation to global discoverability.
+          </p>
+        </header>
 
-      {/* Step-by-step */}
-      <MarketingSection>
-        <div className="space-y-4">
-          {STEPS.map(({ n, title, body }) => (
-            <div
-              key={n}
-              className="grid grid-cols-[48px_1fr] gap-6 rounded-2xl border border-hairline bg-white px-6 py-6 sm:grid-cols-[64px_1fr]"
-            >
-              <span className="font-mono text-xs font-semibold text-muted/70">
-                {n}
-              </span>
-              <div className="space-y-2">
-                <h2 className="text-sm font-semibold text-ink">
-                  {title}
-                </h2>
-                <p className="text-sm leading-relaxed text-muted">
-                  {body}
-                </p>
+        {/* Step-by-step */}
+        <MarketingSection>
+          <div className="space-y-4">
+            {STEPS.map(({ n, title, body }) => (
+              <div
+                key={n}
+                className="grid grid-cols-[48px_1fr] gap-6 rounded-2xl border border-hairline bg-cream px-6 py-6 sm:grid-cols-[64px_1fr]"
+              >
+                <span className="font-mono text-xs font-semibold text-muted/70">
+                  {n}
+                </span>
+                <div className="space-y-2">
+                  <h2 className="text-sm font-semibold text-ink">
+                    {title}
+                  </h2>
+                  <p className="text-sm leading-relaxed text-muted">
+                    {body}
+                  </p>
+                </div>
               </div>
+            ))}
+          </div>
+        </MarketingSection>
+
+        {/* For professionals */}
+        <MarketingSection heading="For professionals">
+          <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
+            <div className="space-y-4 text-sm leading-relaxed text-muted">
+              <p>
+                For designers and architecture firms, Archtivy is a structured
+                visibility layer beneath professional practice. Not social media
+                reach. Not portfolio hosting. A permanent, structured record of
+                your professional output that connects your work to the products
+                within it and to the industry that relies on it.
+              </p>
+              <p>
+                Each project you submit with complete credits accumulates
+                authority in the network. Brands discover your specification
+                patterns. Researchers can query your professional history by
+                project type, location, or material category. Your record persists
+                independent of any publication cycle.
+              </p>
             </div>
-          ))}
-        </div>
-      </MarketingSection>
+            <div className="space-y-3">
+              {[
+                "Credits are attributed by role, not just by name",
+                "Your profile aggregates all projects you have contributed to",
+                "Products you specify connect your work to brands",
+                "Your record is permanent and queryable",
+                "Discoverability compounds with every project added",
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="flex items-start gap-4 rounded-2xl border border-hairline bg-cream px-5 py-3.5"
+                >
+                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-archtivy-primary" />
+                  <span className="text-sm text-muted">
+                    {item}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </MarketingSection>
 
-      {/* For professionals */}
-      <MarketingSection heading="For professionals">
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-4 text-sm leading-relaxed text-muted">
-            <p>
-              For designers and architecture firms, Archtivy is a structured
-              visibility layer beneath professional practice. Not social media
-              reach. Not portfolio hosting. A permanent, structured record of
-              your professional output that connects your work to the products
-              within it and to the industry that relies on it.
-            </p>
-            <p>
-              Each project you submit with complete credits accumulates
-              authority in the network. Brands discover your specification
-              patterns. Researchers can query your professional history by
-              project type, location, or material category. Your record persists
-              independent of any publication cycle.
-            </p>
+        {/* For brands */}
+        <MarketingSection heading="For brands">
+          <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
+            <div className="space-y-4 text-sm leading-relaxed text-muted">
+              <p>
+                For architecture product brands, Archtivy provides traceable
+                visibility inside real architectural contexts. When a designer
+                submits a project and tags your product, a permanent record is
+                created — connecting your product to the firm, the project type,
+                the location, and the year.
+              </p>
+              <p>
+                Over time, your product accumulates a structured specification
+                record. This record is the basis for brand intelligence: which
+                firms specify your products most consistently, which markets, and
+                which typologies. The intelligence compounds with every new
+                project that references your products.
+              </p>
+            </div>
+            <div className="space-y-3">
+              {[
+                "Products appear in context, not as promoted placements",
+                "Specification records are permanent and traceable",
+                "Brand intelligence dashboard in development",
+                "Claim your products to manage your brand record",
+                "Visibility compounds with network scale",
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="flex items-start gap-4 rounded-2xl border border-hairline bg-cream px-5 py-3.5"
+                >
+                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-archtivy-primary" />
+                  <span className="text-sm text-muted">
+                    {item}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="space-y-3">
-            {[
-              "Credits are attributed by role, not just by name",
-              "Your profile aggregates all projects you have contributed to",
-              "Products you specify connect your work to brands",
-              "Your record is permanent and queryable",
-              "Discoverability compounds with every project added",
-            ].map((item) => (
-              <div
-                key={item}
-                className="flex items-start gap-4 rounded-2xl border border-hairline bg-white px-5 py-3.5"
-              >
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-archtivy-primary" />
-                <span className="text-sm text-muted">
-                  {item}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </MarketingSection>
+        </MarketingSection>
 
-      {/* For brands */}
-      <MarketingSection heading="For brands">
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-4 text-sm leading-relaxed text-muted">
-            <p>
-              For architecture product brands, Archtivy provides traceable
-              visibility inside real architectural contexts. When a designer
-              submits a project and tags your product, a permanent record is
-              created — connecting your product to the firm, the project type,
-              the location, and the year.
-            </p>
-            <p>
-              Over time, your product accumulates a structured specification
-              record. This record is the basis for brand intelligence: which
-              firms specify your products most consistently, which markets, and
-              which typologies. The intelligence compounds with every new
-              project that references your products.
-            </p>
-          </div>
-          <div className="space-y-3">
-            {[
-              "Products appear in context, not as promoted placements",
-              "Specification records are permanent and traceable",
-              "Brand intelligence dashboard in development",
-              "Claim your products to manage your brand record",
-              "Visibility compounds with network scale",
-            ].map((item) => (
-              <div
-                key={item}
-                className="flex items-start gap-4 rounded-2xl border border-hairline bg-white px-5 py-3.5"
-              >
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-archtivy-primary" />
-                <span className="text-sm text-muted">
-                  {item}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </MarketingSection>
-
-      <MarketingCTA
-        heading="Start your record."
-        body="Submit your first project or claim your brand profile."
-        primaryLabel="Submit Your Work"
-        primaryHref="/add/project"
-        secondaryLabel="Explore the Platform"
-        secondaryHref="/explore/projects"
-      />
-    </article>
+        <MarketingCTA
+          heading="Start your record."
+          body="Submit your first project or claim your brand profile."
+          primaryLabel="Submit Your Work"
+          primaryHref="/add/project"
+          secondaryLabel="Explore the Platform"
+          secondaryHref="/explore/projects"
+        />
+      </article>
+    </SitePage>
   );
 }

@@ -1,3 +1,4 @@
+import { SitePage } from "@/components/layout/SitePage";
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { getProfileByClerkId } from "@/lib/db/profiles";
@@ -140,115 +141,117 @@ export default async function FAQPage() {
   const faqJsonLd = buildFaqJsonLd(allFaqItems);
 
   return (
-    <article className="space-y-16 sm:space-y-24">
-      {"@type" in faqJsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
-        />
-      )}
-      <header className="space-y-6 pt-4 text-center sm:pt-8">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted">
-          FAQ
-        </p>
-        <h1 className="font-serif text-3xl font-normal tracking-tight text-ink sm:text-4xl md:text-5xl">
-          Frequently asked questions
-        </h1>
-        <p className="mx-auto max-w-2xl text-lg leading-relaxed text-muted">
-          Platform usage, roles, discovery, Save & boards, and how collaboration works.
-        </p>
-
-        {/* Jump to section */}
-        <nav aria-label="FAQ sections" className="mx-auto max-w-2xl pt-4">
-          <p className="mb-3 text-sm font-medium text-ink/80">
-            Jump to section
+    <SitePage width="narrow" footer>
+      <article className="space-y-16 sm:space-y-24">
+        {"@type" in faqJsonLd && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
+          />
+        )}
+        <header className="space-y-6 pt-4 text-center sm:pt-8">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted">
+            FAQ
           </p>
-          <ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm">
-            {SECTION_NAV.map((item) => (
+          <h1 className="font-serif text-3xl font-normal tracking-tight text-ink sm:text-4xl md:text-5xl">
+            Frequently asked questions
+          </h1>
+          <p className="mx-auto max-w-2xl text-lg leading-relaxed text-muted">
+            Platform usage, roles, discovery, Save & boards, and how collaboration works.
+          </p>
+
+          {/* Jump to section */}
+          <nav aria-label="FAQ sections" className="mx-auto max-w-2xl pt-4">
+            <p className="mb-3 text-sm font-medium text-ink/80">
+              Jump to section
+            </p>
+            <ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm">
+              {SECTION_NAV.map((item) => (
+                <li key={item.id}>
+                  <a
+                    href={`#${item.id}`}
+                    className="text-muted underline decoration-zinc-300 underline-offset-2 hover:text-archtivy-primary hover:decoration-archtivy-primary"
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </header>
+
+        {/* Top questions */}
+        <section className="border-t border-hairline pt-12">
+          <h2 className="mb-6 font-serif text-xl font-normal tracking-tight text-ink">
+            Top questions
+          </h2>
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {TOP_QUESTIONS.map((item) => (
               <li key={item.id}>
                 <a
                   href={`#${item.id}`}
-                  className="text-muted underline decoration-zinc-300 underline-offset-2 hover:text-archtivy-primary hover:decoration-archtivy-primary dark:decoration-zinc-600 dark:hover:text-archtivy-primary"
+                  className="text-sm text-muted underline decoration-zinc-300 underline-offset-2 hover:text-archtivy-primary hover:decoration-archtivy-primary"
                 >
-                  {item.label}
+                  {item.title}
                 </a>
               </li>
             ))}
           </ul>
-        </nav>
-      </header>
-
-      {/* Top questions */}
-      <section className="border-t border-hairline pt-12">
-        <h2 className="mb-6 font-serif text-xl font-normal tracking-tight text-ink">
-          Top questions
-        </h2>
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {TOP_QUESTIONS.map((item) => (
-            <li key={item.id}>
-              <a
-                href={`#${item.id}`}
-                className="text-sm text-muted underline decoration-zinc-300 underline-offset-2 hover:text-archtivy-primary hover:decoration-archtivy-primary dark:decoration-zinc-600 dark:hover:text-archtivy-primary"
-              >
-                {item.title}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* Sections */}
-      {SECTIONS.map((section) => (
-        <section
-          key={section.sectionId}
-          id={section.sectionId}
-          className="scroll-mt-8 border-t border-hairline pt-12"
-        >
-          <h2 className="mb-8 font-serif text-xl font-normal tracking-tight text-ink">
-            {section.title}
-          </h2>
-          <ul className="space-y-10">
-            {section.items.map((item, i) => (
-              <li
-                key={i}
-                id={item.id}
-                className="scroll-mt-8 border-b border-hairline pb-10 last:border-0"
-              >
-                <h3 className="text-base font-semibold text-ink">
-                  {item.q}
-                </h3>
-                <p className="mt-2 leading-relaxed text-muted">
-                  {item.a}
-                </p>
-              </li>
-            ))}
-          </ul>
-          {section.sectionId === "section-trust-credibility" && (
-            <p className="mt-6 text-sm italic text-muted">
-              {TRUST_DISCLAIMER}
-            </p>
-          )}
         </section>
-      ))}
 
-      {/* Still need help? */}
-      <section className="border-t border-hairline pt-12">
-        <div className="rounded-lg border border-hairline bg-stone/25 px-6 py-8 /50">
-          <h2 className="mb-2 font-serif text-lg font-normal tracking-tight text-ink">
-            Still need help?
-          </h2>
-          <p className="text-sm leading-relaxed text-muted">
-            Use the <Link href="/contact" className="font-medium text-archtivy-primary underline underline-offset-2 hover:no-underline dark:text-archtivy-primary">Contact</Link> link in the footer. Include the page URL and what you were trying to do so we can respond quickly.
+        {/* Sections */}
+        {SECTIONS.map((section) => (
+          <section
+            key={section.sectionId}
+            id={section.sectionId}
+            className="scroll-mt-8 border-t border-hairline pt-12"
+          >
+            <h2 className="mb-8 font-serif text-xl font-normal tracking-tight text-ink">
+              {section.title}
+            </h2>
+            <ul className="space-y-10">
+              {section.items.map((item, i) => (
+                <li
+                  key={i}
+                  id={item.id}
+                  className="scroll-mt-8 border-b border-hairline pb-10 last:border-0"
+                >
+                  <h3 className="text-base font-semibold text-ink">
+                    {item.q}
+                  </h3>
+                  <p className="mt-2 leading-relaxed text-muted">
+                    {item.a}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            {section.sectionId === "section-trust-credibility" && (
+              <p className="mt-6 text-sm italic text-muted">
+                {TRUST_DISCLAIMER}
+              </p>
+            )}
+          </section>
+        ))}
+
+        {/* Still need help? */}
+        <section className="border-t border-hairline pt-12">
+          <div className="rounded-lg border border-hairline bg-stone/25 px-6 py-8 /50">
+            <h2 className="mb-2 font-serif text-lg font-normal tracking-tight text-ink">
+              Still need help?
+            </h2>
+            <p className="text-sm leading-relaxed text-muted">
+              Use the <Link href="/contact" className="font-medium text-archtivy-primary underline underline-offset-2 hover:no-underline">Contact</Link> link in the footer. Include the page URL and what you were trying to do so we can respond quickly.
+            </p>
+          </div>
+        </section>
+
+        <section className="border-t border-hairline pt-16 text-center sm:pt-20">
+          <p className="mb-6 text-muted">
+            Ready to share your work or explore projects?
           </p>
-        </div>
-      </section>
-
-      <section className="border-t border-hairline pt-16 text-center sm:pt-20">
-        <p className="mb-6 text-muted">
-          Ready to share your work or explore projects?
-        </p>
-        <PageCTA userId={userId} role={role} />
-      </section>
-    </article>
+          <PageCTA userId={userId} role={role} />
+        </section>
+      </article>
+    </SitePage>
   );
 }

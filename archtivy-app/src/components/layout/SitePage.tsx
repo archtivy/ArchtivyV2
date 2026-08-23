@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { HomeNav } from "@/components/home/HomeNav";
+import { HomeFooter } from "@/components/home/HomeFooter";
 
 /**
  * The standard interior page frame: cream ground, HomeNav, one measured column.
@@ -34,10 +35,11 @@ const WIDTHS = {
    */
   wide: "mx-auto w-full max-w-[1400px] px-5 md:px-10 lg:px-14",
   /**
-   * Long-form prose — legal, policy, corporate copy. Capped near 70 characters
-   * per line; the 1440px column is unreadable for continuous text.
+   * Reading measure for corporate, legal and policy copy — 1040px, the width
+   * Container gave these pages before they left the TopNav shell. The 1440px
+   * column runs continuous text far past a comfortable line length.
    */
-  prose: "mx-auto w-full max-w-[760px] px-4 md:px-6",
+  narrow: "mx-auto w-full max-w-[1040px] px-4 sm:px-6",
   /**
    * No column at all: the page paints its own full-bleed bands (a profile hero,
    * an edge-to-edge gallery) and containers each section itself. Still gets the
@@ -61,6 +63,15 @@ interface SitePageProps {
    */
   navVariant?: "solid" | "overlay";
   /**
+   * Render HomeFooter beneath the column. Reading surfaces (corporate, legal,
+   * editorial) want it; working surfaces — the dashboard, the wizards, /explore
+   * — deliberately end without one, which is why this is off by default.
+   *
+   * A route that turns this on must also be listed in ConditionalFooter, or the
+   * page ends with two footers: this one and the global zinc Footer.
+   */
+  footer?: boolean;
+  /**
    * Extra classes on the column. Additive only — do not pass utilities that
    * collide with the ones set here (`pt-*`, `pb-*`, `max-w-*`, `px-*`). Two
    * competing Tailwind utilities are resolved by stylesheet order, not by
@@ -74,6 +85,7 @@ export function SitePage({
   children,
   width = "content",
   navVariant = "solid",
+  footer = false,
   className = "",
 }: SitePageProps) {
   return (
@@ -82,6 +94,7 @@ export function SitePage({
       <main className={`${WIDTHS[width]} ${NAV_OFFSET} pb-20 ${className}`.trim()}>
         {children}
       </main>
+      {footer && <HomeFooter />}
     </div>
   );
 }

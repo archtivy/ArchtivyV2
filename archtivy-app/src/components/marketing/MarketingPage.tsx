@@ -1,6 +1,18 @@
 import Link from "next/link";
+import { SitePage } from "@/components/layout/SitePage";
 
 // ─── MarketingPage ────────────────────────────────────────────────────────────
+
+/**
+ * The corporate / legal / policy page frame — about, vision, careers, privacy,
+ * terms and nine others.
+ *
+ * These used to be the one branch of SiteShell that painted its own ground:
+ * the shell wrapped them in a cream <main> because a page rendered inside
+ * PageContainer cannot paint full-bleed behind the container it sits in. Now
+ * that the frame is a component the page renders itself, the ground comes with
+ * it and that special case in the shell goes away.
+ */
 
 interface MarketingPageProps {
   label?: string;
@@ -16,24 +28,26 @@ export function MarketingPage({
   children,
 }: MarketingPageProps) {
   return (
-    <article className="space-y-16 sm:space-y-20">
-      <header className="space-y-5 pt-4 sm:pt-8">
-        {label && (
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
-            {label}
-          </p>
-        )}
-        <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
-          {headline}
-        </h1>
-        {subheadline && (
-          <p className="max-w-2xl text-base leading-relaxed text-zinc-500 dark:text-zinc-400">
-            {subheadline}
-          </p>
-        )}
-      </header>
-      {children}
-    </article>
+    <SitePage width="narrow" footer>
+      <article className="space-y-16 sm:space-y-20">
+        <header className="space-y-5">
+          {label && (
+            <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+              {label}
+            </p>
+          )}
+          <h1 className="max-w-3xl font-display text-[34px] font-medium leading-[1.1] tracking-tight text-ink sm:text-[42px]">
+            {headline}
+          </h1>
+          {subheadline && (
+            <p className="max-w-2xl font-body text-[17px] leading-relaxed text-muted">
+              {subheadline}
+            </p>
+          )}
+        </header>
+        {children}
+      </article>
+    </SitePage>
   );
 }
 
@@ -52,10 +66,10 @@ export function MarketingSection({
 }: MarketingSectionProps) {
   return (
     <section
-      className={`border-t border-zinc-200 pt-12 dark:border-zinc-800 sm:pt-16 ${className}`.trim()}
+      className={`border-t border-hairline pt-12 sm:pt-16 ${className}`.trim()}
     >
       {heading && (
-        <h2 className="mb-8 text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h2 className="mb-8 text-lg font-semibold tracking-tight text-ink">
           {heading}
         </h2>
       )}
@@ -84,28 +98,28 @@ export function MarketingCTA({
   secondaryHref = "/explore/projects",
 }: MarketingCTAProps) {
   return (
-    <section className="border-t border-zinc-200 pt-12 dark:border-zinc-800 sm:pt-16">
+    <section className="border-t border-hairline pt-12 sm:pt-16">
       <div className="space-y-5">
         {heading && (
-          <h2 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h2 className="text-lg font-semibold tracking-tight text-ink">
             {heading}
           </h2>
         )}
         {body && (
-          <p className="max-w-xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <p className="max-w-xl text-sm leading-relaxed text-muted">
             {body}
           </p>
         )}
         <div className="flex flex-wrap gap-3 pt-1">
           <Link
             href={primaryHref}
-            className="inline-flex items-center justify-center rounded-[4px] bg-[#002abf] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2"
+            className="inline-flex items-center justify-center rounded-full bg-ink px-5 py-2.5 font-body text-[14px] text-cream transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ink focus:ring-offset-2"
           >
             {primaryLabel}
           </Link>
           <Link
             href={secondaryHref}
-            className="inline-flex items-center justify-center rounded-[4px] border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:border-zinc-400 hover:text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-300 dark:hover:border-zinc-500"
+            className="inline-flex items-center justify-center rounded-full border border-ink/25 px-5 py-2.5 font-body text-[14px] text-ink transition-colors hover:bg-stone/50 focus:outline-none focus:ring-2 focus:ring-ink focus:ring-offset-2"
           >
             {secondaryLabel}
           </Link>

@@ -1,3 +1,4 @@
+import { SitePage } from "@/components/layout/SitePage";
 import { auth } from "@clerk/nextjs/server";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { PageCTA } from "@/components/layout/PageCTA";
@@ -37,31 +38,33 @@ export default async function GuidelinesPage() {
   const role = profileResult.data?.role ?? undefined;
 
   return (
-    <article className="space-y-20 sm:space-y-28">
-      <header className="space-y-6 px-4 text-center pt-4 sm:px-0 sm:pt-8">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted">
-          Guidelines
-        </p>
-        <h1 className="font-serif text-3xl font-normal tracking-tight text-ink sm:text-4xl md:text-5xl">
-          Quality and conduct
-        </h1>
-        <p className="mx-auto max-w-2xl text-lg leading-relaxed text-muted">
-          How we expect listings and behaviour on Archtivy so the platform stays useful for everyone.
-        </p>
-      </header>
+    <SitePage width="narrow" footer>
+      <article className="space-y-20 sm:space-y-28">
+        <header className="space-y-6 px-4 text-center pt-4 sm:px-0 sm:pt-8">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted">
+            Guidelines
+          </p>
+          <h1 className="font-serif text-3xl font-normal tracking-tight text-ink sm:text-4xl md:text-5xl">
+            Quality and conduct
+          </h1>
+          <p className="mx-auto max-w-2xl text-lg leading-relaxed text-muted">
+            How we expect listings and behaviour on Archtivy so the platform stays useful for everyone.
+          </p>
+        </header>
 
-      <section className="space-y-8 border-t border-hairline px-4 pt-8 sm:px-0 sm:pt-12 md:space-y-10 md:pt-16">
-        <div className="mx-auto max-w-2xl">
-          <GuidelinesAccordion items={GUIDELINES_ITEMS} />
-        </div>
-      </section>
+        <section className="space-y-8 border-t border-hairline px-4 pt-8 sm:px-0 sm:pt-12 md:space-y-10 md:pt-16">
+          <div className="mx-auto max-w-2xl">
+            <GuidelinesAccordion items={GUIDELINES_ITEMS} />
+          </div>
+        </section>
 
-      <section className="border-t border-hairline pt-16 text-center sm:pt-20">
-        <p className="mb-6 text-muted">
-          Ready to share your work or explore projects?
-        </p>
-        <PageCTA userId={userId} role={role} />
-      </section>
-    </article>
+        <section className="border-t border-hairline pt-16 text-center sm:pt-20">
+          <p className="mb-6 text-muted">
+            Ready to share your work or explore projects?
+          </p>
+          <PageCTA userId={userId} role={role} />
+        </section>
+      </article>
+    </SitePage>
   );
 }
