@@ -554,6 +554,18 @@ export async function createProductCanonical(
   const materialIds = parseMaterialIds(formData.get("product_material_ids"));
   const taxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
 
+  /*
+   * Lifecycle and collaboration. These columns existed and the RPC already
+   * took parameters for them, but this action — the one the public product
+   * wizard posts to — never read them: they were only reachable through the
+   * admin form. Promoting the fields into the public wizard without this would
+   * have rendered four controls that submit and vanish.
+   */
+  const productStageInput = (formData.get("product_stage") as string)?.trim() || null;
+  const productCollabInput =
+    (formData.get("product_collaboration_status") as string)?.trim() || null;
+  const productLookingForInput = parseMaterialIds(formData.get("product_looking_for"));
+
   if (!title) return { error: "Product title is required." };
 
   if (!isDraft) {
@@ -625,6 +637,9 @@ export async function createProductCanonical(
       p_status: isDraft ? "DRAFT" : "PENDING",
       p_owner_clerk_user_id: userId,
       p_color_options: colorOptions,
+      p_product_stage: productStageInput,
+      p_product_collaboration_status: productCollabInput,
+      p_product_looking_for: productLookingForInput.length > 0 ? productLookingForInput : [],
     }
   );
 

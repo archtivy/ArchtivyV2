@@ -3,7 +3,8 @@ import { AdminPage } from "@/components/admin/AdminPage";
 import { ProjectWizard } from "@/app/(app)/add/project/ProjectWizard";
 import { getWizardOwnerOptions } from "@/lib/admin/wizardOwnerOptions";
 import {
-  getWizardCategories,
+  getWizardTaxonomyNodes,
+  getWizardFacets,
   getWizardMaterials,
   getWizardProducts,
   getWizardMemberTitles,
@@ -26,12 +27,15 @@ export const revalidate = 0;
  * other reads to whoever notices as data loss.
  */
 export default async function AdminNewProjectPage() {
-  const [ownerOptions, categories, materials, products, memberTitles] = await Promise.all([
+  const [ownerOptions, categories, materials, products, memberTitles,
+    facets,
+  ] = await Promise.all([
     getWizardOwnerOptions("project"),
-    getWizardCategories("project"),
+    getWizardTaxonomyNodes("project"),
     getWizardMaterials(),
     getWizardProducts(),
     getWizardMemberTitles(),
+    getWizardFacets("project"),
   ]);
 
   return (
@@ -49,6 +53,7 @@ export default async function AdminNewProjectPage() {
     >
       <ProjectWizard
         categories={categories}
+        facets={facets}
         materials={materials}
         products={products}
         memberTitles={memberTitles}

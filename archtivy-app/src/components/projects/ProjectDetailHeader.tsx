@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, MapPin, User, Calendar, Home, Share2, MoreHorizontal, Check } from "lucide-react";
 import { SaveToggle } from "@/components/home/SaveToggle";
+import { ProjectStatusBadge, CollaborationBadge } from "@/components/listing/StatusBadge";
 
 /**
  * Detail header (brief §1).
@@ -22,6 +23,8 @@ export function ProjectDetailHeader({
   architectHref,
   year,
   buildingType,
+  projectStatus,
+  collaborationStatus,
 }: {
   listingId: string;
   title: string;
@@ -30,6 +33,9 @@ export function ProjectDetailHeader({
   architectHref: string | null;
   year: number | null;
   buildingType: string | null;
+  /** Renders a badge only when not the ordinary "completed" state. */
+  projectStatus?: string | null;
+  collaborationStatus?: string | null;
 }) {
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -68,6 +74,11 @@ export function ProjectDetailHeader({
           <h1 className="font-display text-[32px] leading-[1.1] tracking-[-0.02em] text-ink sm:text-[40px]">
             {title}
           </h1>
+
+          <div className="mt-3 flex flex-wrap gap-2 empty:mt-0">
+            <ProjectStatusBadge status={projectStatus} />
+            <CollaborationBadge status={collaborationStatus} kind="project" />
+          </div>
 
           <ul className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
             {location && (

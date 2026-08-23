@@ -34,6 +34,8 @@ import { createProject } from "@/app/actions/createProject";
 import { updateProjectCanonical } from "@/app/actions/updateListing";
 import type { ProjectEditData } from "@/lib/db/listingEdit";
 import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
+import { TaxonomyCascade } from "@/components/add/wizard/TaxonomyCascade";
+import { FacetPicker, type FacetForPicker } from "@/components/add/wizard/FacetPicker";
 import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
 import {
   PROJECT_STATUS_VALUES,
@@ -68,6 +70,8 @@ export interface TaxonomyOption {
   id: string;
   label: string;
   slugPath: string;
+  parentId: string | null;
+  depth: number;
 }
 export interface MaterialOption {
   id: string;
@@ -106,6 +110,7 @@ export function ProjectWizard({
   materials,
   products,
   memberTitles,
+  facets,
   initial,
   initialStep,
   admin,
@@ -114,6 +119,8 @@ export function ProjectWizard({
   materials: MaterialOption[];
   products: ProductOption[];
   memberTitles: MemberTitleOption[];
+  /** Every facet the project domain declares — see FacetPicker. */
+  facets: FacetForPicker[];
   /**
    * Present only when editing. Its absence is what makes this a create form —
    * there is no separate `mode` prop to keep in sync with it.
@@ -163,6 +170,9 @@ export function ProjectWizard({
   );
   const [productIds, setProductIds] = useState<string[]>(initial?.mentionedProducts ?? []);
   const [ownerProfileId, setOwnerProfileId] = useState(admin?.ownerProfileId ?? "");
+  // True when the chosen node still has children — "Residential" without a
+  // subcategory. Stored and saved either way; it only gates publishing.
+  const [taxonomyIncomplete, setTaxonomyIncomplete] = useState(false);
   // Admin-only fields, carried over from the legacy admin form. Each lives in
   // the nearest existing step rather than a step of its own — see AdminOnly.
   const [materialOrFinish, setMaterialOrFinish] = useState(initial?.materialOrFinish ?? "");
@@ -171,6 +181,7 @@ export function ProjectWizard({
   const [lookingFor, setLookingFor] = useState<string[]>(initial?.projectLookingFor ?? []);
   const [documents, setDocuments] = useState<File[]>([]);
   const [materialIds, setMaterialIds] = useState<string[]>(initial?.materialIds ?? []);
+  const [facetValueIds, setFacetValueIds] = useState<string[]>(initial?.facetValueIds ?? []);
   /*
    * Real Mapbox-backed location. The first pass used three plain text inputs,
    * which produced no lat/lng — and createProject REQUIRES coordinates to
@@ -304,6 +315,7 @@ export function ProjectWizard({
       )
     );
     fd.set("project_material_ids", JSON.stringify(materialIds));
+    fd.set("facet_value_ids", JSON.stringify(facetValueIds));
     // Picked products go as ids; any free-text mentions the admin form allowed
     // ride along unchanged so an edit does not silently delete them. Both
     // shapes normalise server-side — see lib/listings/mentionedProducts.ts.
@@ -317,18 +329,21 @@ export function ProjectWizard({
     fd.set("video_url", videoUrl);
     fd.set("slug", slug);
     if (draft) fd.set("draft", "1");
+    // Lifecycle and collaboration are author-facing now, so they are always
+    // submitted — not only when an admin is driving the form.
+    fd.set("project_status", projectStatus);
+    fd.set("project_collaboration_status", collabStatus);
+    // "Looking for" only means something while open to collaboration, and the
+    // field is hidden once it is not — so send an empty list rather than
+    // leaving stale roles attached to a project that closed.
+    fd.set(
+      "project_looking_for",
+      JSON.stringify(collabStatus && collabStatus !== "not_open_for_collaboration" ? lookingFor : [])
+    );
+
     if (admin) {
       fd.set("owner_profile_id", ownerProfileId);
       fd.set("material_or_finish", materialOrFinish);
-      fd.set("project_status", projectStatus);
-      fd.set("project_collaboration_status", collabStatus);
-      // "Looking for" only means something while open to collaboration, and
-      // the field is hidden once it is not — so send an empty list rather than
-      // leaving stale roles attached to a project that closed.
-      fd.set(
-        "project_looking_for",
-        JSON.stringify(collabStatus && collabStatus !== "not_open_for_collaboration" ? lookingFor : [])
-      );
       // Raw Files: the admin actions read formData.getAll("documents"), unlike
       // the gallery which is uploaded client-side and posted as JSON.
       for (const f of documents) fd.append("documents", f);
@@ -374,7 +389,10 @@ export function ProjectWizard({
   // submission without one, and a listing with no owner is invisible in
   // /me/listings and unattributed publicly.
   const canPublish =
-    title.trim().length > 0 && images.length > 0 && (!admin || Boolean(ownerProfileId));
+    title.trim().length > 0 && images.length > 0 && (!admin || Boolean(ownerProfileId)) &&
+    // A node that still has children is a half-made choice — "Furniture" does
+    // not say what the product is. Saved either way; only publishing waits.
+    !taxonomyIncomplete;
 
   return (
     <WizardFrame bare={Boolean(admin)}>
@@ -468,14 +486,12 @@ export function ProjectWizard({
                   <Field label="Project title" required>
                     <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="Cliff House" />
                   </Field>
-                  <Field label="Category">
-                    <select value={taxonomyNodeId} onChange={(e) => setTaxonomyNodeId(e.target.value)} className={inputCls}>
-                      <option value="">Choose a category…</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id}>{c.label}</option>
-                      ))}
-                    </select>
-                  </Field>
+                  <TaxonomyCascade
+                    nodes={categories}
+                    value={taxonomyNodeId}
+                    onChange={setTaxonomyNodeId}
+                    onIncompleteChange={setTaxonomyIncomplete}
+                  />
                   <div className="grid grid-cols-2 gap-5">
                     <Field label="Completion year">
                       <input value={year} onChange={(e) => setYear(e.target.value)} inputMode="numeric" className={inputCls} placeholder="2024" />
@@ -519,6 +535,15 @@ export function ProjectWizard({
                     placeholder="Search materials…"
                     emptyHint="No materials tagged yet."
                   />
+                  {facets.length > 0 && (
+                    <div className="rounded-2xl border border-hairline bg-cream p-6 sm:p-8">
+                      <FacetPicker
+                        facets={facets}
+                        selectedIds={facetValueIds}
+                        onChange={setFacetValueIds}
+                      />
+                    </div>
+                  )}
                   {admin && (
                     <AdminOnly label="Material or finish">
                       <Field
@@ -580,9 +605,17 @@ export function ProjectWizard({
                 />
               )}
 
-              {step === 7 && admin && (
-                <div className="mt-8">
-                  <AdminOnly label="Lifecycle & collaboration">
+              {step === 7 && (
+                <div className="mt-8 space-y-5 rounded-2xl border border-hairline bg-cream p-6 sm:p-8">
+                  <div>
+                    <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+                      Lifecycle &amp; collaboration
+                    </p>
+                    <p className="mt-1.5 max-w-[52ch] font-body text-[13px] leading-[19px] text-muted">
+                      Optional. Tells people where this project stands and whether you are open to
+                      working with them on it.
+                    </p>
+                  </div>
                     <Field label="Project status">
                       <select
                         value={projectStatus}
@@ -644,7 +677,6 @@ export function ProjectWizard({
                         </div>
                       </fieldset>
                     )}
-                  </AdminOnly>
                 </div>
               )}
 

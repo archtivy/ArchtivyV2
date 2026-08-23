@@ -17,7 +17,8 @@ import { EditorialImageManager } from "@/components/listing/EditorialImageManage
 import type { ImageTaggingItem } from "@/components/listing/ImageProductTaggingBlock";
 import { getWizardOwnerOptions } from "@/lib/admin/wizardOwnerOptions";
 import {
-  getWizardCategories,
+  getWizardTaxonomyNodes,
+  getWizardFacets,
   getWizardMaterials,
   getWizardMemberTitles,
 } from "@/lib/publish/wizardReferenceData";
@@ -53,13 +54,15 @@ export default async function AdminProductEditPage({
     memberTitles,
     imagesWithIdsResult,
     productMaterialOptions,
+    facets,
   ] = await Promise.all([
     getWizardOwnerOptions("product"),
-    getWizardCategories("product"),
+    getWizardTaxonomyNodes("product"),
     getWizardMaterials(),
     getWizardMemberTitles(),
     getListingImagesWithIds(id),
     getProductMaterialOptions(),
+    getWizardFacets("product"),
   ]);
 
   const imagesWithIds = imagesWithIdsResult.data ?? [];
@@ -152,6 +155,7 @@ export default async function AdminProductEditPage({
 
       <ProductWizard
         categories={categories}
+        facets={facets}
         materials={materials}
         brandName={null}
         initial={listing}

@@ -5,7 +5,8 @@ import { getProfileByClerkId } from "@/lib/db/profiles";
 // Reference-data queries live in lib/publish/wizardReferenceData so the edit
 // route feeds the same wizard from the same source; see the note there.
 import {
-  getWizardCategories,
+  getWizardTaxonomyNodes,
+  getWizardFacets,
   getWizardMaterials,
   getWizardProducts,
   getWizardMemberTitles,
@@ -40,16 +41,20 @@ export default async function AddProjectPage() {
   // dead-end at the last step into never opening the form at all.
   if (profile.role === "reader") redirect("/me/settings");
 
-  const [categories, materials, products, memberTitles] = await Promise.all([
-    getWizardCategories("project"),
+  const [categories, materials, products, memberTitles,
+    facets,
+  ] = await Promise.all([
+    getWizardTaxonomyNodes("project"),
     getWizardMaterials(),
     getWizardProducts(),
     getWizardMemberTitles(),
+    getWizardFacets("project"),
   ]);
 
   return (
     <ProjectWizard
       categories={categories}
+      facets={facets}
       materials={materials}
       products={products}
       memberTitles={memberTitles}

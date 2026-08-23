@@ -83,6 +83,10 @@ export interface ProductDetail {
    * showing the brand's homepage under a label promising the product's page.
    */
   website: string | null;
+  /** Lifecycle and collaboration — see the note in projectDetail.ts. */
+  productStage: string | null;
+  collaborationStatus: string | null;
+  lookingFor: string[];
   brand: {
     id: string;
     name: string;
@@ -110,7 +114,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   const { data: row } = await sup
     .from("listings")
     .select(
-      "id, slug, title, description, year, dimensions, cover_image_url, owner_profile_id, website"
+      "id, slug, title, description, year, dimensions, cover_image_url, owner_profile_id, website, product_stage, product_collaboration_status, product_looking_for"
     )
     .eq("id", listingId)
     .maybeSingle();
@@ -133,7 +137,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
       .order("sort_order", { ascending: true }),
     sup
       .from("listing_taxonomy_node")
-      .select("is_primary, taxonomy_nodes:taxonomy_node_id(domain, slug_path, label)")
+      .select("is_primary, taxonomy_nodes:taxonomy_node_id(id, domain, slug_path, label)")
       .eq("listing_id", listingId),
     sup.from("product_material_links").select("material_id").eq("product_id", listingId),
     sup.from("project_product_links").select("project_id").eq("product_id", listingId),
@@ -163,11 +167,13 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
     .filter((d) => d.file_url)
     .map((d) => ({ id: d.id, name: d.file_name ?? "Document", url: d.file_url as string }));
 
-  type TaxNode = { domain: string; slug_path: string; label: string };
+  type TaxNode = { id: string; domain: string; slug_path: string; label: string };
   let categoryRoot: string | null = null;
   let categoryLabel: string | null = null;
   let typeLabel: string | null = null;
   let styleLabel: string | null = null;
+  let primaryNodeId: string | null = null;
+
   for (const r of (taxRes.data ?? []) as unknown as {
     is_primary: boolean;
     taxonomy_nodes: TaxNode | TaxNode[] | null;
@@ -176,12 +182,55 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
     if (!n) continue;
     if (n.domain === "product" && (r.is_primary || !categoryRoot)) {
       categoryRoot = n.slug_path.split("/")[0];
-      categoryLabel = titleize(categoryRoot);
       typeLabel = n.label;
+      primaryNodeId = n.id ?? null;
     } else if (n.domain === "style" && !styleLabel) {
       styleLabel = n.label;
     }
   }
+
+  /*
+   * ── THE ROOT'S REAL LABEL, NOT A TITLE-CASED SLUG ─────────────────────────
+   * categoryLabel used to be titleize(categoryRoot) — the slug, word-cased. A
+   * slug has no punctuation, so every root whose label carries any was
+   * rendered wrong: "walls-ceilings-facades" displayed as
+   * "Walls Ceilings Facades" instead of "Walls, Ceilings & Facades", and
+   * "landscape-urban" as "Landscape Urban" rather than "Landscape / Urban".
+   *
+   * It also made the Category/Type duplication undetectable. Both rows are
+   * strings, so telling "the same node rendered twice" apart from "a category
+   * that happens to read like its type" meant comparing text. Resolving the
+   * root node gives an id to compare instead — see rootNodeId below.
+   */
+  let rootNodeId: string | null = null;
+  if (categoryRoot) {
+    const { data: rootNode } = await sup
+      .from("taxonomy_nodes")
+      .select("id, label")
+      .eq("domain", "product")
+      .eq("slug_path", categoryRoot)
+      .maybeSingle();
+    const root = rootNode as { id: string; label: string } | null;
+    if (root) {
+      rootNodeId = root.id;
+      categoryLabel = root.label;
+    } else {
+      // Root missing from the taxonomy (deactivated, or a stale slug_path).
+      // Fall back to the old behaviour rather than dropping the row entirely.
+      categoryLabel = titleize(categoryRoot);
+    }
+  }
+
+  /*
+   * When the primary node IS the root, "Category" and "Type" are the same node
+   * and the detail page printed it twice. Comparing ids rather than labels, so
+   * a genuine subcategory that happens to share wording with its parent still
+   * shows both rows.
+   */
+  const typeDuplicatesCategory = Boolean(
+    primaryNodeId && rootNodeId && primaryNodeId === rootNodeId
+  );
+  if (typeDuplicatesCategory) typeLabel = null;
 
   // Materials: explicit two-step, product_material_links has no FK.
   const materialIds = ((matLinkRes.data ?? []) as { material_id: string }[]).map(
@@ -410,6 +459,9 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
     related,
     relatedReason,
     website: (l.website as string | null) ?? null,
+    productStage: (l.product_stage as string | null) ?? null,
+    collaborationStatus: (l.product_collaboration_status as string | null) ?? null,
+    lookingFor: Array.isArray(l.product_looking_for) ? (l.product_looking_for as string[]) : [],
     brand,
   };
 }

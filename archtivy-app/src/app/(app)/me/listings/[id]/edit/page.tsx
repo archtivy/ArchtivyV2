@@ -5,7 +5,8 @@ import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getListingForEdit } from "@/lib/db/listingEdit";
 import { canManageListing } from "@/lib/auth/listingOwnership";
 import {
-  getWizardCategories,
+  getWizardTaxonomyNodes,
+  getWizardFacets,
   getWizardMaterials,
   getWizardProducts,
   getWizardMemberTitles,
@@ -72,14 +73,16 @@ export default async function EditListingPage({
   if (!owns) notFound();
 
   if (listing.type === "product") {
-    const [categories, materials] = await Promise.all([
-      getWizardCategories("product"),
+    const [categories, materials, facets] = await Promise.all([
+      getWizardTaxonomyNodes("product"),
       getWizardMaterials(),
+      getWizardFacets("product"),
     ]);
     return (
       <ProductWizard
         categories={categories}
         materials={materials}
+        facets={facets}
         brandName={profile.display_name?.trim() || profile.username || null}
         initial={listing}
         initialStep={initialStep}
@@ -87,16 +90,18 @@ export default async function EditListingPage({
     );
   }
 
-  const [categories, materials, products, memberTitles] = await Promise.all([
-    getWizardCategories("project"),
+  const [categories, materials, products, memberTitles, facets] = await Promise.all([
+    getWizardTaxonomyNodes("project"),
     getWizardMaterials(),
     getWizardProducts(),
     getWizardMemberTitles(),
+    getWizardFacets("project"),
   ]);
   return (
     <ProjectWizard
       categories={categories}
       materials={materials}
+      facets={facets}
       products={products}
       memberTitles={memberTitles}
       initial={listing}
