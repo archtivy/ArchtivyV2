@@ -102,6 +102,10 @@ export default async function AddProjectPage() {
   const profileResult = await getProfileByClerkId(userId);
   const profile = profileResult.data;
   if (!profile?.username) redirect("/onboarding");
+  // Readers do not publish. createProjectCanonical already refuses them, but
+  // only after the wizard has been filled in and submitted — this turns a
+  // dead-end at the last step into never opening the form at all.
+  if (profile.role === "reader") redirect("/me/settings");
 
   const [categories, materials, products, memberTitles] = await Promise.all([
     getCategories(),

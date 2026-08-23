@@ -261,9 +261,19 @@ function ListingCard({
             {listing.title?.trim() || "Untitled"}
           </h2>
           <TypeBadge type={listing.type} />
-          <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
-            Published
-          </span>
+          {/* Was hardcoded to "Published", so a draft was labelled Published on
+              its own card while the Drafts filter simultaneously matched it.
+              Mirrors the filter's rule exactly: DRAFT is a draft, anything else
+              counts as published. */}
+          {listing.status === "DRAFT" ? (
+            <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+              Draft
+            </span>
+          ) : (
+            <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+              Published
+            </span>
+          )}
         </div>
         <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
           Last updated {formatDate(listing.created_at)}
