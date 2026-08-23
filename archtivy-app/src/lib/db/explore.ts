@@ -1355,6 +1355,11 @@ export async function getProjectCanonicalBySlugOrId(
   }));
   const projectMaterials = materialsMap[id] ?? [];
   const project = normalizeProject(row, listingImages, projectMaterials);
+  // Carried through from the raw row: normalizeProject does not map it, and the
+  // draft-preview guard on the detail route needs it to recognise owners whose
+  // listing has no owner_clerk_user_id.
+  project.owner_profile_id =
+    (row as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id ?? null;
   const profiles = profilesResult.data ?? [];
   const ownerProfile = profiles[0];
   if (ownerProfile) {

@@ -18,17 +18,14 @@ interface ListingRowActionsProps {
 /**
  * Row actions for a listing the signed-in user owns.
  *
- * ── EDIT WAS A LIE, AND IS NOW ABSENT RATHER THAN FAKE ──────────────────────
- * "View" and "Edit" both pointed at getListingUrl(...) — the same public detail
- * page. Two buttons, one behaviour, and no way to change a listing after
- * publishing it.
+ * ── EDIT IS REAL NOW ────────────────────────────────────────────────────────
+ * "View" and "Edit" once both pointed at getListingUrl(...) — the same public
+ * detail page — so the button was removed rather than left doing the wrong
+ * thing. It is back, pointing at /me/listings/[id]/edit, which renders the
+ * publish wizard prefilled and posts to an owner-guarded update action.
  *
- * The button is REMOVED here rather than repointed. A real edit path needs an
- * owner-guarded update action plus an edit mode in both wizards (createProject
- * alone is 450 lines of related-table writes and rollback), and that has not
- * been built yet. Linking to a route that does not exist would trade a button
- * that does the wrong thing for one that 404s. Absent is the honest state
- * until the edit path lands.
+ * Drafts get Edit too, and it is the ONLY action they get besides Delete:
+ * a draft has no public page, so finishing it is the whole point of the row.
  *
  * ── DELETE IS A REAL CONFIRMATION ───────────────────────────────────────────
  * Previously window.confirm() plus alert() on failure. Both are unstyled OS
@@ -36,8 +33,8 @@ interface ListingRowActionsProps {
  * shared ConfirmDialog focuses Cancel on open and closes on Escape, and errors
  * now render inline instead of in an alert() the user has to dismiss blind.
  *
- * The delete itself is unchanged and already correct: the server action
- * re-checks owner_clerk_user_id and refuses anything the caller does not own.
+ * The delete itself re-checks ownership server-side via canManageListing —
+ * both owner columns, not just owner_clerk_user_id.
  */
 export function ListingRowActions({
   listingId,
@@ -78,6 +75,9 @@ export function ListingRowActions({
             View
           </Link>
         )}
+        <Link href={`/me/listings/${listingId}/edit`} className={linkCls}>
+          Edit
+        </Link>
         <button
           type="button"
           onClick={() => setConfirmOpen(true)}

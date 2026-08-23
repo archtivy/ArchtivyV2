@@ -60,6 +60,13 @@ export interface ProjectCanonical {
   team_members: { name: string; role: string }[];
   documents: unknown[];
   owner_clerk_user_id: string | null;
+  /**
+   * The other ownership column. Populated for 118 of the 129 live listings,
+   * where owner_clerk_user_id is NULL — so any ownership decision that reads
+   * only owner_clerk_user_id gets the wrong answer for most of the platform.
+   * Needed by the draft-preview guard on the public detail route.
+   */
+  owner_profile_id?: string | null;
   /** Resolved from profiles; use for card subtitle. */
   owner: ProjectOwner | null;
   /** team_members.length + brands_used.length. For "X connections" label. */

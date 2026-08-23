@@ -22,6 +22,8 @@ import {
 } from "@/components/add/wizard/WizardPrimitives";
 import type { UploadedGalleryItem } from "@/lib/storage/types";
 import { createProject } from "@/app/actions/createProject";
+import { updateProjectCanonical } from "@/app/actions/updateListing";
+import type { ProjectEditData } from "@/lib/db/listingEdit";
 import { HomeNav } from "@/components/home/HomeNav";
 import { LocationPicker, type LocationValue } from "@/components/location/LocationPicker";
 
@@ -87,12 +89,19 @@ export function ProjectWizard({
   materials,
   products,
   memberTitles,
+  initial,
 }: {
   categories: TaxonomyOption[];
   materials: MaterialOption[];
   products: ProductOption[];
   memberTitles: MemberTitleOption[];
+  /**
+   * Present only when editing. Its absence is what makes this a create form —
+   * there is no separate `mode` prop to keep in sync with it.
+   */
+  initial?: ProjectEditData;
 }) {
+  const isEdit = Boolean(initial);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [step, setStep] = useState(0);
@@ -101,15 +110,26 @@ export function ProjectWizard({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
   // ── Form state ────────────────────────────────────────────────────────────
-  const [images, setImages] = useState<UploadedGalleryItem[]>([]);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [taxonomyNodeId, setTaxonomyNodeId] = useState("");
-  const [year, setYear] = useState("");
-  const [areaSqft, setAreaSqft] = useState("");
-  const [team, setTeam] = useState<TeamMemberDraft[]>([]);
-  const [productIds, setProductIds] = useState<string[]>([]);
-  const [materialIds, setMaterialIds] = useState<string[]>([]);
+  const [images, setImages] = useState<UploadedGalleryItem[]>(initial?.images ?? []);
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [taxonomyNodeId, setTaxonomyNodeId] = useState(initial?.taxonomyNodeId ?? "");
+  const [year, setYear] = useState(initial?.year ?? "");
+  const [areaSqft, setAreaSqft] = useState(
+    initial?.areaSqft != null ? String(initial.areaSqft) : ""
+  );
+  const [team, setTeam] = useState<TeamMemberDraft[]>(
+    // listings.team_members stores `role`; the draft shape calls it `title`.
+    // Mapping back is what makes an edited project keep its credits instead of
+    // showing an empty Team step.
+    (initial?.teamMembers ?? []).map((m) => ({
+      name: m.name ?? "",
+      title: (m as { role?: string }).role ?? "",
+      profileId: (m as { profile_id?: string | null }).profile_id ?? null,
+    }))
+  );
+  const [productIds, setProductIds] = useState<string[]>(initial?.mentionedProducts ?? []);
+  const [materialIds, setMaterialIds] = useState<string[]>(initial?.materialIds ?? []);
   /*
    * Real Mapbox-backed location. The first pass used three plain text inputs,
    * which produced no lat/lng — and createProject REQUIRES coordinates to
@@ -118,16 +138,30 @@ export function ProjectWizard({
    * LocationPicker already exists, geocodes against Mapbox and reads both
    * NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN and NEXT_PUBLIC_MAPBOX_TOKEN.
    */
-  const [location, setLocation] = useState<LocationValue | null>(null);
+  const [location, setLocation] = useState<LocationValue | null>(
+    initial
+      ? {
+          location_place_name: initial.locationText,
+          location_city: initial.locationCity || null,
+          location_country: initial.locationCountry || null,
+          location_lat: initial.locationLat,
+          location_lng: initial.locationLng,
+          location_text: initial.locationText,
+        }
+      : null
+  );
   const city = location?.location_city ?? "";
   const country = location?.location_country ?? "";
   const locationText = location?.location_text ?? "";
-  const [website, setWebsite] = useState("");
-  const [instagram, setInstagram] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
-  const [metaDescription, setMetaDescription] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
+  const [website, setWebsite] = useState(initial?.website ?? "");
+  const [instagram, setInstagram] = useState(initial?.instagram ?? "");
+  const [videoUrl, setVideoUrl] = useState(initial?.videoUrl ?? "");
+  const [metaDescription, setMetaDescription] = useState(initial?.metaDescription ?? "");
+  const [slug, setSlug] = useState(initial?.slug ?? "");
+  // An existing listing's slug is fixed, so it counts as "touched" from the
+  // start — otherwise the title-sync effect below would rewrite the live URL
+  // the moment the author corrected a typo in the name.
+  const [slugTouched, setSlugTouched] = useState(isEdit);
 
   // Slug tracks the title until the author edits it themselves.
   useEffect(() => {
@@ -242,9 +276,19 @@ export function ProjectWizard({
   function submit(draft: boolean) {
     setError(null);
     startTransition(async () => {
-      const result = await createProject({}, buildFormData(draft));
+      // Editing never changes status — updateProjectCanonical ignores `draft`
+      // entirely and keeps whatever the listing already was. A draft stays a
+      // draft; a published project is not silently unpublished.
+      const result = initial
+        ? await updateProjectCanonical(initial.id, buildFormData(draft))
+        : await createProject({}, buildFormData(draft));
       if (result?.error) {
         setError(result.error);
+        return;
+      }
+      if (initial) {
+        router.push("/me/listings?updated=1");
+        router.refresh();
         return;
       }
       router.push(draft ? "/me/listings" : "/me/listings?published=1");
@@ -260,10 +304,14 @@ export function ProjectWizard({
         <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-              New project
+              {isEdit
+                ? initial?.status === "DRAFT"
+                  ? "Editing draft"
+                  : "Editing project"
+                : "New project"}
             </p>
             <h1 className="mt-2 font-display text-[34px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[42px]">
-              Share your work.
+              {isEdit ? title.trim() || "Edit project." : "Share your work."}
             </h1>
           </div>
           <div className="flex items-center gap-4">
@@ -274,7 +322,10 @@ export function ProjectWizard({
               disabled={pending || !title.trim()}
               className="rounded-full border border-ink/25 px-5 py-2.5 font-body text-[14px] text-ink transition-all duration-150 hover:bg-stone/50 active:scale-[0.98] disabled:opacity-40 motion-reduce:transition-none"
             >
-              Save as draft
+              {/* In edit mode both buttons run the same update and neither
+                  changes status, so "Save as draft" would be a lie on a
+                  published project. */}
+              {isEdit ? "Save changes" : "Save as draft"}
             </button>
           </div>
         </header>
@@ -399,11 +450,31 @@ export function ProjectWizard({
                     metaDescription={metaDescription}
                     onMeta={setMetaDescription}
                     seo={seo}
+                    /* Locked when editing: the slug is the live URL and
+                       updateProjectCanonical never changes it. */
+                    slugReadOnly={isEdit}
+                    note={
+                      isEdit
+                        ? "The URL is fixed once a project exists — changing it would break every link already pointing here."
+                        : undefined
+                    }
                   />
                 )}
 
                 {step === 8 && (
-                  <PublishStep seo={seo} canPublish={canPublish} pending={pending} onPublish={() => submit(false)} onDraft={() => submit(true)} />
+                  <PublishStep
+                    seo={seo}
+                    canPublish={canPublish}
+                    pending={pending}
+                    onPublish={() => submit(false)}
+                    onDraft={() => submit(true)}
+                    isEdit={isEdit}
+                    publishNote={
+                      isEdit
+                        ? "Saving updates the project in place. Its published state doesn’t change."
+                        : undefined
+                    }
+                  />
                 )}
               </div>
 

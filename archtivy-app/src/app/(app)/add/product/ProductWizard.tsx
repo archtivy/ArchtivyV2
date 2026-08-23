@@ -24,6 +24,8 @@ import {
 import { computeSeoScore, countWords, SEO_THRESHOLDS } from "@/lib/publish/seoScore";
 import type { UploadedGalleryItem } from "@/lib/storage/types";
 import { createProductCanonical } from "@/app/actions/listings";
+import { updateProductCanonical } from "@/app/actions/updateListing";
+import type { ProductEditData } from "@/lib/db/listingEdit";
 
 /**
  * Product publish wizard — the product-side twin of ProjectWizard.
@@ -80,11 +82,18 @@ export function ProductWizard({
   categories,
   materials,
   brandName,
+  initial,
 }: {
   categories: ProductTaxonomyOption[];
   materials: ProductMaterialOption[];
   brandName: string | null;
+  /**
+   * Present only when editing. Its absence is what makes this a create form —
+   * there is no separate `mode` prop to keep in sync with it.
+   */
+  initial?: ProductEditData;
 }) {
+  const isEdit = Boolean(initial);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [step, setStep] = useState(0);
@@ -92,19 +101,22 @@ export function ProductWizard({
   const [error, setError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
-  const [images, setImages] = useState<UploadedGalleryItem[]>([]);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [taxonomyNodeId, setTaxonomyNodeId] = useState("");
-  const [colorOptions, setColorOptions] = useState<string[]>([]);
+  const [images, setImages] = useState<UploadedGalleryItem[]>(initial?.images ?? []);
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [taxonomyNodeId, setTaxonomyNodeId] = useState(initial?.taxonomyNodeId ?? "");
+  const [colorOptions, setColorOptions] = useState<string[]>(initial?.colorOptions ?? []);
   const [colorDraft, setColorDraft] = useState("");
-  const [materialIds, setMaterialIds] = useState<string[]>([]);
-  const [website, setWebsite] = useState("");
-  const [instagram, setInstagram] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
-  const [metaDescription, setMetaDescription] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
+  const [materialIds, setMaterialIds] = useState<string[]>(initial?.materialIds ?? []);
+  const [website, setWebsite] = useState(initial?.website ?? "");
+  const [instagram, setInstagram] = useState(initial?.instagram ?? "");
+  const [videoUrl, setVideoUrl] = useState(initial?.videoUrl ?? "");
+  const [metaDescription, setMetaDescription] = useState(initial?.metaDescription ?? "");
+  const [slug, setSlug] = useState(initial?.slug ?? "");
+  // An existing listing's slug is fixed, so it counts as "touched" from the
+  // start — otherwise the title-sync effect below would rewrite the live URL
+  // the moment the author corrected a typo in the name.
+  const [slugTouched, setSlugTouched] = useState(isEdit);
 
   useEffect(() => {
     if (!slugTouched) setSlug(slugify(title));
@@ -189,9 +201,19 @@ export function ProductWizard({
   function submit(draft: boolean) {
     setError(null);
     startTransition(async () => {
-      const result = await createProductCanonical(null, buildFormData(draft));
+      // Editing never changes status — updateProductCanonical ignores `draft`
+      // entirely and keeps whatever the listing already was. A draft stays a
+      // draft; a published product is not silently pulled back for review.
+      const result = initial
+        ? await updateProductCanonical(initial.id, buildFormData(draft))
+        : await createProductCanonical(null, buildFormData(draft));
       if (result?.error) {
         setError(result.error);
+        return;
+      }
+      if (initial) {
+        router.push("/me/listings?updated=1");
+        router.refresh();
         return;
       }
       router.push(draft ? "/me/listings" : "/me/listings?submitted=1");
@@ -207,10 +229,10 @@ export function ProductWizard({
         <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-              New product
+              {isEdit ? (initial?.status === "DRAFT" ? "Editing draft" : "Editing product") : "New product"}
             </p>
             <h1 className="mt-2 font-display text-[34px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[42px]">
-              Add a product.
+              {isEdit ? title.trim() || "Edit product." : "Add a product."}
             </h1>
           </div>
           <div className="flex items-center gap-4">
@@ -221,7 +243,10 @@ export function ProductWizard({
               disabled={pending || !title.trim()}
               className="rounded-full border border-ink/25 px-5 py-2.5 font-body text-[14px] text-ink transition-all duration-150 hover:bg-stone/50 active:scale-[0.98] disabled:opacity-40 motion-reduce:transition-none"
             >
-              Save as draft
+              {/* In edit mode both buttons run the same update and neither
+                  changes status, so "Save as draft" would be a lie on a
+                  published product. */}
+              {isEdit ? "Save changes" : "Save as draft"}
             </button>
           </div>
         </header>
@@ -405,7 +430,16 @@ export function ProductWizard({
                     onMeta={setMetaDescription}
                     seo={seo}
                     slugPrefix="/products/"
-                    note="Products have no location of their own, so that check stays unticked — it doesn’t stop you publishing."
+                    /* The slug is shown but not editable when editing: it is
+                       the live URL, and updateProductCanonical deliberately
+                       never changes it. An editable field that silently
+                       discards its own input is worse than a locked one. */
+                    slugReadOnly={isEdit}
+                    note={
+                      isEdit
+                        ? "The URL is fixed once a product exists — changing it would break every link already pointing here."
+                        : "Products have no location of their own, so that check stays unticked — it doesn’t stop you publishing."
+                    }
                   />
                 )}
 
@@ -416,11 +450,16 @@ export function ProductWizard({
                     pending={pending}
                     onPublish={() => submit(false)}
                     onDraft={() => submit(true)}
-                    publishLabel="Submit product"
+                    isEdit={isEdit}
+                    publishLabel={isEdit ? undefined : "Submit product"}
                     /* Products go to PENDING, not straight live — the RPC has
                        always done this, unlike projects. Say so plainly rather
                        than let someone wonder why it is not on their profile. */
-                    publishNote="Products are reviewed before they appear publicly. You’ll keep the draft either way."
+                    publishNote={
+                      isEdit
+                        ? "Saving updates the product in place. Its published state doesn’t change."
+                        : "Products are reviewed before they appear publicly. You’ll keep the draft either way."
+                    }
                   />
                 )}
               </div>
