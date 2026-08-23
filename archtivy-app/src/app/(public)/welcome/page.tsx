@@ -20,7 +20,7 @@ export default async function WelcomePage() {
   // If signed out, show public CTAs (sign in / explore)
   if (!userId) {
     return (
-      <SitePage width="narrow">
+      <SitePage width="narrow" footer>
         <div className="mx-auto max-w-2xl text-center">
           <h1 className="font-display text-[34px] font-medium leading-[1.1] tracking-tight text-ink sm:text-[42px]">
             Welcome to Archtivy
@@ -42,7 +42,7 @@ export default async function WelcomePage() {
   }
 
   return (
-    <SitePage width="narrow">
+    <SitePage width="narrow" footer>
       <div className="mx-auto max-w-2xl">
         <h1 className="font-display text-[34px] font-medium leading-[1.1] tracking-tight text-ink sm:text-[42px]">
           Welcome to Archtivy

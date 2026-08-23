@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { ArticleForm, type TopicOption, type MentionOption } from "./ArticleForm";
+import { SitePage } from "@/components/layout/SitePage";
 
 export const dynamic = "force-dynamic";
 
@@ -103,8 +104,8 @@ export default async function AddArticlePage() {
   const [topics, mentionOptions] = await Promise.all([getTopicOptions(), getMentionOptions()]);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+    <SitePage width="wide">
       <ArticleForm topics={topics} mentionOptions={mentionOptions} />
-    </div>
+    </SitePage>
   );
 }

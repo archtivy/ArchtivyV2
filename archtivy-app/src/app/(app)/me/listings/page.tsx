@@ -21,14 +21,11 @@ import type { ProfileRole } from "@/lib/auth/config";
  *
  * ── RESTYLED ONTO THE EDITORIAL SYSTEM ──────────────────────────────────────
  * This page was the last high-traffic signed-in surface still on the legacy
- * zinc palette with the blue #002abf/archtivy-primary accent, rendered under
- * TopNav via SiteShell's fall-through default. Reached in one click from the
+ * zinc palette with the blue #002abf accent. Reached in one click from the
  * dashboard's "Manage listings", it made the two pages look like two products.
  *
- * It now renders its own HomeNav on cream/ink/hairline and Jet Black accents,
- * matching /me/dashboard, /me/profile and /me/files. SiteShell needs no change:
- * /me/listings is added to EDITORIAL_ROUTES so the global TopNav, PageContainer
- * and Footer are not also drawn around it.
+ * It now renders SitePage on cream/ink/hairline with Jet Black accents, like
+ * every other route.
  *
  * Behaviour is unchanged — same queries, same tabs, same filters, same actions.
  * This is chrome only.

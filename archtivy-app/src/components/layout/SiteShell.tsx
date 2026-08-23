@@ -1,50 +1,55 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { TopNav } from "@/components/layout/TopNav";
-import { PageContainer } from "@/components/layout/PageContainer";
 import { ExploreToolHeader } from "@/components/explore/ExploreToolHeader";
-import { isShellLess } from "@/lib/layout/shellRoutes";
-
-// Routes that should render "shellless" (no public TopNav/Footer/PageContainer).
-// Admin has its own layout + navigation, so treat it like auth/onboarding here.
-const AUTH_PATH_PREFIXES = ["/sign-in", "/sign-up", "/onboarding", "/complete-profile", "/admin"];
-
-// Routes that show a minimal tool header (no main site nav).
-const TOOL_PATHS = ["/explore"];
-
-// Routes that show TopNav but skip PageContainer (full-width content).
-const FULL_WIDTH_PATHS: string[] = [];
-
-function isAuthRoute(pathname: string | null): boolean {
-  if (!pathname) return false;
-  return AUTH_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
-}
-
-function isToolRoute(pathname: string | null): boolean {
-  if (!pathname) return false;
-  return TOOL_PATHS.some((p) => pathname === p);
-}
-
-function isFullWidthRoute(pathname: string | null): boolean {
-  if (!pathname) return false;
-  return FULL_WIDTH_PATHS.some((p) => pathname === p);
-}
-
-interface SiteShellProps {
-  children: React.ReactNode;
-}
 
 /**
- * For auth/onboarding routes: render children only in a fullscreen wrapper (no Header, no Footer, no PageContainer).
- * For tool routes (/explore): render minimal ExploreToolHeader + children (no footer).
- * For all other routes: render TopNav + main + PageContainer + children + Footer.
+ * What wraps a route, for the two cases a page cannot decide for itself.
+ *
+ * ── WHAT THIS USED TO BE ────────────────────────────────────────────────────
+ * A seven-branch router that chose between TopNav + PageContainer, TopNav +
+ * full-width, TopNav + a cream <main> for static pages, the explore tool
+ * header, and "bare" for the growing list of routes that had moved to HomeNav.
+ * Every new page meant picking a branch, and picking wrong was invisible:
+ * HomeNav is `fixed top-0 z-50` and opaque, so a page that drew its own header
+ * inside the TopNav shell covered the shell's header exactly. That is how
+ * /me/dashboard, /me/listings, /me/profile, /me/files, /me/listings/[id]/edit
+ * and /status each shipped with two headers.
+ *
+ * ── WHAT IT IS NOW ──────────────────────────────────────────────────────────
+ * Pages own their chrome. SitePage draws HomeNav and the column; a page that
+ * wants a header renders SitePage, and the default here is to wrap nothing at
+ * all. Two exceptions remain, both because the chrome is genuinely not the
+ * page's to draw:
+ *
+ *   auth / onboarding / admin — fullscreen surfaces with their own navigation,
+ *     or none at all.
+ *   /explore — the fullscreen map tool. Its header is tool chrome (view
+ *     switcher, filters) rather than site chrome, and it has to sit inside a
+ *     flex column that owns the viewport height, which a page-level component
+ *     cannot do from inside.
+ *
+ * Nothing else routes through here. A new page renders SitePage and appears
+ * correctly without touching this file — which is the whole point.
  */
-export function SiteShell({ children }: SiteShellProps) {
-  const pathname = usePathname();
-  const auth = isAuthRoute(pathname);
 
-  if (auth) {
+// Fullscreen surfaces: Clerk's own screens, the onboarding flow, and admin,
+// which has its own layout and sidebar.
+const BARE_PREFIXES = ["/sign-in", "/sign-up", "/onboarding", "/complete-profile", "/admin"];
+
+// The fullscreen map tool. Exact match: /explore/projects and /explore/products
+// are ordinary pages that render SitePage.
+const TOOL_PATHS = ["/explore"];
+
+function hasPrefix(pathname: string | null, prefixes: string[]): boolean {
+  if (!pathname) return false;
+  return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+export function SiteShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  if (hasPrefix(pathname, BARE_PREFIXES)) {
     return (
       <div className="min-h-screen w-full" style={{ minHeight: "100vh" }}>
         {children}
@@ -52,7 +57,7 @@ export function SiteShell({ children }: SiteShellProps) {
     );
   }
 
-  if (isToolRoute(pathname)) {
+  if (pathname && TOOL_PATHS.includes(pathname)) {
     return (
       <div className="flex h-screen flex-col">
         <ExploreToolHeader />
@@ -61,28 +66,5 @@ export function SiteShell({ children }: SiteShellProps) {
     );
   }
 
-  // Pages that supply their own chrome — HomeNav via SitePage, and their own
-  // footer where they want one. The route list lives in lib/layout/shellRoutes
-  // so this decision and ConditionalFooter's cannot disagree.
-  if (isShellLess(pathname)) {
-    return <>{children}</>;
-  }
-
-  if (isFullWidthRoute(pathname)) {
-    return (
-      <>
-        <TopNav />
-        <main>{children}</main>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <TopNav />
-      <main>
-        <PageContainer>{children}</PageContainer>
-      </main>
-    </>
-  );
+  return <>{children}</>;
 }

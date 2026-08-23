@@ -1,25 +1,28 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { isShellLess } from "@/lib/layout/shellRoutes";
 
 /**
- * Suppresses the global (zinc) Footer on any page that supplies its own.
+ * Where the global (zinc) Footer still renders.
  *
- * Every shell-less route renders SitePage, which either draws HomeFooter on the
- * editorial tokens or deliberately ends without a footer — dashboards, the
- * wizards and /explore are working surfaces. Either way the global Footer must
- * not also render, or the page ends with two.
+ * ── AN ALLOWLIST, NOT A BLOCKLIST ───────────────────────────────────────────
+ * This used to name the routes that must NOT show the footer, and carried the
+ * warning "Keep in sync with EDITORIAL_ROUTES in SiteShell, or a page gets two
+ * footers." That is the wrong default: a new page got the global footer unless
+ * someone remembered to exclude it, and a page that also drew its own ended up
+ * with both.
  *
- * The route list is shared with SiteShell rather than copied. /explore is the
- * one addition: it keeps the ExploreToolHeader shell rather than SitePage, so
- * it is not shell-less, but it is still footerless.
+ * Every public page now renders SitePage, which draws HomeFooter when it wants
+ * one. The only routes left without a footer of their own are Clerk's screens,
+ * so those are the only ones named here — and a new page can no longer acquire
+ * a second footer by forgetting to opt out of the first.
  */
-const EXTRA_FOOTERLESS_ROUTES = new Set(["/explore"]);
+const FOOTER_PREFIXES = ["/sign-in", "/sign-up"];
 
 export function ConditionalFooter({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  if (isShellLess(pathname)) return null;
-  if (pathname && EXTRA_FOOTERLESS_ROUTES.has(pathname)) return null;
-  return <>{children}</>;
+  const show =
+    !!pathname &&
+    FOOTER_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  return show ? <>{children}</> : null;
 }

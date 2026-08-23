@@ -15,7 +15,7 @@ export default async function ClaimPage({
 
   if (!token) {
     return (
-      <SitePage width="narrow">
+      <SitePage width="narrow" footer>
         <div className="mx-auto max-w-md">
           <div className="rounded border border-hairline p-6">
             <p className="font-body text-[15px] font-medium text-ink">
@@ -59,7 +59,7 @@ export default async function ClaimPage({
   }
 
   return (
-    <SitePage width="narrow">
+    <SitePage width="narrow" footer>
       <div className="mx-auto max-w-md">
         <div className="rounded border border-amber-300 bg-amber-50 p-6">
           <p className="font-body text-[15px] font-medium text-amber-900">{result.error}</p>
