@@ -18,6 +18,7 @@ import type { ImageTaggingItem } from "@/components/listing/ImageProductTaggingB
 import { getWizardOwnerOptions } from "@/lib/admin/wizardOwnerOptions";
 import {
   getWizardTaxonomyNodes,
+  getWizardFacets,
   getWizardMaterials,
   getWizardProducts,
   getWizardMemberTitles,
@@ -69,6 +70,7 @@ export default async function AdminProjectEditPage({
     memberTitles,
     imagesWithIdsResult,
     productMaterialOptions,
+    facets,
   ] = await Promise.all([
     getWizardOwnerOptions("project"),
     getWizardTaxonomyNodes("project"),
@@ -77,6 +79,7 @@ export default async function AdminProjectEditPage({
     getWizardMemberTitles(),
     getListingImagesWithIds(id),
     getProductMaterialOptions(),
+    getWizardFacets("project"),
   ]);
 
   const imagesWithIds = imagesWithIdsResult.data ?? [];
@@ -169,6 +172,7 @@ export default async function AdminProjectEditPage({
 
       <ProjectWizard
         categories={categories}
+        facets={facets}
         materials={materials}
         products={products}
         memberTitles={memberTitles}

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, X, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import {
   StepRail,
   WizardFrame,
@@ -32,6 +32,7 @@ import { updateProductCanonical } from "@/app/actions/updateListing";
 import type { ProductEditData } from "@/lib/db/listingEdit";
 import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
 import { TaxonomyCascade } from "@/components/add/wizard/TaxonomyCascade";
+import { FacetPicker, type FacetForPicker } from "@/components/add/wizard/FacetPicker";
 import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
 import {
   PRODUCT_STAGE_VALUES,
@@ -97,6 +98,7 @@ function slugify(v: string): string {
 export function ProductWizard({
   categories,
   materials,
+  facets,
   brandName,
   initial,
   initialStep,
@@ -104,6 +106,8 @@ export function ProductWizard({
 }: {
   categories: ProductTaxonomyOption[];
   materials: ProductMaterialOption[];
+  /** Every facet the product domain declares — see FacetPicker. */
+  facets: FacetForPicker[];
   brandName: string | null;
   /**
    * Present only when editing. Its absence is what makes this a create form —
@@ -137,8 +141,16 @@ export function ProductWizard({
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [taxonomyNodeId, setTaxonomyNodeId] = useState(initial?.taxonomyNodeId ?? "");
-  const [colorOptions, setColorOptions] = useState<string[]>(initial?.colorOptions ?? []);
-  const [colorDraft, setColorDraft] = useState("");
+  /*
+   * ── FREE TEXT REPLACED BY FACET VALUES ────────────────────────────────────
+   * products.color_options held typed strings. Nine products used it, across
+   * eight distinct values, every one of which already exists as a color-family
+   * facet value — so nothing here is lost, it is relocated. The old value is
+   * still read into state and still submitted, so an untouched save does not
+   * strip a product whose colours have not been migrated yet.
+   */
+  const [colorOptions] = useState<string[]>(initial?.colorOptions ?? []);
+  const [facetValueIds, setFacetValueIds] = useState<string[]>(initial?.facetValueIds ?? []);
   const [ownerProfileId, setOwnerProfileId] = useState(admin?.ownerProfileId ?? "");
   // True when the chosen node still has children — "Furniture" without a
   // subcategory and type. Stored and saved either way; it only gates publishing.
@@ -188,7 +200,7 @@ export function ProductWizard({
       clearTimeout(a);
       clearTimeout(b);
     };
-  }, [title, description, images, materialIds, colorOptions, metaDescription]);
+  }, [title, description, images, materialIds, facetValueIds, metaDescription]);
 
   const seo = useMemo(
     () =>
@@ -218,7 +230,7 @@ export function ProductWizard({
     complete: [
       images.length > 0,
       title.trim().length > 0 && description.trim().length > 0,
-      Boolean(taxonomyNodeId) || colorOptions.length > 0,
+      Boolean(taxonomyNodeId) || facetValueIds.length > 0,
       materialIds.length > 0,
       Boolean(website || instagram || videoUrl),
       seo.checks.find((c) => c.id === "meta")?.passed ?? false,
@@ -242,6 +254,7 @@ export function ProductWizard({
     fd.set("gallery", JSON.stringify(images));
     fd.set("product_material_ids", JSON.stringify(materialIds));
     fd.set("color_options", JSON.stringify(colorOptions));
+    fd.set("facet_value_ids", JSON.stringify(facetValueIds));
     fd.set("meta_description", metaDescription);
     fd.set("website", website);
     fd.set("instagram", instagram);
@@ -446,56 +459,11 @@ export function ProductWizard({
 
               {step === 2 && (
                 <Card>
-                  <Field
-                    label="Finish and colour options"
-                    hint="One per line, or press Enter"
-                  >
-                    <div className="flex gap-2">
-                      <input
-                        value={colorDraft}
-                        onChange={(e) => setColorDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            const v = colorDraft.trim();
-                            if (v && !colorOptions.includes(v)) setColorOptions([...colorOptions, v]);
-                            setColorDraft("");
-                          }
-                        }}
-                        className={inputCls}
-                        placeholder="Walnut, Black leather, Brushed brass…"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const v = colorDraft.trim();
-                          if (v && !colorOptions.includes(v)) setColorOptions([...colorOptions, v]);
-                          setColorDraft("");
-                        }}
-                        className="shrink-0 rounded-xl border border-ink/25 px-4 font-body text-[14px] text-ink transition-colors hover:bg-stone/50"
-                      >
-                        <Plus strokeWidth={1.5} className="h-4 w-4" aria-hidden />
-                        <span className="sr-only">Add option</span>
-                      </button>
-                    </div>
-                  </Field>
-                  {colorOptions.length > 0 && (
-                    <ul className="flex flex-wrap gap-2">
-                      {colorOptions.map((c) => (
-                        <li key={c}>
-                          <button
-                            type="button"
-                            onClick={() => setColorOptions(colorOptions.filter((x) => x !== c))}
-                            className="inline-flex items-center gap-2 rounded-full bg-stone px-4 py-2 font-body text-[13px] text-ink transition-colors hover:bg-stone/70"
-                          >
-                            {c}
-                            <X strokeWidth={2} className="h-3 w-3" aria-hidden />
-                            <span className="sr-only">Remove option</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <FacetPicker
+                    facets={facets}
+                    selectedIds={facetValueIds}
+                    onChange={setFacetValueIds}
+                  />
                   {admin && (
                     <AdminOnly label="Specification">
                       <div className="grid grid-cols-2 gap-5">

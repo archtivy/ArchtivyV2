@@ -35,6 +35,7 @@ import { updateProjectCanonical } from "@/app/actions/updateListing";
 import type { ProjectEditData } from "@/lib/db/listingEdit";
 import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
 import { TaxonomyCascade } from "@/components/add/wizard/TaxonomyCascade";
+import { FacetPicker, type FacetForPicker } from "@/components/add/wizard/FacetPicker";
 import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
 import {
   PROJECT_STATUS_VALUES,
@@ -109,6 +110,7 @@ export function ProjectWizard({
   materials,
   products,
   memberTitles,
+  facets,
   initial,
   initialStep,
   admin,
@@ -117,6 +119,8 @@ export function ProjectWizard({
   materials: MaterialOption[];
   products: ProductOption[];
   memberTitles: MemberTitleOption[];
+  /** Every facet the project domain declares — see FacetPicker. */
+  facets: FacetForPicker[];
   /**
    * Present only when editing. Its absence is what makes this a create form —
    * there is no separate `mode` prop to keep in sync with it.
@@ -177,6 +181,7 @@ export function ProjectWizard({
   const [lookingFor, setLookingFor] = useState<string[]>(initial?.projectLookingFor ?? []);
   const [documents, setDocuments] = useState<File[]>([]);
   const [materialIds, setMaterialIds] = useState<string[]>(initial?.materialIds ?? []);
+  const [facetValueIds, setFacetValueIds] = useState<string[]>(initial?.facetValueIds ?? []);
   /*
    * Real Mapbox-backed location. The first pass used three plain text inputs,
    * which produced no lat/lng — and createProject REQUIRES coordinates to
@@ -310,6 +315,7 @@ export function ProjectWizard({
       )
     );
     fd.set("project_material_ids", JSON.stringify(materialIds));
+    fd.set("facet_value_ids", JSON.stringify(facetValueIds));
     // Picked products go as ids; any free-text mentions the admin form allowed
     // ride along unchanged so an edit does not silently delete them. Both
     // shapes normalise server-side — see lib/listings/mentionedProducts.ts.
@@ -529,6 +535,15 @@ export function ProjectWizard({
                     placeholder="Search materials…"
                     emptyHint="No materials tagged yet."
                   />
+                  {facets.length > 0 && (
+                    <div className="rounded-2xl border border-hairline bg-cream p-6 sm:p-8">
+                      <FacetPicker
+                        facets={facets}
+                        selectedIds={facetValueIds}
+                        onChange={setFacetValueIds}
+                      />
+                    </div>
+                  )}
                   {admin && (
                     <AdminOnly label="Material or finish">
                       <Field

@@ -1,5 +1,5 @@
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
-import { getTaxonomyTree } from "@/lib/taxonomy/taxonomyDb";
+import { getTaxonomyTree, getFacetsForDomain } from "@/lib/taxonomy/taxonomyDb";
 
 /**
  * Reference data the publish wizards need to render their pickers.
@@ -132,4 +132,31 @@ export async function getWizardMemberTitles(): Promise<MemberTitleOptionShape[]>
     .order("sort_order", { ascending: true });
   if (error) return [];
   return ((data ?? []) as { label: string }[]).map((t) => ({ label: t.label }));
+}
+
+export interface WizardFacetShape {
+  id: string;
+  slug: string;
+  label: string;
+  values: { id: string; slug: string; label: string }[];
+}
+
+/**
+ * Facets a domain declares, with their active values.
+ *
+ * Returns whatever `facets.applies_to` says — no UI-side whitelist. That
+ * declaration is already the source of truth (color-family carries both
+ * "product" and "project"), and a second list in the wizard would be one more
+ * thing to keep in step with it.
+ */
+export async function getWizardFacets(
+  domain: "project" | "product"
+): Promise<WizardFacetShape[]> {
+  const res = await getFacetsForDomain(domain);
+  return (res.data ?? []).map((f) => ({
+    id: f.id,
+    slug: f.slug,
+    label: f.label,
+    values: f.values.map((v) => ({ id: v.id, slug: v.slug, label: v.label })),
+  }));
 }

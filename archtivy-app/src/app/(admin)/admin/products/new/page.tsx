@@ -4,6 +4,7 @@ import { ProductWizard } from "@/app/(app)/add/product/ProductWizard";
 import { getWizardOwnerOptions } from "@/lib/admin/wizardOwnerOptions";
 import {
   getWizardTaxonomyNodes,
+  getWizardFacets,
   getWizardMaterials,
   getWizardMemberTitles,
 } from "@/lib/publish/wizardReferenceData";
@@ -23,11 +24,14 @@ export const revalidate = 0;
  * reason to load or forward it.
  */
 export default async function AdminNewProductPage() {
-  const [ownerOptions, categories, materials, memberTitles] = await Promise.all([
+  const [ownerOptions, categories, materials, memberTitles,
+    facets,
+  ] = await Promise.all([
     getWizardOwnerOptions("product"),
     getWizardTaxonomyNodes("product"),
     getWizardMaterials(),
     getWizardMemberTitles(),
+    getWizardFacets("product"),
   ]);
 
   return (
@@ -45,6 +49,7 @@ export default async function AdminNewProductPage() {
     >
       <ProductWizard
         categories={categories}
+        facets={facets}
         materials={materials}
         brandName={null}
         admin={{
