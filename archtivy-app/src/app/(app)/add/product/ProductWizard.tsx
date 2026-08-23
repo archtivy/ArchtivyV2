@@ -17,6 +17,7 @@ import {
   Card,
   Field,
   inputCls,
+  OwnerField,
   PickerStep,
   SeoStep,
   PublishStep,
@@ -26,6 +27,7 @@ import type { UploadedGalleryItem } from "@/lib/storage/types";
 import { createProductCanonical } from "@/app/actions/listings";
 import { updateProductCanonical } from "@/app/actions/updateListing";
 import type { ProductEditData } from "@/lib/db/listingEdit";
+import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
 
 /**
  * Product publish wizard — the product-side twin of ProjectWizard.
@@ -84,6 +86,7 @@ export function ProductWizard({
   brandName,
   initial,
   initialStep,
+  admin,
 }: {
   categories: ProductTaxonomyOption[];
   materials: ProductMaterialOption[];
@@ -99,6 +102,12 @@ export function ProductWizard({
    * for it would undercut the point of naming the field.
    */
   initialStep?: number;
+  /**
+   * Present only in /admin. Same convention as `initial` — the wizard is in
+   * admin context because it was handed what only an admin has, so a mode flag
+   * and the data behind it cannot disagree. See adminContext.ts.
+   */
+  admin?: WizardAdminContext;
 }) {
   const isEdit = Boolean(initial);
   const router = useRouter();
@@ -116,6 +125,7 @@ export function ProductWizard({
   const [taxonomyNodeId, setTaxonomyNodeId] = useState(initial?.taxonomyNodeId ?? "");
   const [colorOptions, setColorOptions] = useState<string[]>(initial?.colorOptions ?? []);
   const [colorDraft, setColorDraft] = useState("");
+  const [ownerProfileId, setOwnerProfileId] = useState(admin?.ownerProfileId ?? "");
   const [materialIds, setMaterialIds] = useState<string[]>(initial?.materialIds ?? []);
   const [website, setWebsite] = useState(initial?.website ?? "");
   const [instagram, setInstagram] = useState(initial?.instagram ?? "");
@@ -204,6 +214,7 @@ export function ProductWizard({
     fd.set("video_url", videoUrl);
     fd.set("slug", slug);
     if (draft) fd.set("draft", "1");
+    if (admin) fd.set("owner_profile_id", ownerProfileId);
     return fd;
   }
 
@@ -213,11 +224,23 @@ export function ProductWizard({
       // Editing never changes status — updateProductCanonical ignores `draft`
       // entirely and keeps whatever the listing already was. A draft stays a
       // draft; a published product is not silently pulled back for review.
-      const result = initial
-        ? await updateProductCanonical(initial.id, buildFormData(draft))
-        : await createProductCanonical(null, buildFormData(draft));
-      if (result?.error) {
+      const fd = buildFormData(draft);
+      const result = admin
+        ? initial
+          ? await admin.onUpdate(initial.id, fd)
+          : await admin.onCreate(fd)
+        : initial
+          ? await updateProductCanonical(initial.id, fd)
+          : await createProductCanonical(null, fd);
+      if (result && "error" in result && result.error) {
         setError(result.error);
+        return;
+      }
+      // The admin actions redirect server-side on success, so this only runs
+      // when they returned without redirecting.
+      if (admin) {
+        router.push(admin.returnTo);
+        router.refresh();
         return;
       }
       if (initial) {
@@ -229,10 +252,13 @@ export function ProductWizard({
     });
   }
 
-  const canPublish = title.trim().length > 0 && images.length > 0;
+  // createAdminProductFull rejects a submission with no owner, and an
+  // unowned product is unattributed publicly and invisible in /me/listings.
+  const canPublish =
+    title.trim().length > 0 && images.length > 0 && (!admin || Boolean(ownerProfileId));
 
   return (
-    <WizardFrame>
+    <WizardFrame bare={Boolean(admin)}>
       <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
@@ -291,11 +317,23 @@ export function ProductWizard({
 
               {step === 1 && (
                 <Card>
-                  {brandName && (
-                    <p className="rounded-xl bg-stone/40 px-4 py-3 font-body text-[13px] text-muted">
-                      Publishing as <span className="text-ink">{brandName}</span> — products are
-                      attributed to your brand profile automatically.
-                    </p>
+                  {/* The brand is the submitter when a brand is submitting, and
+                      a choice when an admin is. These are the same slot: the
+                      note below states the attribution, the picker sets it. */}
+                  {admin ? (
+                    <OwnerField
+                      kind="product"
+                      options={admin.ownerOptions}
+                      value={ownerProfileId}
+                      onChange={setOwnerProfileId}
+                    />
+                  ) : (
+                    brandName && (
+                      <p className="rounded-xl bg-stone/40 px-4 py-3 font-body text-[13px] text-muted">
+                        Publishing as <span className="text-ink">{brandName}</span> — products are
+                        attributed to your brand profile automatically.
+                      </p>
+                    )
                   )}
                   <Field label="Product name" required>
                     <input

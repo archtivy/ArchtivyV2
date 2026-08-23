@@ -21,6 +21,7 @@ import {
   Field,
   inputCls,
   TeamStep,
+  OwnerField,
   PickerStep,
   SeoStep,
   PublishStep,
@@ -31,6 +32,7 @@ import type { UploadedGalleryItem } from "@/lib/storage/types";
 import { createProject } from "@/app/actions/createProject";
 import { updateProjectCanonical } from "@/app/actions/updateListing";
 import type { ProjectEditData } from "@/lib/db/listingEdit";
+import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
 import { LocationPicker, type LocationValue } from "@/components/location/LocationPicker";
 
 /**
@@ -97,6 +99,7 @@ export function ProjectWizard({
   memberTitles,
   initial,
   initialStep,
+  admin,
 }: {
   categories: TaxonomyOption[];
   materials: MaterialOption[];
@@ -113,6 +116,12 @@ export function ProjectWizard({
    * for it would undercut the point of naming the field.
    */
   initialStep?: number;
+  /**
+   * Present only in /admin. Same convention as `initial` — the wizard is in
+   * admin context because it was handed what only an admin has, so a mode flag
+   * and the data behind it cannot disagree. See adminContext.ts.
+   */
+  admin?: WizardAdminContext;
 }) {
   const isEdit = Boolean(initial);
   const router = useRouter();
@@ -144,6 +153,7 @@ export function ProjectWizard({
     }))
   );
   const [productIds, setProductIds] = useState<string[]>(initial?.mentionedProducts ?? []);
+  const [ownerProfileId, setOwnerProfileId] = useState(admin?.ownerProfileId ?? "");
   const [materialIds, setMaterialIds] = useState<string[]>(initial?.materialIds ?? []);
   /*
    * Real Mapbox-backed location. The first pass used three plain text inputs,
@@ -278,27 +288,46 @@ export function ProjectWizard({
       )
     );
     fd.set("project_material_ids", JSON.stringify(materialIds));
-    fd.set("mentioned_products", JSON.stringify(productIds));
+    // Picked products go as ids; any free-text mentions the admin form allowed
+    // ride along unchanged so an edit does not silently delete them. Both
+    // shapes normalise server-side — see lib/listings/mentionedProducts.ts.
+    fd.set(
+      "mentioned_products",
+      JSON.stringify([...productIds, ...(admin?.mentionedFreeText ?? [])])
+    );
     fd.set("meta_description", metaDescription);
     fd.set("website", website);
     fd.set("instagram", instagram);
     fd.set("video_url", videoUrl);
     fd.set("slug", slug);
     if (draft) fd.set("draft", "1");
+    if (admin) fd.set("owner_profile_id", ownerProfileId);
     return fd;
   }
 
   function submit(draft: boolean) {
     setError(null);
     startTransition(async () => {
-      // Editing never changes status — updateProjectCanonical ignores `draft`
-      // entirely and keeps whatever the listing already was. A draft stays a
+      // Editing never changes status — the update actions ignore `draft`
+      // entirely and keep whatever the listing already was. A draft stays a
       // draft; a published project is not silently unpublished.
-      const result = initial
-        ? await updateProjectCanonical(initial.id, buildFormData(draft))
-        : await createProject({}, buildFormData(draft));
-      if (result?.error) {
+      const fd = buildFormData(draft);
+      const result = admin
+        ? initial
+          ? await admin.onUpdate(initial.id, fd)
+          : await admin.onCreate(fd)
+        : initial
+          ? await updateProjectCanonical(initial.id, fd)
+          : await createProject({}, fd);
+      if (result && "error" in result && result.error) {
         setError(result.error);
+        return;
+      }
+      // The admin actions redirect server-side on success, so this only runs
+      // when they returned without redirecting.
+      if (admin) {
+        router.push(admin.returnTo);
+        router.refresh();
         return;
       }
       if (initial) {
@@ -310,10 +339,14 @@ export function ProjectWizard({
     });
   }
 
-  const canPublish = title.trim().length > 0 && images.length > 0;
+  // In admin context an owner is mandatory: createAdminProjectFull rejects a
+  // submission without one, and a listing with no owner is invisible in
+  // /me/listings and unattributed publicly.
+  const canPublish =
+    title.trim().length > 0 && images.length > 0 && (!admin || Boolean(ownerProfileId));
 
   return (
-    <WizardFrame>
+    <WizardFrame bare={Boolean(admin)}>
       <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
@@ -376,6 +409,14 @@ export function ProjectWizard({
 
               {step === 1 && (
                 <Card>
+                  {admin && (
+                    <OwnerField
+                      kind="project"
+                      options={admin.ownerOptions}
+                      value={ownerProfileId}
+                      onChange={setOwnerProfileId}
+                    />
+                  )}
                   <Field label="Project title" required>
                     <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="Cliff House" />
                   </Field>

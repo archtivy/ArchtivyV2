@@ -66,6 +66,59 @@ export function Field({
   );
 }
 
+/**
+ * Owner picker — admin only, first field on the Information step.
+ *
+ * ── WHY IT IS A REQUIRED FIELD AND NOT A DEFAULTED ONE ──────────────────────
+ * Both admin create actions reject a submission with no owner_profile_id, and
+ * they are right to: a listing with no owner is invisible in /me/listings, not
+ * editable by the person it belongs to, and unattributed on the public page.
+ * Defaulting it to the acting admin would produce a listing quietly owned by
+ * staff, which is worse than an error. So this renders the empty option as an
+ * instruction rather than a value, and the Publish button stays disabled until
+ * a real profile is chosen.
+ *
+ * A plain <select> rather than the searchable combobox used elsewhere:
+ * searchProfilesForOwner caps at 100 profiles and the platform has a few
+ * hundred, so this is the same trade the legacy admin form made. If the roster
+ * outgrows the list, this is the one place to swap in a search.
+ */
+export function OwnerField({
+  options,
+  value,
+  onChange,
+  kind,
+}: {
+  options: { id: string; label: string; sub: string | null }[];
+  value: string;
+  onChange: (id: string) => void;
+  kind: "project" | "product";
+}) {
+  return (
+    <Field
+      label="Owner profile"
+      required
+      hint={kind === "product" ? "Brands only" : "Designers and brands"}
+    >
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputCls}>
+        <option value="">Choose the profile this belongs to…</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
+            {o.sub ? ` (@${o.sub})` : ""}
+          </option>
+        ))}
+      </select>
+      {!value && (
+        <p className="mt-2 font-body text-[13px] text-muted">
+          The listing is attributed to this profile and appears in their listings. It cannot be
+          left unset.
+        </p>
+      )}
+    </Field>
+  );
+}
+
 export function TeamStep({
   team,
   setTeam,
