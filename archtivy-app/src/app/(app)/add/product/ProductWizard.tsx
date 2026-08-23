@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, X, Plus } from "lucide-react";
-import { HomeNav } from "@/components/home/HomeNav";
 import {
   StepRail,
+  WizardFrame,
   WizardProgress,
   SaveIndicator,
   DeviceFrame,
@@ -232,324 +232,321 @@ export function ProductWizard({
   const canPublish = title.trim().length > 0 && images.length > 0;
 
   return (
-    <div className="min-h-screen bg-cream font-body text-ink">
-      <HomeNav variant="solid" />
-      <div className="mx-auto max-w-[1400px] px-5 pb-16 pt-[104px] md:px-10 lg:px-14">
-        <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
-          <div>
+    <WizardFrame>
+      <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+            {isEdit ? (initial?.status === "DRAFT" ? "Editing draft" : "Editing product") : "New product"}
+          </p>
+          <h1 className="mt-2 font-display text-[34px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[42px]">
+            {isEdit ? title.trim() || "Edit product." : "Add a product."}
+          </h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <SaveIndicator state={saveState} />
+          <button
+            type="button"
+            onClick={() => submit(true)}
+            disabled={pending || !title.trim()}
+            className="rounded-full border border-ink/25 px-5 py-2.5 font-body text-[14px] text-ink transition-all duration-150 hover:bg-stone/50 active:scale-[0.98] disabled:opacity-40 motion-reduce:transition-none"
+          >
+            {/* In edit mode both buttons run the same update and neither
+                changes status, so "Save as draft" would be a lie on a
+                published product. */}
+            {isEdit ? "Save changes" : "Save as draft"}
+          </button>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
+        <aside className="lg:col-span-3">
+          <div className="lg:sticky lg:top-[104px] lg:space-y-8">
+            <WizardProgress steps={steps} />
+            <StepRail steps={steps} current={step} onGo={go} />
+          </div>
+        </aside>
+
+        <main className="min-w-0 lg:col-span-6">
+          <div
+            key={step}
+            className={[
+              "motion-reduce:animate-none",
+              direction === 1
+                ? "animate-[wizardInRight_320ms_ease-out]"
+                : "animate-[wizardInLeft_320ms_ease-out]",
+            ].join(" ")}
+          >
             <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-              {isEdit ? (initial?.status === "DRAFT" ? "Editing draft" : "Editing product") : "New product"}
+              Step {step + 1} of {STEP_LABELS.length}
             </p>
-            <h1 className="mt-2 font-display text-[34px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[42px]">
-              {isEdit ? title.trim() || "Edit product." : "Add a product."}
-            </h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <SaveIndicator state={saveState} />
-            <button
-              type="button"
-              onClick={() => submit(true)}
-              disabled={pending || !title.trim()}
-              className="rounded-full border border-ink/25 px-5 py-2.5 font-body text-[14px] text-ink transition-all duration-150 hover:bg-stone/50 active:scale-[0.98] disabled:opacity-40 motion-reduce:transition-none"
-            >
-              {/* In edit mode both buttons run the same update and neither
-                  changes status, so "Save as draft" would be a lie on a
-                  published product. */}
-              {isEdit ? "Save changes" : "Save as draft"}
-            </button>
-          </div>
-        </header>
+            <h2 className="mt-2 font-display text-[30px] leading-[1.1] tracking-[-0.02em] text-ink">
+              {HEADINGS[step]}
+            </h2>
+            <p className="mt-3 max-w-[52ch] font-body text-[15px] leading-[24px] text-muted">
+              {BLURBS[step]}
+            </p>
 
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
-          <aside className="lg:col-span-3">
-            <div className="lg:sticky lg:top-[104px] lg:space-y-8">
-              <WizardProgress steps={steps} />
-              <StepRail steps={steps} current={step} onGo={go} />
-            </div>
-          </aside>
+            <div className="mt-8">
+              {step === 0 && <ImageDropzone items={images} onChange={setImages} />}
 
-          <main className="min-w-0 lg:col-span-6">
-            <div
-              key={step}
-              className={[
-                "motion-reduce:animate-none",
-                direction === 1
-                  ? "animate-[wizardInRight_320ms_ease-out]"
-                  : "animate-[wizardInLeft_320ms_ease-out]",
-              ].join(" ")}
-            >
-              <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-                Step {step + 1} of {STEP_LABELS.length}
-              </p>
-              <h2 className="mt-2 font-display text-[30px] leading-[1.1] tracking-[-0.02em] text-ink">
-                {HEADINGS[step]}
-              </h2>
-              <p className="mt-3 max-w-[52ch] font-body text-[15px] leading-[24px] text-muted">
-                {BLURBS[step]}
-              </p>
+              {step === 1 && (
+                <Card>
+                  {brandName && (
+                    <p className="rounded-xl bg-stone/40 px-4 py-3 font-body text-[13px] text-muted">
+                      Publishing as <span className="text-ink">{brandName}</span> — products are
+                      attributed to your brand profile automatically.
+                    </p>
+                  )}
+                  <Field label="Product name" required>
+                    <input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className={inputCls}
+                      placeholder="Nena Armchair"
+                    />
+                  </Field>
+                  <Field label="Category">
+                    <select
+                      value={taxonomyNodeId}
+                      onChange={(e) => setTaxonomyNodeId(e.target.value)}
+                      className={inputCls}
+                    >
+                      <option value="">Choose a category…</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field
+                    label="Description"
+                    required
+                    hint={`${countWords(description)} words · ${SEO_THRESHOLDS.minDescriptionWords} recommended`}
+                  >
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={9}
+                      className={`${inputCls} leading-[24px]`}
+                      placeholder="What it is, what it's made of, and what makes it worth specifying…"
+                    />
+                  </Field>
+                </Card>
+              )}
 
-              <div className="mt-8">
-                {step === 0 && <ImageDropzone items={images} onChange={setImages} />}
-
-                {step === 1 && (
-                  <Card>
-                    {brandName && (
-                      <p className="rounded-xl bg-stone/40 px-4 py-3 font-body text-[13px] text-muted">
-                        Publishing as <span className="text-ink">{brandName}</span> — products are
-                        attributed to your brand profile automatically.
-                      </p>
-                    )}
-                    <Field label="Product name" required>
+              {step === 2 && (
+                <Card>
+                  <Field
+                    label="Finish and colour options"
+                    hint="One per line, or press Enter"
+                  >
+                    <div className="flex gap-2">
                       <input
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        className={inputCls}
-                        placeholder="Nena Armchair"
-                      />
-                    </Field>
-                    <Field label="Category">
-                      <select
-                        value={taxonomyNodeId}
-                        onChange={(e) => setTaxonomyNodeId(e.target.value)}
-                        className={inputCls}
-                      >
-                        <option value="">Choose a category…</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.label}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field
-                      label="Description"
-                      required
-                      hint={`${countWords(description)} words · ${SEO_THRESHOLDS.minDescriptionWords} recommended`}
-                    >
-                      <textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        rows={9}
-                        className={`${inputCls} leading-[24px]`}
-                        placeholder="What it is, what it's made of, and what makes it worth specifying…"
-                      />
-                    </Field>
-                  </Card>
-                )}
-
-                {step === 2 && (
-                  <Card>
-                    <Field
-                      label="Finish and colour options"
-                      hint="One per line, or press Enter"
-                    >
-                      <div className="flex gap-2">
-                        <input
-                          value={colorDraft}
-                          onChange={(e) => setColorDraft(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              const v = colorDraft.trim();
-                              if (v && !colorOptions.includes(v)) setColorOptions([...colorOptions, v]);
-                              setColorDraft("");
-                            }
-                          }}
-                          className={inputCls}
-                          placeholder="Walnut, Black leather, Brushed brass…"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
+                        value={colorDraft}
+                        onChange={(e) => setColorDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
                             const v = colorDraft.trim();
                             if (v && !colorOptions.includes(v)) setColorOptions([...colorOptions, v]);
                             setColorDraft("");
-                          }}
-                          className="shrink-0 rounded-xl border border-ink/25 px-4 font-body text-[14px] text-ink transition-colors hover:bg-stone/50"
-                        >
-                          <Plus strokeWidth={1.5} className="h-4 w-4" aria-hidden />
-                          <span className="sr-only">Add option</span>
-                        </button>
-                      </div>
-                    </Field>
-                    {colorOptions.length > 0 && (
-                      <ul className="flex flex-wrap gap-2">
-                        {colorOptions.map((c) => (
-                          <li key={c}>
-                            <button
-                              type="button"
-                              onClick={() => setColorOptions(colorOptions.filter((x) => x !== c))}
-                              className="inline-flex items-center gap-2 rounded-full bg-stone px-4 py-2 font-body text-[13px] text-ink transition-colors hover:bg-stone/70"
-                            >
-                              {c}
-                              <X strokeWidth={2} className="h-3 w-3" aria-hidden />
-                              <span className="sr-only">Remove option</span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </Card>
-                )}
-
-                {step === 3 && (
-                  <PickerStep
-                    kind="material"
-                    options={materials.map((m) => ({ id: m.id, label: m.label, sub: null, cover: null }))}
-                    selected={materialIds}
-                    onChange={setMaterialIds}
-                    placeholder="Search materials…"
-                    emptyHint="No materials tagged yet."
-                    footnote="Materials power the material filters across Archtivy — they're how specifiers find products like yours."
-                  />
-                )}
-
-                {step === 4 && (
-                  <Card>
-                    <Field label="Product page on your site">
-                      <input value={website} onChange={(e) => setWebsite(e.target.value)} className={inputCls} placeholder="https://example.com/products/nena" />
-                    </Field>
-                    <Field label="Instagram" hint="Just the handle — we build the link">
-                      <div className="relative">
-                        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-body text-[15px] text-muted">
-                          @
-                        </span>
-                        <input
-                          value={instagram}
-                          onChange={(e) => setInstagram(e.target.value.replace(/^@/, "").toLowerCase())}
-                          className={`${inputCls} pl-9`}
-                          placeholder="brandname"
-                        />
-                      </div>
-                    </Field>
-                    <Field label="Video" hint="YouTube or Vimeo">
-                      <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className={inputCls} placeholder="https://vimeo.com/123456789" />
-                    </Field>
-                  </Card>
-                )}
-
-                {step === 5 && (
-                  <SeoStep
-                    slug={slug}
-                    onSlug={(v) => {
-                      setSlugTouched(true);
-                      setSlug(slugify(v));
-                    }}
-                    metaDescription={metaDescription}
-                    onMeta={setMetaDescription}
-                    seo={seo}
-                    slugPrefix="/products/"
-                    /* The slug is shown but not editable when editing: it is
-                       the live URL, and updateProductCanonical deliberately
-                       never changes it. An editable field that silently
-                       discards its own input is worse than a locked one. */
-                    slugReadOnly={isEdit}
-                    note={
-                      isEdit
-                        ? "The URL is fixed once a product exists — changing it would break every link already pointing here."
-                        : "Products have no location of their own, so that check stays unticked — it doesn’t stop you publishing."
-                    }
-                  />
-                )}
-
-                {step === 6 && (
-                  <PublishStep
-                    seo={seo}
-                    canPublish={canPublish}
-                    pending={pending}
-                    onPublish={() => submit(false)}
-                    onDraft={() => submit(true)}
-                    isEdit={isEdit}
-                    publishLabel={isEdit ? undefined : "Submit product"}
-                    /* Products go to PENDING, not straight live — the RPC has
-                       always done this, unlike projects. Say so plainly rather
-                       than let someone wonder why it is not on their profile. */
-                    publishNote={
-                      isEdit
-                        ? "Saving updates the product in place. Its published state doesn’t change."
-                        : "Products are reviewed before they appear publicly. You’ll keep the draft either way."
-                    }
-                  />
-                )}
-              </div>
-
-              {error && (
-                <p role="alert" className="mt-6 rounded-xl bg-red-50 px-4 py-3 font-body text-[14px] text-red-700">
-                  {error}
-                </p>
+                          }
+                        }}
+                        className={inputCls}
+                        placeholder="Walnut, Black leather, Brushed brass…"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const v = colorDraft.trim();
+                          if (v && !colorOptions.includes(v)) setColorOptions([...colorOptions, v]);
+                          setColorDraft("");
+                        }}
+                        className="shrink-0 rounded-xl border border-ink/25 px-4 font-body text-[14px] text-ink transition-colors hover:bg-stone/50"
+                      >
+                        <Plus strokeWidth={1.5} className="h-4 w-4" aria-hidden />
+                        <span className="sr-only">Add option</span>
+                      </button>
+                    </div>
+                  </Field>
+                  {colorOptions.length > 0 && (
+                    <ul className="flex flex-wrap gap-2">
+                      {colorOptions.map((c) => (
+                        <li key={c}>
+                          <button
+                            type="button"
+                            onClick={() => setColorOptions(colorOptions.filter((x) => x !== c))}
+                            className="inline-flex items-center gap-2 rounded-full bg-stone px-4 py-2 font-body text-[13px] text-ink transition-colors hover:bg-stone/70"
+                          >
+                            {c}
+                            <X strokeWidth={2} className="h-3 w-3" aria-hidden />
+                            <span className="sr-only">Remove option</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Card>
               )}
 
-              <div className="mt-10 flex items-center justify-between border-t border-hairline pt-6">
+              {step === 3 && (
+                <PickerStep
+                  kind="material"
+                  options={materials.map((m) => ({ id: m.id, label: m.label, sub: null, cover: null }))}
+                  selected={materialIds}
+                  onChange={setMaterialIds}
+                  placeholder="Search materials…"
+                  emptyHint="No materials tagged yet."
+                  footnote="Materials power the material filters across Archtivy — they're how specifiers find products like yours."
+                />
+              )}
+
+              {step === 4 && (
+                <Card>
+                  <Field label="Product page on your site">
+                    <input value={website} onChange={(e) => setWebsite(e.target.value)} className={inputCls} placeholder="https://example.com/products/nena" />
+                  </Field>
+                  <Field label="Instagram" hint="Just the handle — we build the link">
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-body text-[15px] text-muted">
+                        @
+                      </span>
+                      <input
+                        value={instagram}
+                        onChange={(e) => setInstagram(e.target.value.replace(/^@/, "").toLowerCase())}
+                        className={`${inputCls} pl-9`}
+                        placeholder="brandname"
+                      />
+                    </div>
+                  </Field>
+                  <Field label="Video" hint="YouTube or Vimeo">
+                    <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className={inputCls} placeholder="https://vimeo.com/123456789" />
+                  </Field>
+                </Card>
+              )}
+
+              {step === 5 && (
+                <SeoStep
+                  slug={slug}
+                  onSlug={(v) => {
+                    setSlugTouched(true);
+                    setSlug(slugify(v));
+                  }}
+                  metaDescription={metaDescription}
+                  onMeta={setMetaDescription}
+                  seo={seo}
+                  slugPrefix="/products/"
+                  /* The slug is shown but not editable when editing: it is
+                     the live URL, and updateProductCanonical deliberately
+                     never changes it. An editable field that silently
+                     discards its own input is worse than a locked one. */
+                  slugReadOnly={isEdit}
+                  note={
+                    isEdit
+                      ? "The URL is fixed once a product exists — changing it would break every link already pointing here."
+                      : "Products have no location of their own, so that check stays unticked — it doesn’t stop you publishing."
+                  }
+                />
+              )}
+
+              {step === 6 && (
+                <PublishStep
+                  seo={seo}
+                  canPublish={canPublish}
+                  pending={pending}
+                  onPublish={() => submit(false)}
+                  onDraft={() => submit(true)}
+                  isEdit={isEdit}
+                  publishLabel={isEdit ? undefined : "Submit product"}
+                  /* Products go to PENDING, not straight live — the RPC has
+                     always done this, unlike projects. Say so plainly rather
+                     than let someone wonder why it is not on their profile. */
+                  publishNote={
+                    isEdit
+                      ? "Saving updates the product in place. Its published state doesn’t change."
+                      : "Products are reviewed before they appear publicly. You’ll keep the draft either way."
+                  }
+                />
+              )}
+            </div>
+
+            {error && (
+              <p role="alert" className="mt-6 rounded-xl bg-red-50 px-4 py-3 font-body text-[14px] text-red-700">
+                {error}
+              </p>
+            )}
+
+            <div className="mt-10 flex items-center justify-between border-t border-hairline pt-6">
+              <button
+                type="button"
+                onClick={() => go(step - 1)}
+                disabled={step === 0}
+                className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 font-body text-[14px] text-muted transition-colors hover:text-ink disabled:opacity-0"
+              >
+                <ArrowLeft strokeWidth={1.5} className="h-4 w-4" /> Back
+              </button>
+              {step < STEP_LABELS.length - 1 && (
                 <button
                   type="button"
-                  onClick={() => go(step - 1)}
-                  disabled={step === 0}
-                  className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 font-body text-[14px] text-muted transition-colors hover:text-ink disabled:opacity-0"
+                  onClick={() => go(step + 1)}
+                  className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 font-body text-[15px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
                 >
-                  <ArrowLeft strokeWidth={1.5} className="h-4 w-4" /> Back
+                  Continue <ArrowRight strokeWidth={1.5} className="h-4 w-4" />
                 </button>
-                {step < STEP_LABELS.length - 1 && (
-                  <button
-                    type="button"
-                    onClick={() => go(step + 1)}
-                    className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 font-body text-[15px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
-                  >
-                    Continue <ArrowRight strokeWidth={1.5} className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+              )}
             </div>
-          </main>
+          </div>
+        </main>
 
-          <aside className="lg:col-span-3">
-            <div className="lg:sticky lg:top-[104px]">
-              <p className="mb-3 font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-                Live preview
-              </p>
-              <DeviceFrame url={`archtivy.com/products/${slug || "your-product"}`}>
-                <div className="overflow-hidden rounded-lg">
-                  <div className="relative aspect-square w-full bg-stone">
-                    {images[0] && (
-                      <Image src={images[0].url} alt="" fill sizes="320px" className="object-cover" />
-                    )}
-                  </div>
-                  <div className="pt-3">
-                    {brandName && (
-                      <p className="font-body text-[11px] uppercase tracking-[0.1em] text-muted">
-                        {brandName}
-                      </p>
-                    )}
-                    <p className="mt-1 font-display text-[17px] leading-[1.2] tracking-tight text-ink">
-                      {title.trim() || "Your product name"}
+        <aside className="lg:col-span-3">
+          <div className="lg:sticky lg:top-[104px]">
+            <p className="mb-3 font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+              Live preview
+            </p>
+            <DeviceFrame url={`archtivy.com/products/${slug || "your-product"}`}>
+              <div className="overflow-hidden rounded-lg">
+                <div className="relative aspect-square w-full bg-stone">
+                  {images[0] && (
+                    <Image src={images[0].url} alt="" fill sizes="320px" className="object-cover" />
+                  )}
+                </div>
+                <div className="pt-3">
+                  {brandName && (
+                    <p className="font-body text-[11px] uppercase tracking-[0.1em] text-muted">
+                      {brandName}
                     </p>
-                    {colorOptions.length > 1 && (
-                      <p className="mt-1.5 font-body text-[12px] text-muted">
-                        {colorOptions.length} finishes
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </DeviceFrame>
-
-              <div className="mt-5 rounded-xl border border-hairline p-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-body text-[13px] text-ink">Search readiness</span>
-                  <span className="font-body text-[13px] tabular-nums text-muted">
-                    {seo.passed}/{seo.total}
-                  </span>
-                </div>
-                <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-stone">
-                  <div
-                    className="h-full rounded-full bg-ink transition-[width] duration-500 ease-out motion-reduce:transition-none"
-                    style={{ width: `${seo.percent}%` }}
-                  />
+                  )}
+                  <p className="mt-1 font-display text-[17px] leading-[1.2] tracking-tight text-ink">
+                    {title.trim() || "Your product name"}
+                  </p>
+                  {colorOptions.length > 1 && (
+                    <p className="mt-1.5 font-body text-[12px] text-muted">
+                      {colorOptions.length} finishes
+                    </p>
+                  )}
                 </div>
               </div>
+            </DeviceFrame>
+
+            <div className="mt-5 rounded-xl border border-hairline p-4">
+              <div className="flex items-center justify-between">
+                <span className="font-body text-[13px] text-ink">Search readiness</span>
+                <span className="font-body text-[13px] tabular-nums text-muted">
+                  {seo.passed}/{seo.total}
+                </span>
+              </div>
+              <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-stone">
+                <div
+                  className="h-full rounded-full bg-ink transition-[width] duration-500 ease-out motion-reduce:transition-none"
+                  style={{ width: `${seo.percent}%` }}
+                />
+              </div>
             </div>
-          </aside>
-        </div>
+          </div>
+        </aside>
       </div>
-    </div>
+    </WizardFrame>
   );
 }
 

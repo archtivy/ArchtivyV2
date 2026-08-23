@@ -4,7 +4,14 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Search, X, Plus, ExternalLink, MapPin } from "lucide-react";
-import { StepRail, WizardProgress, SaveIndicator, DeviceFrame, type WizardStepMeta } from "@/components/add/wizard/WizardChrome";
+import {
+  StepRail,
+  WizardFrame,
+  WizardProgress,
+  SaveIndicator,
+  DeviceFrame,
+  type WizardStepMeta,
+} from "@/components/add/wizard/WizardChrome";
 import { ImageDropzone } from "@/components/add/wizard/ImageDropzone";
 import { computeSeoScore } from "@/lib/publish/seoScore";
 import { countWords, SEO_THRESHOLDS } from "@/lib/publish/seoScore";
@@ -24,7 +31,6 @@ import type { UploadedGalleryItem } from "@/lib/storage/types";
 import { createProject } from "@/app/actions/createProject";
 import { updateProjectCanonical } from "@/app/actions/updateListing";
 import type { ProjectEditData } from "@/lib/db/listingEdit";
-import { HomeNav } from "@/components/home/HomeNav";
 import { LocationPicker, type LocationValue } from "@/components/location/LocationPicker";
 
 /**
@@ -307,270 +313,267 @@ export function ProjectWizard({
   const canPublish = title.trim().length > 0 && images.length > 0;
 
   return (
-    <div className="min-h-screen bg-cream font-body text-ink">
-      <HomeNav variant="solid" />
-      <div className="mx-auto max-w-[1400px] px-5 pb-16 pt-[104px] md:px-10 lg:px-14">
-        <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
-          <div>
+    <WizardFrame>
+      <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+            {isEdit
+              ? initial?.status === "DRAFT"
+                ? "Editing draft"
+                : "Editing project"
+              : "New project"}
+          </p>
+          <h1 className="mt-2 font-display text-[34px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[42px]">
+            {isEdit ? title.trim() || "Edit project." : "Share your work."}
+          </h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <SaveIndicator state={saveState} />
+          <button
+            type="button"
+            onClick={() => submit(true)}
+            disabled={pending || !title.trim()}
+            className="rounded-full border border-ink/25 px-5 py-2.5 font-body text-[14px] text-ink transition-all duration-150 hover:bg-stone/50 active:scale-[0.98] disabled:opacity-40 motion-reduce:transition-none"
+          >
+            {/* In edit mode both buttons run the same update and neither
+                changes status, so "Save as draft" would be a lie on a
+                published project. */}
+            {isEdit ? "Save changes" : "Save as draft"}
+          </button>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
+        {/* ── Rail ─────────────────────────────────────────────────────── */}
+        <aside className="lg:col-span-3">
+          <div className="lg:sticky lg:top-[104px] lg:space-y-8">
+            <WizardProgress steps={steps} />
+            <StepRail steps={steps} current={step} onGo={go} />
+          </div>
+        </aside>
+
+        {/* ── Step body ────────────────────────────────────────────────── */}
+        <main className="min-w-0 lg:col-span-6">
+          <div
+            key={step}
+            className={[
+              "motion-reduce:animate-none",
+              direction === 1 ? "animate-[wizardInRight_320ms_ease-out]" : "animate-[wizardInLeft_320ms_ease-out]",
+            ].join(" ")}
+          >
             <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-              {isEdit
-                ? initial?.status === "DRAFT"
-                  ? "Editing draft"
-                  : "Editing project"
-                : "New project"}
+              Step {step + 1} of {STEP_LABELS.length}
             </p>
-            <h1 className="mt-2 font-display text-[34px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[42px]">
-              {isEdit ? title.trim() || "Edit project." : "Share your work."}
-            </h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <SaveIndicator state={saveState} />
-            <button
-              type="button"
-              onClick={() => submit(true)}
-              disabled={pending || !title.trim()}
-              className="rounded-full border border-ink/25 px-5 py-2.5 font-body text-[14px] text-ink transition-all duration-150 hover:bg-stone/50 active:scale-[0.98] disabled:opacity-40 motion-reduce:transition-none"
-            >
-              {/* In edit mode both buttons run the same update and neither
-                  changes status, so "Save as draft" would be a lie on a
-                  published project. */}
-              {isEdit ? "Save changes" : "Save as draft"}
-            </button>
-          </div>
-        </header>
+            <h2 className="mt-2 font-display text-[30px] leading-[1.1] tracking-[-0.02em] text-ink">
+              {stepHeading(step)}
+            </h2>
+            <p className="mt-3 max-w-[52ch] font-body text-[15px] leading-[24px] text-muted">
+              {stepBlurb(step)}
+            </p>
 
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
-          {/* ── Rail ─────────────────────────────────────────────────────── */}
-          <aside className="lg:col-span-3">
-            <div className="lg:sticky lg:top-[104px] lg:space-y-8">
-              <WizardProgress steps={steps} />
-              <StepRail steps={steps} current={step} onGo={go} />
-            </div>
-          </aside>
+            <div className="mt-8">
+              {step === 0 && <ImageDropzone items={images} onChange={setImages} />}
 
-          {/* ── Step body ────────────────────────────────────────────────── */}
-          <main className="min-w-0 lg:col-span-6">
-            <div
-              key={step}
-              className={[
-                "motion-reduce:animate-none",
-                direction === 1 ? "animate-[wizardInRight_320ms_ease-out]" : "animate-[wizardInLeft_320ms_ease-out]",
-              ].join(" ")}
-            >
-              <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-                Step {step + 1} of {STEP_LABELS.length}
-              </p>
-              <h2 className="mt-2 font-display text-[30px] leading-[1.1] tracking-[-0.02em] text-ink">
-                {stepHeading(step)}
-              </h2>
-              <p className="mt-3 max-w-[52ch] font-body text-[15px] leading-[24px] text-muted">
-                {stepBlurb(step)}
-              </p>
-
-              <div className="mt-8">
-                {step === 0 && <ImageDropzone items={images} onChange={setImages} />}
-
-                {step === 1 && (
-                  <Card>
-                    <Field label="Project title" required>
-                      <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="Cliff House" />
+              {step === 1 && (
+                <Card>
+                  <Field label="Project title" required>
+                    <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="Cliff House" />
+                  </Field>
+                  <Field label="Category">
+                    <select value={taxonomyNodeId} onChange={(e) => setTaxonomyNodeId(e.target.value)} className={inputCls}>
+                      <option value="">Choose a category…</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>{c.label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <div className="grid grid-cols-2 gap-5">
+                    <Field label="Completion year">
+                      <input value={year} onChange={(e) => setYear(e.target.value)} inputMode="numeric" className={inputCls} placeholder="2024" />
                     </Field>
-                    <Field label="Category">
-                      <select value={taxonomyNodeId} onChange={(e) => setTaxonomyNodeId(e.target.value)} className={inputCls}>
-                        <option value="">Choose a category…</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>{c.label}</option>
-                        ))}
-                      </select>
+                    <Field label="Floor area (ft²)">
+                      <input value={areaSqft} onChange={(e) => setAreaSqft(e.target.value)} inputMode="numeric" className={inputCls} placeholder="4520" />
                     </Field>
-                    <div className="grid grid-cols-2 gap-5">
-                      <Field label="Completion year">
-                        <input value={year} onChange={(e) => setYear(e.target.value)} inputMode="numeric" className={inputCls} placeholder="2024" />
-                      </Field>
-                      <Field label="Floor area (ft²)">
-                        <input value={areaSqft} onChange={(e) => setAreaSqft(e.target.value)} inputMode="numeric" className={inputCls} placeholder="4520" />
-                      </Field>
-                    </div>
-                    <Field
-                      label="Description"
-                      hint={`${countWords(description)} words · ${SEO_THRESHOLDS.minDescriptionWords} recommended`}
-                    >
-                      <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={9} className={`${inputCls} leading-[24px]`} placeholder="Tell the story of the project…" />
-                    </Field>
-                  </Card>
-                )}
-
-                {step === 2 && (
-                  <TeamStep team={team} setTeam={setTeam} titles={memberTitles} />
-                )}
-
-                {step === 3 && (
-                  <PickerStep
-                    kind="product"
-                    options={products.map((p) => ({ id: p.id, label: p.title, sub: p.brand, cover: p.cover }))}
-                    selected={productIds}
-                    onChange={setProductIds}
-                    placeholder="Search products by name or brand…"
-                    emptyHint="No products tagged yet."
-                    footnote="Once published, you’ll be able to tag exactly where each product appears in your photos."
-                  />
-                )}
-
-                {step === 4 && (
-                  <PickerStep
-                    kind="material"
-                    options={materials.map((m) => ({ id: m.id, label: m.label, sub: null, cover: null }))}
-                    selected={materialIds}
-                    onChange={setMaterialIds}
-                    placeholder="Search materials…"
-                    emptyHint="No materials tagged yet."
-                  />
-                )}
-
-                {step === 5 && (
-                  <Card>
-                    <LocationPicker namePrefix="location" value={location} onChange={setLocation} required />
-                    {location?.location_lat == null && (
-                      <p className="font-body text-[13px] text-muted">
-                        Search for the address and pick a result — the coordinates are what put
-                        your project on the map and in nearby searches.
-                      </p>
-                    )}
-                  </Card>
-                )}
-
-                {step === 6 && (
-                  <Card>
-                    <Field label="Project website"><input value={website} onChange={(e) => setWebsite(e.target.value)} className={inputCls} placeholder="https://example.com" /></Field>
-                    <Field label="Instagram" hint="Just the handle — we build the link">
-                      <div className="relative">
-                        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-body text-[15px] text-muted">@</span>
-                        <input value={instagram} onChange={(e) => setInstagram(e.target.value.replace(/^@/, "").toLowerCase())} className={`${inputCls} pl-9`} placeholder="studioname" />
-                      </div>
-                    </Field>
-                    <Field label="Video" hint="YouTube or Vimeo"><input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className={inputCls} placeholder="https://vimeo.com/123456789" /></Field>
-                  </Card>
-                )}
-
-                {step === 7 && (
-                  <SeoStep
-                    slug={slug}
-                    onSlug={(v) => { setSlugTouched(true); setSlug(slugify(v)); }}
-                    metaDescription={metaDescription}
-                    onMeta={setMetaDescription}
-                    seo={seo}
-                    /* Locked when editing: the slug is the live URL and
-                       updateProjectCanonical never changes it. */
-                    slugReadOnly={isEdit}
-                    note={
-                      isEdit
-                        ? "The URL is fixed once a project exists — changing it would break every link already pointing here."
-                        : undefined
-                    }
-                  />
-                )}
-
-                {step === 8 && (
-                  <PublishStep
-                    seo={seo}
-                    canPublish={canPublish}
-                    pending={pending}
-                    onPublish={() => submit(false)}
-                    onDraft={() => submit(true)}
-                    isEdit={isEdit}
-                    publishNote={
-                      isEdit
-                        ? "Saving updates the project in place. Its published state doesn’t change."
-                        : undefined
-                    }
-                  />
-                )}
-              </div>
-
-              {error && (
-                <p role="alert" className="mt-6 rounded-xl bg-red-50 px-4 py-3 font-body text-[14px] text-red-700">
-                  {error}
-                </p>
+                  </div>
+                  <Field
+                    label="Description"
+                    hint={`${countWords(description)} words · ${SEO_THRESHOLDS.minDescriptionWords} recommended`}
+                  >
+                    <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={9} className={`${inputCls} leading-[24px]`} placeholder="Tell the story of the project…" />
+                  </Field>
+                </Card>
               )}
 
-              {/* ── One clear action per screen ───────────────────────────── */}
-              <div className="mt-10 flex items-center justify-between border-t border-hairline pt-6">
+              {step === 2 && (
+                <TeamStep team={team} setTeam={setTeam} titles={memberTitles} />
+              )}
+
+              {step === 3 && (
+                <PickerStep
+                  kind="product"
+                  options={products.map((p) => ({ id: p.id, label: p.title, sub: p.brand, cover: p.cover }))}
+                  selected={productIds}
+                  onChange={setProductIds}
+                  placeholder="Search products by name or brand…"
+                  emptyHint="No products tagged yet."
+                  footnote="Once published, you’ll be able to tag exactly where each product appears in your photos."
+                />
+              )}
+
+              {step === 4 && (
+                <PickerStep
+                  kind="material"
+                  options={materials.map((m) => ({ id: m.id, label: m.label, sub: null, cover: null }))}
+                  selected={materialIds}
+                  onChange={setMaterialIds}
+                  placeholder="Search materials…"
+                  emptyHint="No materials tagged yet."
+                />
+              )}
+
+              {step === 5 && (
+                <Card>
+                  <LocationPicker namePrefix="location" value={location} onChange={setLocation} required />
+                  {location?.location_lat == null && (
+                    <p className="font-body text-[13px] text-muted">
+                      Search for the address and pick a result — the coordinates are what put
+                      your project on the map and in nearby searches.
+                    </p>
+                  )}
+                </Card>
+              )}
+
+              {step === 6 && (
+                <Card>
+                  <Field label="Project website"><input value={website} onChange={(e) => setWebsite(e.target.value)} className={inputCls} placeholder="https://example.com" /></Field>
+                  <Field label="Instagram" hint="Just the handle — we build the link">
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-body text-[15px] text-muted">@</span>
+                      <input value={instagram} onChange={(e) => setInstagram(e.target.value.replace(/^@/, "").toLowerCase())} className={`${inputCls} pl-9`} placeholder="studioname" />
+                    </div>
+                  </Field>
+                  <Field label="Video" hint="YouTube or Vimeo"><input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className={inputCls} placeholder="https://vimeo.com/123456789" /></Field>
+                </Card>
+              )}
+
+              {step === 7 && (
+                <SeoStep
+                  slug={slug}
+                  onSlug={(v) => { setSlugTouched(true); setSlug(slugify(v)); }}
+                  metaDescription={metaDescription}
+                  onMeta={setMetaDescription}
+                  seo={seo}
+                  /* Locked when editing: the slug is the live URL and
+                     updateProjectCanonical never changes it. */
+                  slugReadOnly={isEdit}
+                  note={
+                    isEdit
+                      ? "The URL is fixed once a project exists — changing it would break every link already pointing here."
+                      : undefined
+                  }
+                />
+              )}
+
+              {step === 8 && (
+                <PublishStep
+                  seo={seo}
+                  canPublish={canPublish}
+                  pending={pending}
+                  onPublish={() => submit(false)}
+                  onDraft={() => submit(true)}
+                  isEdit={isEdit}
+                  publishNote={
+                    isEdit
+                      ? "Saving updates the project in place. Its published state doesn’t change."
+                      : undefined
+                  }
+                />
+              )}
+            </div>
+
+            {error && (
+              <p role="alert" className="mt-6 rounded-xl bg-red-50 px-4 py-3 font-body text-[14px] text-red-700">
+                {error}
+              </p>
+            )}
+
+            {/* ── One clear action per screen ───────────────────────────── */}
+            <div className="mt-10 flex items-center justify-between border-t border-hairline pt-6">
+              <button
+                type="button"
+                onClick={() => go(step - 1)}
+                disabled={step === 0}
+                className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 font-body text-[14px] text-muted transition-colors hover:text-ink disabled:opacity-0"
+              >
+                <ArrowLeft strokeWidth={1.5} className="h-4 w-4" /> Back
+              </button>
+              {step < STEP_LABELS.length - 1 && (
                 <button
                   type="button"
-                  onClick={() => go(step - 1)}
-                  disabled={step === 0}
-                  className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 font-body text-[14px] text-muted transition-colors hover:text-ink disabled:opacity-0"
+                  onClick={() => go(step + 1)}
+                  className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 font-body text-[15px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
                 >
-                  <ArrowLeft strokeWidth={1.5} className="h-4 w-4" /> Back
+                  Continue <ArrowRight strokeWidth={1.5} className="h-4 w-4" />
                 </button>
-                {step < STEP_LABELS.length - 1 && (
-                  <button
-                    type="button"
-                    onClick={() => go(step + 1)}
-                    className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 font-body text-[15px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
-                  >
-                    Continue <ArrowRight strokeWidth={1.5} className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+              )}
             </div>
-          </main>
+          </div>
+        </main>
 
-          {/* ── Live preview ─────────────────────────────────────────────── */}
-          <aside className="lg:col-span-3">
-            <div className="lg:sticky lg:top-[104px]">
-              <p className="mb-3 font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-                Live preview
-              </p>
-              <DeviceFrame url={`archtivy.com/projects/${slug || "your-project"}`}>
-                <div className="overflow-hidden rounded-lg">
-                  <div className="relative aspect-[4/3] w-full bg-stone">
-                    {images[0] && (
-                      <Image src={images[0].url} alt="" fill sizes="320px" className="object-cover" />
-                    )}
-                  </div>
-                  <div className="pt-3">
-                    <p className="font-display text-[17px] leading-[1.2] tracking-tight text-ink">
-                      {title.trim() || "Your project title"}
+        {/* ── Live preview ─────────────────────────────────────────────── */}
+        <aside className="lg:col-span-3">
+          <div className="lg:sticky lg:top-[104px]">
+            <p className="mb-3 font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+              Live preview
+            </p>
+            <DeviceFrame url={`archtivy.com/projects/${slug || "your-project"}`}>
+              <div className="overflow-hidden rounded-lg">
+                <div className="relative aspect-[4/3] w-full bg-stone">
+                  {images[0] && (
+                    <Image src={images[0].url} alt="" fill sizes="320px" className="object-cover" />
+                  )}
+                </div>
+                <div className="pt-3">
+                  <p className="font-display text-[17px] leading-[1.2] tracking-tight text-ink">
+                    {title.trim() || "Your project title"}
+                  </p>
+                  {[city, country].filter(Boolean).length > 0 && (
+                    <p className="mt-1 font-body text-[12px] text-muted">
+                      {[city, country].filter(Boolean).join(", ")}
                     </p>
-                    {[city, country].filter(Boolean).length > 0 && (
-                      <p className="mt-1 font-body text-[12px] text-muted">
-                        {[city, country].filter(Boolean).join(", ")}
-                      </p>
-                    )}
-                    {description.trim() && (
-                      <p className="mt-2 line-clamp-3 font-body text-[12px] leading-[18px] text-muted">
-                        {description.trim()}
-                      </p>
-                    )}
-                  </div>
+                  )}
+                  {description.trim() && (
+                    <p className="mt-2 line-clamp-3 font-body text-[12px] leading-[18px] text-muted">
+                      {description.trim()}
+                    </p>
+                  )}
                 </div>
-              </DeviceFrame>
-
-              <div className="mt-5 rounded-xl border border-hairline p-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-body text-[13px] text-ink">Search readiness</span>
-                  <span className="font-body text-[13px] tabular-nums text-muted">
-                    {seo.passed}/{seo.total}
-                  </span>
-                </div>
-                <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-stone">
-                  <div
-                    className="h-full rounded-full bg-ink transition-[width] duration-500 ease-out motion-reduce:transition-none"
-                    style={{ width: `${seo.percent}%` }}
-                  />
-                </div>
-                <p className="mt-2.5 font-body text-[12px] leading-[17px] text-muted">
-                  {seo.isIndexable
-                    ? "Ready to appear in search results."
-                    : "Publishes fine — but won’t be indexed until every check passes."}
-                </p>
               </div>
+            </DeviceFrame>
+
+            <div className="mt-5 rounded-xl border border-hairline p-4">
+              <div className="flex items-center justify-between">
+                <span className="font-body text-[13px] text-ink">Search readiness</span>
+                <span className="font-body text-[13px] tabular-nums text-muted">
+                  {seo.passed}/{seo.total}
+                </span>
+              </div>
+              <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-stone">
+                <div
+                  className="h-full rounded-full bg-ink transition-[width] duration-500 ease-out motion-reduce:transition-none"
+                  style={{ width: `${seo.percent}%` }}
+                />
+              </div>
+              <p className="mt-2.5 font-body text-[12px] leading-[17px] text-muted">
+                {seo.isIndexable
+                  ? "Ready to appear in search results."
+                  : "Publishes fine — but won’t be indexed until every check passes."}
+              </p>
             </div>
-          </aside>
-        </div>
+          </div>
+        </aside>
       </div>
-    </div>
+    </WizardFrame>
   );
 }
 
