@@ -6,8 +6,9 @@
 
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { batchResolveTaxonomySlugPaths } from "@/lib/taxonomy/resolve";
+import type { MentionedProduct } from "@/lib/listings/mentionedProducts";
 
-export type MentionedEntry = { brand_name_text: string; product_name_text: string };
+export type MentionedEntry = MentionedProduct;
 
 export type MentionedResolvedItem = MentionedEntry & {
   productId?: string;
@@ -25,9 +26,15 @@ function normalize(s: string): string {
 }
 
 /**
- * For each mentioned entry, try to find an APPROVED product whose title matches
- * (normalized product_name_text equals or is contained in product title).
- * If brand were stored on product we could match brand too; fallback to title-only.
+ * Resolve each entry to a real product where possible.
+ *
+ * ── AN EXACT ID BEATS A FUZZY TITLE ─────────────────────────────────────────
+ * Entries carrying `product_id` were picked from the wizard's product picker,
+ * so the product is known — no matching required. Only free-text entries fall
+ * through to the substring match on title, which is a guess: it links on any
+ * containment in either direction, so "Chair" matches "Eames Lounge Chair".
+ * That heuristic is retained for typed entries because it is the only thing
+ * available for them, but it no longer runs on entries that don't need it.
  */
 export async function resolveMentionedProducts(
   mentioned: MentionedEntry[]
@@ -44,8 +51,25 @@ export async function resolveMentionedProducts(
 
   if (error) return mentioned.map((m) => ({ ...m }));
   const rows = (products ?? []) as { id: string; slug: string | null; title: string | null }[];
+  const byId = new Map(rows.map((p) => [p.id, p]));
 
   const results: MentionedResolvedItem[] = mentioned.map((entry) => {
+    // Picked, not typed — link it directly. A miss here means the product was
+    // deleted or unapproved since; the entry falls back to its stored text,
+    // which is why hydrateMentionedProducts records that text on write.
+    if (entry.product_id) {
+      const exact = byId.get(entry.product_id);
+      if (exact) {
+        return {
+          ...entry,
+          productId: exact.id,
+          productSlug: exact.slug ?? exact.id,
+          productTitle: exact.title ?? undefined,
+        };
+      }
+      return { ...entry };
+    }
+
     const wantTitle = normalize(entry.product_name_text);
     if (!wantTitle) return { ...entry };
 

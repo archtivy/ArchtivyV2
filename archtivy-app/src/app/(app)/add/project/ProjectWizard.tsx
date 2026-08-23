@@ -4,7 +4,14 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Search, X, Plus, ExternalLink, MapPin } from "lucide-react";
-import { StepRail, WizardProgress, SaveIndicator, DeviceFrame, type WizardStepMeta } from "@/components/add/wizard/WizardChrome";
+import {
+  StepRail,
+  WizardFrame,
+  WizardProgress,
+  SaveIndicator,
+  DeviceFrame,
+  type WizardStepMeta,
+} from "@/components/add/wizard/WizardChrome";
 import { ImageDropzone } from "@/components/add/wizard/ImageDropzone";
 import { computeSeoScore } from "@/lib/publish/seoScore";
 import { countWords, SEO_THRESHOLDS } from "@/lib/publish/seoScore";
@@ -14,6 +21,8 @@ import {
   Field,
   inputCls,
   TeamStep,
+  OwnerField,
+  AdminOnly,
   PickerStep,
   SeoStep,
   PublishStep,
@@ -24,7 +33,15 @@ import type { UploadedGalleryItem } from "@/lib/storage/types";
 import { createProject } from "@/app/actions/createProject";
 import { updateProjectCanonical } from "@/app/actions/updateListing";
 import type { ProjectEditData } from "@/lib/db/listingEdit";
-import { HomeNav } from "@/components/home/HomeNav";
+import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
+import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
+import {
+  PROJECT_STATUS_VALUES,
+  PROJECT_STATUS_LABELS,
+  PROJECT_COLLAB_VALUES,
+  PROJECT_COLLAB_LABELS,
+  PROJECT_LOOKING_FOR_OPTIONS,
+} from "@/lib/lifecycle";
 import { LocationPicker, type LocationValue } from "@/components/location/LocationPicker";
 
 /**
@@ -91,6 +108,7 @@ export function ProjectWizard({
   memberTitles,
   initial,
   initialStep,
+  admin,
 }: {
   categories: TaxonomyOption[];
   materials: MaterialOption[];
@@ -107,6 +125,12 @@ export function ProjectWizard({
    * for it would undercut the point of naming the field.
    */
   initialStep?: number;
+  /**
+   * Present only in /admin. Same convention as `initial` — the wizard is in
+   * admin context because it was handed what only an admin has, so a mode flag
+   * and the data behind it cannot disagree. See adminContext.ts.
+   */
+  admin?: WizardAdminContext;
 }) {
   const isEdit = Boolean(initial);
   const router = useRouter();
@@ -138,6 +162,14 @@ export function ProjectWizard({
     }))
   );
   const [productIds, setProductIds] = useState<string[]>(initial?.mentionedProducts ?? []);
+  const [ownerProfileId, setOwnerProfileId] = useState(admin?.ownerProfileId ?? "");
+  // Admin-only fields, carried over from the legacy admin form. Each lives in
+  // the nearest existing step rather than a step of its own — see AdminOnly.
+  const [materialOrFinish, setMaterialOrFinish] = useState(initial?.materialOrFinish ?? "");
+  const [projectStatus, setProjectStatus] = useState(initial?.projectStatus ?? "");
+  const [collabStatus, setCollabStatus] = useState(initial?.projectCollaborationStatus ?? "");
+  const [lookingFor, setLookingFor] = useState<string[]>(initial?.projectLookingFor ?? []);
+  const [documents, setDocuments] = useState<File[]>([]);
   const [materialIds, setMaterialIds] = useState<string[]>(initial?.materialIds ?? []);
   /*
    * Real Mapbox-backed location. The first pass used three plain text inputs,
@@ -272,27 +304,61 @@ export function ProjectWizard({
       )
     );
     fd.set("project_material_ids", JSON.stringify(materialIds));
-    fd.set("mentioned_products", JSON.stringify(productIds));
+    // Picked products go as ids; any free-text mentions the admin form allowed
+    // ride along unchanged so an edit does not silently delete them. Both
+    // shapes normalise server-side — see lib/listings/mentionedProducts.ts.
+    fd.set(
+      "mentioned_products",
+      JSON.stringify([...productIds, ...(admin?.mentionedFreeText ?? [])])
+    );
     fd.set("meta_description", metaDescription);
     fd.set("website", website);
     fd.set("instagram", instagram);
     fd.set("video_url", videoUrl);
     fd.set("slug", slug);
     if (draft) fd.set("draft", "1");
+    if (admin) {
+      fd.set("owner_profile_id", ownerProfileId);
+      fd.set("material_or_finish", materialOrFinish);
+      fd.set("project_status", projectStatus);
+      fd.set("project_collaboration_status", collabStatus);
+      // "Looking for" only means something while open to collaboration, and
+      // the field is hidden once it is not — so send an empty list rather than
+      // leaving stale roles attached to a project that closed.
+      fd.set(
+        "project_looking_for",
+        JSON.stringify(collabStatus && collabStatus !== "not_open_for_collaboration" ? lookingFor : [])
+      );
+      // Raw Files: the admin actions read formData.getAll("documents"), unlike
+      // the gallery which is uploaded client-side and posted as JSON.
+      for (const f of documents) fd.append("documents", f);
+    }
     return fd;
   }
 
   function submit(draft: boolean) {
     setError(null);
     startTransition(async () => {
-      // Editing never changes status — updateProjectCanonical ignores `draft`
-      // entirely and keeps whatever the listing already was. A draft stays a
+      // Editing never changes status — the update actions ignore `draft`
+      // entirely and keep whatever the listing already was. A draft stays a
       // draft; a published project is not silently unpublished.
-      const result = initial
-        ? await updateProjectCanonical(initial.id, buildFormData(draft))
-        : await createProject({}, buildFormData(draft));
-      if (result?.error) {
+      const fd = buildFormData(draft);
+      const result = admin
+        ? initial
+          ? await admin.onUpdate(initial.id, fd)
+          : await admin.onCreate(fd)
+        : initial
+          ? await updateProjectCanonical(initial.id, fd)
+          : await createProject({}, fd);
+      if (result && "error" in result && result.error) {
         setError(result.error);
+        return;
+      }
+      // The admin actions redirect server-side on success, so this only runs
+      // when they returned without redirecting.
+      if (admin) {
+        router.push(admin.returnTo);
+        router.refresh();
         return;
       }
       if (initial) {
@@ -304,13 +370,22 @@ export function ProjectWizard({
     });
   }
 
-  const canPublish = title.trim().length > 0 && images.length > 0;
+  // In admin context an owner is mandatory: createAdminProjectFull rejects a
+  // submission without one, and a listing with no owner is invisible in
+  // /me/listings and unattributed publicly.
+  const canPublish =
+    title.trim().length > 0 && images.length > 0 && (!admin || Boolean(ownerProfileId));
 
   return (
-    <div className="min-h-screen bg-cream font-body text-ink">
-      <HomeNav variant="solid" />
-      <div className="mx-auto max-w-[1400px] px-5 pb-16 pt-[104px] md:px-10 lg:px-14">
-        <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
+    <WizardFrame bare={Boolean(admin)}>
+      <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
+        {/* AdminPage already renders a title and an actions bar, so the
+            wizard's own display heading would be a second <h1> saying roughly
+            the same thing. The empty div keeps the action cluster right-aligned
+            under justify-between. */}
+        {admin ? (
+          <div />
+        ) : (
           <div>
             <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
               {isEdit
@@ -323,100 +398,119 @@ export function ProjectWizard({
               {isEdit ? title.trim() || "Edit project." : "Share your work."}
             </h1>
           </div>
-          <div className="flex items-center gap-4">
-            <SaveIndicator state={saveState} />
-            <button
-              type="button"
-              onClick={() => submit(true)}
-              disabled={pending || !title.trim()}
-              className="rounded-full border border-ink/25 px-5 py-2.5 font-body text-[14px] text-ink transition-all duration-150 hover:bg-stone/50 active:scale-[0.98] disabled:opacity-40 motion-reduce:transition-none"
-            >
-              {/* In edit mode both buttons run the same update and neither
-                  changes status, so "Save as draft" would be a lie on a
-                  published project. */}
-              {isEdit ? "Save changes" : "Save as draft"}
-            </button>
+        )}
+        <div className="flex items-center gap-4">
+          <SaveIndicator state={saveState} />
+          <button
+            type="button"
+            onClick={() => submit(true)}
+            disabled={pending || !title.trim()}
+            className="rounded-full border border-ink/25 px-5 py-2.5 font-body text-[14px] text-ink transition-all duration-150 hover:bg-stone/50 active:scale-[0.98] disabled:opacity-40 motion-reduce:transition-none"
+          >
+            {/* In edit mode both buttons run the same update and neither
+                changes status, so "Save as draft" would be a lie on a
+                published project. */}
+            {isEdit ? "Save changes" : "Save as draft"}
+          </button>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
+        {/* ── Rail ─────────────────────────────────────────────────────── */}
+        <aside className="lg:col-span-3">
+          <div className="lg:sticky lg:top-[104px] lg:space-y-8">
+            <WizardProgress steps={steps} />
+            <StepRail steps={steps} current={step} onGo={go} />
           </div>
-        </header>
+        </aside>
 
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
-          {/* ── Rail ─────────────────────────────────────────────────────── */}
-          <aside className="lg:col-span-3">
-            <div className="lg:sticky lg:top-[104px] lg:space-y-8">
-              <WizardProgress steps={steps} />
-              <StepRail steps={steps} current={step} onGo={go} />
-            </div>
-          </aside>
+        {/* ── Step body ────────────────────────────────────────────────── */}
+        <main className="min-w-0 lg:col-span-6">
+          <div
+            key={step}
+            className={[
+              "motion-reduce:animate-none",
+              direction === 1 ? "animate-[wizardInRight_320ms_ease-out]" : "animate-[wizardInLeft_320ms_ease-out]",
+            ].join(" ")}
+          >
+            <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+              Step {step + 1} of {STEP_LABELS.length}
+            </p>
+            <h2 className="mt-2 font-display text-[30px] leading-[1.1] tracking-[-0.02em] text-ink">
+              {stepHeading(step)}
+            </h2>
+            <p className="mt-3 max-w-[52ch] font-body text-[15px] leading-[24px] text-muted">
+              {stepBlurb(step)}
+            </p>
 
-          {/* ── Step body ────────────────────────────────────────────────── */}
-          <main className="min-w-0 lg:col-span-6">
-            <div
-              key={step}
-              className={[
-                "motion-reduce:animate-none",
-                direction === 1 ? "animate-[wizardInRight_320ms_ease-out]" : "animate-[wizardInLeft_320ms_ease-out]",
-              ].join(" ")}
-            >
-              <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-                Step {step + 1} of {STEP_LABELS.length}
-              </p>
-              <h2 className="mt-2 font-display text-[30px] leading-[1.1] tracking-[-0.02em] text-ink">
-                {stepHeading(step)}
-              </h2>
-              <p className="mt-3 max-w-[52ch] font-body text-[15px] leading-[24px] text-muted">
-                {stepBlurb(step)}
-              </p>
+            <div className="mt-8">
+              {step === 0 && (
+                <div className="space-y-8">
+                  <ImageDropzone items={images} onChange={setImages} />
+                  {admin && (
+                    <AdminOnly label="Documents">
+                      <DocumentsUploadCard files={documents} onChange={setDocuments} />
+                    </AdminOnly>
+                  )}
+                </div>
+              )}
 
-              <div className="mt-8">
-                {step === 0 && <ImageDropzone items={images} onChange={setImages} />}
-
-                {step === 1 && (
-                  <Card>
-                    <Field label="Project title" required>
-                      <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="Cliff House" />
+              {step === 1 && (
+                <Card>
+                  {admin && (
+                    <OwnerField
+                      kind="project"
+                      options={admin.ownerOptions}
+                      value={ownerProfileId}
+                      onChange={setOwnerProfileId}
+                    />
+                  )}
+                  <Field label="Project title" required>
+                    <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="Cliff House" />
+                  </Field>
+                  <Field label="Category">
+                    <select value={taxonomyNodeId} onChange={(e) => setTaxonomyNodeId(e.target.value)} className={inputCls}>
+                      <option value="">Choose a category…</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>{c.label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <div className="grid grid-cols-2 gap-5">
+                    <Field label="Completion year">
+                      <input value={year} onChange={(e) => setYear(e.target.value)} inputMode="numeric" className={inputCls} placeholder="2024" />
                     </Field>
-                    <Field label="Category">
-                      <select value={taxonomyNodeId} onChange={(e) => setTaxonomyNodeId(e.target.value)} className={inputCls}>
-                        <option value="">Choose a category…</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>{c.label}</option>
-                        ))}
-                      </select>
+                    <Field label="Floor area (ft²)">
+                      <input value={areaSqft} onChange={(e) => setAreaSqft(e.target.value)} inputMode="numeric" className={inputCls} placeholder="4520" />
                     </Field>
-                    <div className="grid grid-cols-2 gap-5">
-                      <Field label="Completion year">
-                        <input value={year} onChange={(e) => setYear(e.target.value)} inputMode="numeric" className={inputCls} placeholder="2024" />
-                      </Field>
-                      <Field label="Floor area (ft²)">
-                        <input value={areaSqft} onChange={(e) => setAreaSqft(e.target.value)} inputMode="numeric" className={inputCls} placeholder="4520" />
-                      </Field>
-                    </div>
-                    <Field
-                      label="Description"
-                      hint={`${countWords(description)} words · ${SEO_THRESHOLDS.minDescriptionWords} recommended`}
-                    >
-                      <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={9} className={`${inputCls} leading-[24px]`} placeholder="Tell the story of the project…" />
-                    </Field>
-                  </Card>
-                )}
+                  </div>
+                  <Field
+                    label="Description"
+                    hint={`${countWords(description)} words · ${SEO_THRESHOLDS.minDescriptionWords} recommended`}
+                  >
+                    <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={9} className={`${inputCls} leading-[24px]`} placeholder="Tell the story of the project…" />
+                  </Field>
+                </Card>
+              )}
 
-                {step === 2 && (
-                  <TeamStep team={team} setTeam={setTeam} titles={memberTitles} />
-                )}
+              {step === 2 && (
+                <TeamStep team={team} setTeam={setTeam} titles={memberTitles} />
+              )}
 
-                {step === 3 && (
-                  <PickerStep
-                    kind="product"
-                    options={products.map((p) => ({ id: p.id, label: p.title, sub: p.brand, cover: p.cover }))}
-                    selected={productIds}
-                    onChange={setProductIds}
-                    placeholder="Search products by name or brand…"
-                    emptyHint="No products tagged yet."
-                    footnote="Once published, you’ll be able to tag exactly where each product appears in your photos."
-                  />
-                )}
+              {step === 3 && (
+                <PickerStep
+                  kind="product"
+                  options={products.map((p) => ({ id: p.id, label: p.title, sub: p.brand, cover: p.cover }))}
+                  selected={productIds}
+                  onChange={setProductIds}
+                  placeholder="Search products by name or brand…"
+                  emptyHint="No products tagged yet."
+                  footnote="Once published, you’ll be able to tag exactly where each product appears in your photos."
+                />
+              )}
 
-                {step === 4 && (
+              {step === 4 && (
+                <div className="space-y-8">
                   <PickerStep
                     kind="material"
                     options={materials.map((m) => ({ id: m.id, label: m.label, sub: null, cover: null }))}
@@ -425,152 +519,235 @@ export function ProjectWizard({
                     placeholder="Search materials…"
                     emptyHint="No materials tagged yet."
                   />
-                )}
-
-                {step === 5 && (
-                  <Card>
-                    <LocationPicker namePrefix="location" value={location} onChange={setLocation} required />
-                    {location?.location_lat == null && (
-                      <p className="font-body text-[13px] text-muted">
-                        Search for the address and pick a result — the coordinates are what put
-                        your project on the map and in nearby searches.
-                      </p>
-                    )}
-                  </Card>
-                )}
-
-                {step === 6 && (
-                  <Card>
-                    <Field label="Project website"><input value={website} onChange={(e) => setWebsite(e.target.value)} className={inputCls} placeholder="https://example.com" /></Field>
-                    <Field label="Instagram" hint="Just the handle — we build the link">
-                      <div className="relative">
-                        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-body text-[15px] text-muted">@</span>
-                        <input value={instagram} onChange={(e) => setInstagram(e.target.value.replace(/^@/, "").toLowerCase())} className={`${inputCls} pl-9`} placeholder="studioname" />
-                      </div>
-                    </Field>
-                    <Field label="Video" hint="YouTube or Vimeo"><input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className={inputCls} placeholder="https://vimeo.com/123456789" /></Field>
-                  </Card>
-                )}
-
-                {step === 7 && (
-                  <SeoStep
-                    slug={slug}
-                    onSlug={(v) => { setSlugTouched(true); setSlug(slugify(v)); }}
-                    metaDescription={metaDescription}
-                    onMeta={setMetaDescription}
-                    seo={seo}
-                    /* Locked when editing: the slug is the live URL and
-                       updateProjectCanonical never changes it. */
-                    slugReadOnly={isEdit}
-                    note={
-                      isEdit
-                        ? "The URL is fixed once a project exists — changing it would break every link already pointing here."
-                        : undefined
-                    }
-                  />
-                )}
-
-                {step === 8 && (
-                  <PublishStep
-                    seo={seo}
-                    canPublish={canPublish}
-                    pending={pending}
-                    onPublish={() => submit(false)}
-                    onDraft={() => submit(true)}
-                    isEdit={isEdit}
-                    publishNote={
-                      isEdit
-                        ? "Saving updates the project in place. Its published state doesn’t change."
-                        : undefined
-                    }
-                  />
-                )}
-              </div>
-
-              {error && (
-                <p role="alert" className="mt-6 rounded-xl bg-red-50 px-4 py-3 font-body text-[14px] text-red-700">
-                  {error}
-                </p>
+                  {admin && (
+                    <AdminOnly label="Material or finish">
+                      <Field
+                        label="Free-text material or finish"
+                        hint="Legacy field — the tags above drive the filters"
+                      >
+                        <input
+                          value={materialOrFinish}
+                          onChange={(e) => setMaterialOrFinish(e.target.value)}
+                          className={inputCls}
+                          placeholder="Board-formed concrete, oiled oak"
+                        />
+                      </Field>
+                    </AdminOnly>
+                  )}
+                </div>
               )}
 
-              {/* ── One clear action per screen ───────────────────────────── */}
-              <div className="mt-10 flex items-center justify-between border-t border-hairline pt-6">
+              {step === 5 && (
+                <Card>
+                  <LocationPicker namePrefix="location" value={location} onChange={setLocation} required />
+                  {location?.location_lat == null && (
+                    <p className="font-body text-[13px] text-muted">
+                      Search for the address and pick a result — the coordinates are what put
+                      your project on the map and in nearby searches.
+                    </p>
+                  )}
+                </Card>
+              )}
+
+              {step === 6 && (
+                <Card>
+                  <Field label="Project website"><input value={website} onChange={(e) => setWebsite(e.target.value)} className={inputCls} placeholder="https://example.com" /></Field>
+                  <Field label="Instagram" hint="Just the handle — we build the link">
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-body text-[15px] text-muted">@</span>
+                      <input value={instagram} onChange={(e) => setInstagram(e.target.value.replace(/^@/, "").toLowerCase())} className={`${inputCls} pl-9`} placeholder="studioname" />
+                    </div>
+                  </Field>
+                  <Field label="Video" hint="YouTube or Vimeo"><input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className={inputCls} placeholder="https://vimeo.com/123456789" /></Field>
+                </Card>
+              )}
+
+              {step === 7 && (
+                <SeoStep
+                  slug={slug}
+                  onSlug={(v) => { setSlugTouched(true); setSlug(slugify(v)); }}
+                  metaDescription={metaDescription}
+                  onMeta={setMetaDescription}
+                  seo={seo}
+                  /* Locked when editing: the slug is the live URL and
+                     updateProjectCanonical never changes it. */
+                  slugReadOnly={isEdit}
+                  note={
+                    isEdit
+                      ? "The URL is fixed once a project exists — changing it would break every link already pointing here."
+                      : undefined
+                  }
+                />
+              )}
+
+              {step === 7 && admin && (
+                <div className="mt-8">
+                  <AdminOnly label="Lifecycle & collaboration">
+                    <Field label="Project status">
+                      <select
+                        value={projectStatus}
+                        onChange={(e) => setProjectStatus(e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">Not set</option>
+                        {PROJECT_STATUS_VALUES.map((v) => (
+                          <option key={v} value={v}>
+                            {PROJECT_STATUS_LABELS[v]}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Collaboration status">
+                      <select
+                        value={collabStatus}
+                        onChange={(e) => setCollabStatus(e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">Not set</option>
+                        {PROJECT_COLLAB_VALUES.map((v) => (
+                          <option key={v} value={v}>
+                            {PROJECT_COLLAB_LABELS[v]}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    {/* Hidden unless collaboration is actually open — the roles
+                        are meaningless otherwise, and submit() sends an empty
+                        list in that case so none are left stranded. */}
+                    {collabStatus && collabStatus !== "not_open_for_collaboration" && (
+                      <fieldset>
+                        <legend className="mb-2 font-body text-[14px] text-ink">Looking for</legend>
+                        <div className="flex flex-wrap gap-2">
+                          {PROJECT_LOOKING_FOR_OPTIONS.map((opt) => {
+                            const on = lookingFor.includes(opt.value);
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() =>
+                                  setLookingFor((prev) =>
+                                    on ? prev.filter((v) => v !== opt.value) : [...prev, opt.value]
+                                  )
+                                }
+                                className={[
+                                  "rounded-full border px-4 py-2 font-body text-[13px] transition-colors duration-150",
+                                  on
+                                    ? "border-ink bg-ink text-cream"
+                                    : "border-ink/25 text-muted hover:border-ink/40 hover:text-ink",
+                                ].join(" ")}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
+                    )}
+                  </AdminOnly>
+                </div>
+              )}
+
+              {step === 8 && (
+                <PublishStep
+                  seo={seo}
+                  canPublish={canPublish}
+                  pending={pending}
+                  onPublish={() => submit(false)}
+                  onDraft={() => submit(true)}
+                  isEdit={isEdit}
+                  publishNote={
+                    isEdit
+                      ? "Saving updates the project in place. Its published state doesn’t change."
+                      : undefined
+                  }
+                />
+              )}
+            </div>
+
+            {error && (
+              <p role="alert" className="mt-6 rounded-xl bg-red-50 px-4 py-3 font-body text-[14px] text-red-700">
+                {error}
+              </p>
+            )}
+
+            {/* ── One clear action per screen ───────────────────────────── */}
+            <div className="mt-10 flex items-center justify-between border-t border-hairline pt-6">
+              <button
+                type="button"
+                onClick={() => go(step - 1)}
+                disabled={step === 0}
+                className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 font-body text-[14px] text-muted transition-colors hover:text-ink disabled:opacity-0"
+              >
+                <ArrowLeft strokeWidth={1.5} className="h-4 w-4" /> Back
+              </button>
+              {step < STEP_LABELS.length - 1 && (
                 <button
                   type="button"
-                  onClick={() => go(step - 1)}
-                  disabled={step === 0}
-                  className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 font-body text-[14px] text-muted transition-colors hover:text-ink disabled:opacity-0"
+                  onClick={() => go(step + 1)}
+                  className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 font-body text-[15px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
                 >
-                  <ArrowLeft strokeWidth={1.5} className="h-4 w-4" /> Back
+                  Continue <ArrowRight strokeWidth={1.5} className="h-4 w-4" />
                 </button>
-                {step < STEP_LABELS.length - 1 && (
-                  <button
-                    type="button"
-                    onClick={() => go(step + 1)}
-                    className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 font-body text-[15px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
-                  >
-                    Continue <ArrowRight strokeWidth={1.5} className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+              )}
             </div>
-          </main>
+          </div>
+        </main>
 
-          {/* ── Live preview ─────────────────────────────────────────────── */}
-          <aside className="lg:col-span-3">
-            <div className="lg:sticky lg:top-[104px]">
-              <p className="mb-3 font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-                Live preview
-              </p>
-              <DeviceFrame url={`archtivy.com/projects/${slug || "your-project"}`}>
-                <div className="overflow-hidden rounded-lg">
-                  <div className="relative aspect-[4/3] w-full bg-stone">
-                    {images[0] && (
-                      <Image src={images[0].url} alt="" fill sizes="320px" className="object-cover" />
-                    )}
-                  </div>
-                  <div className="pt-3">
-                    <p className="font-display text-[17px] leading-[1.2] tracking-tight text-ink">
-                      {title.trim() || "Your project title"}
+        {/* ── Live preview ─────────────────────────────────────────────── */}
+        <aside className="lg:col-span-3">
+          <div className="lg:sticky lg:top-[104px]">
+            <p className="mb-3 font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+              Live preview
+            </p>
+            <DeviceFrame url={`archtivy.com/projects/${slug || "your-project"}`}>
+              <div className="overflow-hidden rounded-lg">
+                <div className="relative aspect-[4/3] w-full bg-stone">
+                  {images[0] && (
+                    <Image src={images[0].url} alt="" fill sizes="320px" className="object-cover" />
+                  )}
+                </div>
+                <div className="pt-3">
+                  <p className="font-display text-[17px] leading-[1.2] tracking-tight text-ink">
+                    {title.trim() || "Your project title"}
+                  </p>
+                  {[city, country].filter(Boolean).length > 0 && (
+                    <p className="mt-1 font-body text-[12px] text-muted">
+                      {[city, country].filter(Boolean).join(", ")}
                     </p>
-                    {[city, country].filter(Boolean).length > 0 && (
-                      <p className="mt-1 font-body text-[12px] text-muted">
-                        {[city, country].filter(Boolean).join(", ")}
-                      </p>
-                    )}
-                    {description.trim() && (
-                      <p className="mt-2 line-clamp-3 font-body text-[12px] leading-[18px] text-muted">
-                        {description.trim()}
-                      </p>
-                    )}
-                  </div>
+                  )}
+                  {description.trim() && (
+                    <p className="mt-2 line-clamp-3 font-body text-[12px] leading-[18px] text-muted">
+                      {description.trim()}
+                    </p>
+                  )}
                 </div>
-              </DeviceFrame>
-
-              <div className="mt-5 rounded-xl border border-hairline p-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-body text-[13px] text-ink">Search readiness</span>
-                  <span className="font-body text-[13px] tabular-nums text-muted">
-                    {seo.passed}/{seo.total}
-                  </span>
-                </div>
-                <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-stone">
-                  <div
-                    className="h-full rounded-full bg-ink transition-[width] duration-500 ease-out motion-reduce:transition-none"
-                    style={{ width: `${seo.percent}%` }}
-                  />
-                </div>
-                <p className="mt-2.5 font-body text-[12px] leading-[17px] text-muted">
-                  {seo.isIndexable
-                    ? "Ready to appear in search results."
-                    : "Publishes fine — but won’t be indexed until every check passes."}
-                </p>
               </div>
+            </DeviceFrame>
+
+            <div className="mt-5 rounded-xl border border-hairline p-4">
+              <div className="flex items-center justify-between">
+                <span className="font-body text-[13px] text-ink">Search readiness</span>
+                <span className="font-body text-[13px] tabular-nums text-muted">
+                  {seo.passed}/{seo.total}
+                </span>
+              </div>
+              <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-stone">
+                <div
+                  className="h-full rounded-full bg-ink transition-[width] duration-500 ease-out motion-reduce:transition-none"
+                  style={{ width: `${seo.percent}%` }}
+                />
+              </div>
+              <p className="mt-2.5 font-body text-[12px] leading-[17px] text-muted">
+                {seo.isIndexable
+                  ? "Ready to appear in search results."
+                  : "Publishes fine — but won’t be indexed until every check passes."}
+              </p>
             </div>
-          </aside>
-        </div>
+          </div>
+        </aside>
       </div>
-    </div>
+    </WizardFrame>
   );
 }
 

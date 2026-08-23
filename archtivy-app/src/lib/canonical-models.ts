@@ -8,6 +8,10 @@ import {
   sanitizeListingImageUrl,
 } from "@/lib/db/listingImages";
 import type { ListingCardData, MaterialTag } from "@/lib/types/listings";
+import {
+  normaliseMentionedProducts,
+  type MentionedProduct,
+} from "@/lib/listings/mentionedProducts";
 
 // Raw row from public.listings (project row)
 export type RawListingRow = Record<string, unknown>;
@@ -75,8 +79,8 @@ export interface ProjectCanonical {
   updated_at: string | null;
   /** PENDING until admin approves; only APPROVED in public explore. */
   status: "PENDING" | "APPROVED";
-  /** User-provided { brand_name_text, product_name_text }[]; link if match existing product. */
-  mentioned_products: { brand_name_text: string; product_name_text: string }[];
+  /** Author-stated products. `product_id` set when picked rather than typed. */
+  mentioned_products: MentionedProduct[];
   /** Brands credited on project (from raw.brands_used). Used for brands_count, not products_count. */
   brands_used?: { name: string; logo_url?: string | null }[];
   /** Taxonomy node ID (nullable until backfill complete). */
@@ -294,16 +298,15 @@ export function normalizeProject(
   };
 }
 
-function parseMentionedProducts(
-  val: unknown
-): { brand_name_text: string; product_name_text: string }[] {
-  if (!Array.isArray(val)) return [];
-  return val
-    .filter((m) => m && typeof m === "object" && "brand_name_text" in m && "product_name_text" in m)
-    .map((m) => ({
-      brand_name_text: String((m as { brand_name_text: unknown }).brand_name_text ?? "").trim(),
-      product_name_text: String((m as { product_name_text: unknown }).product_name_text ?? "").trim(),
-    }));
+/**
+ * Delegates to the shared normaliser.
+ *
+ * The filter this replaced required both text keys to be present, so rows
+ * written as bare product ids by updateProjectCanonical were dropped here —
+ * making the wizard's tagged products invisible on the public project page.
+ */
+function parseMentionedProducts(val: unknown): MentionedProduct[] {
+  return normaliseMentionedProducts(val);
 }
 
 /** Normalize raw product + product_images to ProductCanonical. Gallery from product_images only. */

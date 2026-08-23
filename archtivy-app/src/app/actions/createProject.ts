@@ -12,6 +12,12 @@ import type { ActionResult } from "@/app/actions/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TeamMember, BrandUsed } from "@/lib/types/listings";
 import { setProjectMaterials } from "@/lib/db/materials";
+import {
+  parseMentionedProductsField,
+  hydrateMentionedProducts,
+  mentionedProductIds,
+} from "@/lib/listings/mentionedProducts";
+import { setProjectProductsManualAction } from "@/app/actions/projectBrandsProducts";
 import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets } from "@/lib/taxonomy/taxonomyDb";
 import {
   notifyDesignerPublishedProject,
@@ -112,24 +118,6 @@ function parseMaterialIds(value: FormDataEntryValue | null): string[] {
   }
 }
 
-export type MentionedProductEntry = { brand_name_text: string; product_name_text: string };
-
-function parseMentionedProducts(value: FormDataEntryValue | null): MentionedProductEntry[] {
-  if (!value || typeof value !== "string" || !value.trim()) return [];
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (x): x is MentionedProductEntry =>
-        typeof x === "object" &&
-        x !== null &&
-        typeof (x as MentionedProductEntry).brand_name_text === "string" &&
-        typeof (x as MentionedProductEntry).product_name_text === "string"
-    );
-  } catch {
-    return [];
-  }
-}
 
 /**
  * Persist team members to listing_team_members: for each member call
@@ -259,7 +247,7 @@ export async function createProject(
   const material_or_finish = (formData.get("material_or_finish") as string)?.trim() ?? null;
   const team_members = parseTeamMembers(formData.get("team_members"));
   const material_ids = parseMaterialIds(formData.get("project_material_ids"));
-  const mentioned_products = parseMentionedProducts(formData.get("mentioned_products"));
+  const mentioned_products_raw = parseMentionedProductsField(formData.get("mentioned_products"));
   const project_status = (formData.get("project_status") as string)?.trim() || null;
   const project_collaboration_status = (formData.get("project_collaboration_status") as string)?.trim() || null;
   const project_looking_for = parseMaterialIds(formData.get("project_looking_for"));
@@ -317,6 +305,11 @@ export async function createProject(
   if (!slug || !String(slug).trim()) {
     return { error: "Unable to generate a valid slug for the project." };
   }
+
+  // Picked products arrive as bare ids. Fill in the brand and product names so
+  // the stored row is readable on its own, and stays readable if the product is
+  // deleted later.
+  const mentioned_products = await hydrateMentionedProducts(supabase, mentioned_products_raw);
 
   const { data: listing, error: insertError } = await supabase
     .from("listings")
@@ -443,6 +436,23 @@ export async function createProject(
   const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
   const facetRes = await setListingFacets(listingId, facetValueIds);
   if (facetRes.error) console.warn("[createProject] facet values error (non-fatal):", facetRes.error);
+
+  // ── THE RELATIONAL EDGE, WHICH NOTHING USED TO WRITE ──────────────────────
+  // mentioned_products is the author's stated list; project_product_links is
+  // what Explore, the network graph and the admin connection counts actually
+  // read. No publish path wrote it — links only ever appeared when an admin
+  // tagged a product in a photo. So the wizard's promise that tagging a product
+  // "connects your project to that product's page" produced no connection.
+  //
+  // Manual source, so photo_tag links made later are preserved rather than
+  // replaced (setProjectProductsManualAction keeps them).
+  const linkedProductIds = mentionedProductIds(mentioned_products);
+  if (linkedProductIds.length > 0) {
+    const linkRes = await setProjectProductsManualAction(listingId, linkedProductIds);
+    if (!linkRes.ok) {
+      console.warn("[createProject] product links error (non-fatal):", linkRes.error);
+    }
+  }
 
   // Notify followers of this designer — fire and forget
   if (profile?.id) {

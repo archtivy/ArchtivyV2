@@ -17,7 +17,15 @@ import type { TeamMember, BrandUsed } from "@/lib/types/listings";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
 import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets, getTaxonomyNodeById } from "@/lib/taxonomy/taxonomyDb";
+import {
+  parseMentionedProductsField,
+  hydrateMentionedProducts,
+  mentionedProductIds,
+} from "@/lib/listings/mentionedProducts";
+import { setProjectProductsManualAction } from "@/app/actions/projectBrandsProducts";
 import { notifySearchEngines } from "@/lib/seo/indexnow";
+import { normaliseInstagramHandle } from "@/lib/publish/instagram";
+import { replaceGallery } from "@/lib/db/listingGallery";
 
 const MIN_GALLERY_IMAGES = 3;
 
@@ -109,24 +117,7 @@ function parseColorOptions(value: FormDataEntryValue | null): string[] {
   }
 }
 
-type MentionedProductEntry = { brand_name_text: string; product_name_text: string };
 
-function parseMentionedProducts(value: FormDataEntryValue | null): MentionedProductEntry[] {
-  if (!value || typeof value !== "string" || !value.trim()) return [];
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (x): x is MentionedProductEntry =>
-        typeof x === "object" &&
-        x !== null &&
-        typeof (x as MentionedProductEntry).brand_name_text === "string" &&
-        typeof (x as MentionedProductEntry).product_name_text === "string"
-    );
-  } catch {
-    return [];
-  }
-}
 
 export type AdminCreateResult = { error?: string };
 
@@ -168,16 +159,36 @@ export async function createAdminProjectFull(
   const material_or_finish = (formData.get("material_or_finish") as string)?.trim() ?? null;
   const team_members = parseTeamMembers(formData.get("team_members"));
   const material_ids = parseMaterialIds(formData.get("project_material_ids"));
-  const mentioned_products = parseMentionedProducts(formData.get("mentioned_products"));
+  const mentioned_products_raw = parseMentionedProductsField(formData.get("mentioned_products"));
   const project_status = (formData.get("project_status") as string)?.trim() || null;
   const project_collaboration_status = (formData.get("project_collaboration_status") as string)?.trim() || null;
   const project_looking_for = parseMaterialIds(formData.get("project_looking_for"));
 
+  // Publish-flow fields. The wizard's SEO step posts all four; the legacy admin
+  // form posted none of them, so they were dropped on every admin create.
+  const meta_description = (formData.get("meta_description") as string)?.trim() || null;
+  const website = (formData.get("website") as string)?.trim() || null;
+  const video_url = (formData.get("video_url") as string)?.trim() || null;
+  const instagramRaw = (formData.get("instagram") as string)?.trim() || "";
+  const instagram = normaliseInstagramHandle(instagramRaw);
+  if (instagramRaw && !instagram) {
+    return { error: "Instagram should be a handle like studioname, not a full URL." };
+  }
+  // Author-supplied slug from the SEO step, still run through the same
+  // slugify + uniqueness path so it cannot produce an unreachable URL.
+  const slugInput = (formData.get("slug") as string)?.trim().toLowerCase() || "";
+
+  // Admins get real drafts too. The legacy form had no draft concept and always
+  // wrote APPROVED, so an admin had no way to stage an incomplete listing.
+  const isDraft = formData.get("draft") === "1";
+
   if (!title) return { error: "Title is required." };
-  if (!description?.trim()) return { error: "Description is required." };
-  if (!location?.trim()) return { error: "Project location is required." };
-  if (!projectTaxonomyNodeId && !category?.trim()) return { error: "Project category is required." };
-  if (!year?.trim()) return { error: "Year is required." };
+  if (!isDraft) {
+    if (!description?.trim()) return { error: "Description is required." };
+    if (!location?.trim()) return { error: "Project location is required." };
+    if (!projectTaxonomyNodeId && !category?.trim()) return { error: "Project category is required." };
+    if (!year?.trim()) return { error: "Year is required." };
+  }
 
   // Derive legacy category from taxonomy node when taxonomy is primary but category is empty
   let resolvedCreateCategory: string | null = category;
@@ -189,16 +200,20 @@ export async function createAdminProjectFull(
   }
 
   const galleryItems = parseGalleryJson(formData.get("gallery"));
-  if (galleryItems.length < MIN_GALLERY_IMAGES) {
+  if (!isDraft && galleryItems.length < MIN_GALLERY_IMAGES) {
     return { error: `At least ${MIN_GALLERY_IMAGES} gallery images are required.` };
   }
 
   const supabase = getSupabaseServiceClient();
-  const baseSlug = slugFromTitle(title || "project");
+  const baseSlug = slugFromTitle(slugInput || title || "project");
   const slug = await ensureUniqueSlug(supabase, baseSlug);
   if (!slug || !String(slug).trim()) {
     return { error: "Unable to generate a valid slug for the project." };
   }
+
+  // Wizard-picked products arrive as ids; typed entries arrive as text. Both
+  // normalise to the same stored shape, with the ids given readable names.
+  const mentioned_products = await hydrateMentionedProducts(supabase, mentioned_products_raw);
 
   const areaSqftValue =
     area_sqft != null && !Number.isNaN(area_sqft) && area_sqft > 0 ? area_sqft : null;
@@ -207,7 +222,9 @@ export async function createAdminProjectFull(
     .insert({
       type: "project",
       listing_type: "project",
-      status: "APPROVED",
+      // An admin IS the reviewer, so a non-draft admin create publishes
+      // directly rather than entering the queue it would review itself.
+      status: isDraft ? "DRAFT" : "APPROVED",
       title,
       description: description || null,
       slug,
@@ -232,6 +249,10 @@ export async function createAdminProjectFull(
       project_status: project_status || null,
       project_collaboration_status: project_collaboration_status || null,
       project_looking_for: project_looking_for.length > 0 ? project_looking_for : [],
+      meta_description,
+      website,
+      instagram,
+      video_url,
     })
     .select("id")
     .maybeSingle();
@@ -261,19 +282,25 @@ export async function createAdminProjectFull(
     }
   }
 
-  const imageRows = galleryItems.map((item, i) => ({
-    listing_id: listingId,
-    image_url: item.url,
-    alt: item.alt?.trim() || null,
-    sort_order: i,
-  }));
-  const { error: imagesInsertError } = await supabase.from("listing_images").insert(imageRows);
-  if (imagesInsertError) {
-    await supabase.from("listings").delete().eq("id", listingId);
-    return { error: `Failed to save gallery: ${imagesInsertError.message}` };
+  // A draft may legitimately have no images yet — galleryItems[0] would throw.
+  if (galleryItems.length > 0) {
+    const imageRows = galleryItems.map((item, i) => ({
+      listing_id: listingId,
+      image_url: item.url,
+      alt: item.alt?.trim() || null,
+      caption: item.caption?.trim() || null,
+      sort_order: i,
+    }));
+    const { error: imagesInsertError } = await supabase.from("listing_images").insert(imageRows);
+    if (imagesInsertError) {
+      await supabase.from("listings").delete().eq("id", listingId);
+      return { error: `Failed to save gallery: ${imagesInsertError.message}` };
+    }
+    await supabase
+      .from("listings")
+      .update({ cover_image_url: galleryItems[0].url })
+      .eq("id", listingId);
   }
-  const coverImageUrl = galleryItems[0].url;
-  await supabase.from("listings").update({ cover_image_url: coverImageUrl }).eq("id", listingId);
 
   // Match computation runs in background; cache invalidation happens after completion
   const { enqueueMatchRecomputation: enqueueProjectCreate } = await import("@/lib/matches/recompute");
@@ -315,6 +342,14 @@ export async function createAdminProjectFull(
   const facetRes = await setListingFacets(listingId, facetValueIds);
   if (facetRes.error) console.warn("[admin createProject] facet values error (non-fatal):", facetRes.error);
 
+  // The relational edge Explore and the connection counts read. No publish
+  // path wrote it before this change.
+  const createLinkIds = mentionedProductIds(mentioned_products);
+  if (createLinkIds.length > 0) {
+    const linkRes = await setProjectProductsManualAction(listingId, createLinkIds);
+    if (!linkRes.ok) console.warn("[admin createProject] product links error (non-fatal):", linkRes.error);
+  }
+
   if (admin.ok) {
     await createAuditLog({
       adminUserId: admin.adminUserId,
@@ -329,7 +364,7 @@ export async function createAdminProjectFull(
   revalidatePath("/explore/products");
   revalidatePath("/sitemap.xml");
   revalidatePath("/admin");
-  notifySearchEngines([`/projects/${slug}`]).catch(() => {});
+  if (!isDraft) notifySearchEngines([`/projects/${slug}`]).catch(() => {});
   redirect(`/admin/projects/${listingId}`);
 }
 
@@ -361,10 +396,23 @@ export async function createAdminProductFull(
   const product_collaboration_status = (formData.get("product_collaboration_status") as string)?.trim() || null;
   const product_looking_for = parseMaterialIds(formData.get("product_looking_for"));
 
+  const meta_description = (formData.get("meta_description") as string)?.trim() || null;
+  const website = (formData.get("website") as string)?.trim() || null;
+  const video_url = (formData.get("video_url") as string)?.trim() || null;
+  const instagramRaw = (formData.get("instagram") as string)?.trim() || "";
+  const instagram = normaliseInstagramHandle(instagramRaw);
+  if (instagramRaw && !instagram) {
+    return { error: "Instagram should be a handle like studioname, not a full URL." };
+  }
+  const slugInput = (formData.get("slug") as string)?.trim().toLowerCase() || "";
+  const isDraft = formData.get("draft") === "1";
+
   if (!title) return { error: "Product title is required." };
-  if (!description?.trim()) return { error: "Product description is required." };
-  if (!taxonomy_node_id && !product_type?.trim()) return { error: "Product type is required." };
-  if (!taxonomy_node_id && !product_subcategory?.trim()) return { error: "Product subcategory is required." };
+  if (!isDraft) {
+    if (!description?.trim()) return { error: "Product description is required." };
+    if (!taxonomy_node_id && !product_type?.trim()) return { error: "Product type is required." };
+    if (!taxonomy_node_id && !product_subcategory?.trim()) return { error: "Product subcategory is required." };
+  }
 
   // Derive legacy fields from taxonomy node when taxonomy is selected but legacy fields are empty
   let resolvedProductType: string | null = product_type;
@@ -379,13 +427,25 @@ export async function createAdminProductFull(
     }
   }
 
-  const descWords = (description ?? "").trim().split(/\s+/).filter(Boolean).length;
-  if (descWords < 200) return { error: "Description must be at least 200 words." };
+  if (!isDraft) {
+    const descWords = (description ?? "").trim().split(/\s+/).filter(Boolean).length;
+    if (descWords < 200) return { error: "Description must be at least 200 words." };
+  }
 
+  // ── TWO IMAGE SOURCES, AND ONLY ONE WAS BEING READ ────────────────────────
+  // This action accepted only `images` (raw File uploads), the shape the legacy
+  // admin form posted. The wizard uploads client-side through ImageDropzone and
+  // posts `gallery` — a JSON array of already-uploaded {path,url} items.
+  // createProductCanonical grew this same branch on 2026-08-15 for exactly this
+  // reason; without it here, an admin creating a product through the wizard
+  // would get no listing_images rows and no cover image.
+  //
+  // `gallery` wins when both are present; they never arrive together.
+  const galleryItems = parseGalleryJson(formData.get("gallery"));
   const imageFiles = getImageFiles(formData);
 
   const supabase = getSupabaseServiceClient();
-  const baseSlug = slugFromTitle(title || "product");
+  const baseSlug = slugFromTitle(slugInput || title || "product");
   const slug = await ensureUniqueSlug(supabase, baseSlug);
 
   // `year` arrives from FormData as a string and used to be passed straight into
@@ -421,6 +481,10 @@ export async function createAdminProductFull(
       p_dimensions: dimensions || null,
       p_year: parsedYear,
       p_team_members: team_members,
+      // Explicit rather than relying on the function's 'APPROVED' default: an
+      // admin IS the reviewer, so a non-draft admin create publishes directly,
+      // but a draft must not go live.
+      p_status: isDraft ? "DRAFT" : "APPROVED",
       p_product_stage: product_stage || null,
       p_product_collaboration_status: product_collaboration_status || null,
       p_product_looking_for: product_looking_for.length > 0 ? product_looking_for : [],
@@ -459,25 +523,56 @@ export async function createAdminProductFull(
     }
   }
 
-  const uploadResult = await uploadGalleryImagesServer(listingId, imageFiles);
-  if (uploadResult.error || !uploadResult.data?.length) {
+  let imageRows: { listing_id: string; image_url: string; alt: string | null; caption?: string | null; sort_order: number }[] = [];
+  if (galleryItems.length > 0) {
+    imageRows = galleryItems.map((item, i) => ({
+      listing_id: listingId,
+      image_url: item.url,
+      alt: item.alt?.trim() || null,
+      caption: item.caption?.trim() || null,
+      sort_order: i,
+    }));
+  } else if (imageFiles.length > 0) {
+    const uploadResult = await uploadGalleryImagesServer(listingId, imageFiles);
+    if (uploadResult.error || !uploadResult.data?.length) {
+      await supabase.from("listings").delete().eq("id", listingId);
+      return { error: uploadResult.error ?? "Image upload failed." };
+    }
+    imageRows = uploadResult.data.map((image_url, i) => ({
+      listing_id: listingId,
+      image_url,
+      alt: null,
+      sort_order: i,
+    }));
+  } else if (!isDraft) {
     await supabase.from("listings").delete().eq("id", listingId);
-    return { error: uploadResult.error ?? "Image upload failed." };
+    return { error: "At least one image is required." };
   }
-  const imageUrls = uploadResult.data;
-  const coverImageUrl = imageUrls[0];
-  const imageRows = imageUrls.map((image_url, i) => ({
-    listing_id: listingId,
-    image_url,
-    alt: null as string | null,
-    sort_order: i,
-  }));
-  const { error: imagesInsertError } = await supabase.from("listing_images").insert(imageRows);
-  if (imagesInsertError) {
-    await supabase.from("listings").delete().eq("id", listingId);
-    return { error: `Failed to save gallery: ${imagesInsertError.message}` };
+
+  if (imageRows.length > 0) {
+    const { error: imagesInsertError } = await supabase.from("listing_images").insert(imageRows);
+    if (imagesInsertError) {
+      await supabase.from("listings").delete().eq("id", listingId);
+      return { error: `Failed to save gallery: ${imagesInsertError.message}` };
+    }
+    await supabase
+      .from("listings")
+      .update({ cover_image_url: imageRows[0].image_url })
+      .eq("id", listingId);
   }
-  await supabase.from("listings").update({ cover_image_url: coverImageUrl }).eq("id", listingId);
+
+  // Publish-flow columns. create_product_with_sidecar has no parameters for
+  // these, so they are patched onto the row it just created — same approach
+  // createProductCanonical takes.
+  if (meta_description || website || video_url || instagram) {
+    const { error: metaErr } = await supabase
+      .from("listings")
+      .update({ meta_description, website, instagram, video_url })
+      .eq("id", listingId);
+    if (metaErr) {
+      console.error("[admin createProduct] publish-flow fields failed:", metaErr.code, metaErr.message);
+    }
+  }
 
   // Match computation runs in background; cache invalidation happens after completion
   const { enqueueMatchRecomputation: enqueueProductCreate } = await import("@/lib/matches/recompute");
@@ -522,7 +617,7 @@ export async function createAdminProductFull(
   revalidatePath("/explore/products");
   revalidatePath("/sitemap.xml");
   revalidatePath("/admin");
-  notifySearchEngines([`/products/${slug}`]).catch(() => {});
+  if (!isDraft) notifySearchEngines([`/products/${slug}`]).catch(() => {});
   redirect(`/admin/products/${listingId}`);
 }
 
@@ -846,10 +941,22 @@ export async function updateProjectAction(
   const material_or_finish = (formData.get("material_or_finish") as string)?.trim() ?? null;
   const team_members = parseTeamMembers(formData.get("team_members"));
   const material_ids = parseMaterialIds(formData.get("project_material_ids"));
-  const mentioned_products = parseMentionedProducts(formData.get("mentioned_products"));
+  const mentioned_products_raw = parseMentionedProductsField(formData.get("mentioned_products"));
   const project_status_upd = (formData.get("project_status") as string)?.trim() || null;
   const project_collab_status_upd = (formData.get("project_collaboration_status") as string)?.trim() || null;
   const project_looking_for_upd = parseMaterialIds(formData.get("project_looking_for"));
+
+  // Publish-flow fields from the wizard's SEO step. The legacy admin form had
+  // no controls for these and posted nothing, so an admin save used to discard
+  // whatever the author had set.
+  const meta_description = (formData.get("meta_description") as string)?.trim() || null;
+  const website = (formData.get("website") as string)?.trim() || null;
+  const video_url = (formData.get("video_url") as string)?.trim() || null;
+  const instagramRaw = (formData.get("instagram") as string)?.trim() || "";
+  const instagram = normaliseInstagramHandle(instagramRaw);
+  if (instagramRaw && !instagram) {
+    return { error: "Instagram should be a handle like studioname, not a full URL." };
+  }
 
   if (!title) return { error: "Title is required." };
   if (!description?.trim()) return { error: "Description is required." };
@@ -867,6 +974,7 @@ export async function updateProjectAction(
   }
 
   const supabase = getSupabaseServiceClient();
+  const mentioned_products = await hydrateMentionedProducts(supabase, mentioned_products_raw);
   const { error: updateError } = await supabase
     .from("listings")
     .update({
@@ -889,6 +997,10 @@ export async function updateProjectAction(
       project_status: project_status_upd || null,
       project_collaboration_status: project_collab_status_upd || null,
       project_looking_for: project_looking_for_upd.length > 0 ? project_looking_for_upd : [],
+      meta_description,
+      website,
+      instagram,
+      video_url,
     })
     .eq("id", listingId);
 
@@ -900,8 +1012,18 @@ export async function updateProjectAction(
     return { error: err instanceof Error ? err.message : "Failed to save team members." };
   }
 
-  // Gallery images are managed separately via EditorialImageManager (media.ts actions).
-  // No image upload/replace logic here.
+  // The wizard's Images step owns the gallery. replaceGallery matches rows by
+  // image_url so kept images retain their listing_images id — and therefore
+  // their photo product tags, which EditorialImageManager places on this same
+  // page and which only an admin can create.
+  //
+  // Absent is not empty: a caller that does not manage the gallery must not
+  // wipe it. FormData.get() returns null for an absent key, "" for a cleared one.
+  const rawGallery = formData.get("gallery");
+  if (rawGallery !== null) {
+    const galleryError = await replaceGallery(listingId, parseGalleryJson(rawGallery));
+    if (galleryError) return { error: galleryError };
+  }
 
   const docFiles = getDocumentFiles(formData);
   if (docFiles.length > 0) {
@@ -939,6 +1061,14 @@ export async function updateProjectAction(
   const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
   const facetRes = await setListingFacets(listingId, facetValueIds);
   if (facetRes.error) console.warn("[updateProject] facet values error (non-fatal):", facetRes.error);
+
+  // Replace semantics: an unticked product loses its manual link. photo_tag
+  // links survive — setProjectProductsManualAction only touches source='manual'.
+  const updateLinkRes = await setProjectProductsManualAction(
+    listingId,
+    mentionedProductIds(mentioned_products)
+  );
+  if (!updateLinkRes.ok) console.warn("[updateProject] product links error (non-fatal):", updateLinkRes.error);
 
   if (admin.ok) {
     await createAuditLog({
@@ -992,6 +1122,18 @@ export async function updateProductAction(
   const product_collab_status_upd = (formData.get("product_collaboration_status") as string)?.trim() || null;
   const product_looking_for_upd = parseMaterialIds(formData.get("product_looking_for"));
 
+  // Publish-flow fields from the wizard's SEO step. The legacy admin form had
+  // no controls for these and posted nothing, so an admin save used to discard
+  // whatever the author had set.
+  const meta_description = (formData.get("meta_description") as string)?.trim() || null;
+  const website = (formData.get("website") as string)?.trim() || null;
+  const video_url = (formData.get("video_url") as string)?.trim() || null;
+  const instagramRaw = (formData.get("instagram") as string)?.trim() || "";
+  const instagram = normaliseInstagramHandle(instagramRaw);
+  if (instagramRaw && !instagram) {
+    return { error: "Instagram should be a handle like studioname, not a full URL." };
+  }
+
   if (!title) return { error: "Product title is required." };
   if (!description?.trim()) return { error: "Description is required." };
   if (!taxonomy_node_id && !product_type?.trim()) return { error: "Product type is required." };
@@ -1026,6 +1168,10 @@ export async function updateProductAction(
       product_stage: product_stage_upd || null,
       product_collaboration_status: product_collab_status_upd || null,
       product_looking_for: product_looking_for_upd.length > 0 ? product_looking_for_upd : [],
+      meta_description,
+      website,
+      instagram,
+      video_url,
     })
     .eq("id", listingId);
 
@@ -1061,8 +1207,18 @@ export async function updateProductAction(
     return { error: err instanceof Error ? err.message : "Failed to save team members." };
   }
 
-  // Gallery images are managed separately via EditorialImageManager (media.ts actions).
-  // No image upload/replace logic here.
+  // The wizard's Images step owns the gallery. replaceGallery matches rows by
+  // image_url so kept images retain their listing_images id — and therefore
+  // their photo product tags, which EditorialImageManager places on this same
+  // page and which only an admin can create.
+  //
+  // Absent is not empty: a caller that does not manage the gallery must not
+  // wipe it. FormData.get() returns null for an absent key, "" for a cleared one.
+  const rawGallery = formData.get("gallery");
+  if (rawGallery !== null) {
+    const galleryError = await replaceGallery(listingId, parseGalleryJson(rawGallery));
+    if (galleryError) return { error: galleryError };
+  }
 
   const docFiles = getDocumentFiles(formData);
   if (docFiles.length > 0) {
@@ -1170,4 +1326,45 @@ export async function deleteAdminProjectAction(listingId: string) {
 /** Admin-only: delete a single product listing by id. Use from Admin Products list. */
 export async function deleteAdminProductAction(listingId: string) {
   return deleteListing(listingId);
+}
+
+/* ── Wizard adapters ──────────────────────────────────────────────────────────
+ *
+ * WizardAdminContext asks for (FormData) and (id, FormData). The four actions
+ * above predate it and take useFormState's (prevState, FormData), with the
+ * listing id smuggled through a hidden _listingId field the wizard has no
+ * reason to know about.
+ *
+ * These four adapters own that mismatch. They exist as server actions rather
+ * than as closures in the routes because a client component can only receive a
+ * server action by reference — a wrapper defined in a server component is not
+ * serialisable and would fail at the boundary.
+ */
+
+export async function createAdminProjectFromWizard(
+  formData: FormData
+): Promise<AdminCreateResult> {
+  return createAdminProjectFull(null, formData);
+}
+
+export async function updateAdminProjectFromWizard(
+  listingId: string,
+  formData: FormData
+): Promise<AdminCreateResult> {
+  formData.set("_listingId", listingId);
+  return updateProjectAction(null, formData);
+}
+
+export async function createAdminProductFromWizard(
+  formData: FormData
+): Promise<AdminCreateResult> {
+  return createAdminProductFull(null, formData);
+}
+
+export async function updateAdminProductFromWizard(
+  listingId: string,
+  formData: FormData
+): Promise<AdminCreateResult> {
+  formData.set("_listingId", listingId);
+  return updateProductAction(null, formData);
 }

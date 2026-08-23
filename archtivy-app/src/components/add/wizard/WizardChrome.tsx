@@ -1,15 +1,53 @@
 "use client";
 
 import { Check } from "lucide-react";
+import { HomeNav } from "@/components/home/HomeNav";
 
 /**
- * Wizard chrome — the step rail, progress and autosave indicator.
+ * Wizard chrome — the frame, step rail, progress and autosave indicator.
  *
  * Visual bar: this is an authoring surface people spend twenty minutes in, not
  * an admin table. Soft cards, hairline borders, generous spacing, one focal
  * action per screen. It deliberately does not reuse /add/project's old dense
  * styling — only its data handling was worth keeping.
  */
+
+/**
+ * The page frame both wizards sit in.
+ *
+ * ── WHY THIS IS A COMPONENT AND NOT SIX LINES IN EACH WIZARD ────────────────
+ * The wizards now render in two places that disagree about who owns the page
+ * chrome:
+ *
+ *   /add/* and /me/listings/[id]/edit — standalone pages. The wizard supplies
+ *     the site header and the cream ground, because nothing else will.
+ *   /admin/projects/* and /admin/products/* — already inside AdminShell, which
+ *     draws the admin sidebar and header. A wizard drawing HomeNav here would
+ *     stack a full-width site header on top of the admin chrome.
+ *
+ * `bare` is that switch. Keeping it in one component means the admin routes
+ * cannot forget to set it, and the public frame can change shape without
+ * touching either wizard.
+ */
+export function WizardFrame({
+  bare = false,
+  children,
+}: {
+  /** True inside AdminShell, which supplies its own chrome. */
+  bare?: boolean;
+  children: React.ReactNode;
+}) {
+  if (bare) return <div className="font-body text-ink">{children}</div>;
+
+  return (
+    <div className="min-h-screen bg-cream font-body text-ink">
+      <HomeNav variant="solid" />
+      <div className="mx-auto max-w-[1400px] px-5 pb-16 pt-[104px] md:px-10 lg:px-14">
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export interface WizardStepMeta {
   id: string;

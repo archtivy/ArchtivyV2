@@ -6,6 +6,11 @@ import {
   getListingTaxonomyNodes,
 } from "@/lib/taxonomy/taxonomyDb";
 import { getMaterialsByProductIds, getMaterialsByProjectIds } from "@/lib/db/materials";
+import {
+  normaliseMentionedProducts,
+  mentionedProductIds,
+  type MentionedProduct,
+} from "@/lib/listings/mentionedProducts";
 import type { UploadedGalleryItem } from "@/lib/storage/types";
 import type { TeamMember } from "@/lib/types/listings";
 
@@ -78,7 +83,10 @@ export interface ProjectEditData extends ListingEditCommon {
   areaSqft: number | null;
   materialOrFinish: string;
   teamMembers: TeamMember[];
+  /** Linked product listing ids — what the wizard's Products picker binds to. */
   mentionedProducts: string[];
+  /** Entries naming a product that is not on the platform. Preserved on save. */
+  mentionedProductsFreeText: MentionedProduct[];
   projectStatus: string;
   projectCollaborationStatus: string;
   projectLookingFor: string[];
@@ -90,6 +98,18 @@ export interface ProductEditData extends ListingEditCommon {
   productType: string;
   productCategory: string;
   productSubcategory: string;
+  /**
+   * Below here: fields the product wizard never rendered, so nothing needed
+   * them loaded. The admin form could set all of them, so they are read now —
+   * without this an admin edit would blank every one of them on save.
+   */
+  year: string;
+  dimensions: string;
+  materialOrFinish: string;
+  teamMembers: TeamMember[];
+  productStage: string;
+  productCollaborationStatus: string;
+  productLookingFor: string[];
 }
 
 export type ListingEditData = ProjectEditData | ProductEditData;
@@ -178,6 +198,15 @@ export async function getListingForEdit(listingId: string): Promise<ListingEditD
       productType: str(listing.product_type),
       productCategory: str(listing.product_category),
       productSubcategory: str(listing.product_subcategory),
+      year: listing.year != null ? String(listing.year) : "",
+      dimensions: str(listing.dimensions),
+      materialOrFinish: str(listing.material_or_finish),
+      teamMembers: Array.isArray(listing.team_members)
+        ? (listing.team_members as TeamMember[])
+        : [],
+      productStage: str(listing.product_stage),
+      productCollaborationStatus: str(listing.product_collaboration_status),
+      productLookingFor: strArray(listing.product_looking_for),
     };
   }
 
@@ -197,7 +226,20 @@ export async function getListingForEdit(listingId: string): Promise<ListingEditD
     teamMembers: Array.isArray(listing.team_members)
       ? (listing.team_members as TeamMember[])
       : [],
-    mentionedProducts: strArray(listing.mentioned_products),
+    // The wizard's picker selects by product id, so this exposes the linked
+    // ids only. It used to be strArray(), which ran String() over the stored
+    // { brand_name_text, product_name_text } objects and produced the literal
+    // "[object Object]" — showing an empty Products step, then overwriting the
+    // real entries with that string on save.
+    mentionedProducts: mentionedProductIds(
+      normaliseMentionedProducts(listing.mentioned_products)
+    ),
+    // Free-text entries carry no product id and so cannot round-trip through
+    // the picker. Passed through separately so an edit preserves them instead
+    // of dropping them on save.
+    mentionedProductsFreeText: normaliseMentionedProducts(
+      listing.mentioned_products
+    ).filter((m) => !m.product_id),
     projectStatus: str(listing.project_status),
     projectCollaborationStatus: str(listing.project_collaboration_status),
     projectLookingFor: strArray(listing.project_looking_for),

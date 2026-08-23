@@ -6,6 +6,7 @@ import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { canManageListing } from "@/lib/auth/listingOwnership";
+import { replaceGallery } from "@/lib/db/listingGallery";
 import { normaliseInstagramHandle } from "@/lib/publish/instagram";
 import { parseGalleryJson } from "@/lib/storage/types";
 import {
@@ -15,6 +16,12 @@ import {
   getTaxonomyNodeById,
 } from "@/lib/taxonomy/taxonomyDb";
 import { setProjectMaterials, setProductMaterials } from "@/lib/db/materials";
+import {
+  parseMentionedProductsField,
+  hydrateMentionedProducts,
+  mentionedProductIds,
+} from "@/lib/listings/mentionedProducts";
+import { setProjectProductsManualAction } from "@/app/actions/projectBrandsProducts";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
 import { notifySearchEngines } from "@/lib/seo/indexnow";
 import type { ActionResult } from "./types";
@@ -126,58 +133,6 @@ async function authorizeListingEdit(
 }
 
 /**
- * Replace a listing's gallery with the submitted set.
- *
- * Rows are deleted and re-inserted rather than diffed: the wizard posts an
- * ordered array with no stable row ids, so sort_order is a property of position
- * in that array. A diff would have to reconcile order anyway, and a partial
- * failure mid-diff leaves a half-ordered gallery.
- *
- * The delete only touches listing_images. Storage objects are intentionally
- * left in place — an image removed here may still be referenced by a cached
- * render or an older revision, and orphan cleanup is a background job's
- * problem, not an interactive save's.
- */
-async function replaceGallery(
-  listingId: string,
-  images: { url: string; alt?: string; caption?: string }[]
-): Promise<string | null> {
-  const supabase = getSupabaseServiceClient();
-
-  const { error: delErr } = await supabase
-    .from("listing_images")
-    .delete()
-    .eq("listing_id", listingId);
-  if (delErr) return `Failed to update gallery: ${delErr.message}`;
-
-  if (images.length === 0) {
-    // No images left: clear the cover too, or the listing keeps rendering a
-    // thumbnail whose row no longer exists.
-    await supabase.from("listings").update({ cover_image_url: null }).eq("id", listingId);
-    return null;
-  }
-
-  const rows = images.map((item, i) => ({
-    listing_id: listingId,
-    image_url: item.url,
-    alt: item.alt?.trim() || null,
-    caption: item.caption?.trim() || null,
-    sort_order: i,
-  }));
-
-  const { error: insErr } = await supabase.from("listing_images").insert(rows);
-  if (insErr) return `Failed to save gallery: ${insErr.message}`;
-
-  const { error: coverErr } = await supabase
-    .from("listings")
-    .update({ cover_image_url: images[0].url })
-    .eq("id", listingId);
-  if (coverErr) return `Failed to set cover image: ${coverErr.message}`;
-
-  return null;
-}
-
-/**
  * Material-taxonomy and facet links, applied ONLY when the form actually
  * carries them.
  *
@@ -254,7 +209,7 @@ export async function updateProjectCanonical(
   const materialOrFinish = (formData.get("material_or_finish") as string)?.trim() || null;
   const teamMembers = parseTeamMembers(formData.get("team_members"));
   const materialIds = parseStringArray(formData.get("project_material_ids"));
-  const mentionedProducts = parseStringArray(formData.get("mentioned_products"));
+  const mentionedProductsRaw = parseMentionedProductsField(formData.get("mentioned_products"));
   const projectStatus = (formData.get("project_status") as string)?.trim() || null;
   const projectCollab = (formData.get("project_collaboration_status") as string)?.trim() || null;
   const projectLookingFor = parseStringArray(formData.get("project_looking_for"));
@@ -286,6 +241,13 @@ export async function updateProjectCanonical(
   }
 
   const supabase = getSupabaseServiceClient();
+
+  // Was parseStringArray, which stored bare product ids — a shape neither the
+  // public project page nor the admin form could read. Normalised and hydrated
+  // into the canonical object shape now; free-text entries typed in the admin
+  // form survive the round-trip untouched.
+  const mentionedProducts = await hydrateMentionedProducts(supabase, mentionedProductsRaw);
+
   const { error: updateError } = await supabase
     .from("listings")
     .update({
@@ -335,6 +297,16 @@ export async function updateProjectCanonical(
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to save team members." };
   }
+
+  // Keep project_product_links in step with the author's picks. Replace
+  // semantics, matching every other relationship set on this action — an
+  // unticked product must actually lose its link. photo_tag links are
+  // preserved by setProjectProductsManualAction.
+  const linkRes = await setProjectProductsManualAction(
+    listingId,
+    mentionedProductIds(mentionedProducts)
+  );
+  if (!linkRes.ok) console.warn("[updateProject] product links failed:", linkRes.error);
 
   const slug = String(listing.slug ?? "");
   revalidateListing("project", slug);

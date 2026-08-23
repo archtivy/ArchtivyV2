@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, X, Plus } from "lucide-react";
-import { HomeNav } from "@/components/home/HomeNav";
 import {
   StepRail,
+  WizardFrame,
   WizardProgress,
   SaveIndicator,
   DeviceFrame,
@@ -17,15 +17,28 @@ import {
   Card,
   Field,
   inputCls,
+  OwnerField,
+  AdminOnly,
+  TeamStep,
   PickerStep,
   SeoStep,
   PublishStep,
+  type TeamMemberDraft,
 } from "@/components/add/wizard/WizardPrimitives";
 import { computeSeoScore, countWords, SEO_THRESHOLDS } from "@/lib/publish/seoScore";
 import type { UploadedGalleryItem } from "@/lib/storage/types";
 import { createProductCanonical } from "@/app/actions/listings";
 import { updateProductCanonical } from "@/app/actions/updateListing";
 import type { ProductEditData } from "@/lib/db/listingEdit";
+import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
+import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
+import {
+  PRODUCT_STAGE_VALUES,
+  PRODUCT_STAGE_LABELS,
+  PRODUCT_COLLAB_VALUES,
+  PRODUCT_COLLAB_LABELS,
+  PRODUCT_LOOKING_FOR_OPTIONS,
+} from "@/lib/lifecycle";
 
 /**
  * Product publish wizard — the product-side twin of ProjectWizard.
@@ -84,6 +97,7 @@ export function ProductWizard({
   brandName,
   initial,
   initialStep,
+  admin,
 }: {
   categories: ProductTaxonomyOption[];
   materials: ProductMaterialOption[];
@@ -99,6 +113,12 @@ export function ProductWizard({
    * for it would undercut the point of naming the field.
    */
   initialStep?: number;
+  /**
+   * Present only in /admin. Same convention as `initial` — the wizard is in
+   * admin context because it was handed what only an admin has, so a mode flag
+   * and the data behind it cannot disagree. See adminContext.ts.
+   */
+  admin?: WizardAdminContext;
 }) {
   const isEdit = Boolean(initial);
   const router = useRouter();
@@ -116,6 +136,24 @@ export function ProductWizard({
   const [taxonomyNodeId, setTaxonomyNodeId] = useState(initial?.taxonomyNodeId ?? "");
   const [colorOptions, setColorOptions] = useState<string[]>(initial?.colorOptions ?? []);
   const [colorDraft, setColorDraft] = useState("");
+  const [ownerProfileId, setOwnerProfileId] = useState(admin?.ownerProfileId ?? "");
+  // Admin-only fields, carried over from the legacy admin form. Each folds
+  // into the nearest existing step rather than adding one — see AdminOnly.
+  const [year, setYear] = useState(initial?.year ?? "");
+  const [dimensions, setDimensions] = useState(initial?.dimensions ?? "");
+  const [materialOrFinish, setMaterialOrFinish] = useState(initial?.materialOrFinish ?? "");
+  const [team, setTeam] = useState<TeamMemberDraft[]>(
+    // listings.team_members stores `role`; the draft shape calls it `title`.
+    (initial?.teamMembers ?? []).map((m) => ({
+      name: m.name ?? "",
+      title: (m as { role?: string }).role ?? "",
+      profileId: (m as { profile_id?: string | null }).profile_id ?? null,
+    }))
+  );
+  const [productStage, setProductStage] = useState(initial?.productStage ?? "");
+  const [collabStatus, setCollabStatus] = useState(initial?.productCollaborationStatus ?? "");
+  const [lookingFor, setLookingFor] = useState<string[]>(initial?.productLookingFor ?? []);
+  const [documents, setDocuments] = useState<File[]>([]);
   const [materialIds, setMaterialIds] = useState<string[]>(initial?.materialIds ?? []);
   const [website, setWebsite] = useState(initial?.website ?? "");
   const [instagram, setInstagram] = useState(initial?.instagram ?? "");
@@ -204,6 +242,33 @@ export function ProductWizard({
     fd.set("video_url", videoUrl);
     fd.set("slug", slug);
     if (draft) fd.set("draft", "1");
+    if (admin) {
+      fd.set("owner_profile_id", ownerProfileId);
+      fd.set("year", year);
+      fd.set("dimensions", dimensions);
+      fd.set("material_or_finish", materialOrFinish);
+      // Map title -> role: parseTeamMembers validates `role`, and serialising
+      // the draft as-is would fail that check and discard every credit.
+      fd.set(
+        "team_members",
+        JSON.stringify(
+          team
+            .filter((t) => t.name.trim())
+            .map((t) => ({
+              name: t.name.trim(),
+              role: t.title ?? "",
+              profile_id: t.profileId ?? null,
+            }))
+        )
+      );
+      fd.set("product_stage", productStage);
+      fd.set("product_collaboration_status", collabStatus);
+      fd.set(
+        "product_looking_for",
+        JSON.stringify(collabStatus && collabStatus !== "not_open_for_collaboration" ? lookingFor : [])
+      );
+      for (const f of documents) fd.append("documents", f);
+    }
     return fd;
   }
 
@@ -213,11 +278,23 @@ export function ProductWizard({
       // Editing never changes status — updateProductCanonical ignores `draft`
       // entirely and keeps whatever the listing already was. A draft stays a
       // draft; a published product is not silently pulled back for review.
-      const result = initial
-        ? await updateProductCanonical(initial.id, buildFormData(draft))
-        : await createProductCanonical(null, buildFormData(draft));
-      if (result?.error) {
+      const fd = buildFormData(draft);
+      const result = admin
+        ? initial
+          ? await admin.onUpdate(initial.id, fd)
+          : await admin.onCreate(fd)
+        : initial
+          ? await updateProductCanonical(initial.id, fd)
+          : await createProductCanonical(null, fd);
+      if (result && "error" in result && result.error) {
         setError(result.error);
+        return;
+      }
+      // The admin actions redirect server-side on success, so this only runs
+      // when they returned without redirecting.
+      if (admin) {
+        router.push(admin.returnTo);
+        router.refresh();
         return;
       }
       if (initial) {
@@ -229,13 +306,18 @@ export function ProductWizard({
     });
   }
 
-  const canPublish = title.trim().length > 0 && images.length > 0;
+  // createAdminProductFull rejects a submission with no owner, and an
+  // unowned product is unattributed publicly and invisible in /me/listings.
+  const canPublish =
+    title.trim().length > 0 && images.length > 0 && (!admin || Boolean(ownerProfileId));
 
   return (
-    <div className="min-h-screen bg-cream font-body text-ink">
-      <HomeNav variant="solid" />
-      <div className="mx-auto max-w-[1400px] px-5 pb-16 pt-[104px] md:px-10 lg:px-14">
-        <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
+    <WizardFrame bare={Boolean(admin)}>
+      <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
+        {/* Suppressed in admin: AdminPage supplies the title and actions bar. */}
+        {admin ? (
+          <div />
+        ) : (
           <div>
             <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
               {isEdit ? (initial?.status === "DRAFT" ? "Editing draft" : "Editing product") : "New product"}
@@ -244,155 +326,213 @@ export function ProductWizard({
               {isEdit ? title.trim() || "Edit product." : "Add a product."}
             </h1>
           </div>
-          <div className="flex items-center gap-4">
-            <SaveIndicator state={saveState} />
-            <button
-              type="button"
-              onClick={() => submit(true)}
-              disabled={pending || !title.trim()}
-              className="rounded-full border border-ink/25 px-5 py-2.5 font-body text-[14px] text-ink transition-all duration-150 hover:bg-stone/50 active:scale-[0.98] disabled:opacity-40 motion-reduce:transition-none"
-            >
-              {/* In edit mode both buttons run the same update and neither
-                  changes status, so "Save as draft" would be a lie on a
-                  published product. */}
-              {isEdit ? "Save changes" : "Save as draft"}
-            </button>
+        )}
+        <div className="flex items-center gap-4">
+          <SaveIndicator state={saveState} />
+          <button
+            type="button"
+            onClick={() => submit(true)}
+            disabled={pending || !title.trim()}
+            className="rounded-full border border-ink/25 px-5 py-2.5 font-body text-[14px] text-ink transition-all duration-150 hover:bg-stone/50 active:scale-[0.98] disabled:opacity-40 motion-reduce:transition-none"
+          >
+            {/* In edit mode both buttons run the same update and neither
+                changes status, so "Save as draft" would be a lie on a
+                published product. */}
+            {isEdit ? "Save changes" : "Save as draft"}
+          </button>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
+        <aside className="lg:col-span-3">
+          <div className="lg:sticky lg:top-[104px] lg:space-y-8">
+            <WizardProgress steps={steps} />
+            <StepRail steps={steps} current={step} onGo={go} />
           </div>
-        </header>
+        </aside>
 
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-12">
-          <aside className="lg:col-span-3">
-            <div className="lg:sticky lg:top-[104px] lg:space-y-8">
-              <WizardProgress steps={steps} />
-              <StepRail steps={steps} current={step} onGo={go} />
-            </div>
-          </aside>
+        <main className="min-w-0 lg:col-span-6">
+          <div
+            key={step}
+            className={[
+              "motion-reduce:animate-none",
+              direction === 1
+                ? "animate-[wizardInRight_320ms_ease-out]"
+                : "animate-[wizardInLeft_320ms_ease-out]",
+            ].join(" ")}
+          >
+            <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+              Step {step + 1} of {STEP_LABELS.length}
+            </p>
+            <h2 className="mt-2 font-display text-[30px] leading-[1.1] tracking-[-0.02em] text-ink">
+              {HEADINGS[step]}
+            </h2>
+            <p className="mt-3 max-w-[52ch] font-body text-[15px] leading-[24px] text-muted">
+              {BLURBS[step]}
+            </p>
 
-          <main className="min-w-0 lg:col-span-6">
-            <div
-              key={step}
-              className={[
-                "motion-reduce:animate-none",
-                direction === 1
-                  ? "animate-[wizardInRight_320ms_ease-out]"
-                  : "animate-[wizardInLeft_320ms_ease-out]",
-              ].join(" ")}
-            >
-              <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-                Step {step + 1} of {STEP_LABELS.length}
-              </p>
-              <h2 className="mt-2 font-display text-[30px] leading-[1.1] tracking-[-0.02em] text-ink">
-                {HEADINGS[step]}
-              </h2>
-              <p className="mt-3 max-w-[52ch] font-body text-[15px] leading-[24px] text-muted">
-                {BLURBS[step]}
-              </p>
+            <div className="mt-8">
+              {step === 0 && (
+                <div className="space-y-8">
+                  <ImageDropzone items={images} onChange={setImages} />
+                  {admin && (
+                    <AdminOnly label="Documents">
+                      <DocumentsUploadCard files={documents} onChange={setDocuments} />
+                    </AdminOnly>
+                  )}
+                </div>
+              )}
 
-              <div className="mt-8">
-                {step === 0 && <ImageDropzone items={images} onChange={setImages} />}
-
-                {step === 1 && (
-                  <Card>
-                    {brandName && (
+              {step === 1 && (
+                <Card>
+                  {/* The brand is the submitter when a brand is submitting, and
+                      a choice when an admin is. These are the same slot: the
+                      note below states the attribution, the picker sets it. */}
+                  {admin ? (
+                    <OwnerField
+                      kind="product"
+                      options={admin.ownerOptions}
+                      value={ownerProfileId}
+                      onChange={setOwnerProfileId}
+                    />
+                  ) : (
+                    brandName && (
                       <p className="rounded-xl bg-stone/40 px-4 py-3 font-body text-[13px] text-muted">
                         Publishing as <span className="text-ink">{brandName}</span> — products are
                         attributed to your brand profile automatically.
                       </p>
-                    )}
-                    <Field label="Product name" required>
-                      <input
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        className={inputCls}
-                        placeholder="Nena Armchair"
-                      />
-                    </Field>
-                    <Field label="Category">
-                      <select
-                        value={taxonomyNodeId}
-                        onChange={(e) => setTaxonomyNodeId(e.target.value)}
-                        className={inputCls}
-                      >
-                        <option value="">Choose a category…</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.label}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field
-                      label="Description"
-                      required
-                      hint={`${countWords(description)} words · ${SEO_THRESHOLDS.minDescriptionWords} recommended`}
+                    )
+                  )}
+                  <Field label="Product name" required>
+                    <input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className={inputCls}
+                      placeholder="Nena Armchair"
+                    />
+                  </Field>
+                  <Field label="Category">
+                    <select
+                      value={taxonomyNodeId}
+                      onChange={(e) => setTaxonomyNodeId(e.target.value)}
+                      className={inputCls}
                     >
-                      <textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        rows={9}
-                        className={`${inputCls} leading-[24px]`}
-                        placeholder="What it is, what it's made of, and what makes it worth specifying…"
-                      />
-                    </Field>
-                  </Card>
-                )}
+                      <option value="">Choose a category…</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field
+                    label="Description"
+                    required
+                    hint={`${countWords(description)} words · ${SEO_THRESHOLDS.minDescriptionWords} recommended`}
+                  >
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={9}
+                      className={`${inputCls} leading-[24px]`}
+                      placeholder="What it is, what it's made of, and what makes it worth specifying…"
+                    />
+                  </Field>
+                </Card>
+              )}
 
-                {step === 2 && (
-                  <Card>
-                    <Field
-                      label="Finish and colour options"
-                      hint="One per line, or press Enter"
-                    >
-                      <div className="flex gap-2">
-                        <input
-                          value={colorDraft}
-                          onChange={(e) => setColorDraft(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              const v = colorDraft.trim();
-                              if (v && !colorOptions.includes(v)) setColorOptions([...colorOptions, v]);
-                              setColorDraft("");
-                            }
-                          }}
-                          className={inputCls}
-                          placeholder="Walnut, Black leather, Brushed brass…"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
+              {step === 2 && (
+                <Card>
+                  <Field
+                    label="Finish and colour options"
+                    hint="One per line, or press Enter"
+                  >
+                    <div className="flex gap-2">
+                      <input
+                        value={colorDraft}
+                        onChange={(e) => setColorDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
                             const v = colorDraft.trim();
                             if (v && !colorOptions.includes(v)) setColorOptions([...colorOptions, v]);
                             setColorDraft("");
-                          }}
-                          className="shrink-0 rounded-xl border border-ink/25 px-4 font-body text-[14px] text-ink transition-colors hover:bg-stone/50"
-                        >
-                          <Plus strokeWidth={1.5} className="h-4 w-4" aria-hidden />
-                          <span className="sr-only">Add option</span>
-                        </button>
+                          }
+                        }}
+                        className={inputCls}
+                        placeholder="Walnut, Black leather, Brushed brass…"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const v = colorDraft.trim();
+                          if (v && !colorOptions.includes(v)) setColorOptions([...colorOptions, v]);
+                          setColorDraft("");
+                        }}
+                        className="shrink-0 rounded-xl border border-ink/25 px-4 font-body text-[14px] text-ink transition-colors hover:bg-stone/50"
+                      >
+                        <Plus strokeWidth={1.5} className="h-4 w-4" aria-hidden />
+                        <span className="sr-only">Add option</span>
+                      </button>
+                    </div>
+                  </Field>
+                  {colorOptions.length > 0 && (
+                    <ul className="flex flex-wrap gap-2">
+                      {colorOptions.map((c) => (
+                        <li key={c}>
+                          <button
+                            type="button"
+                            onClick={() => setColorOptions(colorOptions.filter((x) => x !== c))}
+                            className="inline-flex items-center gap-2 rounded-full bg-stone px-4 py-2 font-body text-[13px] text-ink transition-colors hover:bg-stone/70"
+                          >
+                            {c}
+                            <X strokeWidth={2} className="h-3 w-3" aria-hidden />
+                            <span className="sr-only">Remove option</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {admin && (
+                    <AdminOnly label="Specification">
+                      <div className="grid grid-cols-2 gap-5">
+                        <Field label="Year">
+                          <input
+                            value={year}
+                            onChange={(e) => setYear(e.target.value)}
+                            inputMode="numeric"
+                            className={inputCls}
+                            placeholder="2024"
+                          />
+                        </Field>
+                        <Field label="Dimensions">
+                          <input
+                            value={dimensions}
+                            onChange={(e) => setDimensions(e.target.value)}
+                            className={inputCls}
+                            placeholder="W 82 × D 78 × H 71 cm"
+                          />
+                        </Field>
                       </div>
-                    </Field>
-                    {colorOptions.length > 0 && (
-                      <ul className="flex flex-wrap gap-2">
-                        {colorOptions.map((c) => (
-                          <li key={c}>
-                            <button
-                              type="button"
-                              onClick={() => setColorOptions(colorOptions.filter((x) => x !== c))}
-                              className="inline-flex items-center gap-2 rounded-full bg-stone px-4 py-2 font-body text-[13px] text-ink transition-colors hover:bg-stone/70"
-                            >
-                              {c}
-                              <X strokeWidth={2} className="h-3 w-3" aria-hidden />
-                              <span className="sr-only">Remove option</span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </Card>
-                )}
+                    </AdminOnly>
+                  )}
+                </Card>
+              )}
 
-                {step === 3 && (
+              {step === 2 && admin && (
+                <div className="mt-8">
+                  <AdminOnly label="Credits">
+                    <TeamStep
+                      team={team}
+                      setTeam={setTeam}
+                      titles={admin.memberTitles ?? []}
+                    />
+                  </AdminOnly>
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="space-y-8">
                   <PickerStep
                     kind="material"
                     options={materials.map((m) => ({ id: m.id, label: m.label, sub: null, cover: null }))}
@@ -402,154 +542,236 @@ export function ProductWizard({
                     emptyHint="No materials tagged yet."
                     footnote="Materials power the material filters across Archtivy — they're how specifiers find products like yours."
                   />
-                )}
-
-                {step === 4 && (
-                  <Card>
-                    <Field label="Product page on your site">
-                      <input value={website} onChange={(e) => setWebsite(e.target.value)} className={inputCls} placeholder="https://example.com/products/nena" />
-                    </Field>
-                    <Field label="Instagram" hint="Just the handle — we build the link">
-                      <div className="relative">
-                        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-body text-[15px] text-muted">
-                          @
-                        </span>
+                  {admin && (
+                    <AdminOnly label="Material or finish">
+                      <Field
+                        label="Free-text material or finish"
+                        hint="Legacy field — the tags above drive the filters"
+                      >
                         <input
-                          value={instagram}
-                          onChange={(e) => setInstagram(e.target.value.replace(/^@/, "").toLowerCase())}
-                          className={`${inputCls} pl-9`}
-                          placeholder="brandname"
+                          value={materialOrFinish}
+                          onChange={(e) => setMaterialOrFinish(e.target.value)}
+                          className={inputCls}
+                          placeholder="Solid walnut, powder-coated steel"
                         />
-                      </div>
-                    </Field>
-                    <Field label="Video" hint="YouTube or Vimeo">
-                      <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className={inputCls} placeholder="https://vimeo.com/123456789" />
-                    </Field>
-                  </Card>
-                )}
-
-                {step === 5 && (
-                  <SeoStep
-                    slug={slug}
-                    onSlug={(v) => {
-                      setSlugTouched(true);
-                      setSlug(slugify(v));
-                    }}
-                    metaDescription={metaDescription}
-                    onMeta={setMetaDescription}
-                    seo={seo}
-                    slugPrefix="/products/"
-                    /* The slug is shown but not editable when editing: it is
-                       the live URL, and updateProductCanonical deliberately
-                       never changes it. An editable field that silently
-                       discards its own input is worse than a locked one. */
-                    slugReadOnly={isEdit}
-                    note={
-                      isEdit
-                        ? "The URL is fixed once a product exists — changing it would break every link already pointing here."
-                        : "Products have no location of their own, so that check stays unticked — it doesn’t stop you publishing."
-                    }
-                  />
-                )}
-
-                {step === 6 && (
-                  <PublishStep
-                    seo={seo}
-                    canPublish={canPublish}
-                    pending={pending}
-                    onPublish={() => submit(false)}
-                    onDraft={() => submit(true)}
-                    isEdit={isEdit}
-                    publishLabel={isEdit ? undefined : "Submit product"}
-                    /* Products go to PENDING, not straight live — the RPC has
-                       always done this, unlike projects. Say so plainly rather
-                       than let someone wonder why it is not on their profile. */
-                    publishNote={
-                      isEdit
-                        ? "Saving updates the product in place. Its published state doesn’t change."
-                        : "Products are reviewed before they appear publicly. You’ll keep the draft either way."
-                    }
-                  />
-                )}
-              </div>
-
-              {error && (
-                <p role="alert" className="mt-6 rounded-xl bg-red-50 px-4 py-3 font-body text-[14px] text-red-700">
-                  {error}
-                </p>
+                      </Field>
+                    </AdminOnly>
+                  )}
+                </div>
               )}
 
-              <div className="mt-10 flex items-center justify-between border-t border-hairline pt-6">
+              {step === 4 && (
+                <Card>
+                  <Field label="Product page on your site">
+                    <input value={website} onChange={(e) => setWebsite(e.target.value)} className={inputCls} placeholder="https://example.com/products/nena" />
+                  </Field>
+                  <Field label="Instagram" hint="Just the handle — we build the link">
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-body text-[15px] text-muted">
+                        @
+                      </span>
+                      <input
+                        value={instagram}
+                        onChange={(e) => setInstagram(e.target.value.replace(/^@/, "").toLowerCase())}
+                        className={`${inputCls} pl-9`}
+                        placeholder="brandname"
+                      />
+                    </div>
+                  </Field>
+                  <Field label="Video" hint="YouTube or Vimeo">
+                    <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className={inputCls} placeholder="https://vimeo.com/123456789" />
+                  </Field>
+                </Card>
+              )}
+
+              {step === 5 && (
+                <SeoStep
+                  slug={slug}
+                  onSlug={(v) => {
+                    setSlugTouched(true);
+                    setSlug(slugify(v));
+                  }}
+                  metaDescription={metaDescription}
+                  onMeta={setMetaDescription}
+                  seo={seo}
+                  slugPrefix="/products/"
+                  /* The slug is shown but not editable when editing: it is
+                     the live URL, and updateProductCanonical deliberately
+                     never changes it. An editable field that silently
+                     discards its own input is worse than a locked one. */
+                  slugReadOnly={isEdit}
+                  note={
+                    isEdit
+                      ? "The URL is fixed once a product exists — changing it would break every link already pointing here."
+                      : "Products have no location of their own, so that check stays unticked — it doesn’t stop you publishing."
+                  }
+                />
+              )}
+
+              {step === 5 && admin && (
+                <div className="mt-8">
+                  <AdminOnly label="Lifecycle & collaboration">
+                    <Field label="Product stage">
+                      <select
+                        value={productStage}
+                        onChange={(e) => setProductStage(e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">Not set</option>
+                        {PRODUCT_STAGE_VALUES.map((v) => (
+                          <option key={v} value={v}>
+                            {PRODUCT_STAGE_LABELS[v]}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Collaboration status">
+                      <select
+                        value={collabStatus}
+                        onChange={(e) => setCollabStatus(e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">Not set</option>
+                        {PRODUCT_COLLAB_VALUES.map((v) => (
+                          <option key={v} value={v}>
+                            {PRODUCT_COLLAB_LABELS[v]}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    {/* Hidden unless collaboration is open, and submit() sends
+                        an empty list in that case so no stale roles linger. */}
+                    {collabStatus && collabStatus !== "not_open_for_collaboration" && (
+                      <fieldset>
+                        <legend className="mb-2 font-body text-[14px] text-ink">Looking for</legend>
+                        <div className="flex flex-wrap gap-2">
+                          {PRODUCT_LOOKING_FOR_OPTIONS.map((opt) => {
+                            const on = lookingFor.includes(opt.value);
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() =>
+                                  setLookingFor((prev) =>
+                                    on ? prev.filter((v) => v !== opt.value) : [...prev, opt.value]
+                                  )
+                                }
+                                className={[
+                                  "rounded-full border px-4 py-2 font-body text-[13px] transition-colors duration-150",
+                                  on
+                                    ? "border-ink bg-ink text-cream"
+                                    : "border-ink/25 text-muted hover:border-ink/40 hover:text-ink",
+                                ].join(" ")}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
+                    )}
+                  </AdminOnly>
+                </div>
+              )}
+
+              {step === 6 && (
+                <PublishStep
+                  seo={seo}
+                  canPublish={canPublish}
+                  pending={pending}
+                  onPublish={() => submit(false)}
+                  onDraft={() => submit(true)}
+                  isEdit={isEdit}
+                  publishLabel={isEdit ? undefined : "Submit product"}
+                  /* Products go to PENDING, not straight live — the RPC has
+                     always done this, unlike projects. Say so plainly rather
+                     than let someone wonder why it is not on their profile. */
+                  publishNote={
+                    isEdit
+                      ? "Saving updates the product in place. Its published state doesn’t change."
+                      : "Products are reviewed before they appear publicly. You’ll keep the draft either way."
+                  }
+                />
+              )}
+            </div>
+
+            {error && (
+              <p role="alert" className="mt-6 rounded-xl bg-red-50 px-4 py-3 font-body text-[14px] text-red-700">
+                {error}
+              </p>
+            )}
+
+            <div className="mt-10 flex items-center justify-between border-t border-hairline pt-6">
+              <button
+                type="button"
+                onClick={() => go(step - 1)}
+                disabled={step === 0}
+                className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 font-body text-[14px] text-muted transition-colors hover:text-ink disabled:opacity-0"
+              >
+                <ArrowLeft strokeWidth={1.5} className="h-4 w-4" /> Back
+              </button>
+              {step < STEP_LABELS.length - 1 && (
                 <button
                   type="button"
-                  onClick={() => go(step - 1)}
-                  disabled={step === 0}
-                  className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 font-body text-[14px] text-muted transition-colors hover:text-ink disabled:opacity-0"
+                  onClick={() => go(step + 1)}
+                  className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 font-body text-[15px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
                 >
-                  <ArrowLeft strokeWidth={1.5} className="h-4 w-4" /> Back
+                  Continue <ArrowRight strokeWidth={1.5} className="h-4 w-4" />
                 </button>
-                {step < STEP_LABELS.length - 1 && (
-                  <button
-                    type="button"
-                    onClick={() => go(step + 1)}
-                    className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 font-body text-[15px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
-                  >
-                    Continue <ArrowRight strokeWidth={1.5} className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+              )}
             </div>
-          </main>
+          </div>
+        </main>
 
-          <aside className="lg:col-span-3">
-            <div className="lg:sticky lg:top-[104px]">
-              <p className="mb-3 font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-                Live preview
-              </p>
-              <DeviceFrame url={`archtivy.com/products/${slug || "your-product"}`}>
-                <div className="overflow-hidden rounded-lg">
-                  <div className="relative aspect-square w-full bg-stone">
-                    {images[0] && (
-                      <Image src={images[0].url} alt="" fill sizes="320px" className="object-cover" />
-                    )}
-                  </div>
-                  <div className="pt-3">
-                    {brandName && (
-                      <p className="font-body text-[11px] uppercase tracking-[0.1em] text-muted">
-                        {brandName}
-                      </p>
-                    )}
-                    <p className="mt-1 font-display text-[17px] leading-[1.2] tracking-tight text-ink">
-                      {title.trim() || "Your product name"}
+        <aside className="lg:col-span-3">
+          <div className="lg:sticky lg:top-[104px]">
+            <p className="mb-3 font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+              Live preview
+            </p>
+            <DeviceFrame url={`archtivy.com/products/${slug || "your-product"}`}>
+              <div className="overflow-hidden rounded-lg">
+                <div className="relative aspect-square w-full bg-stone">
+                  {images[0] && (
+                    <Image src={images[0].url} alt="" fill sizes="320px" className="object-cover" />
+                  )}
+                </div>
+                <div className="pt-3">
+                  {brandName && (
+                    <p className="font-body text-[11px] uppercase tracking-[0.1em] text-muted">
+                      {brandName}
                     </p>
-                    {colorOptions.length > 1 && (
-                      <p className="mt-1.5 font-body text-[12px] text-muted">
-                        {colorOptions.length} finishes
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </DeviceFrame>
-
-              <div className="mt-5 rounded-xl border border-hairline p-4">
-                <div className="flex items-center justify-between">
-                  <span className="font-body text-[13px] text-ink">Search readiness</span>
-                  <span className="font-body text-[13px] tabular-nums text-muted">
-                    {seo.passed}/{seo.total}
-                  </span>
-                </div>
-                <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-stone">
-                  <div
-                    className="h-full rounded-full bg-ink transition-[width] duration-500 ease-out motion-reduce:transition-none"
-                    style={{ width: `${seo.percent}%` }}
-                  />
+                  )}
+                  <p className="mt-1 font-display text-[17px] leading-[1.2] tracking-tight text-ink">
+                    {title.trim() || "Your product name"}
+                  </p>
+                  {colorOptions.length > 1 && (
+                    <p className="mt-1.5 font-body text-[12px] text-muted">
+                      {colorOptions.length} finishes
+                    </p>
+                  )}
                 </div>
               </div>
+            </DeviceFrame>
+
+            <div className="mt-5 rounded-xl border border-hairline p-4">
+              <div className="flex items-center justify-between">
+                <span className="font-body text-[13px] text-ink">Search readiness</span>
+                <span className="font-body text-[13px] tabular-nums text-muted">
+                  {seo.passed}/{seo.total}
+                </span>
+              </div>
+              <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-stone">
+                <div
+                  className="h-full rounded-full bg-ink transition-[width] duration-500 ease-out motion-reduce:transition-none"
+                  style={{ width: `${seo.percent}%` }}
+                />
+              </div>
             </div>
-          </aside>
-        </div>
+          </div>
+        </aside>
       </div>
-    </div>
+    </WizardFrame>
   );
 }
 
