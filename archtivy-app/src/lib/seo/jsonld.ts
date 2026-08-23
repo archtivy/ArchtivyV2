@@ -1,3 +1,4 @@
+import { normaliseExternalUrl } from "@/lib/url/externalUrl";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import type { ProjectCanonical, ProductCanonical } from "@/lib/canonical-models";
 import { SITE_NAME, SITE_DESCRIPTION, SOCIAL_PROFILES, FOUNDING_DATE } from "./siteConfig";
@@ -293,11 +294,10 @@ export function buildProfileJsonLd(
   const bio = profile.bio?.trim();
   if (bio) ld.description = bio.slice(0, 500);
 
-  if (profile.website) {
-    ld.sameAs = profile.website.startsWith("http")
-      ? profile.website
-      : `https://${profile.website}`;
-  }
+  // Was an inline startsWith("http") ternary — the only place in the codebase
+  // that handled schemeless website values, while every rendered link did not.
+  const profileWebsite = normaliseExternalUrl(profile.website);
+  if (profileWebsite) ld.sameAs = profileWebsite;
 
   if (profile.location_visibility !== "private") {
     const loc = [profile.location_city, profile.location_country]
