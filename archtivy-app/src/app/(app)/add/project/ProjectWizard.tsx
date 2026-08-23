@@ -22,6 +22,7 @@ import {
   inputCls,
   TeamStep,
   OwnerField,
+  AdminOnly,
   PickerStep,
   SeoStep,
   PublishStep,
@@ -33,6 +34,14 @@ import { createProject } from "@/app/actions/createProject";
 import { updateProjectCanonical } from "@/app/actions/updateListing";
 import type { ProjectEditData } from "@/lib/db/listingEdit";
 import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
+import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
+import {
+  PROJECT_STATUS_VALUES,
+  PROJECT_STATUS_LABELS,
+  PROJECT_COLLAB_VALUES,
+  PROJECT_COLLAB_LABELS,
+  PROJECT_LOOKING_FOR_OPTIONS,
+} from "@/lib/lifecycle";
 import { LocationPicker, type LocationValue } from "@/components/location/LocationPicker";
 
 /**
@@ -154,6 +163,13 @@ export function ProjectWizard({
   );
   const [productIds, setProductIds] = useState<string[]>(initial?.mentionedProducts ?? []);
   const [ownerProfileId, setOwnerProfileId] = useState(admin?.ownerProfileId ?? "");
+  // Admin-only fields, carried over from the legacy admin form. Each lives in
+  // the nearest existing step rather than a step of its own — see AdminOnly.
+  const [materialOrFinish, setMaterialOrFinish] = useState(initial?.materialOrFinish ?? "");
+  const [projectStatus, setProjectStatus] = useState(initial?.projectStatus ?? "");
+  const [collabStatus, setCollabStatus] = useState(initial?.projectCollaborationStatus ?? "");
+  const [lookingFor, setLookingFor] = useState<string[]>(initial?.projectLookingFor ?? []);
+  const [documents, setDocuments] = useState<File[]>([]);
   const [materialIds, setMaterialIds] = useState<string[]>(initial?.materialIds ?? []);
   /*
    * Real Mapbox-backed location. The first pass used three plain text inputs,
@@ -301,7 +317,22 @@ export function ProjectWizard({
     fd.set("video_url", videoUrl);
     fd.set("slug", slug);
     if (draft) fd.set("draft", "1");
-    if (admin) fd.set("owner_profile_id", ownerProfileId);
+    if (admin) {
+      fd.set("owner_profile_id", ownerProfileId);
+      fd.set("material_or_finish", materialOrFinish);
+      fd.set("project_status", projectStatus);
+      fd.set("project_collaboration_status", collabStatus);
+      // "Looking for" only means something while open to collaboration, and
+      // the field is hidden once it is not — so send an empty list rather than
+      // leaving stale roles attached to a project that closed.
+      fd.set(
+        "project_looking_for",
+        JSON.stringify(collabStatus && collabStatus !== "not_open_for_collaboration" ? lookingFor : [])
+      );
+      // Raw Files: the admin actions read formData.getAll("documents"), unlike
+      // the gallery which is uploaded client-side and posted as JSON.
+      for (const f of documents) fd.append("documents", f);
+    }
     return fd;
   }
 
@@ -405,7 +436,16 @@ export function ProjectWizard({
             </p>
 
             <div className="mt-8">
-              {step === 0 && <ImageDropzone items={images} onChange={setImages} />}
+              {step === 0 && (
+                <div className="space-y-8">
+                  <ImageDropzone items={images} onChange={setImages} />
+                  {admin && (
+                    <AdminOnly label="Documents">
+                      <DocumentsUploadCard files={documents} onChange={setDocuments} />
+                    </AdminOnly>
+                  )}
+                </div>
+              )}
 
               {step === 1 && (
                 <Card>
@@ -462,14 +502,31 @@ export function ProjectWizard({
               )}
 
               {step === 4 && (
-                <PickerStep
-                  kind="material"
-                  options={materials.map((m) => ({ id: m.id, label: m.label, sub: null, cover: null }))}
-                  selected={materialIds}
-                  onChange={setMaterialIds}
-                  placeholder="Search materials…"
-                  emptyHint="No materials tagged yet."
-                />
+                <div className="space-y-8">
+                  <PickerStep
+                    kind="material"
+                    options={materials.map((m) => ({ id: m.id, label: m.label, sub: null, cover: null }))}
+                    selected={materialIds}
+                    onChange={setMaterialIds}
+                    placeholder="Search materials…"
+                    emptyHint="No materials tagged yet."
+                  />
+                  {admin && (
+                    <AdminOnly label="Material or finish">
+                      <Field
+                        label="Free-text material or finish"
+                        hint="Legacy field — the tags above drive the filters"
+                      >
+                        <input
+                          value={materialOrFinish}
+                          onChange={(e) => setMaterialOrFinish(e.target.value)}
+                          className={inputCls}
+                          placeholder="Board-formed concrete, oiled oak"
+                        />
+                      </Field>
+                    </AdminOnly>
+                  )}
+                </div>
               )}
 
               {step === 5 && (
@@ -513,6 +570,74 @@ export function ProjectWizard({
                       : undefined
                   }
                 />
+              )}
+
+              {step === 7 && admin && (
+                <div className="mt-8">
+                  <AdminOnly label="Lifecycle & collaboration">
+                    <Field label="Project status">
+                      <select
+                        value={projectStatus}
+                        onChange={(e) => setProjectStatus(e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">Not set</option>
+                        {PROJECT_STATUS_VALUES.map((v) => (
+                          <option key={v} value={v}>
+                            {PROJECT_STATUS_LABELS[v]}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Collaboration status">
+                      <select
+                        value={collabStatus}
+                        onChange={(e) => setCollabStatus(e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">Not set</option>
+                        {PROJECT_COLLAB_VALUES.map((v) => (
+                          <option key={v} value={v}>
+                            {PROJECT_COLLAB_LABELS[v]}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    {/* Hidden unless collaboration is actually open — the roles
+                        are meaningless otherwise, and submit() sends an empty
+                        list in that case so none are left stranded. */}
+                    {collabStatus && collabStatus !== "not_open_for_collaboration" && (
+                      <fieldset>
+                        <legend className="mb-2 font-body text-[14px] text-ink">Looking for</legend>
+                        <div className="flex flex-wrap gap-2">
+                          {PROJECT_LOOKING_FOR_OPTIONS.map((opt) => {
+                            const on = lookingFor.includes(opt.value);
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() =>
+                                  setLookingFor((prev) =>
+                                    on ? prev.filter((v) => v !== opt.value) : [...prev, opt.value]
+                                  )
+                                }
+                                className={[
+                                  "rounded-full border px-4 py-2 font-body text-[13px] transition-colors duration-150",
+                                  on
+                                    ? "border-ink bg-ink text-cream"
+                                    : "border-ink/25 text-muted hover:border-ink/40 hover:text-ink",
+                                ].join(" ")}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
+                    )}
+                  </AdminOnly>
+                </div>
               )}
 
               {step === 8 && (

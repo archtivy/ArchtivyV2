@@ -67,6 +67,33 @@ export function Field({
 }
 
 /**
+ * Marks a block that only exists in admin context.
+ *
+ * These fields were on the legacy admin form and have no home in the author
+ * flow — lifecycle state, collaboration signals, document attachments. They
+ * are folded into the nearest existing step rather than given steps of their
+ * own (which would shift the indices ?step=N depends on), so without a marker
+ * an admin cannot tell which fields the author will also see. The rule is
+ * "the author never sees anything inside this".
+ */
+export function AdminOnly({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-5 rounded-xl border border-dashed border-ink/20 bg-stone/20 p-5">
+      <p className="font-body text-[11px] uppercase tracking-[0.14em] text-muted">
+        {label} · admin only
+      </p>
+      {children}
+    </section>
+  );
+}
+
+/**
  * Owner picker — admin only, first field on the Information step.
  *
  * ── WHY IT IS A REQUIRED FIELD AND NOT A DEFAULTED ONE ──────────────────────
