@@ -7,6 +7,7 @@ import { SignedIn, useAuth, useClerk } from "@clerk/nextjs";
 import { HeaderNotificationBell } from "@/components/home/HeaderNotificationBell";
 import { HeaderProfileMenu } from "@/components/home/HeaderProfileMenu";
 import { HomeNavCreateButton } from "@/components/home/HomeNavCreateButton";
+import { usePublisherRole } from "@/lib/hooks/usePublisherRole";
 
 /**
  * Global Primary Nav for the homepage (Build Brief §1).
@@ -53,6 +54,10 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
   // CTA for everyone who matters most.
   const { isLoaded, isSignedIn } = useAuth();
   const showGuestCta = !isLoaded || !isSignedIn;
+  // Readers do not publish, so they get no create affordance — not a disabled
+  // one. Server-side guards on both wizard routes and both create actions are
+  // the actual enforcement; this only stops offering a door that is locked.
+  const { canPublish } = usePublisherRole();
   const [scrolled, setScrolled] = useState(variant === "solid");
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -126,8 +131,9 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
           <SignedIn>
             {/* Primary action, ahead of the bell: publishing is what an account
                 holder is here to do, and until now this header had no route to
-                the wizard at all. */}
-            <HomeNavCreateButton onDark={onDark} />
+                the wizard at all. Publisher roles only — a reader clicking this
+                reached a wizard that would refuse the submission. */}
+            {canPublish && <HomeNavCreateButton onDark={onDark} />}
             <HeaderNotificationBell onDark={onDark} />
           </SignedIn>
 
@@ -192,25 +198,32 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
             <SignedIn>
               {/* Two direct links rather than the chooser modal: opening a
                   dialog on top of an open drawer stacks two overlays and traps
-                  focus in the wrong one. The destinations are identical. */}
-              <li className="mt-2 border-t border-hairline pt-2">
-                <Link
-                  href="/add/project"
-                  onClick={() => setMenuOpen(false)}
-                  className="block py-3 font-body text-[16px] font-medium text-ink"
-                >
-                  Share a Project
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/add/product"
-                  onClick={() => setMenuOpen(false)}
-                  className="block py-3 font-body text-[16px] font-medium text-ink"
-                >
-                  Share a Product
-                </Link>
-              </li>
+                  focus in the wrong one. The destinations are identical.
+
+                  Gated on the same role check as the desktop button — the
+                  drawer was the second place a reader was offered the wizard. */}
+              {canPublish && (
+                <>
+                  <li className="mt-2 border-t border-hairline pt-2">
+                    <Link
+                      href="/add/project"
+                      onClick={() => setMenuOpen(false)}
+                      className="block py-3 font-body text-[16px] font-medium text-ink"
+                    >
+                      Share a Project
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/add/product"
+                      onClick={() => setMenuOpen(false)}
+                      className="block py-3 font-body text-[16px] font-medium text-ink"
+                    >
+                      Share a Product
+                    </Link>
+                  </li>
+                </>
+              )}
               <li className="mt-2 border-t border-hairline pt-2">
                 <Link
                   href="/me/notifications"

@@ -47,8 +47,16 @@ export default async function AddProductPage() {
   if (!userId) redirect("/sign-in?redirect_url=/add/product");
 
   const profileResult = await getProfileByClerkId(userId);
-  const profile = profileResult.data as { username?: string; display_name?: string | null } | null;
+  const profile = profileResult.data as {
+    username?: string;
+    display_name?: string | null;
+    role?: string | null;
+  } | null;
   if (!profile?.username) redirect("/onboarding");
+  // Readers do not publish. Until now nothing on this route tested the role,
+  // and createProductCanonical did not either — so a reader could reach this
+  // wizard directly and publish a live product.
+  if (profile.role === "reader") redirect("/me/settings");
 
   const [categories, materials] = await Promise.all([getCategories(), getMaterials()]);
 

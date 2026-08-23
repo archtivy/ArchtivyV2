@@ -22,6 +22,7 @@ import {
 import { uploadListingDocumentsServer } from "@/lib/storage/documents";
 import { normaliseInstagramHandle } from "@/lib/publish/instagram";
 import { getProfileByClerkId } from "@/lib/db/profiles";
+import { canManageListing } from "@/lib/auth/listingOwnership";
 import { getProductCanonicalBySlug } from "@/lib/db/explore";
 import {
   createProjectRow,
@@ -429,7 +430,14 @@ export async function deleteListing(listingId: string): Promise<ActionResult> {
   if (fetchError || !listing) {
     return { error: "Listing not found." };
   }
-  if (listing.owner_clerk_user_id !== userId) {
+  // Ownership lives in either column — see canManageListing. This previously
+  // tested owner_clerk_user_id alone, which rejected the true owner of 118 of
+  // the 129 live listings: /me/listings listed them (that query ORs both
+  // columns) but Delete always answered "You can only delete your own
+  // listings."
+  const ownerProfileResult = await getProfileByClerkId(userId);
+  const ownerProfileId = ownerProfileResult.data?.id ?? null;
+  if (!canManageListing(listing, userId, ownerProfileId)) {
     return { error: "You can only delete your own listings." };
   }
   const wasProduct = listing.type === "product";
@@ -518,6 +526,23 @@ export async function createProductCanonical(
   const profileResult = await getProfileByClerkId(userId);
   const profile = profileResult.data;
   if (!profile?.username) return { error: "Complete onboarding first." };
+  // Role gate, mirroring createProjectCanonical's `role !== "designer"` check.
+  // Its absence here meant a `reader` account could publish a product outright:
+  // neither this action nor /add/product's page guard tested the role, so the
+  // only thing between a reader and a live product listing was the UI not
+  // offering the button.
+  //
+  // An ALLOW-list, not a deny-list on "reader": a role added later should have
+  // to be granted publishing explicitly rather than inherit it by omission.
+  //
+  // Designers are allowed through even though production shows a clean split
+  // (52 projects all designer-owned, 76 products all brand-owned, no
+  // crossover). Narrowing this to brands only would match the FAQ's stated
+  // model, but that is a policy change rather than a bug fix, so it is left for
+  // a deliberate decision instead of being folded into a hotfix.
+  if (profile.role !== "brand" && profile.role !== "designer") {
+    return { error: "Your account type cannot publish products." };
+  }
   const title = (formData.get("title") as string)?.trim();
   const description = (formData.get("description") as string)?.trim() ?? null;
   const subtitle = description?.trim() || null;

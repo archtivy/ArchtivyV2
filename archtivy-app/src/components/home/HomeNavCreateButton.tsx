@@ -24,11 +24,17 @@ import { ShareWorkChooser } from "@/components/ShareWorkChooser";
  * rendered inside <SignedIn>, so the signed-out redirect branch ShareCTA
  * handles is unreachable here.
  *
- * The `reader` role (3 profiles) is not special-cased. ShareCTA shows those
- * accounts an inline "can't share work" message, but that needs the role. The
- * wizard guards the route itself — signed-out redirects to sign-in, a profile
- * without a username to /onboarding — and creation is role-checked server-side
- * in the action, so the worst case is a redirect rather than a broken write.
+ * ── ROLE GATING LIVES IN THE CALLER ─────────────────────────────────────────
+ * HomeNav renders this only when usePublisherRole() says the account may
+ * publish, so this component takes no role prop and makes no role decision.
+ *
+ * A previous version of this note claimed the `reader` role needed no
+ * special-casing because "creation is role-checked server-side in the action".
+ * That was only half true: createProjectCanonical checked `role !== "designer"`,
+ * but createProductCanonical checked nothing beyond onboarding, and neither
+ * /add/product nor /add/project guarded its route. A reader could publish a
+ * live product. Both actions and both routes now enforce the rule; this button
+ * is the cosmetic layer over it, not the guard.
  */
 export function HomeNavCreateButton({ onDark = false }: { onDark?: boolean }) {
   const [open, setOpen] = useState(false);
