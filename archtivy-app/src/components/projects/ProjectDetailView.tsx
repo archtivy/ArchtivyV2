@@ -11,6 +11,7 @@ import {
 } from "@/components/entity/RelationshipRail";
 import { ProjectDetailHeader } from "@/components/projects/ProjectDetailHeader";
 import { ProjectDetailTabs } from "@/components/projects/ProjectDetailTabs";
+import { ProjectCollaborationSection } from "@/components/listing/CollaborationSection";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildProjectJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
@@ -104,12 +105,19 @@ export async function ProjectDetailView({
           architectHref={architectHref}
           year={detail.year}
           buildingType={detail.buildingTypeLabel}
+        projectStatus={detail.projectStatus}
+        collaborationStatus={detail.collaborationStatus}
         />
 
         <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-8">
           <div className="min-w-0 lg:col-span-8">
             <Gallery images={detail.images} title={detail.title} />
             <ProjectDetailTabs project={detail} />
+
+            <ProjectCollaborationSection
+              project_collaboration_status={detail.collaborationStatus}
+              project_looking_for={detail.lookingFor}
+            />
           </div>
 
           <aside className="min-w-0 space-y-5 lg:col-span-4">

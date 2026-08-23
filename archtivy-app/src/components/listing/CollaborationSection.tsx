@@ -1,29 +1,31 @@
 import {
-  PROJECT_STATUS_LABELS,
-  PROJECT_STATUS_BADGE_CLASS,
-  PRODUCT_STAGE_LABELS,
-  PRODUCT_STAGE_BADGE_CLASS,
   PROJECT_COLLAB_LABELS,
   PRODUCT_COLLAB_LABELS,
-  type ProjectStatus,
-  type ProductStage,
-  type ProjectCollaborationStatus,
-  type ProductCollaborationStatus,
+  PROJECT_LOOKING_FOR_OPTIONS,
+  PRODUCT_LOOKING_FOR_OPTIONS,
 } from "@/lib/lifecycle";
 
-interface ProjectCollaborationSectionProps {
-  project_status?: string | null;
-  project_collaboration_status?: string | null;
-  project_looking_for?: string[] | null;
-  ownerEmail?: string | null;
-}
-
-interface ProductCollaborationSectionProps {
-  product_stage?: string | null;
-  product_collaboration_status?: string | null;
-  product_looking_for?: string[] | null;
-  ownerEmail?: string | null;
-}
+/**
+ * Collaboration panel — who the owner is looking to hear from.
+ *
+ * ── WHAT THIS NO LONGER DOES ────────────────────────────────────────────────
+ * It used to also render the lifecycle status chip. That now lives in the
+ * detail header (StatusBadge), where it belongs: status describes the thing
+ * and reads next to its title, whereas collaboration is an invitation and
+ * earns a block of its own. Keeping both would have printed "Under
+ * Construction" twice on the same page.
+ *
+ * ── RESTYLED OFF ZINC ───────────────────────────────────────────────────────
+ * Was zinc-50/zinc-200 with dark: variants, from the palette the detail pages
+ * used before the editorial redesign. Those pages are now cream and have no
+ * dark counterpart, so the section rendered as a grey slab on a cream ground.
+ *
+ * ── ROLE SLUGS ARE RESOLVED TO LABELS ───────────────────────────────────────
+ * project_looking_for stores slugs ("interior_designer"). The old version
+ * printed them raw, so a reader saw "interior_designer" rather than "Interior
+ * Designer". Unknown slugs fall back to a de-slugged form rather than being
+ * dropped — an unrecognised role is still information.
+ */
 
 const OPEN_PROJECT_COLLAB = new Set([
   "open_for_collaboration",
@@ -39,152 +41,94 @@ const OPEN_PRODUCT_COLLAB = new Set([
   "seeking_brand_partner",
 ]);
 
-export function ProjectCollaborationSection({
-  project_status,
-  project_collaboration_status,
-  project_looking_for,
-}: ProjectCollaborationSectionProps) {
-  const hasStatus = Boolean(project_status);
-  const hasCollab = Boolean(project_collaboration_status);
-  const hasLooking = (project_looking_for ?? []).length > 0;
+function deslug(v: string): string {
+  return v
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
 
-  if (!hasStatus && !hasCollab && !hasLooking) return null;
-
-  const statusLabel = project_status
-    ? (PROJECT_STATUS_LABELS[project_status as ProjectStatus] ?? null)
-    : null;
-  const statusBadgeClass = project_status
-    ? (PROJECT_STATUS_BADGE_CLASS[project_status as ProjectStatus] ??
-        "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400")
-    : null;
-
-  const collabLabel = project_collaboration_status
-    ? (PROJECT_COLLAB_LABELS[project_collaboration_status as ProjectCollaborationStatus] ?? null)
-    : null;
-
-  const isOpen =
-    project_collaboration_status != null &&
-    OPEN_PROJECT_COLLAB.has(project_collaboration_status);
-
-  const lookingFor = (project_looking_for ?? []).filter(Boolean);
-
+function Panel({
+  headline,
+  roles,
+}: {
+  headline: string;
+  roles: string[];
+}) {
   return (
-    <section className="mt-8 rounded-lg border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900/50">
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+    <section className="mt-10 rounded-2xl border border-hairline bg-stone/30 p-6 sm:p-8">
+      <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
         Collaboration
-      </h2>
-      <div className="flex flex-wrap gap-3">
-        {statusLabel && statusBadgeClass && (
-          <span
-            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass}`}
-          >
-            {statusLabel}
-          </span>
-        )}
-        {collabLabel && (
-          <span
-            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
-              isOpen
-                ? "bg-[#002abf]/10 text-[#002abf] dark:bg-[#002abf]/20 dark:text-blue-300"
-                : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
-            }`}
-          >
-            {collabLabel}
-          </span>
-        )}
-      </div>
-      {lookingFor.length > 0 && (
-        <div className="mt-3">
-          <p className="mb-1.5 text-xs text-zinc-400 dark:text-zinc-500">
+      </p>
+      <p className="mt-2 font-display text-[20px] leading-[1.25] tracking-[-0.01em] text-ink">
+        {headline}
+      </p>
+      {roles.length > 0 && (
+        <>
+          <p className="mt-5 font-body text-[12px] uppercase tracking-[0.14em] text-muted">
             Looking for
           </p>
-          <div className="flex flex-wrap gap-1.5">
-            {lookingFor.map((v) => (
-              <span
-                key={v}
-                className="inline-flex items-center rounded border border-zinc-200 bg-white px-2 py-0.5 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+          <ul className="mt-2.5 flex flex-wrap gap-2">
+            {roles.map((r) => (
+              <li
+                key={r}
+                className="rounded-full border border-ink/20 px-3.5 py-1.5 font-body text-[13px] text-ink"
               >
-                {v.replace(/_/g, " ")}
-              </span>
+                {r}
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </>
       )}
     </section>
   );
 }
 
+function resolveRoles(
+  slugs: string[] | null | undefined,
+  options: readonly { value: string; label: string }[]
+): string[] {
+  const byValue = new Map(options.map((o) => [o.value, o.label]));
+  return (slugs ?? []).filter(Boolean).map((s) => byValue.get(s) ?? deslug(s));
+}
+
+export function ProjectCollaborationSection({
+  project_collaboration_status,
+  project_looking_for,
+}: {
+  project_status?: string | null;
+  project_collaboration_status?: string | null;
+  project_looking_for?: string[] | null;
+  ownerEmail?: string | null;
+}) {
+  const status = project_collaboration_status?.trim().toLowerCase() ?? "";
+  // Only render when the owner has actually opened the door. A closed or unset
+  // status is the default and says nothing worth a panel.
+  if (!OPEN_PROJECT_COLLAB.has(status)) return null;
+
+  const headline =
+    PROJECT_COLLAB_LABELS[status as keyof typeof PROJECT_COLLAB_LABELS] ?? deslug(status);
+  return (
+    <Panel headline={headline} roles={resolveRoles(project_looking_for, PROJECT_LOOKING_FOR_OPTIONS)} />
+  );
+}
+
 export function ProductCollaborationSection({
-  product_stage,
   product_collaboration_status,
   product_looking_for,
-}: ProductCollaborationSectionProps) {
-  const hasStage = Boolean(product_stage);
-  const hasCollab = Boolean(product_collaboration_status);
-  const hasLooking = (product_looking_for ?? []).length > 0;
+}: {
+  product_stage?: string | null;
+  product_collaboration_status?: string | null;
+  product_looking_for?: string[] | null;
+  ownerEmail?: string | null;
+}) {
+  const status = product_collaboration_status?.trim().toLowerCase() ?? "";
+  if (!OPEN_PRODUCT_COLLAB.has(status)) return null;
 
-  if (!hasStage && !hasCollab && !hasLooking) return null;
-
-  const stageLabel = product_stage
-    ? (PRODUCT_STAGE_LABELS[product_stage as ProductStage] ?? null)
-    : null;
-  const stageBadgeClass = product_stage
-    ? (PRODUCT_STAGE_BADGE_CLASS[product_stage as ProductStage] ??
-        "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400")
-    : null;
-
-  const collabLabel = product_collaboration_status
-    ? (PRODUCT_COLLAB_LABELS[product_collaboration_status as ProductCollaborationStatus] ?? null)
-    : null;
-
-  const isOpen =
-    product_collaboration_status != null &&
-    OPEN_PRODUCT_COLLAB.has(product_collaboration_status);
-
-  const lookingFor = (product_looking_for ?? []).filter(Boolean);
-
+  const headline =
+    PRODUCT_COLLAB_LABELS[status as keyof typeof PRODUCT_COLLAB_LABELS] ?? deslug(status);
   return (
-    <section className="mt-8 rounded-lg border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900/50">
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-        Collaboration
-      </h2>
-      <div className="flex flex-wrap gap-3">
-        {stageLabel && stageBadgeClass && (
-          <span
-            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${stageBadgeClass}`}
-          >
-            {stageLabel}
-          </span>
-        )}
-        {collabLabel && (
-          <span
-            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
-              isOpen
-                ? "bg-[#002abf]/10 text-[#002abf] dark:bg-[#002abf]/20 dark:text-blue-300"
-                : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
-            }`}
-          >
-            {collabLabel}
-          </span>
-        )}
-      </div>
-      {lookingFor.length > 0 && (
-        <div className="mt-3">
-          <p className="mb-1.5 text-xs text-zinc-400 dark:text-zinc-500">
-            Looking for
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {lookingFor.map((v) => (
-              <span
-                key={v}
-                className="inline-flex items-center rounded border border-zinc-200 bg-white px-2 py-0.5 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-              >
-                {v.replace(/_/g, " ")}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </section>
+    <Panel headline={headline} roles={resolveRoles(product_looking_for, PRODUCT_LOOKING_FOR_OPTIONS)} />
   );
 }

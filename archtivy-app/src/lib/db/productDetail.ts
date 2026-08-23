@@ -83,6 +83,10 @@ export interface ProductDetail {
    * showing the brand's homepage under a label promising the product's page.
    */
   website: string | null;
+  /** Lifecycle and collaboration — see the note in projectDetail.ts. */
+  productStage: string | null;
+  collaborationStatus: string | null;
+  lookingFor: string[];
   brand: {
     id: string;
     name: string;
@@ -110,7 +114,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   const { data: row } = await sup
     .from("listings")
     .select(
-      "id, slug, title, description, year, dimensions, cover_image_url, owner_profile_id, website"
+      "id, slug, title, description, year, dimensions, cover_image_url, owner_profile_id, website, product_stage, product_collaboration_status, product_looking_for"
     )
     .eq("id", listingId)
     .maybeSingle();
@@ -455,6 +459,9 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
     related,
     relatedReason,
     website: (l.website as string | null) ?? null,
+    productStage: (l.product_stage as string | null) ?? null,
+    collaborationStatus: (l.product_collaboration_status as string | null) ?? null,
+    lookingFor: Array.isArray(l.product_looking_for) ? (l.product_looking_for as string[]) : [],
     brand,
   };
 }

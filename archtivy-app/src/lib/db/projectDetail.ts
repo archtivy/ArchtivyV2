@@ -74,6 +74,14 @@ export interface ProjectDetail {
   related: DetailRelated[];
   /** Plain-language basis for `related`. No similarity score, no AI. */
   relatedReason: string;
+  /**
+   * Lifecycle and collaboration. Columns existed and the admin form wrote
+   * them, but no detail loader ever selected them — so nothing could be shown
+   * even when an author had set it.
+   */
+  projectStatus: string | null;
+  collaborationStatus: string | null;
+  lookingFor: string[];
 }
 
 function titleize(slug: string): string {
@@ -89,7 +97,7 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   const { data: row } = await sup
     .from("listings")
     .select(
-      "id, slug, title, description, location, year, area_sqft, cover_image_url, owner_profile_id"
+      "id, slug, title, description, location, year, area_sqft, cover_image_url, owner_profile_id, project_status, project_collaboration_status, project_looking_for"
     )
     .eq("id", listingId)
     .maybeSingle();
@@ -407,6 +415,9 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
     documents,
     related,
     relatedReason,
+    projectStatus: (l.project_status as string | null) ?? null,
+    collaborationStatus: (l.project_collaboration_status as string | null) ?? null,
+    lookingFor: Array.isArray(l.project_looking_for) ? (l.project_looking_for as string[]) : [],
   };
 }
 

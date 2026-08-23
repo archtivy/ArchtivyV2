@@ -10,6 +10,8 @@ import { RailPanel, RelatedPanel } from "@/components/entity/RelationshipRail";
 import { EntityCard } from "@/components/home/EntityCard";
 import { SaveToggle } from "@/components/home/SaveToggle";
 import { normaliseExternalUrl } from "@/lib/url/externalUrl";
+import { ProductStageBadge, CollaborationBadge } from "@/components/listing/StatusBadge";
+import { ProductCollaborationSection } from "@/components/listing/CollaborationSection";
 import { RequestQuoteButton } from "@/components/products/RequestQuoteButton";
 import { ProductDetailTabs } from "@/components/products/ProductDetailTabs";
 import { SeenInProjects } from "@/components/products/SeenInProjects";
@@ -151,6 +153,13 @@ export async function ProductDetailView({
                 {detail.title}
               </h1>
 
+              {/* Lifecycle badges. Render nothing at all when the product is
+                  in its ordinary state — see StatusBadge. */}
+              <div className="mt-3 flex flex-wrap gap-2 empty:mt-0">
+                <ProductStageBadge stage={detail.productStage} />
+                <CollaborationBadge status={detail.collaborationStatus} kind="product" />
+              </div>
+
               {detail.subtitle && (
                 <p className="mt-3 max-w-[56ch] font-body text-[15px] leading-[24px] text-muted">
                   {detail.subtitle}
@@ -200,6 +209,11 @@ export async function ProductDetailView({
             </div>
 
             <ProductDetailTabs product={detail} />
+
+            <ProductCollaborationSection
+              product_collaboration_status={detail.collaborationStatus}
+              product_looking_for={detail.lookingFor}
+            />
           </div>
 
           {/* ── Relationship Rail: Brand ───────────────────────────────── */}
