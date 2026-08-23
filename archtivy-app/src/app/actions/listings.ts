@@ -23,6 +23,7 @@ import { uploadListingDocumentsServer } from "@/lib/storage/documents";
 import { normaliseInstagramHandle } from "@/lib/publish/instagram";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { canManageListing } from "@/lib/auth/listingOwnership";
+import { parseGalleryJson } from "@/lib/storage/types";
 import { getProductCanonicalBySlug } from "@/lib/db/explore";
 import {
   createProjectRow,
@@ -674,7 +675,55 @@ export async function createProductCanonical(
   const facetRes = await setListingFacets(productId, facetValueIds);
   if (facetRes.error) console.warn("[createProduct] facet values set error (non-fatal):", facetRes.error);
 
-  if (imageFiles.length > 0) {
+  // ── TWO IMAGE SOURCES, AND ONLY ONE WAS BEING READ ────────────────────────
+  // This action accepted only `images` (raw File uploads), the shape the old
+  // form posted. ProductWizard, added 2026-08-15, uploads client-side through
+  // ImageDropzone and posts `gallery` — a JSON array of already-uploaded
+  // {path,url} items — exactly as ProjectWizard does. Nothing here read it, so
+  // a wizard-published product got no listing_images rows and no cover image,
+  // while the wizard's own `canPublish` required at least one image.
+  //
+  // It has never fired in production: the newest product predates the wizard,
+  // so no product has yet been created through it. It would have fired on the
+  // first real brand submission. Both shapes are handled now, `gallery` first,
+  // since the two never arrive together.
+  const galleryItems = parseGalleryJson(formData.get("gallery"));
+  if (galleryItems.length > 0) {
+    const imageRows = galleryItems.map((item, i) => ({
+      listing_id: productId,
+      image_url: item.url,
+      alt: item.alt?.trim() || title,
+      caption: item.caption?.trim() || null,
+      sort_order: i,
+    }));
+    const { error: imagesErr } = await supabaseForProduct
+      .from("listing_images")
+      .insert(imageRows);
+    if (imagesErr) {
+      await dbDeleteListing(productId);
+      await deleteProductRow(productId);
+      return { error: `Failed to save gallery: ${imagesErr.message}` };
+    }
+    const urls = galleryItems.map((item) => item.url);
+    const addErr = await addProductImages(
+      productId,
+      urls.map((src) => ({ src, alt: title }))
+    );
+    if (addErr.error) {
+      await dbDeleteListing(productId);
+      await deleteProductRow(productId);
+      return { error: addErr.error };
+    }
+    const coverErr = await updateListingCoverImage(productId, urls[0]);
+    if (coverErr.error) {
+      await dbDeleteListing(productId);
+      await deleteProductRow(productId);
+      return { error: coverErr.error ?? "Failed to set cover image." };
+    }
+
+    const { enqueueMatchRecomputation: enqueueGallery } = await import("@/lib/matches/recompute");
+    enqueueGallery({ event: "product_created", listingId: productId });
+  } else if (imageFiles.length > 0) {
     const uploadResult = await uploadGalleryImagesForProduct(productId, imageFiles);
     if (uploadResult.error || !uploadResult.data?.length) {
       await dbDeleteListing(productId);

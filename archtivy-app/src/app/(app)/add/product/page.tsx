@@ -2,13 +2,9 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getProfileByClerkId } from "@/lib/db/profiles";
-import { getSupabaseServiceClient } from "@/lib/supabaseServer";
-import { getTaxonomyTree } from "@/lib/taxonomy/taxonomyDb";
-import {
-  ProductWizard,
-  type ProductTaxonomyOption,
-  type ProductMaterialOption,
-} from "./ProductWizard";
+// Shared with the edit route — see lib/publish/wizardReferenceData.
+import { getWizardCategories, getWizardMaterials } from "@/lib/publish/wizardReferenceData";
+import { ProductWizard } from "./ProductWizard";
 
 export const dynamic = "force-dynamic";
 
@@ -23,24 +19,6 @@ export const metadata: Metadata = {
  * Server half loads reference data only; the write path stays in
  * createProductCanonical (create_product_with_sidecar RPC), unchanged.
  */
-
-async function getCategories(): Promise<ProductTaxonomyOption[]> {
-  const res = await getTaxonomyTree("product");
-  return (res.data ?? [])
-    .filter((n) => !n.slug_path.includes("/"))
-    .map((n) => ({ id: n.id, label: n.label }))
-    .sort((a, b) => a.label.localeCompare(b.label));
-}
-
-async function getMaterials(): Promise<ProductMaterialOption[]> {
-  const sup = getSupabaseServiceClient();
-  const { data, error } = await sup.from("materials").select("id, name").order("name");
-  if (error) {
-    console.error("[add/product] materials failed:", error.message);
-    return [];
-  }
-  return ((data ?? []) as { id: string; name: string }[]).map((m) => ({ id: m.id, label: m.name }));
-}
 
 export default async function AddProductPage() {
   const { userId } = await auth();
@@ -58,7 +36,10 @@ export default async function AddProductPage() {
   // wizard directly and publish a live product.
   if (profile.role === "reader") redirect("/me/settings");
 
-  const [categories, materials] = await Promise.all([getCategories(), getMaterials()]);
+  const [categories, materials] = await Promise.all([
+    getWizardCategories("product"),
+    getWizardMaterials(),
+  ]);
 
   return (
     <ProductWizard

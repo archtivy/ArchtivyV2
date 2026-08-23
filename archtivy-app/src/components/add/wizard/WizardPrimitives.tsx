@@ -281,6 +281,7 @@ export function SeoStep({
   seo,
   slugPrefix = "/projects/",
   note,
+  slugReadOnly = false,
 }: {
   slug: string;
   onSlug: (v: string) => void;
@@ -291,21 +292,42 @@ export function SeoStep({
   slugPrefix?: string;
   /** Entity-specific caveat shown under the checklist. */
   note?: string;
+  /**
+   * Locks the slug field. Set when editing an existing listing: the slug is
+   * the live URL and the update actions never change it, so an editable input
+   * here would quietly discard whatever was typed into it.
+   */
+  slugReadOnly?: boolean;
 }) {
   const len = metaDescription.trim().length;
   const inBand = len >= SEO_THRESHOLDS.metaDescriptionMin && len <= SEO_THRESHOLDS.metaDescriptionMax;
   return (
     <div className="space-y-6">
       <Card>
-        <Field label="URL" hint="Lowercase, hyphenated">
-          <div className="flex items-center gap-0 overflow-hidden rounded-xl border border-hairline bg-cream focus-within:border-ink/40 focus-within:ring-4 focus-within:ring-ink/5">
+        <Field
+          label="URL"
+          hint={slugReadOnly ? "Fixed once published" : "Lowercase, hyphenated"}
+        >
+          <div
+            className={[
+              "flex items-center gap-0 overflow-hidden rounded-xl border border-hairline",
+              slugReadOnly
+                ? "bg-stone/25"
+                : "bg-cream focus-within:border-ink/40 focus-within:ring-4 focus-within:ring-ink/5",
+            ].join(" ")}
+          >
             <span className="shrink-0 border-r border-hairline bg-stone/40 px-4 py-3 font-body text-[14px] text-muted">
               {slugPrefix}
             </span>
             <input
               value={slug}
               onChange={(e) => onSlug(e.target.value)}
-              className="min-w-0 flex-1 bg-transparent px-4 py-3 font-body text-[15px] text-ink focus:outline-none"
+              readOnly={slugReadOnly}
+              aria-readonly={slugReadOnly || undefined}
+              className={[
+                "min-w-0 flex-1 bg-transparent px-4 py-3 font-body text-[15px] focus:outline-none",
+                slugReadOnly ? "cursor-not-allowed text-muted" : "text-ink",
+              ].join(" ")}
               placeholder="cliff-house"
             />
           </div>
@@ -380,8 +402,9 @@ export function PublishStep({
   pending,
   onPublish,
   onDraft,
-  publishLabel = "Publish project",
+  publishLabel,
   publishNote,
+  isEdit = false,
 }: {
   seo: ReturnType<typeof computeSeoScore>;
   canPublish: boolean;
@@ -391,22 +414,43 @@ export function PublishStep({
   publishLabel?: string;
   /** e.g. products go to review rather than straight live. */
   publishNote?: string;
+  /**
+   * Editing an existing listing. Drops the secondary "Save as draft" button —
+   * in edit mode both buttons call the same update and neither changes status,
+   * so two of them only invite the question of which one publishes.
+   */
+  isEdit?: boolean;
 }) {
   const failing = seo.checks.filter((c) => !c.passed);
+  const resolvedPublishLabel = publishLabel ?? (isEdit ? "Save changes" : "Publish project");
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-hairline bg-cream p-6 sm:p-8">
-        <h3 className="font-display text-[22px] tracking-tight text-ink">Before you publish</h3>
+        <h3 className="font-display text-[22px] tracking-tight text-ink">
+          {isEdit ? "Before you save" : "Before you publish"}
+        </h3>
         {failing.length === 0 ? (
           <p className="mt-3 font-body text-[15px] leading-[24px] text-muted">
-            Everything checks out. Your project will be visible and eligible for search results.
+            {isEdit
+              ? "Everything checks out. This listing stays eligible for search results."
+              : "Everything checks out. Your project will be visible and eligible for search results."}
           </p>
         ) : (
           <>
             <p className="mt-3 max-w-[56ch] font-body text-[15px] leading-[24px] text-muted">
-              {failing.length} {failing.length === 1 ? "item is" : "items are"} incomplete. You can
-              still publish — the project will be live on Archtivy, just not indexed by search
-              engines until these pass.
+              {isEdit ? (
+                <>
+                  {failing.length} {failing.length === 1 ? "item is" : "items are"} incomplete. You
+                  can still save — the listing stays as it is on Archtivy, just not indexed by
+                  search engines until these pass.
+                </>
+              ) : (
+                <>
+                  {failing.length} {failing.length === 1 ? "item is" : "items are"} incomplete. You
+                  can still publish — the project will be live on Archtivy, just not indexed by
+                  search engines until these pass.
+                </>
+              )}
             </p>
             <ul className="mt-5 space-y-2">
               {failing.map((c) => (
@@ -426,24 +470,28 @@ export function PublishStep({
           disabled={pending || !canPublish}
           className="inline-flex items-center gap-2 rounded-full bg-ink px-7 py-3.5 font-body text-[15px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] disabled:opacity-40 motion-reduce:transition-none"
         >
-          {pending ? "Submitting…" : publishLabel}
+          {pending ? (isEdit ? "Saving…" : "Submitting…") : resolvedPublishLabel}
           <ExternalLink strokeWidth={1.5} className="h-4 w-4" aria-hidden />
         </button>
-        <button
-          type="button"
-          onClick={onDraft}
-          disabled={pending}
-          className="rounded-full border border-ink/25 px-6 py-3.5 font-body text-[15px] text-ink transition-all duration-150 hover:bg-stone/50 active:scale-[0.98] disabled:opacity-40 motion-reduce:transition-none"
-        >
-          Save as draft
-        </button>
+        {!isEdit && (
+          <button
+            type="button"
+            onClick={onDraft}
+            disabled={pending}
+            className="rounded-full border border-ink/25 px-6 py-3.5 font-body text-[15px] text-ink transition-all duration-150 hover:bg-stone/50 active:scale-[0.98] disabled:opacity-40 motion-reduce:transition-none"
+          >
+            Save as draft
+          </button>
+        )}
       </div>
       {publishNote && (
         <p className="font-body text-[13px] leading-[20px] text-muted">{publishNote}</p>
       )}
       {!canPublish && (
         <p className="font-body text-[13px] text-muted">
-          A title and at least one photo are needed to publish.
+          {isEdit
+            ? "A title and at least one photo are needed to save."
+            : "A title and at least one photo are needed to publish."}
         </p>
       )}
     </div>

@@ -10,6 +10,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getProductCanonicalBySlug } from "@/lib/db/explore";
 import { getProductForProductPage } from "@/app/actions/listings";
 import { getProfileByClerkId } from "@/lib/db/profiles";
+import { canManageListing } from "@/lib/auth/listingOwnership";
 import { getListingUrl } from "@/lib/canonical";
 import { fetchProductArchive } from "@/lib/archive/fetchArchiveData";
 import { ProductCategoryArchive } from "@/components/archive/ProductCategoryArchive";
@@ -72,12 +73,28 @@ async function findProduct(slug: string) {
  */
 const NON_PUBLIC_STATUSES = new Set(["PENDING", "DRAFT"]);
 
-async function authCheckPending(product: { status: string; owner_clerk_user_id?: string | null }) {
+async function authCheckPending(product: {
+  status: string;
+  owner_clerk_user_id?: string | null;
+  brand_profile_id?: string | null;
+}) {
   if (!NON_PUBLIC_STATUSES.has(product.status)) return;
   const { userId } = await auth();
   const profileRes = await getProfileByClerkId(userId ?? "");
-  const profile = profileRes.data as { is_admin?: boolean } | null;
-  const isOwner = Boolean(userId && product.owner_clerk_user_id === userId);
+  const profile = profileRes.data as { is_admin?: boolean; id?: string | null } | null;
+  // Both owner columns. ProductCanonical exposes listings.owner_profile_id
+  // under the name brand_profile_id, so it is mapped across here — testing
+  // owner_clerk_user_id alone made this fail CLOSED for the 118 of 129 live
+  // listings that carry only owner_profile_id, 404ing authors on their own
+  // draft.
+  const isOwner = canManageListing(
+    {
+      owner_clerk_user_id: product.owner_clerk_user_id,
+      owner_profile_id: product.brand_profile_id,
+    },
+    userId,
+    profile?.id ?? null
+  );
   const isAdmin = Boolean(profile?.is_admin);
   if (!isOwner && !isAdmin) notFound();
 }

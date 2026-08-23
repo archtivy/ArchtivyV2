@@ -9,6 +9,7 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getProjectCanonicalBySlugOrId } from "@/lib/db/explore";
 import { getProfileByClerkId } from "@/lib/db/profiles";
+import { canManageListing } from "@/lib/auth/listingOwnership";
 import { getListingUrl } from "@/lib/canonical";
 import { fetchProjectArchive } from "@/lib/archive/fetchArchiveData";
 import { ProjectCategoryArchive } from "@/components/archive/ProjectCategoryArchive";
@@ -71,12 +72,20 @@ async function findProject(slug: string) {
  */
 const NON_PUBLIC_STATUSES = new Set(["PENDING", "DRAFT"]);
 
-async function authCheckPending(project: { status: string; owner_clerk_user_id?: string | null }) {
+async function authCheckPending(project: {
+  status: string;
+  owner_clerk_user_id?: string | null;
+  owner_profile_id?: string | null;
+}) {
   if (!NON_PUBLIC_STATUSES.has(project.status)) return;
   const { userId } = await auth();
   const profileRes = await getProfileByClerkId(userId ?? "");
-  const profile = profileRes.data as { is_admin?: boolean } | null;
-  const isOwner = Boolean(userId && project.owner_clerk_user_id === userId);
+  const profile = profileRes.data as { is_admin?: boolean; id?: string | null } | null;
+  // Both owner columns. Testing owner_clerk_user_id alone made this
+  // fail CLOSED for the 118 of 129 live listings that carry only
+  // owner_profile_id — their authors got a 404 previewing their OWN draft,
+  // which is the one moment a draft preview exists for.
+  const isOwner = canManageListing(project, userId, profile?.id ?? null);
   const isAdmin = Boolean(profile?.is_admin);
   if (!isOwner && !isAdmin) notFound();
 }
