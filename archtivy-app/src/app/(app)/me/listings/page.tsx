@@ -5,26 +5,42 @@ import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import { ArrowRight } from "lucide-react";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getOwnedListingsForClerkUser } from "@/lib/db/listings";
 import { getFirstImageUrlPerListingIds } from "@/lib/db/listingImages";
 import { getUserListingStats, getLiveSaveCountsByListingIds } from "@/lib/db/userStats";
 import { getListingUrl } from "@/lib/canonical";
-import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { TypeBadge } from "@/components/TypeBadge";
 import { ListingRowActions } from "./ListingRowActions";
-import { ListingStatsStrip } from "@/components/dashboard/ListingStatsStrip";
+import { HomeNav } from "@/components/home/HomeNav";
 import type { OwnedListingSummary } from "@/lib/db/listings";
 import type { ProfileRole } from "@/lib/auth/config";
+
+/**
+ * /me/listings — manage everything you own.
+ *
+ * ── RESTYLED ONTO THE EDITORIAL SYSTEM ──────────────────────────────────────
+ * This page was the last high-traffic signed-in surface still on the legacy
+ * zinc palette with the blue #002abf/archtivy-primary accent, rendered under
+ * TopNav via SiteShell's fall-through default. Reached in one click from the
+ * dashboard's "Manage listings", it made the two pages look like two products.
+ *
+ * It now renders its own HomeNav on cream/ink/hairline and Jet Black accents,
+ * matching /me/dashboard, /me/profile and /me/files. SiteShell needs no change:
+ * /me/listings is added to EDITORIAL_ROUTES so the global TopNav, PageContainer
+ * and Footer are not also drawn around it.
+ *
+ * Behaviour is unchanged — same queries, same tabs, same filters, same actions.
+ * This is chrome only.
+ */
 
 export default async function ListingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; status?: string }>;
+  searchParams: Promise<{ tab?: string; status?: string; updated?: string }>;
 }) {
   const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  if (!userId) redirect("/sign-in?redirect_url=/me/listings");
 
   const profileResult = await getProfileByClerkId(userId);
   const profile = profileResult.data;
@@ -35,7 +51,6 @@ export default async function ListingsPage({
 
   const profileId = profile.id ?? "";
 
-  // Fetch listings + stats in parallel (stats queries are independent).
   const [{ data: listings, error }, stats] = await Promise.all([
     getOwnedListingsForClerkUser(userId, profileId || null),
     getUserListingStats(userId, profileId),
@@ -43,7 +58,6 @@ export default async function ListingsPage({
 
   const listingIds = listings?.map((l) => l.id) ?? [];
 
-  // Image thumbnails and live save counts both depend on listing IDs.
   const [imageResultResolved, liveSaves] = await Promise.all([
     listingIds.length > 0
       ? getFirstImageUrlPerListingIds(listingIds)
@@ -57,12 +71,10 @@ export default async function ListingsPage({
   /*
    * Status is a second, independent axis: Drafts / Published.
    *
-   * Deliberately TWO states, not the Draft/Pending/Approved set the brief
-   * asked for. `PENDING` is unreachable from any user-facing create path —
-   * the wizard writes APPROVED, or DRAFT for save-as-draft (see
-   * DATA_INTEGRITY_LOG item 4) — so a Pending tab could never fill, and an
+   * Deliberately TWO states, not Draft/Pending/Approved. `PENDING` is
+   * unreachable from any user-facing create path — the wizard writes APPROVED,
+   * or DRAFT for save-as-draft — so a Pending tab could never fill, and an
    * always-empty tab reads as a broken feature rather than an unused one.
-   * Live counts today: 128 APPROVED, 1 DRAFT, 0 PENDING.
    *
    * Anything not DRAFT counts as published, so an admin-set PENDING row still
    * appears somewhere rather than vanishing from the owner's own list.
@@ -93,95 +105,138 @@ export default async function ListingsPage({
   };
 
   const addHref = role === "designer" ? "/add/project" : "/add/product";
+  const noun = role === "designer" ? "project" : "product";
+
+  const statItems = [
+    { label: "Listings", value: stats.totalListings },
+    { label: "Views", value: stats.totalViews },
+    { label: "Saves", value: stats.totalSaves },
+    { label: "Connections", value: stats.totalConnections },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-            Listings
-          </h1>
-          <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-            Manage your projects and products in one place.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button as="link" href={addHref} variant="primary" className="rounded-[20px]">
-            Add {role === "designer" ? "project" : "product"}
-          </Button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-cream font-body text-ink">
+      <HomeNav variant="solid" />
+      <div className="mx-auto max-w-content px-4 pb-20 pt-[104px] md:px-12 lg:px-24">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+              <Link href="/me/dashboard" className="underline-offset-4 hover:underline">
+                Dashboard
+              </Link>
+            </p>
+            <h1 className="mt-3 font-display text-[36px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[42px]">
+              Listings
+            </h1>
+            <p className="mt-3 font-body text-[15px] leading-[24px] text-muted">
+              Manage your projects and products in one place.
+            </p>
+          </div>
+          <Link
+            href={addHref}
+            className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 font-body text-[14px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
+          >
+            Add a {noun}
+            <ArrowRight strokeWidth={1.5} className="h-4 w-4" aria-hidden />
+          </Link>
+        </header>
 
-      {/* Stats strip — server-aggregated, APPROVED listings only, always fresh */}
-      <ListingStatsStrip stats={stats} />
-
-      {/* Tabs */}
-      <nav className="flex gap-1 border-b border-zinc-200 dark:border-zinc-800" aria-label="Listings tabs">
-        <TabLink href={qs({ tab: "all" })} active={tab === "all"}>
-          All
-        </TabLink>
-        {role === "designer" && (
-          <TabLink href={qs({ tab: "projects" })} active={tab === "projects"}>
-            Projects
-          </TabLink>
-        )}
-        {role === "brand" && (
-          <TabLink href={qs({ tab: "products" })} active={tab === "products"}>
-            Products
-          </TabLink>
-        )}
-      </nav>
-
-      {/* Status filter — a second axis, so it reads as a filter on the tab
-          above rather than a competing set of tabs. Drafts is shown even at
-          zero so the state is discoverable before a draft exists. */}
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by status">
-        <StatusChip href={qs({ status: "all" })} active={status === "all"}>
-          All
-        </StatusChip>
-        <StatusChip href={qs({ status: "published" })} active={status === "published"}>
-          Published
-        </StatusChip>
-        <StatusChip href={qs({ status: "drafts" })} active={status === "drafts"}>
-          Drafts{draftCount > 0 ? ` (${draftCount})` : ""}
-        </StatusChip>
-      </div>
-
-      {error && (
-        <p className="text-sm text-red-600 dark:text-red-400">
-          Could not load listings. Please try again.
-        </p>
-      )}
-
-      {!error && filtered.length === 0 && (
-        <EmptyState
-          title={tab === "all" ? "No listings yet" : `No ${tab} yet`}
-          description={
-            tab === "all"
-              ? "Create your first project or product to get started."
-              : undefined
-          }
-          action={
-            <Button as="link" href={addHref} variant="primary">
-              Add {role === "designer" ? "project" : "product"}
-            </Button>
-          }
-        />
-      )}
-
-      {!error && filtered.length > 0 && (
-        <ul className="space-y-4" aria-label="Your listings">
-          {filtered.map((listing) => (
-            <ListingCard
-              key={listing.id}
-              listing={listing}
-              imageUrl={imageMap[listing.id]}
-              liveViewCount={listing.views_count ?? 0}
-              liveSaveCount={liveSaves[listing.id] ?? 0}
-            />
+        {/* Stats — server-aggregated, APPROVED listings only. Rendered inline
+            on the editorial tokens rather than via ListingStatsStrip, which is
+            still on the zinc palette and is used elsewhere. */}
+        <dl className="mt-9 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {statItems.map(({ label, value }) => (
+            <div key={label} className="rounded-2xl border border-hairline bg-white p-5">
+              <dd className="font-display text-[30px] leading-none tracking-tight text-ink tabular-nums">
+                {value.toLocaleString()}
+              </dd>
+              <dt className="mt-2 font-body text-[12px] text-muted">{label}</dt>
+            </div>
           ))}
-        </ul>
-      )}
+        </dl>
+
+        {/* Type tabs */}
+        <nav
+          className="mt-10 flex gap-1 border-b border-hairline"
+          aria-label="Listings tabs"
+        >
+          <TabLink href={qs({ tab: "all" })} active={tab === "all"}>
+            All
+          </TabLink>
+          {role === "designer" && (
+            <TabLink href={qs({ tab: "projects" })} active={tab === "projects"}>
+              Projects
+            </TabLink>
+          )}
+          {role === "brand" && (
+            <TabLink href={qs({ tab: "products" })} active={tab === "products"}>
+              Products
+            </TabLink>
+          )}
+        </nav>
+
+        {/* Status filter — a second axis, so it reads as a filter on the tab
+            above rather than a competing set of tabs. Drafts is shown even at
+            zero so the state is discoverable before a draft exists. */}
+        <div
+          className="mt-5 flex flex-wrap items-center gap-2"
+          role="group"
+          aria-label="Filter by status"
+        >
+          <StatusChip href={qs({ status: "all" })} active={status === "all"}>
+            All
+          </StatusChip>
+          <StatusChip href={qs({ status: "published" })} active={status === "published"}>
+            Published
+          </StatusChip>
+          <StatusChip href={qs({ status: "drafts" })} active={status === "drafts"}>
+            Drafts{draftCount > 0 ? ` (${draftCount})` : ""}
+          </StatusChip>
+        </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="mt-6 rounded-2xl bg-red-50 px-4 py-3 font-body text-[14px] text-red-700"
+          >
+            Could not load listings. Please try again.
+          </p>
+        )}
+
+        {!error && filtered.length === 0 && (
+          <div className="mt-8 rounded-2xl border border-hairline bg-white p-10 text-center">
+            <p className="font-display text-[22px] tracking-tight text-ink">
+              {tab === "all" ? `No ${noun}s yet` : `No ${tab} yet`}
+            </p>
+            <p className="mx-auto mt-2 max-w-[42ch] font-body text-[14px] leading-[22px] text-muted">
+              {status === "drafts"
+                ? "Drafts you save from the wizard will wait for you here."
+                : `Publish your first ${noun} — it takes about ten minutes.`}
+            </p>
+            <Link
+              href={addHref}
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 font-body text-[14px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
+            >
+              Add a {noun}
+              <ArrowRight strokeWidth={1.5} className="h-4 w-4" aria-hidden />
+            </Link>
+          </div>
+        )}
+
+        {!error && filtered.length > 0 && (
+          <ul className="mt-8 space-y-3" aria-label="Your listings">
+            {filtered.map((listing) => (
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                imageUrl={imageMap[listing.id]}
+                liveViewCount={listing.views_count ?? 0}
+                liveSaveCount={liveSaves[listing.id] ?? 0}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
@@ -198,11 +253,14 @@ function TabLink({
   return (
     <Link
       href={href}
-      className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
+      aria-current={active ? "page" : undefined}
+      className={[
+        "-mb-px border-b-2 px-3 py-2.5 font-body text-[14px] transition-colors",
+        // Jet Black is the accent now; the underline was archtivy-primary blue.
         active
-          ? "border-archtivy-primary text-archtivy-primary"
-          : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-      }`}
+          ? "border-archtivy-jet text-ink"
+          : "border-transparent text-muted hover:text-ink",
+      ].join(" ")}
     >
       {children}
     </Link>
@@ -234,11 +292,12 @@ function ListingCard({
   /** save_count from listing_saves (live SQL-aggregated on server). */
   liveSaveCount: number;
 }) {
+  const isDraft = listing.status === "DRAFT";
   return (
-    <li className="flex flex-col gap-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:flex-row sm:items-center">
+    <li className="flex flex-col gap-4 rounded-2xl border border-hairline bg-white p-4 transition-colors hover:border-ink/20 sm:flex-row sm:items-center">
       <Link
         href={getListingUrl(listing)}
-        className="relative h-24 w-40 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800"
+        className="relative h-24 w-full shrink-0 overflow-hidden rounded-xl bg-stone/40 sm:w-40"
       >
         {imageUrl ? (
           <Image
@@ -250,45 +309,45 @@ function ListingCard({
             unoptimized
           />
         ) : (
-          <span className="flex h-full w-full items-center justify-center text-xs text-zinc-400 dark:text-zinc-500">
+          <span className="flex h-full w-full items-center justify-center font-body text-[12px] text-muted">
             No image
           </span>
         )}
       </Link>
+
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+          <h2 className="font-body text-[15px] font-medium text-ink">
             {listing.title?.trim() || "Untitled"}
           </h2>
-          <TypeBadge type={listing.type} />
-          {/* Was hardcoded to "Published", so a draft was labelled Published on
-              its own card while the Drafts filter simultaneously matched it.
-              Mirrors the filter's rule exactly: DRAFT is a draft, anything else
-              counts as published. */}
-          {listing.status === "DRAFT" ? (
-            <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+          <span className="rounded-full border border-hairline px-2 py-0.5 font-body text-[11px] capitalize text-muted">
+            {listing.type}
+          </span>
+          {/* Mirrors the Drafts filter's rule exactly: DRAFT is a draft,
+              anything else counts as published. */}
+          {isDraft ? (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 font-body text-[11px] font-medium text-amber-900">
               Draft
             </span>
           ) : (
-            <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+            <span className="rounded-full bg-stone/50 px-2 py-0.5 font-body text-[11px] text-muted">
               Published
             </span>
           )}
         </div>
-        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 font-body text-[12px] text-muted">
           Last updated {formatDate(listing.created_at)}
         </p>
-        <div className="mt-1 flex flex-wrap gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+        <div className="mt-1.5 flex flex-wrap gap-3 font-body text-[12px] text-muted">
           <span>{liveViewCount} views</span>
           <span>{liveSaveCount} saves</span>
         </div>
       </div>
+
       <div className="flex shrink-0 items-center gap-2">
-        {/* Entry point to the per-listing management page. Without this the
-            route exists but nothing links to it. */}
         <Link
           href={`/me/listings/${listing.id}`}
-          className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm text-zinc-900 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          className="rounded-full border border-ink/25 px-4 py-2 font-body text-[13px] text-ink transition-colors hover:bg-stone/50"
         >
           Manage
         </Link>
@@ -296,7 +355,7 @@ function ListingCard({
           listingId={listing.id}
           listingType={listing.type}
           listingTitle={listing.title?.trim() || "Untitled"}
-          isDraft={listing.status === "DRAFT"}
+          isDraft={isDraft}
         />
       </div>
     </li>
@@ -319,10 +378,10 @@ function StatusChip({
       href={href}
       aria-current={active ? "true" : undefined}
       className={[
-        "rounded-full border px-3 py-1 text-xs font-medium transition",
+        "rounded-full border px-3.5 py-1.5 font-body text-[12px] transition-colors",
         active
-          ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-          : "border-zinc-200 text-zinc-600 hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-100",
+          ? "border-archtivy-jet bg-archtivy-jet text-cream"
+          : "border-hairline text-muted hover:border-ink/25 hover:text-ink",
       ].join(" ")}
     >
       {children}
