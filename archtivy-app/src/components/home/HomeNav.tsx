@@ -226,6 +226,15 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
               )}
               <li className="mt-2 border-t border-hairline pt-2">
                 <Link
+                  href="/me/dashboard"
+                  onClick={() => setMenuOpen(false)}
+                  className="block py-3 font-body text-[16px] font-medium text-ink"
+                >
+                  Dashboard
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/me/notifications"
                   onClick={() => setMenuOpen(false)}
                   className="block py-3 font-body text-[16px] text-ink"

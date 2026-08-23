@@ -35,10 +35,18 @@ export const metadata: Metadata = {
  */
 export default async function EditListingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ step?: string }>;
 }) {
   const { id } = await params;
+  // ?step=N arrives from a dashboard draft card that named a specific missing
+  // field. Parsed loosely — a bad value falls back to step 0 rather than 404s,
+  // since the step is a convenience and the listing is the point.
+  const { step: stepParam } = await searchParams;
+  const parsedStep = Number.parseInt(stepParam ?? "", 10);
+  const initialStep = Number.isFinite(parsedStep) && parsedStep >= 0 ? parsedStep : undefined;
 
   const { userId } = await auth();
   if (!userId) redirect(`/sign-in?redirect_url=/me/listings/${id}/edit`);
@@ -74,6 +82,7 @@ export default async function EditListingPage({
         materials={materials}
         brandName={profile.display_name?.trim() || profile.username || null}
         initial={listing}
+        initialStep={initialStep}
       />
     );
   }
@@ -91,6 +100,7 @@ export default async function EditListingPage({
       products={products}
       memberTitles={memberTitles}
       initial={listing}
+      initialStep={initialStep}
     />
   );
 }
