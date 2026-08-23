@@ -2,6 +2,16 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 
 export type LeadStatus = "pending" | "approved" | "rejected";
 
+/**
+ * What shape of request this is.
+ *
+ * Quote requests reuse `leads` rather than getting their own table: the
+ * pipeline — pending → admin review → forward to owner — is identical, and a
+ * parallel table would mean a second status enum, moderation screen and
+ * forwarding path to keep in step. See migration 20260823100000.
+ */
+export type LeadKind = "contact" | "quote";
+
 export interface LeadRow {
   id: string;
   listing_id: string;
@@ -18,7 +28,13 @@ export interface LeadRow {
   reviewed_by: string | null;
   ip_hash: string | null;
   user_agent: string | null;
-  // NOTE: new column exists in DB; we don't have to add it here to fix the bug.
+  /** 'contact' (general enquiry) or 'quote' (product quote request). */
+  kind: LeadKind;
+  quantity: string | null;
+  project_name: string | null;
+  location: string | null;
+  desired_timeline: string | null;
+  idempotency_key: string | null;
 }
 
 export interface InsertLeadInput {
@@ -32,9 +48,18 @@ export interface InsertLeadInput {
   message: string;
   ip_hash?: string | null;
   user_agent?: string | null;
+  /** Defaults to 'contact' to match every row written before quotes existed. */
+  kind?: LeadKind;
+  quantity?: string | null;
+  project_name?: string | null;
+  location?: string | null;
+  desired_timeline?: string | null;
+  idempotency_key?: string | null;
 }
 
-export async function insertLead(input: InsertLeadInput): Promise<{ id: string } | { error: string }> {
+export async function insertLead(
+  input: InsertLeadInput
+): Promise<{ id: string; duplicate?: boolean } | { error: string }> {
   const sup = getSupabaseServiceClient();
   const { data, error } = await sup
     .from("leads")
@@ -50,11 +75,32 @@ export async function insertLead(input: InsertLeadInput): Promise<{ id: string }
       status: "pending",
       ip_hash: input.ip_hash ?? null,
       user_agent: input.user_agent ?? null,
+      kind: input.kind ?? "contact",
+      quantity: input.quantity?.trim() || null,
+      project_name: input.project_name?.trim() || null,
+      location: input.location?.trim() || null,
+      desired_timeline: input.desired_timeline?.trim() || null,
+      idempotency_key: input.idempotency_key?.trim() || null,
     })
     .select("id")
     .single();
 
-  if (error) return { error: error.message };
+  if (error) {
+    // 23505 on the partial unique index means this exact submission already
+    // landed — a double-click, a retry, or a refresh-and-resend. Return the
+    // original row instead of a duplicate, and instead of an error: from the
+    // requester's side the request WAS received, and telling them otherwise
+    // invites them to send a third.
+    if (error.code === "23505" && input.idempotency_key) {
+      const { data: existing } = await sup
+        .from("leads")
+        .select("id")
+        .eq("idempotency_key", input.idempotency_key)
+        .maybeSingle();
+      if (existing) return { id: (existing as { id: string }).id, duplicate: true };
+    }
+    return { error: error.message };
+  }
   return { id: (data as { id: string }).id };
 }
 

@@ -8,6 +8,13 @@ export interface ContactLeadModalProps {
   listingId: string;
   listingType: "project" | "product";
   listingTitle: string;
+  /**
+   * 'contact' is the general enquiry this form has always been. 'quote' adds
+   * the specification fields a brand needs to price something, and relabels
+   * the dialog. Same endpoint, same moderation queue — see the leads
+   * quote-request migration for why this is one pipeline and not two.
+   */
+  kind?: "contact" | "quote";
 }
 
 const MIN_MESSAGE_LENGTH = 15;
@@ -18,21 +25,47 @@ export function ContactLeadModal({
   listingId,
   listingType,
   listingTitle,
+  kind = "contact",
 }: ContactLeadModalProps) {
   const [sender_name, setSenderName] = useState("");
   const [sender_email, setSenderEmail] = useState("");
   const [sender_company, setSenderCompany] = useState("");
   const [message, setMessage] = useState("");
+  const [project_name, setProjectName] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [location, setLocation] = useState("");
+  const [desired_timeline, setDesiredTimeline] = useState("");
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  /*
+   * ── SERVER-SIDE DUPLICATE PREVENTION ──────────────────────────────────────
+   * Minted once per opened form and sent with the submission, where a partial
+   * unique index collapses repeats onto one row.
+   *
+   * Disabling the button while submitting (which this form already did) only
+   * covers the slow-double-click case. It does not cover a request that
+   * succeeds while the response is lost, someone refreshing and resubmitting,
+   * or a browser retrying a POST — all of which produce a second identical
+   * request the client has no way to recognise. The key travels with the
+   * request, so the server can.
+   *
+   * Reset alongside the fields, so a genuinely new enquiry gets a new key.
+   */
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
 
   const reset = useCallback(() => {
     setSenderName("");
     setSenderEmail("");
     setSenderCompany("");
     setMessage("");
+    setProjectName("");
+    setQuantity("");
+    setLocation("");
+    setDesiredTimeline("");
     setStatus("idle");
     setErrorMessage(null);
+    setIdempotencyKey(crypto.randomUUID());
   }, []);
 
   const handleClose = useCallback(() => {
@@ -77,6 +110,16 @@ export function ContactLeadModal({
             sender_email: email,
             sender_company: company,
             message: msg,
+            kind,
+            idempotency_key: idempotencyKey,
+            ...(kind === "quote"
+              ? {
+                  project_name: project_name.trim() || null,
+                  quantity: quantity.trim() || null,
+                  location: location.trim() || null,
+                  desired_timeline: desired_timeline.trim() || null,
+                }
+              : {}),
           }),
         });
         const data = (await res.json()) as { error?: string };
@@ -92,7 +135,19 @@ export function ContactLeadModal({
         setErrorMessage("Network error. Please try again.");
       }
     },
-    [listingId, sender_name, sender_email, sender_company, message]
+    [
+      listingId,
+      sender_name,
+      sender_email,
+      sender_company,
+      message,
+      kind,
+      idempotencyKey,
+      project_name,
+      quantity,
+      location,
+      desired_timeline,
+    ]
   );
 
   if (!open) return null;
@@ -112,7 +167,7 @@ export function ContactLeadModal({
       <div className="relative w-full max-w-md rounded-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
         <div className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-700">
           <h2 id="contact-lead-title" className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            Contact via Archtivy
+            {kind === "quote" ? "Request a Quote" : "Contact via Archtivy"}
           </h2>
           <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
             About: {listingTitle}
@@ -186,6 +241,69 @@ export function ContactLeadModal({
                 disabled={status === "submitting"}
               />
             </div>
+            {/* Quote-only. Every field optional: a quote with just a message
+                is still a real quote worth forwarding, and a wall of required
+                fields is how an enquiry form stops being used. */}
+            {kind === "quote" && (
+              <div className="space-y-4 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+              <div>
+                <label htmlFor="quote-project" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Project <span className="text-zinc-400">(optional)</span>
+                </label>
+                <input
+                  id="quote-project"
+                  type="text"
+                  value={project_name}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-500 focus:border-[#002abf] focus:outline-none focus:ring-1 focus:ring-[#002abf] dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                  placeholder="Where it will be specified"
+                  disabled={status === "submitting"}
+                />
+              </div>
+              <div>
+                <label htmlFor="quote-quantity" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Quantity <span className="text-zinc-400">(optional)</span>
+                </label>
+                <input
+                  id="quote-quantity"
+                  type="text"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-500 focus:border-[#002abf] focus:outline-none focus:ring-1 focus:ring-[#002abf] dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                  placeholder="e.g. 40–60 units"
+                  disabled={status === "submitting"}
+                />
+              </div>
+              <div>
+                <label htmlFor="quote-location" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Location <span className="text-zinc-400">(optional)</span>
+                </label>
+                <input
+                  id="quote-location"
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-500 focus:border-[#002abf] focus:outline-none focus:ring-1 focus:ring-[#002abf] dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                  placeholder="Delivery or project location"
+                  disabled={status === "submitting"}
+                />
+              </div>
+              <div>
+                <label htmlFor="quote-timeline" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Desired timeline <span className="text-zinc-400">(optional)</span>
+                </label>
+                <input
+                  id="quote-timeline"
+                  type="text"
+                  value={desired_timeline}
+                  onChange={(e) => setDesiredTimeline(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-500 focus:border-[#002abf] focus:outline-none focus:ring-1 focus:ring-[#002abf] dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                  placeholder="e.g. Q3 2026"
+                  disabled={status === "submitting"}
+                />
+              </div>
+              </div>
+            )}
             <div>
               <label htmlFor="contact-message" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 Message * <span className="text-zinc-400">(min {MIN_MESSAGE_LENGTH} characters)</span>

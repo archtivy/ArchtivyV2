@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ExternalLink, Mail } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { getProductDetail } from "@/lib/db/productDetail";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { HomeNav } from "@/components/home/HomeNav";
@@ -10,6 +10,7 @@ import { RailPanel, RelatedPanel } from "@/components/entity/RelationshipRail";
 import { EntityCard } from "@/components/home/EntityCard";
 import { SaveToggle } from "@/components/home/SaveToggle";
 import { normaliseExternalUrl } from "@/lib/url/externalUrl";
+import { RequestQuoteButton } from "@/components/products/RequestQuoteButton";
 import { ProductDetailTabs } from "@/components/products/ProductDetailTabs";
 import { SeenInProjects } from "@/components/products/SeenInProjects";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
@@ -176,19 +177,7 @@ export async function ProductDetailView({
                   </a>
                 )}
 
-                {/*
-                  STUB — no quote-request flow, table or endpoint exists.
-                  Points at the real /contact page rather than posting into
-                  nothing, same pattern as "Request a Project".
-                  TODO(request-a-quote): build the flow, then point this at it.
-                */}
-                <Link
-                  href="/contact"
-                  className="inline-flex items-center gap-2 rounded-full border border-ink/25 px-4 py-2 font-body text-[13px] text-ink transition-colors hover:bg-stone/50"
-                >
-                  Request a Quote
-                  <Mail strokeWidth={1.5} className="h-3.5 w-3.5" aria-hidden />
-                </Link>
+                <RequestQuoteButton listingId={detail.id} listingTitle={detail.title} />
               </div>
 
               {/* Colour options only when this product genuinely has more than
