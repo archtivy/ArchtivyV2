@@ -331,6 +331,14 @@ export async function updateProductCanonical(
   const taxonomyNodeId = (formData.get("taxonomy_node_id") as string)?.trim() || null;
   const colorOptions = parseStringArray(formData.get("color_options"));
   const materialIds = parseStringArray(formData.get("product_material_ids"));
+  // Lifecycle and collaboration. Read here for the first time: these columns
+  // were only ever written by the admin update action, so a product edited
+  // through the public wizard would have had them silently blanked once the
+  // fields became visible there.
+  const productStage = (formData.get("product_stage") as string)?.trim() || null;
+  const productCollab =
+    (formData.get("product_collaboration_status") as string)?.trim() || null;
+  const productLookingFor = parseStringArray(formData.get("product_looking_for"));
   const metaDescription = (formData.get("meta_description") as string)?.trim() || null;
   const website = (formData.get("website") as string)?.trim() || null;
   const videoUrl = (formData.get("video_url") as string)?.trim() || null;
@@ -383,6 +391,9 @@ export async function updateProductCanonical(
       product_type: productType,
       product_category: productCategory,
       product_subcategory: productSubcategory,
+      product_stage: productStage,
+      product_collaboration_status: productCollab,
+      product_looking_for: productLookingFor,
       meta_description: metaDescription,
       website,
       instagram,

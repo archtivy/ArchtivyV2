@@ -317,18 +317,21 @@ export function ProjectWizard({
     fd.set("video_url", videoUrl);
     fd.set("slug", slug);
     if (draft) fd.set("draft", "1");
+    // Lifecycle and collaboration are author-facing now, so they are always
+    // submitted — not only when an admin is driving the form.
+    fd.set("project_status", projectStatus);
+    fd.set("project_collaboration_status", collabStatus);
+    // "Looking for" only means something while open to collaboration, and the
+    // field is hidden once it is not — so send an empty list rather than
+    // leaving stale roles attached to a project that closed.
+    fd.set(
+      "project_looking_for",
+      JSON.stringify(collabStatus && collabStatus !== "not_open_for_collaboration" ? lookingFor : [])
+    );
+
     if (admin) {
       fd.set("owner_profile_id", ownerProfileId);
       fd.set("material_or_finish", materialOrFinish);
-      fd.set("project_status", projectStatus);
-      fd.set("project_collaboration_status", collabStatus);
-      // "Looking for" only means something while open to collaboration, and
-      // the field is hidden once it is not — so send an empty list rather than
-      // leaving stale roles attached to a project that closed.
-      fd.set(
-        "project_looking_for",
-        JSON.stringify(collabStatus && collabStatus !== "not_open_for_collaboration" ? lookingFor : [])
-      );
       // Raw Files: the admin actions read formData.getAll("documents"), unlike
       // the gallery which is uploaded client-side and posted as JSON.
       for (const f of documents) fd.append("documents", f);
@@ -580,9 +583,17 @@ export function ProjectWizard({
                 />
               )}
 
-              {step === 7 && admin && (
-                <div className="mt-8">
-                  <AdminOnly label="Lifecycle & collaboration">
+              {step === 7 && (
+                <div className="mt-8 space-y-5 rounded-2xl border border-hairline bg-cream p-6 sm:p-8">
+                  <div>
+                    <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+                      Lifecycle &amp; collaboration
+                    </p>
+                    <p className="mt-1.5 max-w-[52ch] font-body text-[13px] leading-[19px] text-muted">
+                      Optional. Tells people where this project stands and whether you are open to
+                      working with them on it.
+                    </p>
+                  </div>
                     <Field label="Project status">
                       <select
                         value={projectStatus}
@@ -644,7 +655,6 @@ export function ProjectWizard({
                         </div>
                       </fieldset>
                     )}
-                  </AdminOnly>
                 </div>
               )}
 

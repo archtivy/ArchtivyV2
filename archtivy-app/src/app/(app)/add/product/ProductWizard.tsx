@@ -261,14 +261,16 @@ export function ProductWizard({
             }))
         )
       );
-      fd.set("product_stage", productStage);
-      fd.set("product_collaboration_status", collabStatus);
-      fd.set(
-        "product_looking_for",
-        JSON.stringify(collabStatus && collabStatus !== "not_open_for_collaboration" ? lookingFor : [])
-      );
       for (const f of documents) fd.append("documents", f);
     }
+
+    // Author-facing now, so always submitted.
+    fd.set("product_stage", productStage);
+    fd.set("product_collaboration_status", collabStatus);
+    fd.set(
+      "product_looking_for",
+      JSON.stringify(collabStatus && collabStatus !== "not_open_for_collaboration" ? lookingFor : [])
+    );
     return fd;
   }
 
@@ -608,9 +610,17 @@ export function ProductWizard({
                 />
               )}
 
-              {step === 5 && admin && (
-                <div className="mt-8">
-                  <AdminOnly label="Lifecycle & collaboration">
+              {step === 5 && (
+                <div className="mt-8 space-y-5 rounded-2xl border border-hairline bg-cream p-6 sm:p-8">
+                  <div>
+                    <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+                      Lifecycle &amp; collaboration
+                    </p>
+                    <p className="mt-1.5 max-w-[52ch] font-body text-[13px] leading-[19px] text-muted">
+                      Optional. Tells people where this product stands and whether you are open to
+                      working with them on it.
+                    </p>
+                  </div>
                     <Field label="Product stage">
                       <select
                         value={productStage}
@@ -671,7 +681,6 @@ export function ProductWizard({
                         </div>
                       </fieldset>
                     )}
-                  </AdminOnly>
                 </div>
               )}
 
