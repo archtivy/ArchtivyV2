@@ -45,8 +45,8 @@ export function ArchiveListingGrid(props: ArchiveListingGridProps) {
 function ArchiveEmpty() {
   return (
     <div className="py-16 text-center">
-      <p className="text-sm text-zinc-500">No listings in this category yet.</p>
-      <p className="mt-2 text-xs text-zinc-400">
+      <p className="text-sm text-muted">No listings in this category yet.</p>
+      <p className="mt-2 text-xs text-muted">
         Try browsing a parent category or use the subcategory links above.
       </p>
     </div>

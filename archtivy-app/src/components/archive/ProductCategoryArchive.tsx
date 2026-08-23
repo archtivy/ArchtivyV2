@@ -2,9 +2,7 @@ import { getAbsoluteUrl } from "@/lib/canonical";
 import { getArchiveHubUrl, getArchiveCategoryUrl, buildArchiveBreadcrumbSegments } from "@/lib/archive/urls";
 import type { TaxonomyNode } from "@/lib/taxonomy/taxonomyDb";
 import type { ProductCanonical } from "@/lib/canonical-models";
-import { Container } from "@/components/layout/Container";
-import { TopNav } from "@/components/layout/TopNav";
-import { Footer } from "@/components/layout/Footer";
+import { SitePage } from "@/components/layout/SitePage";
 import { ArchiveHeader } from "./ArchiveHeader";
 import { ArchiveBreadcrumb } from "./ArchiveBreadcrumb";
 import { SubcategoryLinks, type SubcategoryLinkItem } from "./SubcategoryLinks";
@@ -59,31 +57,30 @@ export function ProductCategoryArchive({
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
 
   /*
-   * Renders its own TopNav and Footer — SiteShell and ConditionalFooter treat
-   * everything under /products/* as shell-less, because that catch-all serves
-   * both category archives and product detail pages and only this server
-   * branch knows which resolved. Keeps archives pixel-identical to before.
+   * Renders its own frame.
+   *
+   * SiteShell treats everything under /products/* as shell-less, because that
+   * catch-all serves BOTH category archives and product detail pages and a
+   * client component cannot tell them apart — only this server branch knows.
+   * The archive branch therefore supplies its own chrome. It used to re-add
+   * TopNav and the global Footer to stay pixel-identical to the old shell;
+   * now it renders SitePage, so archives and detail pages finally share one
+   * header instead of two different ones on the same URL space.
    */
   return (
-    <>
-      <TopNav />
-      <main>
-        <Container className="py-8 sm:py-12">
+    <SitePage width="narrow" footer>
       <JsonLd schemas={[collectionJsonLd, breadcrumbJsonLd]} />
-          <ArchiveBreadcrumb segments={breadcrumbSegments} current={node.label} />
-          <ArchiveHeader title={title} intro={intro} count={total} />
-          {!isSubcategory && childNodes.length > 0 && (
-            <SubcategoryLinks baseSegment="products" items={childNodes} />
-          )}
-          <ArchiveListingGrid type="product" items={listings} />
-          <ArchivePagination
-            currentPage={page}
-            totalPages={totalPages}
-            basePath={archivePath}
-          />
-        </Container>
-      </main>
-      <Footer />
-    </>
+      <ArchiveBreadcrumb segments={breadcrumbSegments} current={node.label} />
+      <ArchiveHeader title={title} intro={intro} count={total} />
+      {!isSubcategory && childNodes.length > 0 && (
+        <SubcategoryLinks baseSegment="products" items={childNodes} />
+      )}
+      <ArchiveListingGrid type="product" items={listings} />
+      <ArchivePagination
+        currentPage={page}
+        totalPages={totalPages}
+        basePath={archivePath}
+      />
+    </SitePage>
   );
 }

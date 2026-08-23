@@ -57,13 +57,13 @@ export function ArchivePagination({
       {currentPage > 1 ? (
         <Link
           href={pageHref(basePath, currentPage - 1)}
-          className="inline-flex h-9 items-center rounded px-3 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          className="inline-flex h-9 items-center rounded px-3 text-sm text-muted hover:bg-stone/60"
           rel="prev"
         >
           &larr; Prev
         </Link>
       ) : (
-        <span className="inline-flex h-9 items-center rounded px-3 text-sm text-zinc-300 dark:text-zinc-600">
+        <span className="inline-flex h-9 items-center rounded px-3 text-sm text-muted">
           &larr; Prev
         </span>
       )}
@@ -73,14 +73,14 @@ export function ArchivePagination({
         p === -1 ? (
           <span
             key={`ellipsis-${i}`}
-            className="inline-flex h-9 w-9 items-center justify-center text-sm text-zinc-400"
+            className="inline-flex h-9 w-9 items-center justify-center text-sm text-muted"
           >
             &hellip;
           </span>
         ) : p === currentPage ? (
           <span
             key={p}
-            className="inline-flex h-9 w-9 items-center justify-center rounded bg-zinc-900 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+            className="inline-flex h-9 w-9 items-center justify-center rounded bg-ink text-sm font-medium text-cream"
             aria-current="page"
           >
             {p}
@@ -89,7 +89,7 @@ export function ArchivePagination({
           <Link
             key={p}
             href={pageHref(basePath, p)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            className="inline-flex h-9 w-9 items-center justify-center rounded text-sm text-muted hover:bg-stone/60"
           >
             {p}
           </Link>
@@ -100,13 +100,13 @@ export function ArchivePagination({
       {currentPage < totalPages ? (
         <Link
           href={pageHref(basePath, currentPage + 1)}
-          className="inline-flex h-9 items-center rounded px-3 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          className="inline-flex h-9 items-center rounded px-3 text-sm text-muted hover:bg-stone/60"
           rel="next"
         >
           Next &rarr;
         </Link>
       ) : (
-        <span className="inline-flex h-9 items-center rounded px-3 text-sm text-zinc-300 dark:text-zinc-600">
+        <span className="inline-flex h-9 items-center rounded px-3 text-sm text-muted">
           Next &rarr;
         </span>
       )}

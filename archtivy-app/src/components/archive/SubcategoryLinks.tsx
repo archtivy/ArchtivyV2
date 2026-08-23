@@ -21,7 +21,7 @@ export function SubcategoryLinks({ baseSegment, items }: SubcategoryLinksProps) 
 
   return (
     <div className="mb-10">
-      <h2 className="text-sm font-medium uppercase tracking-wider text-zinc-500 mb-4">
+      <h2 className="text-sm font-medium uppercase tracking-wider text-muted mb-4">
         Subcategories
       </h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -29,13 +29,13 @@ export function SubcategoryLinks({ baseSegment, items }: SubcategoryLinksProps) 
           <Link
             key={item.slug_path}
             href={`/${baseSegment}/${item.slug_path}`}
-            className="group block rounded border border-zinc-200 bg-white px-4 py-3 transition-colors hover:border-[#002abf] hover:bg-zinc-50"
+            className="group block rounded border border-hairline bg-cream px-4 py-3 transition-colors hover:border-ink hover:bg-stone/40"
           >
-            <span className="text-sm font-medium text-zinc-900 group-hover:text-[#002abf] transition-colors">
+            <span className="text-sm font-medium text-ink group-hover:text-ink transition-colors">
               {item.label}
             </span>
             {item.description && (
-              <span className="mt-0.5 block text-xs text-zinc-500 line-clamp-1">
+              <span className="mt-0.5 block text-xs text-muted line-clamp-1">
                 {item.description}
               </span>
             )}

@@ -21,19 +21,19 @@ export function ArchiveBreadcrumb({ segments, current }: ArchiveBreadcrumbProps)
       className="mb-6 flex flex-wrap items-center gap-1.5 text-sm text-[#374151]"
       aria-label="Breadcrumb"
     >
-      <Link href="/" className="hover:text-zinc-900 transition-colors">
+      <Link href="/" className="hover:text-ink transition-colors">
         Home
       </Link>
       {segments.map((seg) => (
         <span key={seg.href} className="contents">
-          <span aria-hidden className="text-zinc-300">/</span>
-          <Link href={seg.href} className="hover:text-zinc-900 transition-colors">
+          <span aria-hidden className="text-muted">/</span>
+          <Link href={seg.href} className="hover:text-ink transition-colors">
             {seg.label}
           </Link>
         </span>
       ))}
-      <span aria-hidden className="text-zinc-300">/</span>
-      <span className="text-zinc-900 font-medium">{current}</span>
+      <span aria-hidden className="text-muted">/</span>
+      <span className="text-ink font-medium">{current}</span>
     </nav>
   );
 }
