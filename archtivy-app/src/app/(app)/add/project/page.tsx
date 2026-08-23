@@ -5,7 +5,7 @@ import { getProfileByClerkId } from "@/lib/db/profiles";
 // Reference-data queries live in lib/publish/wizardReferenceData so the edit
 // route feeds the same wizard from the same source; see the note there.
 import {
-  getWizardCategories,
+  getWizardTaxonomyNodes,
   getWizardMaterials,
   getWizardProducts,
   getWizardMemberTitles,
@@ -41,7 +41,7 @@ export default async function AddProjectPage() {
   if (profile.role === "reader") redirect("/me/settings");
 
   const [categories, materials, products, memberTitles] = await Promise.all([
-    getWizardCategories("project"),
+    getWizardTaxonomyNodes("project"),
     getWizardMaterials(),
     getWizardProducts(),
     getWizardMemberTitles(),

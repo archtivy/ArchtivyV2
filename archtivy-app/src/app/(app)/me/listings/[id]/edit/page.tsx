@@ -5,7 +5,7 @@ import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getListingForEdit } from "@/lib/db/listingEdit";
 import { canManageListing } from "@/lib/auth/listingOwnership";
 import {
-  getWizardCategories,
+  getWizardTaxonomyNodes,
   getWizardMaterials,
   getWizardProducts,
   getWizardMemberTitles,
@@ -73,7 +73,7 @@ export default async function EditListingPage({
 
   if (listing.type === "product") {
     const [categories, materials] = await Promise.all([
-      getWizardCategories("product"),
+      getWizardTaxonomyNodes("product"),
       getWizardMaterials(),
     ]);
     return (
@@ -88,7 +88,7 @@ export default async function EditListingPage({
   }
 
   const [categories, materials, products, memberTitles] = await Promise.all([
-    getWizardCategories("project"),
+    getWizardTaxonomyNodes("project"),
     getWizardMaterials(),
     getWizardProducts(),
     getWizardMemberTitles(),

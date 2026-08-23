@@ -31,6 +31,7 @@ import { createProductCanonical } from "@/app/actions/listings";
 import { updateProductCanonical } from "@/app/actions/updateListing";
 import type { ProductEditData } from "@/lib/db/listingEdit";
 import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
+import { TaxonomyCascade } from "@/components/add/wizard/TaxonomyCascade";
 import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
 import {
   PRODUCT_STAGE_VALUES,
@@ -66,6 +67,8 @@ import {
 export interface ProductTaxonomyOption {
   id: string;
   label: string;
+  parentId: string | null;
+  depth: number;
 }
 export interface ProductMaterialOption {
   id: string;
@@ -137,6 +140,9 @@ export function ProductWizard({
   const [colorOptions, setColorOptions] = useState<string[]>(initial?.colorOptions ?? []);
   const [colorDraft, setColorDraft] = useState("");
   const [ownerProfileId, setOwnerProfileId] = useState(admin?.ownerProfileId ?? "");
+  // True when the chosen node still has children — "Furniture" without a
+  // subcategory and type. Stored and saved either way; it only gates publishing.
+  const [taxonomyIncomplete, setTaxonomyIncomplete] = useState(false);
   // Admin-only fields, carried over from the legacy admin form. Each folds
   // into the nearest existing step rather than adding one — see AdminOnly.
   const [year, setYear] = useState(initial?.year ?? "");
@@ -311,7 +317,10 @@ export function ProductWizard({
   // createAdminProductFull rejects a submission with no owner, and an
   // unowned product is unattributed publicly and invisible in /me/listings.
   const canPublish =
-    title.trim().length > 0 && images.length > 0 && (!admin || Boolean(ownerProfileId));
+    title.trim().length > 0 && images.length > 0 && (!admin || Boolean(ownerProfileId)) &&
+    // A node that still has children is a half-made choice — "Furniture" does
+    // not say what the product is. Saved either way; only publishing waits.
+    !taxonomyIncomplete;
 
   return (
     <WizardFrame bare={Boolean(admin)}>
@@ -413,20 +422,12 @@ export function ProductWizard({
                       placeholder="Nena Armchair"
                     />
                   </Field>
-                  <Field label="Category">
-                    <select
-                      value={taxonomyNodeId}
-                      onChange={(e) => setTaxonomyNodeId(e.target.value)}
-                      className={inputCls}
-                    >
-                      <option value="">Choose a category…</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                  <TaxonomyCascade
+                    nodes={categories}
+                    value={taxonomyNodeId}
+                    onChange={setTaxonomyNodeId}
+                    onIncompleteChange={setTaxonomyIncomplete}
+                  />
                   <Field
                     label="Description"
                     required

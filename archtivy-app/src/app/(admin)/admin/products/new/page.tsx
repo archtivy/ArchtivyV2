@@ -3,7 +3,7 @@ import { AdminPage } from "@/components/admin/AdminPage";
 import { ProductWizard } from "@/app/(app)/add/product/ProductWizard";
 import { getWizardOwnerOptions } from "@/lib/admin/wizardOwnerOptions";
 import {
-  getWizardCategories,
+  getWizardTaxonomyNodes,
   getWizardMaterials,
   getWizardMemberTitles,
 } from "@/lib/publish/wizardReferenceData";
@@ -25,7 +25,7 @@ export const revalidate = 0;
 export default async function AdminNewProductPage() {
   const [ownerOptions, categories, materials, memberTitles] = await Promise.all([
     getWizardOwnerOptions("product"),
-    getWizardCategories("product"),
+    getWizardTaxonomyNodes("product"),
     getWizardMaterials(),
     getWizardMemberTitles(),
   ]);

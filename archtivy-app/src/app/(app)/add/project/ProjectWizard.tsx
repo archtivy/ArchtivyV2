@@ -34,6 +34,7 @@ import { createProject } from "@/app/actions/createProject";
 import { updateProjectCanonical } from "@/app/actions/updateListing";
 import type { ProjectEditData } from "@/lib/db/listingEdit";
 import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
+import { TaxonomyCascade } from "@/components/add/wizard/TaxonomyCascade";
 import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
 import {
   PROJECT_STATUS_VALUES,
@@ -68,6 +69,8 @@ export interface TaxonomyOption {
   id: string;
   label: string;
   slugPath: string;
+  parentId: string | null;
+  depth: number;
 }
 export interface MaterialOption {
   id: string;
@@ -163,6 +166,9 @@ export function ProjectWizard({
   );
   const [productIds, setProductIds] = useState<string[]>(initial?.mentionedProducts ?? []);
   const [ownerProfileId, setOwnerProfileId] = useState(admin?.ownerProfileId ?? "");
+  // True when the chosen node still has children — "Residential" without a
+  // subcategory. Stored and saved either way; it only gates publishing.
+  const [taxonomyIncomplete, setTaxonomyIncomplete] = useState(false);
   // Admin-only fields, carried over from the legacy admin form. Each lives in
   // the nearest existing step rather than a step of its own — see AdminOnly.
   const [materialOrFinish, setMaterialOrFinish] = useState(initial?.materialOrFinish ?? "");
@@ -377,7 +383,10 @@ export function ProjectWizard({
   // submission without one, and a listing with no owner is invisible in
   // /me/listings and unattributed publicly.
   const canPublish =
-    title.trim().length > 0 && images.length > 0 && (!admin || Boolean(ownerProfileId));
+    title.trim().length > 0 && images.length > 0 && (!admin || Boolean(ownerProfileId)) &&
+    // A node that still has children is a half-made choice — "Furniture" does
+    // not say what the product is. Saved either way; only publishing waits.
+    !taxonomyIncomplete;
 
   return (
     <WizardFrame bare={Boolean(admin)}>
@@ -471,14 +480,12 @@ export function ProjectWizard({
                   <Field label="Project title" required>
                     <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="Cliff House" />
                   </Field>
-                  <Field label="Category">
-                    <select value={taxonomyNodeId} onChange={(e) => setTaxonomyNodeId(e.target.value)} className={inputCls}>
-                      <option value="">Choose a category…</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id}>{c.label}</option>
-                      ))}
-                    </select>
-                  </Field>
+                  <TaxonomyCascade
+                    nodes={categories}
+                    value={taxonomyNodeId}
+                    onChange={setTaxonomyNodeId}
+                    onIncompleteChange={setTaxonomyIncomplete}
+                  />
                   <div className="grid grid-cols-2 gap-5">
                     <Field label="Completion year">
                       <input value={year} onChange={(e) => setYear(e.target.value)} inputMode="numeric" className={inputCls} placeholder="2024" />

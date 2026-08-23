@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 // Shared with the edit route — see lib/publish/wizardReferenceData.
-import { getWizardCategories, getWizardMaterials } from "@/lib/publish/wizardReferenceData";
+import { getWizardTaxonomyNodes, getWizardMaterials } from "@/lib/publish/wizardReferenceData";
 import { ProductWizard } from "./ProductWizard";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ export default async function AddProductPage() {
   if (profile.role === "reader") redirect("/me/settings");
 
   const [categories, materials] = await Promise.all([
-    getWizardCategories("product"),
+    getWizardTaxonomyNodes("product"),
     getWizardMaterials(),
   ]);
 

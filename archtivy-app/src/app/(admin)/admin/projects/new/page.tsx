@@ -3,7 +3,7 @@ import { AdminPage } from "@/components/admin/AdminPage";
 import { ProjectWizard } from "@/app/(app)/add/project/ProjectWizard";
 import { getWizardOwnerOptions } from "@/lib/admin/wizardOwnerOptions";
 import {
-  getWizardCategories,
+  getWizardTaxonomyNodes,
   getWizardMaterials,
   getWizardProducts,
   getWizardMemberTitles,
@@ -28,7 +28,7 @@ export const revalidate = 0;
 export default async function AdminNewProjectPage() {
   const [ownerOptions, categories, materials, products, memberTitles] = await Promise.all([
     getWizardOwnerOptions("project"),
-    getWizardCategories("project"),
+    getWizardTaxonomyNodes("project"),
     getWizardMaterials(),
     getWizardProducts(),
     getWizardMemberTitles(),

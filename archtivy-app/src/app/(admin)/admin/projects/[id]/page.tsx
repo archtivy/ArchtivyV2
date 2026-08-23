@@ -17,7 +17,7 @@ import { EditorialImageManager } from "@/components/listing/EditorialImageManage
 import type { ImageTaggingItem } from "@/components/listing/ImageProductTaggingBlock";
 import { getWizardOwnerOptions } from "@/lib/admin/wizardOwnerOptions";
 import {
-  getWizardCategories,
+  getWizardTaxonomyNodes,
   getWizardMaterials,
   getWizardProducts,
   getWizardMemberTitles,
@@ -71,7 +71,7 @@ export default async function AdminProjectEditPage({
     productMaterialOptions,
   ] = await Promise.all([
     getWizardOwnerOptions("project"),
-    getWizardCategories("project"),
+    getWizardTaxonomyNodes("project"),
     getWizardMaterials(),
     getWizardProducts(),
     getWizardMemberTitles(),
