@@ -15,6 +15,12 @@ import {
   getTaxonomyNodeById,
 } from "@/lib/taxonomy/taxonomyDb";
 import { setProjectMaterials, setProductMaterials } from "@/lib/db/materials";
+import {
+  parseMentionedProductsField,
+  hydrateMentionedProducts,
+  mentionedProductIds,
+} from "@/lib/listings/mentionedProducts";
+import { setProjectProductsManualAction } from "@/app/actions/projectBrandsProducts";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
 import { notifySearchEngines } from "@/lib/seo/indexnow";
 import type { ActionResult } from "./types";
@@ -254,7 +260,7 @@ export async function updateProjectCanonical(
   const materialOrFinish = (formData.get("material_or_finish") as string)?.trim() || null;
   const teamMembers = parseTeamMembers(formData.get("team_members"));
   const materialIds = parseStringArray(formData.get("project_material_ids"));
-  const mentionedProducts = parseStringArray(formData.get("mentioned_products"));
+  const mentionedProductsRaw = parseMentionedProductsField(formData.get("mentioned_products"));
   const projectStatus = (formData.get("project_status") as string)?.trim() || null;
   const projectCollab = (formData.get("project_collaboration_status") as string)?.trim() || null;
   const projectLookingFor = parseStringArray(formData.get("project_looking_for"));
@@ -286,6 +292,13 @@ export async function updateProjectCanonical(
   }
 
   const supabase = getSupabaseServiceClient();
+
+  // Was parseStringArray, which stored bare product ids — a shape neither the
+  // public project page nor the admin form could read. Normalised and hydrated
+  // into the canonical object shape now; free-text entries typed in the admin
+  // form survive the round-trip untouched.
+  const mentionedProducts = await hydrateMentionedProducts(supabase, mentionedProductsRaw);
+
   const { error: updateError } = await supabase
     .from("listings")
     .update({
@@ -335,6 +348,16 @@ export async function updateProjectCanonical(
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Failed to save team members." };
   }
+
+  // Keep project_product_links in step with the author's picks. Replace
+  // semantics, matching every other relationship set on this action — an
+  // unticked product must actually lose its link. photo_tag links are
+  // preserved by setProjectProductsManualAction.
+  const linkRes = await setProjectProductsManualAction(
+    listingId,
+    mentionedProductIds(mentionedProducts)
+  );
+  if (!linkRes.ok) console.warn("[updateProject] product links failed:", linkRes.error);
 
   const slug = String(listing.slug ?? "");
   revalidateListing("project", slug);

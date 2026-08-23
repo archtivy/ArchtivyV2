@@ -17,6 +17,12 @@ import type { TeamMember, BrandUsed } from "@/lib/types/listings";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { persistListingTeamMembers } from "@/app/actions/createProject";
 import { setListingTaxonomyNode, setListingMaterialNodes, setListingFacets, getTaxonomyNodeById } from "@/lib/taxonomy/taxonomyDb";
+import {
+  parseMentionedProductsField,
+  hydrateMentionedProducts,
+  mentionedProductIds,
+} from "@/lib/listings/mentionedProducts";
+import { setProjectProductsManualAction } from "@/app/actions/projectBrandsProducts";
 import { notifySearchEngines } from "@/lib/seo/indexnow";
 
 const MIN_GALLERY_IMAGES = 3;
@@ -109,24 +115,7 @@ function parseColorOptions(value: FormDataEntryValue | null): string[] {
   }
 }
 
-type MentionedProductEntry = { brand_name_text: string; product_name_text: string };
 
-function parseMentionedProducts(value: FormDataEntryValue | null): MentionedProductEntry[] {
-  if (!value || typeof value !== "string" || !value.trim()) return [];
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (x): x is MentionedProductEntry =>
-        typeof x === "object" &&
-        x !== null &&
-        typeof (x as MentionedProductEntry).brand_name_text === "string" &&
-        typeof (x as MentionedProductEntry).product_name_text === "string"
-    );
-  } catch {
-    return [];
-  }
-}
 
 export type AdminCreateResult = { error?: string };
 
@@ -168,7 +157,7 @@ export async function createAdminProjectFull(
   const material_or_finish = (formData.get("material_or_finish") as string)?.trim() ?? null;
   const team_members = parseTeamMembers(formData.get("team_members"));
   const material_ids = parseMaterialIds(formData.get("project_material_ids"));
-  const mentioned_products = parseMentionedProducts(formData.get("mentioned_products"));
+  const mentioned_products_raw = parseMentionedProductsField(formData.get("mentioned_products"));
   const project_status = (formData.get("project_status") as string)?.trim() || null;
   const project_collaboration_status = (formData.get("project_collaboration_status") as string)?.trim() || null;
   const project_looking_for = parseMaterialIds(formData.get("project_looking_for"));
@@ -199,6 +188,10 @@ export async function createAdminProjectFull(
   if (!slug || !String(slug).trim()) {
     return { error: "Unable to generate a valid slug for the project." };
   }
+
+  // Wizard-picked products arrive as ids; typed entries arrive as text. Both
+  // normalise to the same stored shape, with the ids given readable names.
+  const mentioned_products = await hydrateMentionedProducts(supabase, mentioned_products_raw);
 
   const areaSqftValue =
     area_sqft != null && !Number.isNaN(area_sqft) && area_sqft > 0 ? area_sqft : null;
@@ -314,6 +307,14 @@ export async function createAdminProjectFull(
   const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
   const facetRes = await setListingFacets(listingId, facetValueIds);
   if (facetRes.error) console.warn("[admin createProject] facet values error (non-fatal):", facetRes.error);
+
+  // The relational edge Explore and the connection counts read. No publish
+  // path wrote it before this change.
+  const createLinkIds = mentionedProductIds(mentioned_products);
+  if (createLinkIds.length > 0) {
+    const linkRes = await setProjectProductsManualAction(listingId, createLinkIds);
+    if (!linkRes.ok) console.warn("[admin createProject] product links error (non-fatal):", linkRes.error);
+  }
 
   if (admin.ok) {
     await createAuditLog({
@@ -846,7 +847,7 @@ export async function updateProjectAction(
   const material_or_finish = (formData.get("material_or_finish") as string)?.trim() ?? null;
   const team_members = parseTeamMembers(formData.get("team_members"));
   const material_ids = parseMaterialIds(formData.get("project_material_ids"));
-  const mentioned_products = parseMentionedProducts(formData.get("mentioned_products"));
+  const mentioned_products_raw = parseMentionedProductsField(formData.get("mentioned_products"));
   const project_status_upd = (formData.get("project_status") as string)?.trim() || null;
   const project_collab_status_upd = (formData.get("project_collaboration_status") as string)?.trim() || null;
   const project_looking_for_upd = parseMaterialIds(formData.get("project_looking_for"));
@@ -867,6 +868,7 @@ export async function updateProjectAction(
   }
 
   const supabase = getSupabaseServiceClient();
+  const mentioned_products = await hydrateMentionedProducts(supabase, mentioned_products_raw);
   const { error: updateError } = await supabase
     .from("listings")
     .update({
@@ -939,6 +941,14 @@ export async function updateProjectAction(
   const facetValueIds = parseMaterialIds(formData.get("facet_value_ids"));
   const facetRes = await setListingFacets(listingId, facetValueIds);
   if (facetRes.error) console.warn("[updateProject] facet values error (non-fatal):", facetRes.error);
+
+  // Replace semantics: an unticked product loses its manual link. photo_tag
+  // links survive — setProjectProductsManualAction only touches source='manual'.
+  const updateLinkRes = await setProjectProductsManualAction(
+    listingId,
+    mentionedProductIds(mentioned_products)
+  );
+  if (!updateLinkRes.ok) console.warn("[updateProject] product links error (non-fatal):", updateLinkRes.error);
 
   if (admin.ok) {
     await createAuditLog({
