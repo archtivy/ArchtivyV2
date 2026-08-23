@@ -90,6 +90,7 @@ export function ProjectWizard({
   products,
   memberTitles,
   initial,
+  initialStep,
 }: {
   categories: TaxonomyOption[];
   materials: MaterialOption[];
@@ -100,11 +101,19 @@ export function ProjectWizard({
    * there is no separate `mode` prop to keep in sync with it.
    */
   initial?: ProjectEditData;
+  /**
+   * Step to open on. Set when a dashboard draft card deep-links to the exact
+   * field it says is missing — landing on step 0 and making the author hunt
+   * for it would undercut the point of naming the field.
+   */
+  initialStep?: number;
 }) {
   const isEdit = Boolean(initial);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() =>
+    initialStep != null && initialStep >= 0 && initialStep < STEP_LABELS.length ? initialStep : 0
+  );
   const [direction, setDirection] = useState<1 | -1>(1);
   const [error, setError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");

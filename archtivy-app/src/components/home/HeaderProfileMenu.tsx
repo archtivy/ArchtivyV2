@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
   FolderDown,
+  LayoutDashboard,
   type LucideIcon,
 } from "lucide-react";
 
@@ -47,6 +48,10 @@ interface MenuItem {
 }
 
 const ITEMS: MenuItem[] = [
+  // First: it is the signed-in home, and until now nothing linked to it.
+  // Safe for every role — /me/dashboard renders a reader its own minimal
+  // skeleton rather than an empty publisher layout, so this needs no gating.
+  { label: "Dashboard", href: "/me/dashboard", icon: LayoutDashboard },
   // /me resolves the username server-side and redirects to /u/[username], so
   // the menu does not need to know it.
   { label: "View Profile", href: "/me", icon: User },
