@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ExternalLink, Mail } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { getProductDetail } from "@/lib/db/productDetail";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { HomeNav } from "@/components/home/HomeNav";
@@ -9,6 +9,8 @@ import { Gallery } from "@/components/entity/Gallery";
 import { RailPanel, RelatedPanel } from "@/components/entity/RelationshipRail";
 import { EntityCard } from "@/components/home/EntityCard";
 import { SaveToggle } from "@/components/home/SaveToggle";
+import { normaliseExternalUrl } from "@/lib/url/externalUrl";
+import { RequestQuoteButton } from "@/components/products/RequestQuoteButton";
 import { ProductDetailTabs } from "@/components/products/ProductDetailTabs";
 import { SeenInProjects } from "@/components/products/SeenInProjects";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
@@ -68,6 +70,32 @@ export async function ProductDetailView({
   ]);
 
   const brandHref = detail.brand?.username ? `/u/${detail.brand.username}` : null;
+
+  /*
+   * Two different destinations were both being called "Visit Official Website".
+   *
+   * The button read detail.brand.website — the brand's HOMEPAGE, off profiles —
+   * while the publish wizard writes the product's own URL to listings.website
+   * (its placeholder is literally "https://example.com/products/nena"). The
+   * product's own link was never read, so the label promised a product page and
+   * delivered a company homepage.
+   *
+   * The product's page is the more specific answer, so it wins; the brand
+   * homepage stays as the fallback. The label names whichever one is being
+   * used, because "Official Website" describes both and distinguishes neither.
+   *
+   * Both go through normaliseExternalUrl, which returns null for anything it
+   * cannot make into a safe absolute URL — so a value like "archtivy.com" stops
+   * resolving as a relative path (the actual 404), and the button declines to
+   * render rather than promising a destination it cannot reach.
+   */
+  const productSite = normaliseExternalUrl(detail.website);
+  const brandSite = normaliseExternalUrl(detail.brand?.website);
+  const externalSite = productSite
+    ? { href: productSite, label: "Visit Product Website" }
+    : brandSite
+      ? { href: brandSite, label: "Visit Brand Website" }
+      : null;
 
   return (
     <div className="min-h-screen bg-cream font-body text-ink">
@@ -130,33 +158,26 @@ export async function ProductDetailView({
               )}
 
               <div className="mt-5 flex flex-wrap items-center gap-3">
-                <SaveToggle listingId={detail.id} variant="inline" />
+                <SaveToggle
+                  listingId={detail.id}
+                  entityType="product"
+                  entityTitle={detail.title}
+                  variant="inline"
+                />
 
-                {detail.brand?.website && (
+                {externalSite && (
                   <a
-                    href={detail.brand.website}
+                    href={externalSite.href}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 rounded-full border border-ink/25 px-4 py-2 font-body text-[13px] text-ink transition-colors hover:bg-stone/50"
                   >
-                    Visit Official Website
+                    {externalSite.label}
                     <ExternalLink strokeWidth={1.5} className="h-3.5 w-3.5" aria-hidden />
                   </a>
                 )}
 
-                {/*
-                  STUB — no quote-request flow, table or endpoint exists.
-                  Points at the real /contact page rather than posting into
-                  nothing, same pattern as "Request a Project".
-                  TODO(request-a-quote): build the flow, then point this at it.
-                */}
-                <Link
-                  href="/contact"
-                  className="inline-flex items-center gap-2 rounded-full border border-ink/25 px-4 py-2 font-body text-[13px] text-ink transition-colors hover:bg-stone/50"
-                >
-                  Request a Quote
-                  <Mail strokeWidth={1.5} className="h-3.5 w-3.5" aria-hidden />
-                </Link>
+                <RequestQuoteButton listingId={detail.id} listingTitle={detail.title} />
               </div>
 
               {/* Colour options only when this product genuinely has more than

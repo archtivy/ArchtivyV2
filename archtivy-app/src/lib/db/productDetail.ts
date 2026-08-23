@@ -74,6 +74,15 @@ export interface ProductDetail {
   related: ProductDetailRelated[];
   /** Plain-language basis for `related`. No score, no AI. */
   relatedReason: string;
+  /**
+   * The product's OWN website — listings.website, what the publish wizard
+   * writes ("https://example.com/products/nena").
+   *
+   * This column existed and was written on every publish, but was never
+   * selected here, so the detail page had no access to it and fell back to
+   * showing the brand's homepage under a label promising the product's page.
+   */
+  website: string | null;
   brand: {
     id: string;
     name: string;
@@ -101,7 +110,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   const { data: row } = await sup
     .from("listings")
     .select(
-      "id, slug, title, description, year, dimensions, cover_image_url, owner_profile_id"
+      "id, slug, title, description, year, dimensions, cover_image_url, owner_profile_id, website"
     )
     .eq("id", listingId)
     .maybeSingle();
@@ -400,6 +409,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
     projects,
     related,
     relatedReason,
+    website: (l.website as string | null) ?? null,
     brand,
   };
 }

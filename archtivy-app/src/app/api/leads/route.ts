@@ -46,8 +46,8 @@ async function getOwnerEmailForListing(listing: {
   }
 }
 
-function safeErrorMessage(e: any) {
-  if (e?.message) return e.message;
+function safeErrorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
   if (typeof e === "string") return e;
   try {
     return JSON.stringify(e);
@@ -57,19 +57,20 @@ function safeErrorMessage(e: any) {
 }
 
 export async function POST(request: NextRequest) {
-  console.log("[LEADS] hit /api/leads");
-  console.log("[LEADS] env check", {
-    hasResend: !!process.env.RESEND_API_KEY,
-    hasFrom: !!process.env.FROM_EMAIL,
-    hasAdmin: !!process.env.ADMIN_EMAIL,
-    // supabase service client helper hangi env’i kullanıyorsa burada görürüz
-    hasSbUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-    hasService: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-  });
-
   try {
     const body = await request.json();
-    console.log("[LEADS] body", body);
+    /*
+     * ── DO NOT LOG THE BODY ─────────────────────────────────────────────────
+     * This used to `console.log("[LEADS] body", body)`, which put the sender's
+     * name, email address, company and free-text message into Vercel's log
+     * retention on every submission — personal data from someone who filled in
+     * a contact form, not a debugging opt-in. It also logged an env-var
+     * presence check on every request, which is startup information.
+     *
+     * Nothing here logs request content. Failures below log error codes and
+     * the lead id, which is enough to trace a problem to a row without
+     * copying the row into the logs.
+     */
 
     const sender_name = typeof body.sender_name === "string" ? body.sender_name.trim() : "";
     const sender_email = typeof body.sender_email === "string" ? body.sender_email.trim() : "";
@@ -79,6 +80,18 @@ export async function POST(request: NextRequest) {
         : null;
     const message = typeof body.message === "string" ? body.message.trim() : "";
     const listing_id = typeof body.listing_id === "string" ? body.listing_id.trim() : "";
+
+    const optionalText = (v: unknown): string | null =>
+      typeof v === "string" && v.trim() ? v.trim() : null;
+
+    // 'quote' only when explicitly asked for; anything else is a contact lead,
+    // which is what every caller before this change was sending.
+    const kind = body.kind === "quote" ? "quote" : "contact";
+    const quantity = optionalText(body.quantity);
+    const project_name = optionalText(body.project_name);
+    const location = optionalText(body.location);
+    const desired_timeline = optionalText(body.desired_timeline);
+    const idempotency_key = optionalText(body.idempotency_key);
 
     if (!sender_name || sender_name.length < 2) {
       return Response.json(
@@ -131,14 +144,27 @@ export async function POST(request: NextRequest) {
       message,
       ip_hash,
       user_agent,
+      kind,
+      quantity,
+      project_name,
+      location,
+      desired_timeline,
+      idempotency_key,
     });
 
     if ("error" in result) {
-      console.error("[LEADS] insertLead returned error:", result.error);
+      console.error("[LEADS] insert failed:", result.error);
       return Response.json(
         { error: "Failed to save your message. Please try again." },
         { status: 500 }
       );
+    }
+
+    // A duplicate submission is already recorded and already notified. Report
+    // success and skip the second admin email — from the requester's side the
+    // request WAS received, and an error would only invite a third attempt.
+    if (result.duplicate) {
+      return Response.json({ success: true, id: result.id, duplicate: true });
     }
 
     if (ADMIN_EMAIL && resend) {
@@ -147,13 +173,25 @@ export async function POST(request: NextRequest) {
         .send({
           from: FROM_EMAIL,
           to: ADMIN_EMAIL,
-          subject: `Lead Pending Review — ${listing.title}`,
+          subject: `${kind === "quote" ? "Quote Request" : "Lead"} Pending Review — ${listing.title}`,
           html: `
-          <p>A new contact request is pending review.</p>
+          <p>A new ${kind === "quote" ? "quote request" : "contact request"} is pending review.</p>
+          ${
+            listing_owner_email
+              ? ""
+              : `<p style="background:#fff4e5;border:1px solid #ffb020;padding:10px;border-radius:6px;">
+                   <strong>No recipient resolved for this listing.</strong>
+                   Approving will not deliver anywhere — forward it manually.
+                 </p>`
+          }
           <ul>
             <li><strong>Listing:</strong> ${listing.title} (${listing.type})</li>
             <li><strong>From:</strong> ${sender_name} &lt;${sender_email}&gt;</li>
             ${sender_company ? `<li><strong>Company:</strong> ${sender_company}</li>` : ""}
+            ${project_name ? `<li><strong>Project:</strong> ${project_name}</li>` : ""}
+            ${quantity ? `<li><strong>Quantity:</strong> ${quantity}</li>` : ""}
+            ${location ? `<li><strong>Location:</strong> ${location}</li>` : ""}
+            ${desired_timeline ? `<li><strong>Timeline:</strong> ${desired_timeline}</li>` : ""}
           </ul>
           <p><strong>Message:</strong></p>
           <pre style="white-space:pre-wrap;font-family:inherit;background:#f4f4f4;padding:12px;border-radius:6px;">${message
@@ -168,11 +206,13 @@ export async function POST(request: NextRequest) {
     }
 
     return Response.json({ success: true, id: result.id });
-  } catch (e: any) {
-    console.error("[LEADS_POST_ERROR]", e);
-    const msg = safeErrorMessage(e);
+  } catch (e: unknown) {
+    // Message only, server-side only. `debug: msg` used to return the raw
+    // error to the browser, leaking internals to anyone posting malformed
+    // JSON at this endpoint.
+    console.error("[LEADS_POST_ERROR]", safeErrorMessage(e));
     return Response.json(
-      { error: "Something went wrong. Please try again.", debug: msg },
+      { error: "Something went wrong. Please try again." },
       { status: 500 }
     );
   }

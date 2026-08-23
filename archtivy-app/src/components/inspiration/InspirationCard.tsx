@@ -63,7 +63,13 @@ export function InspirationCard({
 
         {/* Materials are not listings, so there is nothing for the save action
             to write against — the control is omitted rather than shown broken. */}
-        {item.entityType !== "material" && <SaveToggle listingId={item.id} />}
+        {item.entityType !== "material" && (
+          <SaveToggle
+            listingId={item.id}
+            entityType={item.entityType}
+            entityTitle={item.title}
+          />
+        )}
       </div>
 
       {item.locationText && (

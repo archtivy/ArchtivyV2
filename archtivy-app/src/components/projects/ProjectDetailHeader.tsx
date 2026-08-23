@@ -120,7 +120,12 @@ export function ProjectDetailHeader({
           {/* Save is the PRIMARY action here, so the inline variant is used —
               the card variant hides itself until hover, which on a header
               reads as a missing button. */}
-          <SaveToggle listingId={listingId} variant="inline" />
+          <SaveToggle
+            listingId={listingId}
+            entityType="project"
+            entityTitle={title}
+            variant="inline"
+          />
 
           <div className="relative">
             <button
