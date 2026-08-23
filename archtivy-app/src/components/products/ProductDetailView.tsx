@@ -157,7 +157,12 @@ export async function ProductDetailView({
               )}
 
               <div className="mt-5 flex flex-wrap items-center gap-3">
-                <SaveToggle listingId={detail.id} variant="inline" />
+                <SaveToggle
+                  listingId={detail.id}
+                  entityType="product"
+                  entityTitle={detail.title}
+                  variant="inline"
+                />
 
                 {externalSite && (
                   <a

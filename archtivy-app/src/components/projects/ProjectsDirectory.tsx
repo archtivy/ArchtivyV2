@@ -262,6 +262,7 @@ export function ProjectsDirectory({
                   imageUrl={p.cover}
                   imageCount={p.imageCount}
                   saveListingId={p.id}
+                saveEntityType="project"
                   avatarUrl={p.architectAvatar}
                   avatarInitials={initialsOf(p.architect)}
                   chips={chipsFor(p)}

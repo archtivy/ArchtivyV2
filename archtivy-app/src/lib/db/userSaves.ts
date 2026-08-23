@@ -1,6 +1,32 @@
 import { supabase } from "@/lib/supabaseClient";
 
 /**
+ * ⚠️ DEPRECATED 2026-08-23 — `listing_saves` is no longer written.
+ *
+ * ── WHY ─────────────────────────────────────────────────────────────────────
+ * There were two unconnected save mechanisms. This one wrote `listing_saves`;
+ * the other writes `folders` / `folder_items` through SaveToFolderModal. Only
+ * the second is ever read — `/me/saved` renders boards, and getSavedListingIds
+ * below has had no callers at all.
+ *
+ * So every save made through this path was written to a table nothing queries.
+ * You pressed Save, a row was inserted, and the item appeared nowhere. Boards
+ * are now the single save mechanism (SaveToggle → SaveToBoardPopover →
+ * folder_items).
+ *
+ * ── WHY THE TABLE IS NOT DROPPED ────────────────────────────────────────────
+ * It holds real rows: genuine save intent from real users, recorded even
+ * though nothing surfaced it. Dropping it would destroy the only record of
+ * what people tried to save, and it is the input any future backfill into
+ * folder_items would need. Per Database Bible, a table that still holds
+ * meaning is deprecated in the code, not deleted from the schema.
+ *
+ * The functions below are kept for that eventual backfill and for the two
+ * remaining callers, both on chains no route renders (DetailActions via
+ * ListingDetailHero, and RemoveFromSavedButton). Do not wire anything new to
+ * them — use @/app/actions/savedFolders.
+ *
+ * ── ORIGINAL NOTE ───────────────────────────────────────────────────────────
  * Saved listings.
  *
  * ── REPOINTED 2026-08-08: user_saves -> listing_saves ───────────────────────

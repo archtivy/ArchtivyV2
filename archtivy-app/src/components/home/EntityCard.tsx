@@ -38,6 +38,12 @@ export interface EntityCardProps {
   imageCount?: number;
   /** Renders the save toggle, top-right. Omit to leave the card read-only. */
   saveListingId?: string;
+  /**
+   * What `saveListingId` refers to. Required alongside it — the save control
+   * labels itself from this, and a default would relabel every product card
+   * "Save project" again.
+   */
+  saveEntityType?: "project" | "product";
   /** Small circular attribution badge, bottom-right of the image. */
   avatarUrl?: string | null;
   /** Fallback when there is no avatar image. */
@@ -69,6 +75,7 @@ export function EntityCard({
   priority = false,
   imageCount,
   saveListingId,
+  saveEntityType,
   avatarUrl,
   avatarInitials,
   chips,
@@ -101,7 +108,13 @@ export function EntityCard({
           </span>
         )}
 
-        {saveListingId && <SaveToggle listingId={saveListingId} />}
+        {saveListingId && saveEntityType && (
+          <SaveToggle
+            listingId={saveListingId}
+            entityType={saveEntityType}
+            entityTitle={title}
+          />
+        )}
 
         {(avatarUrl || avatarInitials) && (
           <span className="absolute bottom-3 right-3 z-10 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-ink font-body text-[11px] text-cream">
