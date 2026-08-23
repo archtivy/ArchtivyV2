@@ -31,6 +31,26 @@ const EDITORIAL_ROUTES = new Set([
   // editorial product — the exact mismatch the brief was written against.
   "/add/project",
   "/add/product",
+
+  // ── SIGNED-IN SURFACES THAT RENDER THEIR OWN HomeNav ──────────────────────
+  // These four were rendering it INSIDE the default shell, which meant each
+  // page drew two headers: TopNav first, then a fixed-position HomeNav on top
+  // of it. The duplicate was invisible — HomeNav is `fixed top-0 z-50`, so it
+  // covered TopNav exactly — which is why it survived review.
+  //
+  // The visible symptom was width, not chrome. PageContainer wraps children in
+  // Container, which caps content at 1040px; each page then applied its own
+  // lg:px-24 inside that, leaving roughly 650px of usable width on a 1440px
+  // viewport. The dashboard looked like a narrow left column with a large empty
+  // area beside it, and no amount of grid work inside the page could fix it.
+  //
+  // /me/listings joins them in this pass, restyled off the zinc palette.
+  // The rest of /me/* still renders TopNav deliberately — see the consolidation
+  // note in the PR; converting them is a separate, larger job.
+  "/me/dashboard",
+  "/me/listings",
+  "/me/profile",
+  "/me/files",
 ]);
 
 // Routes that show TopNav but skip PageContainer (full-width content).

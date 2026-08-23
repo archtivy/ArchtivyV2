@@ -19,6 +19,14 @@ const FOOTERLESS_ROUTES = new Set([
   "/brands",
   "/magazine",
   "/inspiration",
+  // Mirrors EDITORIAL_ROUTES in SiteShell — these render their own HomeNav on
+  // the cream palette. They are working surfaces rather than reading surfaces,
+  // so they carry no footer at all (as /explore already does); the alternative
+  // was the zinc global Footer under a cream page.
+  "/me/dashboard",
+  "/me/listings",
+  "/me/profile",
+  "/me/files",
 ]);
 
 export function ConditionalFooter({ children }: { children: React.ReactNode }) {

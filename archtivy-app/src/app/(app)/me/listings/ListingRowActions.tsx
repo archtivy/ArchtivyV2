@@ -64,7 +64,7 @@ export function ListingRowActions({
   };
 
   const linkCls =
-    "rounded px-2 py-1 font-body text-[13px] text-muted transition-colors hover:text-ink focus:outline-none focus:ring-2 focus:ring-ink/20";
+    "rounded-full px-2.5 py-1.5 font-body text-[13px] text-muted transition-colors hover:text-ink focus:outline-none focus:ring-2 focus:ring-archtivy-jet/25 focus:ring-offset-2 focus:ring-offset-white";
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -82,7 +82,7 @@ export function ListingRowActions({
           type="button"
           onClick={() => setConfirmOpen(true)}
           disabled={isPending}
-          className="rounded px-2 py-1 font-body text-[13px] text-muted transition-colors hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-ink/20 disabled:opacity-50"
+          className="rounded-full px-2.5 py-1.5 font-body text-[13px] text-muted transition-colors hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-archtivy-jet/25 focus:ring-offset-2 focus:ring-offset-white disabled:opacity-50"
         >
           Delete
         </button>
