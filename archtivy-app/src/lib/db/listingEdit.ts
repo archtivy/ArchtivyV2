@@ -98,6 +98,18 @@ export interface ProductEditData extends ListingEditCommon {
   productType: string;
   productCategory: string;
   productSubcategory: string;
+  /**
+   * Below here: fields the product wizard never rendered, so nothing needed
+   * them loaded. The admin form could set all of them, so they are read now —
+   * without this an admin edit would blank every one of them on save.
+   */
+  year: string;
+  dimensions: string;
+  materialOrFinish: string;
+  teamMembers: TeamMember[];
+  productStage: string;
+  productCollaborationStatus: string;
+  productLookingFor: string[];
 }
 
 export type ListingEditData = ProjectEditData | ProductEditData;
@@ -186,6 +198,15 @@ export async function getListingForEdit(listingId: string): Promise<ListingEditD
       productType: str(listing.product_type),
       productCategory: str(listing.product_category),
       productSubcategory: str(listing.product_subcategory),
+      year: listing.year != null ? String(listing.year) : "",
+      dimensions: str(listing.dimensions),
+      materialOrFinish: str(listing.material_or_finish),
+      teamMembers: Array.isArray(listing.team_members)
+        ? (listing.team_members as TeamMember[])
+        : [],
+      productStage: str(listing.product_stage),
+      productCollaborationStatus: str(listing.product_collaboration_status),
+      productLookingFor: strArray(listing.product_looking_for),
     };
   }
 

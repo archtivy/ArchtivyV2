@@ -44,6 +44,13 @@ export interface WizardAdminContext {
    * admin edit preserves them instead of dropping them. Projects only.
    */
   mentionedFreeText?: MentionedProduct[];
+  /**
+   * Credit titles for the team field. Products only: ProjectWizard takes these
+   * as a top-level prop because every author needs them, but the product flow
+   * has no team step outside admin — so the data arrives with the context that
+   * is the only reason to load it.
+   */
+  memberTitles?: { label: string }[];
   /** Admin create action — assigns the chosen owner, audit-logs, no follower notifications. */
   onCreate: (fd: FormData) => Promise<{ error?: string } | void>;
   /** Admin update action — bypasses the self-serve ownership guard. */

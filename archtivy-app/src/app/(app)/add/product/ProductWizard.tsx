@@ -18,9 +18,12 @@ import {
   Field,
   inputCls,
   OwnerField,
+  AdminOnly,
+  TeamStep,
   PickerStep,
   SeoStep,
   PublishStep,
+  type TeamMemberDraft,
 } from "@/components/add/wizard/WizardPrimitives";
 import { computeSeoScore, countWords, SEO_THRESHOLDS } from "@/lib/publish/seoScore";
 import type { UploadedGalleryItem } from "@/lib/storage/types";
@@ -28,6 +31,14 @@ import { createProductCanonical } from "@/app/actions/listings";
 import { updateProductCanonical } from "@/app/actions/updateListing";
 import type { ProductEditData } from "@/lib/db/listingEdit";
 import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
+import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
+import {
+  PRODUCT_STAGE_VALUES,
+  PRODUCT_STAGE_LABELS,
+  PRODUCT_COLLAB_VALUES,
+  PRODUCT_COLLAB_LABELS,
+  PRODUCT_LOOKING_FOR_OPTIONS,
+} from "@/lib/lifecycle";
 
 /**
  * Product publish wizard — the product-side twin of ProjectWizard.
@@ -126,6 +137,23 @@ export function ProductWizard({
   const [colorOptions, setColorOptions] = useState<string[]>(initial?.colorOptions ?? []);
   const [colorDraft, setColorDraft] = useState("");
   const [ownerProfileId, setOwnerProfileId] = useState(admin?.ownerProfileId ?? "");
+  // Admin-only fields, carried over from the legacy admin form. Each folds
+  // into the nearest existing step rather than adding one — see AdminOnly.
+  const [year, setYear] = useState(initial?.year ?? "");
+  const [dimensions, setDimensions] = useState(initial?.dimensions ?? "");
+  const [materialOrFinish, setMaterialOrFinish] = useState(initial?.materialOrFinish ?? "");
+  const [team, setTeam] = useState<TeamMemberDraft[]>(
+    // listings.team_members stores `role`; the draft shape calls it `title`.
+    (initial?.teamMembers ?? []).map((m) => ({
+      name: m.name ?? "",
+      title: (m as { role?: string }).role ?? "",
+      profileId: (m as { profile_id?: string | null }).profile_id ?? null,
+    }))
+  );
+  const [productStage, setProductStage] = useState(initial?.productStage ?? "");
+  const [collabStatus, setCollabStatus] = useState(initial?.productCollaborationStatus ?? "");
+  const [lookingFor, setLookingFor] = useState<string[]>(initial?.productLookingFor ?? []);
+  const [documents, setDocuments] = useState<File[]>([]);
   const [materialIds, setMaterialIds] = useState<string[]>(initial?.materialIds ?? []);
   const [website, setWebsite] = useState(initial?.website ?? "");
   const [instagram, setInstagram] = useState(initial?.instagram ?? "");
@@ -214,7 +242,33 @@ export function ProductWizard({
     fd.set("video_url", videoUrl);
     fd.set("slug", slug);
     if (draft) fd.set("draft", "1");
-    if (admin) fd.set("owner_profile_id", ownerProfileId);
+    if (admin) {
+      fd.set("owner_profile_id", ownerProfileId);
+      fd.set("year", year);
+      fd.set("dimensions", dimensions);
+      fd.set("material_or_finish", materialOrFinish);
+      // Map title -> role: parseTeamMembers validates `role`, and serialising
+      // the draft as-is would fail that check and discard every credit.
+      fd.set(
+        "team_members",
+        JSON.stringify(
+          team
+            .filter((t) => t.name.trim())
+            .map((t) => ({
+              name: t.name.trim(),
+              role: t.title ?? "",
+              profile_id: t.profileId ?? null,
+            }))
+        )
+      );
+      fd.set("product_stage", productStage);
+      fd.set("product_collaboration_status", collabStatus);
+      fd.set(
+        "product_looking_for",
+        JSON.stringify(collabStatus && collabStatus !== "not_open_for_collaboration" ? lookingFor : [])
+      );
+      for (const f of documents) fd.append("documents", f);
+    }
     return fd;
   }
 
@@ -313,7 +367,16 @@ export function ProductWizard({
             </p>
 
             <div className="mt-8">
-              {step === 0 && <ImageDropzone items={images} onChange={setImages} />}
+              {step === 0 && (
+                <div className="space-y-8">
+                  <ImageDropzone items={images} onChange={setImages} />
+                  {admin && (
+                    <AdminOnly label="Documents">
+                      <DocumentsUploadCard files={documents} onChange={setDocuments} />
+                    </AdminOnly>
+                  )}
+                </div>
+              )}
 
               {step === 1 && (
                 <Card>
@@ -425,19 +488,71 @@ export function ProductWizard({
                       ))}
                     </ul>
                   )}
+                  {admin && (
+                    <AdminOnly label="Specification">
+                      <div className="grid grid-cols-2 gap-5">
+                        <Field label="Year">
+                          <input
+                            value={year}
+                            onChange={(e) => setYear(e.target.value)}
+                            inputMode="numeric"
+                            className={inputCls}
+                            placeholder="2024"
+                          />
+                        </Field>
+                        <Field label="Dimensions">
+                          <input
+                            value={dimensions}
+                            onChange={(e) => setDimensions(e.target.value)}
+                            className={inputCls}
+                            placeholder="W 82 × D 78 × H 71 cm"
+                          />
+                        </Field>
+                      </div>
+                    </AdminOnly>
+                  )}
                 </Card>
               )}
 
+              {step === 2 && admin && (
+                <div className="mt-8">
+                  <AdminOnly label="Credits">
+                    <TeamStep
+                      team={team}
+                      setTeam={setTeam}
+                      titles={admin.memberTitles ?? []}
+                    />
+                  </AdminOnly>
+                </div>
+              )}
+
               {step === 3 && (
-                <PickerStep
-                  kind="material"
-                  options={materials.map((m) => ({ id: m.id, label: m.label, sub: null, cover: null }))}
-                  selected={materialIds}
-                  onChange={setMaterialIds}
-                  placeholder="Search materials…"
-                  emptyHint="No materials tagged yet."
-                  footnote="Materials power the material filters across Archtivy — they're how specifiers find products like yours."
-                />
+                <div className="space-y-8">
+                  <PickerStep
+                    kind="material"
+                    options={materials.map((m) => ({ id: m.id, label: m.label, sub: null, cover: null }))}
+                    selected={materialIds}
+                    onChange={setMaterialIds}
+                    placeholder="Search materials…"
+                    emptyHint="No materials tagged yet."
+                    footnote="Materials power the material filters across Archtivy — they're how specifiers find products like yours."
+                  />
+                  {admin && (
+                    <AdminOnly label="Material or finish">
+                      <Field
+                        label="Free-text material or finish"
+                        hint="Legacy field — the tags above drive the filters"
+                      >
+                        <input
+                          value={materialOrFinish}
+                          onChange={(e) => setMaterialOrFinish(e.target.value)}
+                          className={inputCls}
+                          placeholder="Solid walnut, powder-coated steel"
+                        />
+                      </Field>
+                    </AdminOnly>
+                  )}
+                </div>
               )}
 
               {step === 4 && (
@@ -486,6 +601,73 @@ export function ProductWizard({
                       : "Products have no location of their own, so that check stays unticked — it doesn’t stop you publishing."
                   }
                 />
+              )}
+
+              {step === 5 && admin && (
+                <div className="mt-8">
+                  <AdminOnly label="Lifecycle & collaboration">
+                    <Field label="Product stage">
+                      <select
+                        value={productStage}
+                        onChange={(e) => setProductStage(e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">Not set</option>
+                        {PRODUCT_STAGE_VALUES.map((v) => (
+                          <option key={v} value={v}>
+                            {PRODUCT_STAGE_LABELS[v]}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Collaboration status">
+                      <select
+                        value={collabStatus}
+                        onChange={(e) => setCollabStatus(e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">Not set</option>
+                        {PRODUCT_COLLAB_VALUES.map((v) => (
+                          <option key={v} value={v}>
+                            {PRODUCT_COLLAB_LABELS[v]}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    {/* Hidden unless collaboration is open, and submit() sends
+                        an empty list in that case so no stale roles linger. */}
+                    {collabStatus && collabStatus !== "not_open_for_collaboration" && (
+                      <fieldset>
+                        <legend className="mb-2 font-body text-[14px] text-ink">Looking for</legend>
+                        <div className="flex flex-wrap gap-2">
+                          {PRODUCT_LOOKING_FOR_OPTIONS.map((opt) => {
+                            const on = lookingFor.includes(opt.value);
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() =>
+                                  setLookingFor((prev) =>
+                                    on ? prev.filter((v) => v !== opt.value) : [...prev, opt.value]
+                                  )
+                                }
+                                className={[
+                                  "rounded-full border px-4 py-2 font-body text-[13px] transition-colors duration-150",
+                                  on
+                                    ? "border-ink bg-ink text-cream"
+                                    : "border-ink/25 text-muted hover:border-ink/40 hover:text-ink",
+                                ].join(" ")}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
+                    )}
+                  </AdminOnly>
+                </div>
               )}
 
               {step === 6 && (
