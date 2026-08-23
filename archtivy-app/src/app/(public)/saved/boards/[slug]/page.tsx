@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBoardByShareSlug } from "@/app/actions/savedFolders";
-import { Container } from "@/components/layout/Container";
+import { SitePage } from "@/components/layout/SitePage";
+import { PageHeading } from "@/components/layout/PageHeading";
 import type { FolderItemWithCreated } from "@/app/actions/savedFolders";
 import { getListingsByIds } from "@/lib/db/listings";
 import { getFirstImageUrlPerListingIds } from "@/lib/db/listingImages";
@@ -32,20 +33,23 @@ export default async function PublicBoardPage({
   const data = result.data;
   if (data == null) {
     return (
-      <Container className="py-12">
+      <SitePage width="narrow" footer>
         <div className="mx-auto max-w-2xl text-center">
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">This board is private.</h1>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-          The owner has not made this board public. You need to be signed in as the owner to view it.
-        </p>
-        <Link
-          href="/"
-          className="mt-4 inline-block text-sm font-medium text-[#002abf] hover:underline"
-        >
-          Go to home
-        </Link>
+          <h1 className="font-display text-[32px] font-medium tracking-tight text-ink">
+            This board is private.
+          </h1>
+          <p className="mt-3 font-body text-[16px] leading-relaxed text-muted">
+            The owner has not made this board public. You need to be signed in as the
+            owner to view it.
+          </p>
+          <Link
+            href="/"
+            className="mt-6 inline-block font-body text-[14px] text-ink underline-offset-4 hover:underline"
+          >
+            Go to home
+          </Link>
         </div>
-      </Container>
+      </SitePage>
     );
   }
 
@@ -127,15 +131,14 @@ export default async function PublicBoardPage({
   const basePath = `/saved/boards/${slug}`;
 
   return (
-    <Container className="space-y-6 py-8">
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 sm:text-2xl">
-          {folder.name}
-        </h1>
-        <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-          {folder.item_count} item{folder.item_count !== 1 ? "s" : ""} · Shared board
-        </p>
-      </div>
+    <SitePage width="narrow" footer>
+      <PageHeading
+        eyebrow="Shared board"
+        title={folder.name}
+        description={`${folder.item_count} item${folder.item_count !== 1 ? "s" : ""}`}
+        className="mb-10"
+      />
+      <div className="space-y-6">
 
       <BoardDetailFilters
         currentFilter={filterTab}
@@ -146,13 +149,13 @@ export default async function PublicBoardPage({
       />
 
       {error && (
-        <p className="text-sm text-red-600 dark:text-red-400">
+        <p className="text-sm text-red-600">
           Could not load items. Please try again.
         </p>
       )}
 
       {displayList.length === 0 && !error && (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm text-muted">
           {searchQuery.trim()
             ? "No items match your search."
             : filterTab !== "all"
@@ -192,6 +195,7 @@ export default async function PublicBoardPage({
           })}
         </ul>
       )}
-    </Container>
+      </div>
+    </SitePage>
   );
 }

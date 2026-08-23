@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
-import { PageContainer } from "@/components/layout/PageContainer";
+import { SitePage } from "@/components/layout/SitePage";
 import { claimProfile } from "./_actions";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 
@@ -15,24 +15,24 @@ export default async function ClaimPage({
 
   if (!token) {
     return (
-      <PageContainer>
-        <div className="mx-auto max-w-md py-8">
-          <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+      <SitePage width="narrow">
+        <div className="mx-auto max-w-md">
+          <div className="rounded border border-hairline p-6">
+            <p className="font-body text-[15px] font-medium text-ink">
               Invalid or missing claim link
             </p>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="mt-1 font-body text-[15px] leading-relaxed text-muted">
               Use the exact link from your email or from an admin.
             </p>
             <Link
               href="/"
-              className="mt-4 inline-block text-sm font-medium text-archtivy-primary hover:underline"
+              className="mt-4 inline-block font-body text-[14px] text-ink underline-offset-4 hover:underline"
             >
               Back to home
             </Link>
           </div>
         </div>
-      </PageContainer>
+      </SitePage>
     );
   }
 
@@ -59,18 +59,18 @@ export default async function ClaimPage({
   }
 
   return (
-    <PageContainer>
-      <div className="mx-auto max-w-md py-8">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 dark:border-amber-800 dark:bg-amber-950/30">
-          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">{result.error}</p>
+    <SitePage width="narrow">
+      <div className="mx-auto max-w-md">
+        <div className="rounded border border-amber-300 bg-amber-50 p-6">
+          <p className="font-body text-[15px] font-medium text-amber-900">{result.error}</p>
           <Link
             href="/"
-            className="mt-4 inline-block text-sm font-medium text-archtivy-primary hover:underline"
+            className="mt-4 inline-block font-body text-[14px] text-ink underline-offset-4 hover:underline"
           >
             Back to home
           </Link>
         </div>
       </div>
-    </PageContainer>
+    </SitePage>
   );
 }

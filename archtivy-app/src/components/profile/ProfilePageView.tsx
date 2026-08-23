@@ -1,3 +1,4 @@
+import { SitePage } from "@/components/layout/SitePage";
 import Link from "next/link";
 import Image from "next/image";
 // lucide-react dropped its brand glyphs, so Instagram/LinkedIn use neutral
@@ -378,24 +379,22 @@ export function ProfilePageView(props: ProfilePageViewProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-cream font-body text-ink">
-      <div className="mx-auto max-w-[1400px] px-5 pb-24 pt-6 md:px-10 lg:px-14">
-        <ProfileHeader {...props} />
+    <SitePage width="wide" footer>
+      <ProfileHeader {...props} />
 
-        <div className="mt-12">
-          {hasWork ? (
-            <>
-              <ProfileTabs tabs={tabs} />
-              {/* `reader` and any future role get the skeleton only — they own
-                  no listings, so every role panel would be empty anyway. */}
-              {isDesigner && <DesignerPanels profile={profile} data={data} />}
-              {isBrand && <BrandPanels profile={profile} data={data} />}
-            </>
-          ) : (
-            <ProfileEmptyState isOwner={isOwner} displayName={displayName} role={profile.role} />
-          )}
-        </div>
+      <div className="mt-12">
+        {hasWork ? (
+          <>
+            <ProfileTabs tabs={tabs} />
+            {/* `reader` and any future role get the skeleton only — they own
+                no listings, so every role panel would be empty anyway. */}
+            {isDesigner && <DesignerPanels profile={profile} data={data} />}
+            {isBrand && <BrandPanels profile={profile} data={data} />}
+          </>
+        ) : (
+          <ProfileEmptyState isOwner={isOwner} displayName={displayName} role={profile.role} />
+        )}
       </div>
-    </div>
+    </SitePage>
   );
 }

@@ -61,6 +61,13 @@ export const SHELL_LESS_ROUTES: ReadonlySet<string> = new Set([
   "/api-docs",
   "/data-intelligence",
   "/brand-intelligence",
+  // /status renders MarketingPage too — easy to miss because it is a platform
+  // page rather than a corporate one.
+  "/status",
+
+  // Claim and welcome flows, and the public saved boards.
+  "/claim",
+  "/welcome",
 ]);
 
 /**
@@ -88,6 +95,11 @@ export const SHELL_LESS_PREFIXES: readonly string[] = [
   "/products/",
   "/magazine/",
   "/inspiration/",
+  // Public profiles and their claim flows. /u/id/[profileId] usually redirects
+  // to /u/[username], but not always — 158 of 199 profiles have no username —
+  // so both branches render ProfilePageView and both need the prefix.
+  "/u/",
+  "/saved/",
 ];
 
 export function isShellLess(pathname: string | null | undefined): boolean {
