@@ -6,6 +6,8 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getManagedListing, getTaggableProducts } from "@/lib/db/productTags";
 import { PinEditor } from "./PinEditor";
+import { SitePage } from "@/components/layout/SitePage";
+import { PageHeading } from "@/components/layout/PageHeading";
 
 export const dynamic = "force-dynamic";
 
@@ -54,21 +56,20 @@ export default async function ManageListingPage({
   const pinCount = listing.images.reduce((n, i) => n + i.pins.length, 0);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <Link
-        href="/me/listings"
-        className="inline-flex items-center gap-1.5 text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-      >
-        <ArrowLeft strokeWidth={1.5} className="h-4 w-4" />
-        Back to listings
-      </Link>
-
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-            {listing.title}
-          </h1>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+    <SitePage>
+      <PageHeading
+        eyebrow={
+          <Link
+            href="/me/listings"
+            className="inline-flex items-center gap-1.5 underline-offset-4 hover:underline"
+          >
+            <ArrowLeft strokeWidth={1.5} className="h-3.5 w-3.5" />
+            Listings
+          </Link>
+        }
+        title={listing.title}
+        description={
+          <span className="flex flex-wrap items-center gap-2">
             <span className="capitalize">{listing.type}</span>
             <span aria-hidden>·</span>
             <span>{listing.status === "APPROVED" ? "Published" : listing.status}</span>
@@ -84,34 +85,35 @@ export default async function ManageListingPage({
                 </span>
               </>
             )}
-          </p>
-        </div>
-
-        {listing.publicHref && (
-          <Link
-            href={listing.publicHref}
-            target="_blank"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-zinc-300 px-4 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:text-zinc-100"
-          >
-            View public page
-            <ExternalLink strokeWidth={1.5} className="h-3.5 w-3.5" />
-          </Link>
-        )}
-      </div>
+          </span>
+        }
+        actions={
+          listing.publicHref && (
+            <Link
+              href={listing.publicHref}
+              target="_blank"
+              className="inline-flex items-center gap-1.5 rounded-full border border-ink/25 px-4 py-2 font-body text-[14px] text-ink transition-colors hover:bg-stone/50"
+            >
+              View public page
+              <ExternalLink strokeWidth={1.5} className="h-3.5 w-3.5" />
+            </Link>
+          )
+        }
+      />
 
       {/* Single tab, present so the shell reads as intentional rather than
           half-finished. The other six from Image 1 are not built. */}
-      <nav className="mt-6 border-b border-zinc-200 dark:border-zinc-800" aria-label="Listing sections">
-        <span className="inline-block border-b-2 border-zinc-900 px-3 py-2 text-sm font-medium text-zinc-900 dark:border-zinc-100 dark:text-zinc-100">
+      <nav className="mt-8 border-b border-hairline" aria-label="Listing sections">
+        <span className="-mb-px inline-block border-b-2 border-ink px-3 py-2 font-body text-[14px] text-ink">
           Products
         </span>
       </nav>
 
       <div className="mt-6">
-        <p className="mb-5 max-w-[70ch] text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mb-5 max-w-[70ch] font-body text-[15px] leading-relaxed text-muted">
           Pin the products used in this {listing.type} directly onto your photos. Pins you place
-          are marked <strong>Official</strong> and appear on the public page; AI-suggested pins
-          stay hidden until you confirm them.
+          are marked <strong className="font-medium text-ink">Official</strong> and appear on the
+          public page; AI-suggested pins stay hidden until you confirm them.
         </p>
 
         <PinEditor
@@ -120,6 +122,6 @@ export default async function ManageListingPage({
           tagsTableReady={listing.tagsTableReady}
         />
       </div>
-    </div>
+    </SitePage>
   );
 }

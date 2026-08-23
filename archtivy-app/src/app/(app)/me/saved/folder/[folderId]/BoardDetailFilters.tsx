@@ -54,8 +54,8 @@ export function BoardDetailFilters({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 pb-3 dark:border-zinc-800">
-        <span className="mr-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+      <div className="flex flex-wrap items-center gap-2 border-b border-hairline pb-3">
+        <span className="mr-2 text-xs font-medium uppercase tracking-wide text-muted">
           Filter
         </span>
         <nav className="flex gap-1" aria-label="Filter by type">
@@ -72,7 +72,7 @@ export function BoardDetailFilters({
       </div>
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted">
             Sort
           </span>
           <nav className="flex gap-1" aria-label="Sort order">
@@ -94,13 +94,13 @@ export function BoardDetailFilters({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search in board…"
-            className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+            className="rounded border border-hairline bg-cream px-3 py-1.5 text-sm"
             style={{ borderRadius: "4px" }}
           />
           <button
             type="submit"
             disabled={pending}
-            className="rounded bg-zinc-800 px-2 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#002abf] dark:bg-zinc-700 dark:text-zinc-200"
+            className="rounded bg-ink px-2 py-1.5 text-sm font-medium text-cream transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ink"
             style={{ borderRadius: "4px" }}
           >
             Search
@@ -123,10 +123,10 @@ function FilterLink({
   return (
     <Link
       href={href}
-      className={`rounded px-2 py-1 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-[#002abf] ${
+      className={`rounded px-2 py-1 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-ink ${
         active
-          ? "bg-[#002abf] text-white"
-          : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+          ? "bg-ink text-cream"
+          : "text-muted hover:bg-stone/60 hover:text-ink"
       }`}
       style={{ borderRadius: "4px" }}
     >

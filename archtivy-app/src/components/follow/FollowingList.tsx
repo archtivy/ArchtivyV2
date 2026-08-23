@@ -29,7 +29,7 @@ const tabs: { key: FilterTab; label: string }[] = [
 
 function InitialAvatar({ name }: { name: string }) {
   return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500">
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone/60 text-sm font-semibold text-muted">
       {name[0]?.toUpperCase() ?? "?"}
     </div>
   );
@@ -37,8 +37,8 @@ function InitialAvatar({ name }: { name: string }) {
 
 function CategoryIcon() {
   return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-400 dark:text-zinc-500" aria-hidden>
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone/60">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-muted" aria-hidden>
         <rect x="3" y="3" width="7" height="7" rx="1" />
         <rect x="14" y="3" width="7" height="7" rx="1" />
         <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -50,8 +50,8 @@ function CategoryIcon() {
 
 function MaterialIcon() {
   return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-400 dark:text-zinc-500" aria-hidden>
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone/60">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-muted" aria-hidden>
         <path d="M12 2L2 7l10 5 10-5-10-5z" />
         <path d="M2 17l10 5 10-5" />
         <path d="M2 12l10 5 10-5" />
@@ -100,21 +100,21 @@ function FollowingRow({
     );
 
   return (
-    <div className="flex items-center gap-3 rounded px-3 py-3 transition hover:bg-zinc-50 dark:hover:bg-zinc-900/50 sm:px-4">
+    <div className="flex items-center gap-3 rounded px-3 py-3 transition hover:bg-stone/40 sm:px-4">
       {avatar}
       <div className="min-w-0 flex-1">
         <Link
           href={item.href}
-          className="text-sm font-medium text-zinc-900 transition hover:text-[#002abf] dark:text-zinc-100 dark:hover:text-[#5b7cff]"
+          className="text-sm font-medium text-ink underline-offset-4 transition hover:underline"
         >
           {item.name}
         </Link>
-        <p className="text-xs text-zinc-400 dark:text-zinc-500">{item.meta}</p>
+        <p className="text-xs text-muted">{item.meta}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <Link
           href={item.href}
-          className="hidden rounded border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:border-[#002abf] hover:text-[#002abf] dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-[#5b7cff] dark:hover:text-[#5b7cff] sm:inline-flex"
+          className="hidden rounded border border-hairline px-3 py-1.5 text-xs font-medium text-muted transition hover:border-ink hover:text-ink sm:inline-flex"
         >
           View
         </Link>
@@ -125,8 +125,8 @@ function FollowingRow({
           disabled={isPending}
           className={`rounded border px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
             confirmUnfollow
-              ? "border-red-300 text-red-500 hover:bg-red-50 dark:border-red-500/40 dark:text-red-400 dark:hover:bg-red-950/30"
-              : "border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-300"
+              ? "border-red-300 text-red-500 hover:bg-red-50"
+              : "border-hairline text-muted hover:border-ink/40 hover:text-ink"
           }`}
         >
           {isPending ? "Removing..." : confirmUnfollow ? "Confirm" : "Unfollow"}
@@ -158,7 +158,7 @@ export function FollowingList({ items: initialItems }: { items: FollowingItem[] 
   return (
     <div>
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 border-b border-zinc-100 dark:border-zinc-800">
+      <div className="flex items-center gap-1 border-b border-hairline">
         {tabs.map(({ key, label }) => {
           const count = counts[key];
           const isActive = activeTab === key;
@@ -170,18 +170,18 @@ export function FollowingList({ items: initialItems }: { items: FollowingItem[] 
               onClick={() => setActiveTab(key)}
               className={`relative px-3 py-2.5 text-sm font-medium transition ${
                 isActive
-                  ? "text-zinc-900 dark:text-zinc-100"
-                  : "text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+                  ? "text-ink"
+                  : "text-muted hover:text-ink"
               }`}
             >
               {label}
               {count > 0 && (
-                <span className={`ml-1.5 text-xs ${isActive ? "text-zinc-500 dark:text-zinc-400" : "text-zinc-300 dark:text-zinc-600"}`}>
+                <span className={`ml-1.5 text-xs ${isActive ? "text-muted" : "text-muted/70"}`}>
                   {count}
                 </span>
               )}
               {isActive && (
-                <span className="absolute inset-x-0 -bottom-px h-px bg-zinc-900 dark:bg-zinc-100" />
+                <span className="absolute inset-x-0 -bottom-px h-px bg-ink" />
               )}
             </button>
           );
@@ -191,14 +191,14 @@ export function FollowingList({ items: initialItems }: { items: FollowingItem[] 
       {/* List */}
       {filtered.length === 0 ? (
         <div className="py-16 text-center">
-          <p className="text-sm text-zinc-400 dark:text-zinc-500">
+          <p className="text-sm text-muted">
             {items.length === 0
               ? "You're not following anyone yet. Follow designers, brands, categories, or materials to see them here."
               : `No ${activeTab === "all" ? "" : activeTab + " "}follows yet.`}
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-zinc-50 dark:divide-zinc-800/50">
+        <div className="divide-y divide-hairline">
           {filtered.map((item) => (
             <FollowingRow key={item.followId} item={item} onUnfollow={handleUnfollow} />
           ))}

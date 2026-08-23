@@ -78,7 +78,7 @@ export function NetworkUpdatesList({ initialItems, initialTotal }: NetworkUpdate
   return (
     <div>
       {/* Filter tabs + Mark all */}
-      <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800">
+      <div className="flex items-center justify-between border-b border-hairline">
         <div className="flex items-center gap-1">
           {tabs.map(({ key, label }) => {
             const count = countForTab(items, key);
@@ -92,18 +92,18 @@ export function NetworkUpdatesList({ initialItems, initialTotal }: NetworkUpdate
                 onClick={() => setActiveTab(key)}
                 className={`relative px-3 py-2.5 text-sm font-medium transition ${
                   isActive
-                    ? "text-zinc-900 dark:text-zinc-100"
-                    : "text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+                    ? "text-ink"
+                    : "text-muted hover:text-ink"
                 }`}
               >
                 {label}
                 {count > 0 && (
-                  <span className={`ml-1.5 text-xs ${isActive ? "text-zinc-500 dark:text-zinc-400" : "text-zinc-300 dark:text-zinc-600"}`}>
+                  <span className={`ml-1.5 text-xs ${isActive ? "text-muted" : "text-muted/70"}`}>
                     {count}
                   </span>
                 )}
                 {isActive && (
-                  <span className="absolute inset-x-0 -bottom-px h-px bg-zinc-900 dark:bg-zinc-100" />
+                  <span className="absolute inset-x-0 -bottom-px h-px bg-ink" />
                 )}
               </button>
             );
@@ -115,7 +115,7 @@ export function NetworkUpdatesList({ initialItems, initialTotal }: NetworkUpdate
             type="button"
             onClick={handleMarkAllRead}
             disabled={isPending}
-            className="text-[12px] font-medium text-zinc-400 transition hover:text-[#002abf] disabled:opacity-50 dark:text-zinc-500 dark:hover:text-[#5b7cff]"
+            className="text-[12px] font-medium text-muted transition hover:text-ink disabled:opacity-50"
           >
             Mark all as read
           </button>
@@ -125,14 +125,14 @@ export function NetworkUpdatesList({ initialItems, initialTotal }: NetworkUpdate
       {/* List */}
       {filtered.length === 0 ? (
         <div className="py-16 text-center">
-          <p className="text-sm text-zinc-400 dark:text-zinc-500">
+          <p className="text-sm text-muted">
             {items.length === 0
               ? "No updates yet. Follow designers, brands, or categories to receive updates here."
               : `No ${activeTab === "all" ? "" : activeTab + " "}updates.`}
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-zinc-50 dark:divide-zinc-800/50">
+        <div className="divide-y divide-hairline">
           {filtered.map((n) => (
             <NotificationItem key={n.id} notification={n} onRead={handleRead} />
           ))}
@@ -141,8 +141,8 @@ export function NetworkUpdatesList({ initialItems, initialTotal }: NetworkUpdate
 
       {/* Load more hint */}
       {initialTotal > items.length && (
-        <div className="border-t border-zinc-100 py-4 text-center dark:border-zinc-800">
-          <p className="text-xs text-zinc-400 dark:text-zinc-500">
+        <div className="border-t border-hairline py-4 text-center">
+          <p className="text-xs text-muted">
             Showing {items.length} of {initialTotal} updates
           </p>
         </div>

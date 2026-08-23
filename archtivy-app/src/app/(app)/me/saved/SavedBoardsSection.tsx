@@ -83,13 +83,13 @@ export function SavedBoardsSection() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm text-muted">
           Organize saved items into boards. Click a board to view its items.
         </p>
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="rounded border border-zinc-600 bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-200 hover:border-[#002abf] hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#002abf] dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+          className="rounded-full bg-ink px-4 py-2 font-body text-[14px] text-cream transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ink focus:ring-offset-2"
           style={{ borderRadius: "4px" }}
         >
           + Create folder
@@ -98,7 +98,7 @@ export function SavedBoardsSection() {
 
       {error && (
         <div role="alert">
-          <p className="text-sm text-red-600 dark:text-red-400">
+          <p className="text-sm text-red-600">
             {error === "Not signed in"
               ? "Please sign in to view or create boards."
               : error === FOLDERS_SETUP_ERROR
@@ -108,7 +108,7 @@ export function SavedBoardsSection() {
           {error === "Not signed in" && (
             <a
               href="/sign-in"
-              className="mt-2 inline-block text-sm font-medium text-[#002abf] hover:underline"
+              className="mt-2 inline-block text-sm font-medium text-ink hover:underline"
             >
               Sign in
             </a>
@@ -117,13 +117,13 @@ export function SavedBoardsSection() {
       )}
 
       {loading ? (
-        <p className="text-sm text-zinc-500">Loading boards…</p>
+        <p className="text-sm text-muted">Loading boards…</p>
       ) : (
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4" aria-label="Saved boards">
           {folders.map((folder) => (
             <li key={folder.id} className="group">
               <div
-                className="relative block overflow-hidden rounded border border-zinc-200 bg-white shadow-sm transition hover:border-[#002abf] hover:shadow-md focus-within:ring-2 focus-within:ring-[#002abf] dark:border-zinc-800 dark:bg-zinc-900"
+                className="relative block overflow-hidden rounded border border-hairline bg-cream shadow-sm transition hover:border-ink hover:shadow-md focus-within:ring-2 focus-within:ring-ink"
                 style={{ borderRadius: "4px" }}
               >
                 <Link
@@ -131,7 +131,7 @@ export function SavedBoardsSection() {
                   className="block"
                   tabIndex={0}
                 >
-                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-stone/60">
                     {folder.cover_image_url ? (
                       <Image
                         src={folder.cover_image_url}
@@ -142,16 +142,16 @@ export function SavedBoardsSection() {
                         sizes="(max-width: 640px) 50vw, 25vw"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-zinc-400 dark:text-zinc-500">
+                      <div className="flex h-full w-full items-center justify-center text-muted">
                         <span className="text-2xl">—</span>
                       </div>
                     )}
                   </div>
                   <div className="p-3">
-                    <p className="truncate font-medium text-zinc-900 dark:text-zinc-100">
+                    <p className="truncate font-medium text-ink">
                       {folder.name}
                     </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className="text-xs text-muted">
                       {folder.item_count} item{folder.item_count !== 1 ? "s" : ""}
                       {folder.updated_at ? ` · Updated ${formatUpdated(folder.updated_at)}` : ""}
                     </p>
@@ -164,7 +164,7 @@ export function SavedBoardsSection() {
                     e.stopPropagation();
                     setShareFolder(folder);
                   }}
-                  className="absolute right-2 top-2 rounded bg-white/90 px-2 py-1.5 text-xs font-medium text-zinc-800 shadow opacity-0 transition group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#002abf] dark:bg-zinc-800/90 dark:text-zinc-200"
+                  className="absolute right-2 top-2 rounded bg-cream/90 px-2 py-1.5 text-xs font-medium text-ink shadow opacity-0 transition group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-ink"
                   style={{ borderRadius: "4px" }}
                   aria-label={`Share board ${folder.name}`}
                 >
@@ -175,14 +175,14 @@ export function SavedBoardsSection() {
           ))}
           {showCreate ? (
             <li>
-              <div className="overflow-hidden rounded border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/50" style={{ borderRadius: "4px" }}>
+              <div className="overflow-hidden rounded border border-hairline bg-stone/40 p-4" style={{ borderRadius: "4px" }}>
                 <input
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="Board name (max 40)"
                   maxLength={40}
-                  className="mb-3 w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                  className="mb-3 w-full rounded border border-hairline bg-cream px-3 py-2 text-sm"
                   style={{ borderRadius: "4px" }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void handleCreate();
@@ -194,7 +194,7 @@ export function SavedBoardsSection() {
                   <button
                     type="button"
                     onClick={() => { setShowCreate(false); setNewName(""); }}
-                    className="rounded px-2 py-1 text-sm text-zinc-600 dark:text-zinc-400"
+                    className="rounded px-2 py-1 text-sm text-muted"
                     style={{ borderRadius: "4px" }}
                   >
                     Cancel
@@ -203,7 +203,7 @@ export function SavedBoardsSection() {
                     type="button"
                     onClick={handleCreate}
                     disabled={creating || !newName.trim()}
-                    className="rounded bg-[#002abf] px-2 py-1 text-sm font-medium text-white hover:bg-[#0022a0] disabled:opacity-50"
+                    className="rounded bg-ink px-2 py-1 text-sm font-medium text-cream transition-opacity hover:opacity-90 disabled:opacity-50"
                     style={{ borderRadius: "4px" }}
                   >
                     {creating ? "Creating…" : "Create"}
@@ -216,7 +216,7 @@ export function SavedBoardsSection() {
               <button
                 type="button"
                 onClick={() => setShowCreate(true)}
-                className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded border-2 border-dashed border-zinc-300 bg-zinc-50 text-zinc-500 transition hover:border-[#002abf] hover:bg-zinc-100 hover:text-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf] dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-[#002abf] dark:hover:bg-zinc-800"
+                className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded border-2 border-dashed border-hairline bg-stone/40 text-muted transition hover:border-ink hover:bg-stone/60 hover:text-ink focus:outline-none focus:ring-2 focus:ring-ink"
                 style={{ borderRadius: "4px" }}
               >
                 <span className="text-2xl">+</span>

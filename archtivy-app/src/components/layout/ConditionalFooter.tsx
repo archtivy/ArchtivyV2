@@ -19,19 +19,22 @@ const FOOTERLESS_ROUTES = new Set([
   "/brands",
   "/magazine",
   "/inspiration",
-  // Mirrors EDITORIAL_ROUTES in SiteShell — these render their own HomeNav on
-  // the cream palette. They are working surfaces rather than reading surfaces,
-  // so they carry no footer at all (as /explore already does); the alternative
-  // was the zinc global Footer under a cream page.
-  "/me/dashboard",
-  "/me/listings",
-  "/me/profile",
-  "/me/files",
 ]);
+
+/**
+ * Mirrors EDITORIAL_PREFIXES in SiteShell. Signed-in surfaces are working
+ * surfaces rather than reading surfaces, so they carry no footer at all (as
+ * /explore already does); the alternative was the zinc global Footer sitting
+ * under a cream page.
+ */
+const FOOTERLESS_PREFIXES = ["/me"];
 
 export function ConditionalFooter({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   if (FOOTERLESS_ROUTES.has(pathname)) return null;
+  if (FOOTERLESS_PREFIXES.some((p) => pathname === p || pathname?.startsWith(`${p}/`))) {
+    return null;
+  }
   // Mirrors the SiteShell rule: /projects/* and /products/* are shell-less by
   // default because only the server can tell a detail page from an archive.
   // The CategoryArchive components render the global Footer themselves.

@@ -12,6 +12,8 @@ import { ProductCard } from "@/components/listing/ProductCard";
 import { BoardDetailFilters } from "./BoardDetailFilters";
 import type { ListingSummary } from "@/lib/types/listings";
 import type { Profile } from "@/lib/types/profiles";
+import { SitePage } from "@/components/layout/SitePage";
+import { PageHeading } from "@/components/layout/PageHeading";
 
 type FilterTab = "all" | "projects" | "products";
 type SortOption = "recent" | "name";
@@ -114,22 +116,18 @@ export default async function SavedFolderPage({
   const displayList = orderedIds.map((id) => listingById[id]).filter(Boolean) as ListingSummary[];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/me/saved"
-          className="text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-        >
-          ← Back to Boards
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold text-zinc-900 dark:text-zinc-100 sm:text-2xl">
-          {folder.name}
-        </h1>
-        <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-          {folder.item_count} item{folder.item_count !== 1 ? "s" : ""}
-        </p>
-      </div>
+    <SitePage>
+      <PageHeading
+        eyebrow={
+          <Link href="/me/saved" className="underline-offset-4 hover:underline">
+            Boards
+          </Link>
+        }
+        title={folder.name}
+        description={`${folder.item_count} item${folder.item_count !== 1 ? "s" : ""}`}
+      />
 
+      <div className="mt-10 space-y-6">
       <BoardDetailFilters
         currentFilter={filterTab}
         currentSort={sortOption}
@@ -139,13 +137,13 @@ export default async function SavedFolderPage({
       />
 
       {error && (
-        <p className="text-sm text-red-600 dark:text-red-400">
+        <p className="font-body text-[14px] text-red-700">
           Could not load items. Please try again.
         </p>
       )}
 
       {displayList.length === 0 && !error && (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="font-body text-[14px] text-muted">
           {searchQuery.trim()
             ? "No items match your search."
             : filterTab !== "all"
@@ -185,6 +183,7 @@ export default async function SavedFolderPage({
           })}
         </ul>
       )}
-    </div>
+      </div>
+    </SitePage>
   );
 }

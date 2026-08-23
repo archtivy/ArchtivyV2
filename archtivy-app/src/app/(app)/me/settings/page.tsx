@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { SettingsAccount } from "./SettingsAccount";
 import type { ProfileRole } from "@/lib/auth/config";
+import { SitePage } from "@/components/layout/SitePage";
+import { PageHeading } from "@/components/layout/PageHeading";
 
 const ROLE_LABEL: Record<ProfileRole, string> = {
   designer: "Designer",
@@ -32,17 +34,14 @@ export default async function SettingsPage({
     : "";
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-          Settings
-        </h1>
-        <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-          Manage your account and profile.
-        </p>
-      </div>
+    <SitePage>
+      <PageHeading
+        eyebrow="Your account"
+        title="Settings"
+        description="Manage your account and profile."
+      />
 
-      <nav className="flex gap-1 border-b border-zinc-200 dark:border-zinc-800" aria-label="Settings tabs">
+      <nav className="mt-10 flex gap-1 border-b border-hairline" aria-label="Settings tabs">
         <TabLink href="/me/settings?tab=profile" active={tab === "profile"}>
           Profile
         </TabLink>
@@ -52,37 +51,45 @@ export default async function SettingsPage({
       </nav>
 
       {tab === "profile" && (
-        <div className="space-y-6">
+        <div className="mt-8 space-y-6">
           <div>
-            <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Username / slug</h3>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              {profile.username ?? "—"}
-            </p>
+            <h3 className="font-body text-[13px] font-medium uppercase tracking-[0.1em] text-muted">
+              Username / slug
+            </h3>
+            <p className="mt-1 font-body text-[15px] text-ink">{profile.username ?? "—"}</p>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Role</h3>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{roleLabel}</p>
+            <h3 className="font-body text-[13px] font-medium uppercase tracking-[0.1em] text-muted">
+              Role
+            </h3>
+            <p className="mt-1 font-body text-[15px] text-ink">{roleLabel}</p>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Public profile link</h3>
+            <h3 className="font-body text-[13px] font-medium uppercase tracking-[0.1em] text-muted">
+              Public profile link
+            </h3>
             {publicUrl ? (
               <a
                 href={publicUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-1 block text-sm text-archtivy-primary hover:underline"
+                className="mt-1 block font-body text-[15px] text-ink underline-offset-4 hover:underline"
               >
                 {publicUrl}
               </a>
             ) : (
-              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">—</p>
+              <p className="mt-1 font-body text-[15px] text-muted">—</p>
             )}
           </div>
         </div>
       )}
 
-      {tab === "account" && <SettingsAccount />}
-    </div>
+      {tab === "account" && (
+        <div className="mt-8">
+          <SettingsAccount />
+        </div>
+      )}
+    </SitePage>
   );
 }
 
@@ -98,10 +105,10 @@ function TabLink({
   return (
     <Link
       href={href}
-      className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
+      className={`-mb-px border-b-2 px-3 py-2 font-body text-[14px] transition-colors ${
         active
-          ? "border-archtivy-primary text-archtivy-primary"
-          : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          ? "border-ink text-ink"
+          : "border-transparent text-muted hover:text-ink"
       }`}
     >
       {children}

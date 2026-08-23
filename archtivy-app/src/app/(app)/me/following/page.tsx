@@ -4,6 +4,8 @@ import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getFollowingByProfile, type FollowRow } from "@/lib/db/follows";
 import { supabase } from "@/lib/supabaseClient";
 import { FollowingList, type FollowingItem } from "@/components/follow/FollowingList";
+import { SitePage } from "@/components/layout/SitePage";
+import { PageHeading } from "@/components/layout/PageHeading";
 
 async function resolveProfileFollows(
   rows: FollowRow[]
@@ -100,17 +102,15 @@ export default async function FollowingPage() {
   items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-900 sm:text-2xl dark:text-zinc-100">
-          Following
-        </h1>
-        <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-          Designers, brands, categories, and materials you follow.
-        </p>
+    <SitePage>
+      <PageHeading
+        eyebrow="Your account"
+        title="Following"
+        description="Designers, brands, categories, and materials you follow."
+      />
+      <div className="mt-10">
+        <FollowingList items={items} />
       </div>
-
-      <FollowingList items={items} />
-    </div>
+    </SitePage>
   );
 }

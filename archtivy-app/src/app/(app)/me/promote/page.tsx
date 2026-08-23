@@ -6,6 +6,7 @@ import { getOwnedListingsForClerkUser } from "@/lib/db/listings";
 import { getUserCampaigns } from "@/lib/promote/campaigns";
 import { isFeatureListingEnabled } from "@/lib/db/siteSettings";
 import { PromoteDashboard } from "./PromoteDashboard";
+import { SitePage } from "@/components/layout/SitePage";
 
 export const metadata: Metadata = {
   title: "Feature Your Listing | Archtivy",
@@ -20,14 +21,16 @@ export default async function PromotePage() {
   const enabled = await isFeatureListingEnabled();
   if (!enabled) {
     return (
-      <div className="mx-auto max-w-md px-4 py-20 text-center">
-        <h1 className="font-serif text-2xl font-normal text-zinc-900 dark:text-zinc-100">
-          Coming Soon
-        </h1>
-        <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-          The Feature Listing option is not available yet. Check back soon.
-        </p>
-      </div>
+      <SitePage>
+        <div className="mx-auto max-w-md py-20 text-center">
+          <h1 className="font-display text-[32px] font-medium tracking-tight text-ink">
+            Coming Soon
+          </h1>
+          <p className="mt-3 font-body text-[16px] leading-relaxed text-muted">
+            The Feature Listing option is not available yet. Check back soon.
+          </p>
+        </div>
+      </SitePage>
     );
   }
 
@@ -47,10 +50,14 @@ export default async function PromotePage() {
     cover_image_url: l.cover_image_url ?? null,
   }));
 
+  // NOTE: PromoteDashboard's own internals are still on the zinc palette. It is
+  // 450 lines behind a feature flag that is off, and HomeNav lists Promote as
+  // "Coming soon" rather than linking to it — so it is unreachable in
+  // production today. Restyling it is a follow-up, not part of the nav
+  // consolidation; flagged in the PR description so it is not forgotten.
   return (
-    <PromoteDashboard
-      listings={listings}
-      campaigns={campaigns}
-    />
+    <SitePage>
+      <PromoteDashboard listings={listings} campaigns={campaigns} />
+    </SitePage>
   );
 }

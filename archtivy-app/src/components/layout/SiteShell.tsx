@@ -31,27 +31,20 @@ const EDITORIAL_ROUTES = new Set([
   // editorial product — the exact mismatch the brief was written against.
   "/add/project",
   "/add/product",
-
-  // ── SIGNED-IN SURFACES THAT RENDER THEIR OWN HomeNav ──────────────────────
-  // These four were rendering it INSIDE the default shell, which meant each
-  // page drew two headers: TopNav first, then a fixed-position HomeNav on top
-  // of it. The duplicate was invisible — HomeNav is `fixed top-0 z-50`, so it
-  // covered TopNav exactly — which is why it survived review.
-  //
-  // The visible symptom was width, not chrome. PageContainer wraps children in
-  // Container, which caps content at 1040px; each page then applied its own
-  // lg:px-24 inside that, leaving roughly 650px of usable width on a 1440px
-  // viewport. The dashboard looked like a narrow left column with a large empty
-  // area beside it, and no amount of grid work inside the page could fix it.
-  //
-  // /me/listings joins them in this pass, restyled off the zinc palette.
-  // The rest of /me/* still renders TopNav deliberately — see the consolidation
-  // note in the PR; converting them is a separate, larger job.
-  "/me/dashboard",
-  "/me/listings",
-  "/me/profile",
-  "/me/files",
 ]);
+
+/**
+ * Whole subtrees that render their own HomeNav, via SitePage.
+ *
+ * /me — every signed-in surface now renders SitePage, so the prefix replaces
+ * the four exact entries that used to sit in EDITORIAL_ROUTES. Note that
+ * /me/listings/[id]/edit was NOT among those four while already rendering a
+ * wizard that draws its own HomeNav: it was serving two stacked headers, the
+ * top one invisible because HomeNav is `fixed top-0 z-50` and covered TopNav
+ * exactly. Converting the subtree wholesale is what removes that class of bug
+ * rather than another entry in a list.
+ */
+const EDITORIAL_PREFIXES = ["/me"];
 
 // Routes that show TopNav but skip PageContainer (full-width content).
 const FULL_WIDTH_PATHS: string[] = [];
@@ -142,6 +135,10 @@ export function SiteShell({ children }: SiteShellProps) {
   // existing shell and palette. Widening this to a prefix would restyle every
   // archive page unintentionally.
   if (EDITORIAL_ROUTES.has(pathname ?? "")) {
+    return <>{children}</>;
+  }
+
+  if (EDITORIAL_PREFIXES.some((p) => pathname === p || pathname?.startsWith(`${p}/`))) {
     return <>{children}</>;
   }
 
