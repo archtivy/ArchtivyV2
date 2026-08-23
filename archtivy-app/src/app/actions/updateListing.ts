@@ -6,6 +6,7 @@ import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { canManageListing } from "@/lib/auth/listingOwnership";
+import { replaceGallery } from "@/lib/db/listingGallery";
 import { normaliseInstagramHandle } from "@/lib/publish/instagram";
 import { parseGalleryJson } from "@/lib/storage/types";
 import {
@@ -129,58 +130,6 @@ async function authorizeListingEdit(
   }
 
   return { listing, profileId: profile.id ?? null, userId };
-}
-
-/**
- * Replace a listing's gallery with the submitted set.
- *
- * Rows are deleted and re-inserted rather than diffed: the wizard posts an
- * ordered array with no stable row ids, so sort_order is a property of position
- * in that array. A diff would have to reconcile order anyway, and a partial
- * failure mid-diff leaves a half-ordered gallery.
- *
- * The delete only touches listing_images. Storage objects are intentionally
- * left in place — an image removed here may still be referenced by a cached
- * render or an older revision, and orphan cleanup is a background job's
- * problem, not an interactive save's.
- */
-async function replaceGallery(
-  listingId: string,
-  images: { url: string; alt?: string; caption?: string }[]
-): Promise<string | null> {
-  const supabase = getSupabaseServiceClient();
-
-  const { error: delErr } = await supabase
-    .from("listing_images")
-    .delete()
-    .eq("listing_id", listingId);
-  if (delErr) return `Failed to update gallery: ${delErr.message}`;
-
-  if (images.length === 0) {
-    // No images left: clear the cover too, or the listing keeps rendering a
-    // thumbnail whose row no longer exists.
-    await supabase.from("listings").update({ cover_image_url: null }).eq("id", listingId);
-    return null;
-  }
-
-  const rows = images.map((item, i) => ({
-    listing_id: listingId,
-    image_url: item.url,
-    alt: item.alt?.trim() || null,
-    caption: item.caption?.trim() || null,
-    sort_order: i,
-  }));
-
-  const { error: insErr } = await supabase.from("listing_images").insert(rows);
-  if (insErr) return `Failed to save gallery: ${insErr.message}`;
-
-  const { error: coverErr } = await supabase
-    .from("listings")
-    .update({ cover_image_url: images[0].url })
-    .eq("id", listingId);
-  if (coverErr) return `Failed to set cover image: ${coverErr.message}`;
-
-  return null;
 }
 
 /**
