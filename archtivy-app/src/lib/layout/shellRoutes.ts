@@ -100,6 +100,12 @@ export const SHELL_LESS_PREFIXES: readonly string[] = [
   // so both branches render ProfilePageView and both need the prefix.
   "/u/",
   "/saved/",
+  // The two explore catch-alls. NOT "/explore/" — bare /explore is the
+  // fullscreen map tool and keeps ExploreToolHeader, which is a tool chrome
+  // rather than site chrome. /explore/designers and /explore/brands are
+  // permanent redirects and never render, so they need no entry either.
+  "/explore/projects",
+  "/explore/products",
 ];
 
 export function isShellLess(pathname: string | null | undefined): boolean {

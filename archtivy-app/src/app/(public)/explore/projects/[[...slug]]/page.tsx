@@ -16,6 +16,7 @@ import { ExploreEmptyState } from "@/components/explore/ExploreEmptyState";
 import { Container } from "@/components/layout/Container";
 import { getBaseUrl } from "@/lib/canonical";
 import { buildCollectionPageJsonLd, serializeJsonLd } from "@/lib/seo/jsonld";
+import { SitePage } from "@/components/layout/SitePage";
 
 export async function generateMetadata({
   params,
@@ -167,7 +168,7 @@ export default async function ExploreProjectsPage({
   });
 
   return (
-    <div className="min-h-screen bg-white dark:bg-zinc-950">
+    <SitePage width="bleed" footer>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(collectionJsonLd) }}
@@ -182,7 +183,7 @@ export default async function ExploreProjectsPage({
 
       {taxonomyNode?.intro_text && (
         <Container className="pt-4">
-          <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm leading-relaxed text-muted">
             {taxonomyNode.intro_text}
           </p>
         </Container>
@@ -190,8 +191,8 @@ export default async function ExploreProjectsPage({
 
       <Container className="pb-16 pt-2">
         {filters.q?.trim() && (
-          <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
-            Results for <span className="font-medium text-zinc-700 dark:text-zinc-300">&quot;{filters.q.trim()}&quot;</span>
+          <p className="mb-4 text-sm text-muted">
+            Results for <span className="font-medium text-ink">&quot;{filters.q.trim()}&quot;</span>
           </p>
         )}
 
@@ -212,6 +213,6 @@ export default async function ExploreProjectsPage({
           />
         )}
       </Container>
-    </div>
+    </SitePage>
   );
 }

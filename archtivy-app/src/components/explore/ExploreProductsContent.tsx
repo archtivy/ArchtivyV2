@@ -67,7 +67,7 @@ export function ExploreProductsContent({
 
         {/* Result count */}
         <div className="mb-4 flex items-baseline justify-between">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-muted">
             {total.toLocaleString()} {total === 1 ? "product" : "products"}
           </p>
         </div>

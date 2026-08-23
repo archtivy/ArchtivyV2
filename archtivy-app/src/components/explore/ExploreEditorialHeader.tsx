@@ -108,7 +108,7 @@ export function ExploreEditorialHeader({
             />
             <div
               ref={sortPanelRef}
-              className="border border-zinc-200 bg-white py-1 shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="border border-hairline bg-cream py-1 shadow-sm"
               style={{
                 position: "fixed",
                 top: sortPos.top,
@@ -123,10 +123,10 @@ export function ExploreEditorialHeader({
                   key={s}
                   type="button"
                   onClick={() => handleSortChange(s)}
-                  className={`flex w-full items-center px-3.5 py-1.5 text-left text-sm transition hover:bg-zinc-50 dark:hover:bg-zinc-800 ${
+                  className={`flex w-full items-center px-3.5 py-1.5 text-left text-sm transition hover:bg-stone/40 ${
                     sort === s
-                      ? "font-medium text-[#002abf] dark:text-blue-400"
-                      : "text-zinc-600 dark:text-zinc-300"
+                      ? "font-medium text-ink"
+                      : "text-muted"
                   }`}
                 >
                   {SORT_LABELS[s] ?? s}
@@ -143,23 +143,23 @@ export function ExploreEditorialHeader({
       <Container>
         {/* Title + subtitle — left-aligned */}
         <div className="pt-10 pb-4 sm:pt-12">
-          <h1 className="font-serif text-3xl font-normal tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-4xl">
+          <h1 className="font-serif text-3xl font-normal tracking-tight text-ink sm:text-4xl">
             {title}
           </h1>
-          <p className="mt-2 max-w-lg text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted">
             {subtitle}
           </p>
 
           {/* Stats as a single metadata line */}
           {statParts.length > 0 && (
-            <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
+            <p className="mt-3 text-xs text-muted">
               {statParts.join(" · ")}
             </p>
           )}
         </div>
 
         {/* Filter row + sort */}
-        <div className="flex items-start gap-2 border-t border-zinc-100 pt-4 pb-5 dark:border-zinc-800/60">
+        <div className="flex items-start gap-2 border-t border-hairline pt-4 pb-5">
           <div className="min-w-0 flex-1">
             <ExploreFilterBar
               type={type}
@@ -178,7 +178,7 @@ export function ExploreEditorialHeader({
                 setSortOpen((prev) => !prev);
                 if (!sortOpen) setTimeout(updateSortPos, 0);
               }}
-              className="flex items-center gap-1 rounded border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-600"
+              className="flex items-center gap-1 rounded border border-hairline bg-cream px-2.5 py-1.5 text-xs font-medium text-muted transition hover:border-ink/40 hover:bg-stone/40 hover:text-ink"
               style={{ borderRadius: 4 }}
               aria-expanded={sortOpen}
               aria-haspopup="listbox"
@@ -190,7 +190,7 @@ export function ExploreEditorialHeader({
                 viewBox="0 0 12 12"
                 fill="none"
                 aria-hidden
-                className={`text-zinc-400 transition-transform duration-150 ${sortOpen ? "rotate-180" : ""}`}
+                className={`text-muted transition-transform duration-150 ${sortOpen ? "rotate-180" : ""}`}
               >
                 <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>

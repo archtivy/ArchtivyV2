@@ -22,25 +22,25 @@ export function ExploreEmptyState({ type, cityName, showResetAndFirst }: Explore
     : "Try adjusting your filters or expand the map to discover more.";
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-6 py-10 text-center dark:border-zinc-800 dark:bg-zinc-900 sm:px-10 sm:py-12">
-      <p className="text-base font-medium text-zinc-900 sm:text-lg dark:text-zinc-100">
+    <div className="rounded-lg border border-hairline bg-stone/40 px-6 py-10 text-center sm:px-10 sm:py-12">
+      <p className="text-base font-medium text-ink sm:text-lg">
         {title}
       </p>
-      <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+      <p className="mt-2 text-sm text-muted">
         {subtext}
       </p>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         {showResetAndFirst && !isCityOnly && (
           <Link
             href={path}
-            className="inline-block rounded-[20px] border border-zinc-300 bg-transparent px-4 py-2 text-sm font-medium text-zinc-900 hover:border-[#002abf] hover:text-[#002abf] focus:outline-none focus:ring-2 focus:ring-archtivy-primary focus:ring-offset-2 dark:border-zinc-600 dark:text-zinc-100 dark:hover:border-[#5b7cff] dark:hover:text-[#5b7cff] dark:focus:ring-offset-zinc-950"
+            className="inline-block rounded-[20px] border border-hairline bg-transparent px-4 py-2 text-sm font-medium text-ink hover:border-ink hover:text-ink focus:outline-none focus:ring-2 focus:ring-ink focus:ring-offset-2"
           >
             Reset Filters
           </Link>
         )}
         <Link
           href={addHref}
-          className="inline-block rounded-[20px] bg-[#002abf] px-4 py-2 text-sm font-medium text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
+          className="inline-block rounded-[20px] bg-ink px-4 py-2 text-sm font-medium text-cream transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ink focus:ring-offset-2"
         >
           {isCityOnly ? "Add Listing" : "Add the First Listing"}
         </Link>
