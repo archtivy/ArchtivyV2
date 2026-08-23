@@ -13,7 +13,7 @@ import {
 import { RichDashboard } from "@/components/dashboard/RichDashboard";
 import { SparseDashboard } from "@/components/dashboard/SparseDashboard";
 import { ReaderDashboard } from "@/components/dashboard/ReaderDashboard";
-import { HomeNav } from "@/components/home/HomeNav";
+import { SitePage } from "@/components/layout/SitePage";
 
 export const metadata: Metadata = {
   title: "Dashboard | Archtivy",
@@ -60,17 +60,14 @@ export default async function DashboardPage({
   const data = await getDashboardData(profile.id ?? "", profile.role, w);
 
   return (
-    <div className="min-h-screen bg-cream font-body text-ink">
-      <HomeNav variant="solid" />
-      <div className="mx-auto max-w-content px-4 pb-20 pt-[104px] md:px-12 lg:px-24">
-        {data == null ? (
-          <ReaderDashboard displayName={displayName} />
-        ) : data.isSparse ? (
-          <SparseDashboard data={data} displayName={displayName} />
-        ) : (
-          <RichDashboard data={data} displayName={displayName} window={w} />
-        )}
-      </div>
-    </div>
+    <SitePage>
+      {data == null ? (
+        <ReaderDashboard displayName={displayName} />
+      ) : data.isSparse ? (
+        <SparseDashboard data={data} displayName={displayName} />
+      ) : (
+        <RichDashboard data={data} displayName={displayName} window={w} />
+      )}
+    </SitePage>
   );
 }

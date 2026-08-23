@@ -12,7 +12,7 @@ import { getFirstImageUrlPerListingIds } from "@/lib/db/listingImages";
 import { getUserListingStats, getLiveSaveCountsByListingIds } from "@/lib/db/userStats";
 import { getListingUrl } from "@/lib/canonical";
 import { ListingRowActions } from "./ListingRowActions";
-import { HomeNav } from "@/components/home/HomeNav";
+import { SitePage } from "@/components/layout/SitePage";
 import type { OwnedListingSummary } from "@/lib/db/listings";
 import type { ProfileRole } from "@/lib/auth/config";
 
@@ -115,129 +115,126 @@ export default async function ListingsPage({
   ];
 
   return (
-    <div className="min-h-screen bg-cream font-body text-ink">
-      <HomeNav variant="solid" />
-      <div className="mx-auto max-w-content px-4 pb-20 pt-[104px] md:px-12 lg:px-24">
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
-              <Link href="/me/dashboard" className="underline-offset-4 hover:underline">
-                Dashboard
-              </Link>
-            </p>
-            <h1 className="mt-3 font-display text-[36px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[42px]">
-              Listings
-            </h1>
-            <p className="mt-3 font-body text-[15px] leading-[24px] text-muted">
-              Manage your projects and products in one place.
-            </p>
+    <SitePage>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+            <Link href="/me/dashboard" className="underline-offset-4 hover:underline">
+              Dashboard
+            </Link>
+          </p>
+          <h1 className="mt-3 font-display text-[36px] leading-[1.05] tracking-[-0.02em] text-ink sm:text-[42px]">
+            Listings
+          </h1>
+          <p className="mt-3 font-body text-[15px] leading-[24px] text-muted">
+            Manage your projects and products in one place.
+          </p>
+        </div>
+        <Link
+          href={addHref}
+          className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 font-body text-[14px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
+        >
+          Add a {noun}
+          <ArrowRight strokeWidth={1.5} className="h-4 w-4" aria-hidden />
+        </Link>
+      </header>
+
+      {/* Stats — server-aggregated, APPROVED listings only. Rendered inline
+          on the editorial tokens rather than via ListingStatsStrip, which is
+          still on the zinc palette and is used elsewhere. */}
+      <dl className="mt-9 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {statItems.map(({ label, value }) => (
+          <div key={label} className="rounded-2xl border border-hairline bg-white p-5">
+            <dd className="font-display text-[30px] leading-none tracking-tight text-ink tabular-nums">
+              {value.toLocaleString()}
+            </dd>
+            <dt className="mt-2 font-body text-[12px] text-muted">{label}</dt>
           </div>
+        ))}
+      </dl>
+
+      {/* Type tabs */}
+      <nav
+        className="mt-10 flex gap-1 border-b border-hairline"
+        aria-label="Listings tabs"
+      >
+        <TabLink href={qs({ tab: "all" })} active={tab === "all"}>
+          All
+        </TabLink>
+        {role === "designer" && (
+          <TabLink href={qs({ tab: "projects" })} active={tab === "projects"}>
+            Projects
+          </TabLink>
+        )}
+        {role === "brand" && (
+          <TabLink href={qs({ tab: "products" })} active={tab === "products"}>
+            Products
+          </TabLink>
+        )}
+      </nav>
+
+      {/* Status filter — a second axis, so it reads as a filter on the tab
+          above rather than a competing set of tabs. Drafts is shown even at
+          zero so the state is discoverable before a draft exists. */}
+      <div
+        className="mt-5 flex flex-wrap items-center gap-2"
+        role="group"
+        aria-label="Filter by status"
+      >
+        <StatusChip href={qs({ status: "all" })} active={status === "all"}>
+          All
+        </StatusChip>
+        <StatusChip href={qs({ status: "published" })} active={status === "published"}>
+          Published
+        </StatusChip>
+        <StatusChip href={qs({ status: "drafts" })} active={status === "drafts"}>
+          Drafts{draftCount > 0 ? ` (${draftCount})` : ""}
+        </StatusChip>
+      </div>
+
+      {error && (
+        <p
+          role="alert"
+          className="mt-6 rounded-2xl bg-red-50 px-4 py-3 font-body text-[14px] text-red-700"
+        >
+          Could not load listings. Please try again.
+        </p>
+      )}
+
+      {!error && filtered.length === 0 && (
+        <div className="mt-8 rounded-2xl border border-hairline bg-white p-10 text-center">
+          <p className="font-display text-[22px] tracking-tight text-ink">
+            {tab === "all" ? `No ${noun}s yet` : `No ${tab} yet`}
+          </p>
+          <p className="mx-auto mt-2 max-w-[42ch] font-body text-[14px] leading-[22px] text-muted">
+            {status === "drafts"
+              ? "Drafts you save from the wizard will wait for you here."
+              : `Publish your first ${noun} — it takes about ten minutes.`}
+          </p>
           <Link
             href={addHref}
-            className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 font-body text-[14px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
+            className="mt-6 inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 font-body text-[14px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
           >
             Add a {noun}
             <ArrowRight strokeWidth={1.5} className="h-4 w-4" aria-hidden />
           </Link>
-        </header>
-
-        {/* Stats — server-aggregated, APPROVED listings only. Rendered inline
-            on the editorial tokens rather than via ListingStatsStrip, which is
-            still on the zinc palette and is used elsewhere. */}
-        <dl className="mt-9 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {statItems.map(({ label, value }) => (
-            <div key={label} className="rounded-2xl border border-hairline bg-white p-5">
-              <dd className="font-display text-[30px] leading-none tracking-tight text-ink tabular-nums">
-                {value.toLocaleString()}
-              </dd>
-              <dt className="mt-2 font-body text-[12px] text-muted">{label}</dt>
-            </div>
-          ))}
-        </dl>
-
-        {/* Type tabs */}
-        <nav
-          className="mt-10 flex gap-1 border-b border-hairline"
-          aria-label="Listings tabs"
-        >
-          <TabLink href={qs({ tab: "all" })} active={tab === "all"}>
-            All
-          </TabLink>
-          {role === "designer" && (
-            <TabLink href={qs({ tab: "projects" })} active={tab === "projects"}>
-              Projects
-            </TabLink>
-          )}
-          {role === "brand" && (
-            <TabLink href={qs({ tab: "products" })} active={tab === "products"}>
-              Products
-            </TabLink>
-          )}
-        </nav>
-
-        {/* Status filter — a second axis, so it reads as a filter on the tab
-            above rather than a competing set of tabs. Drafts is shown even at
-            zero so the state is discoverable before a draft exists. */}
-        <div
-          className="mt-5 flex flex-wrap items-center gap-2"
-          role="group"
-          aria-label="Filter by status"
-        >
-          <StatusChip href={qs({ status: "all" })} active={status === "all"}>
-            All
-          </StatusChip>
-          <StatusChip href={qs({ status: "published" })} active={status === "published"}>
-            Published
-          </StatusChip>
-          <StatusChip href={qs({ status: "drafts" })} active={status === "drafts"}>
-            Drafts{draftCount > 0 ? ` (${draftCount})` : ""}
-          </StatusChip>
         </div>
+      )}
 
-        {error && (
-          <p
-            role="alert"
-            className="mt-6 rounded-2xl bg-red-50 px-4 py-3 font-body text-[14px] text-red-700"
-          >
-            Could not load listings. Please try again.
-          </p>
-        )}
-
-        {!error && filtered.length === 0 && (
-          <div className="mt-8 rounded-2xl border border-hairline bg-white p-10 text-center">
-            <p className="font-display text-[22px] tracking-tight text-ink">
-              {tab === "all" ? `No ${noun}s yet` : `No ${tab} yet`}
-            </p>
-            <p className="mx-auto mt-2 max-w-[42ch] font-body text-[14px] leading-[22px] text-muted">
-              {status === "drafts"
-                ? "Drafts you save from the wizard will wait for you here."
-                : `Publish your first ${noun} — it takes about ten minutes.`}
-            </p>
-            <Link
-              href={addHref}
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 font-body text-[14px] text-cream transition-all duration-150 hover:opacity-90 active:scale-[0.98] motion-reduce:transition-none"
-            >
-              Add a {noun}
-              <ArrowRight strokeWidth={1.5} className="h-4 w-4" aria-hidden />
-            </Link>
-          </div>
-        )}
-
-        {!error && filtered.length > 0 && (
-          <ul className="mt-8 space-y-3" aria-label="Your listings">
-            {filtered.map((listing) => (
-              <ListingCard
-                key={listing.id}
-                listing={listing}
-                imageUrl={imageMap[listing.id]}
-                liveViewCount={listing.views_count ?? 0}
-                liveSaveCount={liveSaves[listing.id] ?? 0}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
+      {!error && filtered.length > 0 && (
+        <ul className="mt-8 space-y-3" aria-label="Your listings">
+          {filtered.map((listing) => (
+            <ListingCard
+              key={listing.id}
+              listing={listing}
+              imageUrl={imageMap[listing.id]}
+              liveViewCount={listing.views_count ?? 0}
+              liveSaveCount={liveSaves[listing.id] ?? 0}
+            />
+          ))}
+        </ul>
+      )}
+    </SitePage>
   );
 }
 

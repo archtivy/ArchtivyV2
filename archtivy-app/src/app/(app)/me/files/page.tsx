@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { Download, FileText } from "lucide-react";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getDownloadsForProfile } from "@/lib/db/documentDownloads";
-import { HomeNav } from "@/components/home/HomeNav";
+import { SitePage } from "@/components/layout/SitePage";
 
 export const metadata: Metadata = {
   title: "Your files | Archtivy",
@@ -57,99 +57,96 @@ export default async function MyFilesPage() {
   const { data: files, error, tableMissing } = await getDownloadsForProfile(profile.id);
 
   return (
-    <div className="min-h-screen bg-cream">
-      <HomeNav variant="solid" />
-      <main className="mx-auto max-w-content px-4 pb-24 pt-[120px] md:px-12">
-        <header className="max-w-2xl">
-          <h1 className="font-display text-[32px] font-medium tracking-tight text-ink">
-            Your files
-          </h1>
-          <p className="mt-3 font-body text-[16px] leading-relaxed text-muted">
-            Spec sheets, catalogues and drawings you&rsquo;ve downloaded from brand and
-            designer pages. Downloading again always fetches the current version.
-          </p>
-        </header>
+    <SitePage>
+      <header className="max-w-2xl">
+        <h1 className="font-display text-[32px] font-medium tracking-tight text-ink">
+          Your files
+        </h1>
+        <p className="mt-3 font-body text-[16px] leading-relaxed text-muted">
+          Spec sheets, catalogues and drawings you&rsquo;ve downloaded from brand and
+          designer pages. Downloading again always fetches the current version.
+        </p>
+      </header>
 
-        <div className="mt-10">
-          {tableMissing ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50/60 px-5 py-4">
-              <p className="font-body text-[15px] font-medium text-amber-900">
-                Download history isn&rsquo;t switched on yet.
-              </p>
-              <p className="mt-1 font-body text-[14px] leading-relaxed text-amber-800">
-                Downloads work as normal — they just aren&rsquo;t being recorded here
-                until the tracking migration is applied.
-              </p>
-            </div>
-          ) : error ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50/60 px-5 py-4 font-body text-[14px] text-red-700">
-              {error}
-            </div>
-          ) : files.length === 0 ? (
-            <div className="rounded-2xl border border-hairline bg-white px-6 py-16 text-center">
-              <p className="font-body text-[16px] font-medium text-ink">No files yet</p>
-              <p className="mx-auto mt-2 max-w-sm font-body text-[14px] leading-relaxed text-muted">
-                When you download a spec sheet or catalogue from a product or project
-                page, it&rsquo;ll appear here so you can find it again.
-              </p>
-              <Link
-                href="/products"
-                className="mt-6 inline-flex rounded-full bg-ink px-5 py-2.5 font-body text-[14px] text-cream transition-opacity hover:opacity-90"
+      <div className="mt-10">
+        {tableMissing ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/60 px-5 py-4">
+            <p className="font-body text-[15px] font-medium text-amber-900">
+              Download history isn&rsquo;t switched on yet.
+            </p>
+            <p className="mt-1 font-body text-[14px] leading-relaxed text-amber-800">
+              Downloads work as normal — they just aren&rsquo;t being recorded here
+              until the tracking migration is applied.
+            </p>
+          </div>
+        ) : error ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50/60 px-5 py-4 font-body text-[14px] text-red-700">
+            {error}
+          </div>
+        ) : files.length === 0 ? (
+          <div className="rounded-2xl border border-hairline bg-white px-6 py-16 text-center">
+            <p className="font-body text-[16px] font-medium text-ink">No files yet</p>
+            <p className="mx-auto mt-2 max-w-sm font-body text-[14px] leading-relaxed text-muted">
+              When you download a spec sheet or catalogue from a product or project
+              page, it&rsquo;ll appear here so you can find it again.
+            </p>
+            <Link
+              href="/products"
+              className="mt-6 inline-flex rounded-full bg-ink px-5 py-2.5 font-body text-[14px] text-cream transition-opacity hover:opacity-90"
+            >
+              Browse products
+            </Link>
+          </div>
+        ) : (
+          <ul className="overflow-hidden rounded-2xl border border-hairline bg-white">
+            {files.map((f) => (
+              <li
+                key={f.listingDocumentId ?? `${f.fileName}-${f.downloadedAt}`}
+                className="flex flex-wrap items-center gap-4 border-b border-hairline/60 px-5 py-4 last:border-0"
               >
-                Browse products
-              </Link>
-            </div>
-          ) : (
-            <ul className="overflow-hidden rounded-2xl border border-hairline bg-white">
-              {files.map((f) => (
-                <li
-                  key={f.listingDocumentId ?? `${f.fileName}-${f.downloadedAt}`}
-                  className="flex flex-wrap items-center gap-4 border-b border-hairline/60 px-5 py-4 last:border-0"
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone/40 text-muted"
+                  aria-hidden
                 >
-                  <span
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone/40 text-muted"
-                    aria-hidden
+                  <FileText strokeWidth={1.5} className="h-5 w-5" />
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-body text-[15px] font-medium text-ink">
+                    {f.fileName}
+                  </p>
+                  <p className="mt-0.5 font-body text-[13px] text-muted">
+                    {[
+                      extensionOf(f.fileName),
+                      f.listingTitle,
+                      `Downloaded ${formatDate(f.downloadedAt)}`,
+                      f.downloadCount > 1 ? `${f.downloadCount} times` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
+
+                {f.stillAvailable && f.listingDocumentId && f.listingId ? (
+                  <a
+                    href={`/api/documents/download?docId=${encodeURIComponent(
+                      f.listingDocumentId
+                    )}&listingId=${encodeURIComponent(f.listingId)}`}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-full border border-ink/20 px-4 py-2 font-body text-[13px] font-medium text-ink transition-colors hover:bg-stone/40"
                   >
-                    <FileText strokeWidth={1.5} className="h-5 w-5" />
+                    <Download strokeWidth={1.5} className="h-4 w-4" />
+                    Download
+                  </a>
+                ) : (
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-stone/40 px-3 py-1.5 font-body text-[12px] text-muted">
+                    No longer available
                   </span>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-body text-[15px] font-medium text-ink">
-                      {f.fileName}
-                    </p>
-                    <p className="mt-0.5 font-body text-[13px] text-muted">
-                      {[
-                        extensionOf(f.fileName),
-                        f.listingTitle,
-                        `Downloaded ${formatDate(f.downloadedAt)}`,
-                        f.downloadCount > 1 ? `${f.downloadCount} times` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  </div>
-
-                  {f.stillAvailable && f.listingDocumentId && f.listingId ? (
-                    <a
-                      href={`/api/documents/download?docId=${encodeURIComponent(
-                        f.listingDocumentId
-                      )}&listingId=${encodeURIComponent(f.listingId)}`}
-                      className="inline-flex shrink-0 items-center gap-2 rounded-full border border-ink/20 px-4 py-2 font-body text-[13px] font-medium text-ink transition-colors hover:bg-stone/40"
-                    >
-                      <Download strokeWidth={1.5} className="h-4 w-4" />
-                      Download
-                    </a>
-                  ) : (
-                    <span className="inline-flex shrink-0 items-center rounded-full bg-stone/40 px-3 py-1.5 font-body text-[12px] text-muted">
-                      No longer available
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </main>
-    </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </SitePage>
   );
 }
