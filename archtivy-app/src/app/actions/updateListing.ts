@@ -1,11 +1,9 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
-import { getProfileByClerkId } from "@/lib/db/profiles";
-import { canManageListing } from "@/lib/auth/listingOwnership";
+import { authorizeListingEdit } from "@/lib/auth/listingEditGuard";
 import { replaceGallery } from "@/lib/db/listingGallery";
 import { normaliseInstagramHandle } from "@/lib/publish/instagram";
 import { parseGalleryJson } from "@/lib/storage/types";
@@ -83,53 +81,6 @@ function parseTeamMembers(value: FormDataEntryValue | null): TeamMember[] {
   } catch {
     return [];
   }
-}
-
-/**
- * Shared guard: resolves the caller, loads the listing, and confirms ownership.
- *
- * Uses canManageListing rather than an owner_clerk_user_id comparison — 118 of
- * the 129 live listings carry only owner_profile_id, so the narrower check
- * would lock their real owners out of editing exactly as it did out of
- * deleting.
- */
-async function authorizeListingEdit(
-  listingId: string,
-  expectedType: "project" | "product"
-): Promise<
-  | { error: string }
-  | {
-      listing: Record<string, unknown>;
-      profileId: string | null;
-      userId: string;
-    }
-> {
-  const { userId } = await auth();
-  if (!userId) return { error: "Sign in to edit a listing." };
-
-  const profileResult = await getProfileByClerkId(userId);
-  const profile = profileResult.data;
-  if (!profile?.username) return { error: "Complete onboarding first." };
-
-  const supabase = getSupabaseServiceClient();
-  const { data, error } = await supabase
-    .from("listings")
-    .select("*")
-    .eq("id", listingId)
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (error || !data) return { error: "Listing not found." };
-  const listing = data as Record<string, unknown>;
-
-  if (!canManageListing(listing, userId, profile.id ?? null)) {
-    return { error: "You can only edit your own listings." };
-  }
-  if (listing.type !== expectedType) {
-    return { error: `That listing is not a ${expectedType}.` };
-  }
-
-  return { listing, profileId: profile.id ?? null, userId };
 }
 
 /**
