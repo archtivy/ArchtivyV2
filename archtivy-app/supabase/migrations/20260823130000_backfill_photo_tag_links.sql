@@ -49,25 +49,45 @@
 -- hand, which outranks anything inferred from a pin.
 --
 -- ── WHAT THIS DELIBERATELY DOES NOT DO ──────────────────────────────────────
--- It inserts only. It removes nothing, and in particular it does not clean up
--- the 9 existing source='photo_tag' rows that have no product_tags row behind
--- them:
+-- It inserts only. It removes nothing. Nine existing source='photo_tag' rows
+-- have no PUBLIC product_tags row standing behind them, and all nine are left
+-- exactly as they are. They are NOT one group — they are two, with different
+-- origins, and the distinction matters:
 --
---   red-rock-residence -> ava-table, monk-armchair, tibeau-bed-2, wish-bed
---   fr-house           -> blevio-table, turner-sofa
---   big-barn           -> gillis-armchair
---   forest-house       -> serie-18
---   mafema-apartment   -> nena-armchair-2
+--   A. Five have no product_tags row AT ALL:
 --
--- Those come from the AI workstation (app/actions/smartProductTagging.ts),
--- which upserts project_product_links directly and does not write a
--- product_tags row. They are real relationships from a different writer, not
--- debris, and deleting them because a second system cannot see their origin
--- would destroy information to satisfy a tidiness rule.
+--        red-rock-residence -> ava-table
+--        red-rock-residence -> monk-armchair
+--        fr-house           -> blevio-table
+--        fr-house           -> turner-sofa
+--        big-barn           -> gillis-armchair
 --
--- The application makes the same choice: reconcilePhotoTagLink only withdraws
--- an edge when the caller has just removed a publicly visible tag for that
--- exact pair, so an unrelated pin edit can never take one of these 9 away.
+--      These come from the AI workstation (app/actions/smartProductTagging.ts),
+--      which upserts project_product_links directly and writes no product_tags
+--      row. Real relationships from a different writer, not debris — deleting
+--      them because a second system cannot see their origin would destroy
+--      information to satisfy a tidiness rule.
+--
+--   B. Four DO have a product_tags row; it is merely `unverified`:
+--
+--        red-rock-residence -> tibeau-bed-2      (owner, 2026-03-04)
+--        red-rock-residence -> wish-bed          (owner, 2026-03-04)
+--        forest-house       -> serie-18          (owner, 2026-03-05)
+--        mafema-apartment   -> nena-armchair-2   (owner, 2026-03-11)
+--
+--      These are legacy-mirrored tags that were never reviewed. Their hotspot
+--      is hidden on the public page while their link still says "used in this
+--      project" — precisely the inconsistency the new invariant prevents going
+--      forward. Repairing it means deciding whether those four tags should be
+--      promoted or the links withdrawn, which is a content judgement about
+--      someone else's projects and not a migration's call to make.
+--
+-- (An earlier draft of this comment described all nine as having no
+-- product_tags row. That was wrong for group B and is corrected here.)
+--
+-- The application makes the same choice in code: reconcilePhotoTagLink only
+-- withdraws an edge when the caller has just removed a publicly visible tag for
+-- that exact pair, so an unrelated pin edit cannot take any of the nine away.
 --
 -- Idempotent: re-running matches nothing, because the guard tests for the row
 -- this migration creates.

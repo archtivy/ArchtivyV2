@@ -46,9 +46,11 @@ const PPL = "project_product_links";
  * not be reported as failed because a derived edge could not be written.
  *
  * ── WHY REMOVAL HAS TO BE ASKED FOR ─────────────────────────────────────────
- * product_tags is not the only writer of source='photo_tag'. The AI workstation
- * (app/actions/smartProductTagging.ts) upserts these rows directly, and 9 such
- * links exist in production with no product_tags row behind them at all.
+ * Nine source='photo_tag' links exist in production with no PUBLIC tag standing
+ * behind them, from two different causes. FIVE have no product_tags row at all:
+ * product_tags is not the only writer of this source, and the AI workstation
+ * (app/actions/smartProductTagging.ts) upserts these rows directly. The other
+ * FOUR do have a tag — it was simply never reviewed out of `unverified`.
  *
  * A rule of "delete the edge whenever no public tag exists" would let an
  * unrelated pin edit on one of those pairs quietly destroy a relationship this
