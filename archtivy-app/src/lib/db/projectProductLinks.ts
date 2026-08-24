@@ -70,7 +70,10 @@ export async function getProductsForProject(
 ): Promise<DbResult<ListingSummary[]>> {
   let query = supabase
     .from(PPL)
-    .select("product_id")
+    // `source` rides along so callers can tell the two relationships apart. A
+    // product specified for the build and a product pinned in a photo are
+    // different claims, and the public page says which is which.
+    .select("product_id, source")
     .eq("project_id", projectId)
     .order("created_at", { ascending: true });
   if (options?.sources?.length) {
@@ -82,6 +85,16 @@ export async function getProductsForProject(
     return { data: null, error: linksError.message };
   }
 
+  const sourceByProduct = new Map<string, ProjectProductLinkSource>(
+    (links ?? [])
+      .filter((r) => r.product_id)
+      .map((r) => [
+        r.product_id as string,
+        ((r as { source?: string }).source === "photo_tag"
+          ? "photo_tag"
+          : "manual") as ProjectProductLinkSource,
+      ])
+  );
   const productIds = (links ?? []).map((r) => r.product_id).filter(Boolean);
   if (productIds.length === 0) {
     return { data: [], error: null };
@@ -113,6 +126,7 @@ export async function getProductsForProject(
   const taxMap = await batchResolveTaxonomySlugPaths(sorted.map((r) => r.id));
   for (const r of sorted) {
     (r as Record<string, unknown>).taxonomy_slug_path = taxMap.get(r.id) ?? null;
+    (r as Record<string, unknown>).link_source = sourceByProduct.get(r.id) ?? "manual";
   }
 
   return { data: sorted as ListingSummary[], error: null };

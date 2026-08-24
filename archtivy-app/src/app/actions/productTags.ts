@@ -6,7 +6,14 @@ import { z } from "zod";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { reconcilePhotoTagLink } from "@/lib/db/productTagLinks";
-import { PUBLIC_STATUSES, type VerificationStatus } from "@/lib/db/productTags";
+import {
+  PUBLIC_STATUSES,
+  getManagedListing,
+  getTaggableProducts,
+  type ManagedImage,
+  type TaggableProduct,
+  type VerificationStatus,
+} from "@/lib/db/productTags";
 
 /**
  * Product pin mutations. Server Actions, matching how every other entity in
@@ -121,6 +128,41 @@ async function writeAuditRow(params: {
 function bust(type: string, slug: string | null, listingId: string) {
   revalidatePath(`/me/listings/${listingId}`);
   if (slug) revalidatePath(`/${type === "product" ? "products" : "projects"}/${slug}`);
+}
+
+/**
+ * Everything the pin editor needs for one listing, in one call.
+ *
+ * ── WHY THE WIZARD NEEDS AN ACTION AND THE MANAGE PAGE DOES NOT ─────────────
+ * The management page is a Server Component and reads getManagedListing
+ * directly. The wizard is a client component that only learns its draft's id at
+ * runtime — the row is created when the Images step completes — so it cannot be
+ * handed this as a prop. It fetches after the draft exists, and again after
+ * every pin change.
+ *
+ * Ownership is re-checked here rather than trusted: getManagedListing returns
+ * null when the profile does not own the listing, and null is reported the same
+ * way as "not found" so the two stay indistinguishable to a caller probing ids.
+ */
+export async function getListingTaggingData(listingId: string): Promise<
+  | { ok: true; images: ManagedImage[]; products: TaggableProduct[]; tagsTableReady: boolean }
+  | { ok: false; error: string }
+> {
+  const profile = await currentProfile();
+  if (!profile) return { ok: false, error: "Sign in first." };
+
+  const [listing, products] = await Promise.all([
+    getManagedListing(listingId, profile.id, profile.is_admin === true),
+    getTaggableProducts(),
+  ]);
+  if (!listing) return { ok: false, error: "Listing not found." };
+
+  return {
+    ok: true,
+    images: listing.images,
+    products,
+    tagsTableReady: listing.tagsTableReady,
+  };
 }
 
 /** Owner places a pin. Lands as `official` — the owner stating their own build. */

@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getManagedListing, getTaggableProducts } from "@/lib/db/productTags";
-import { PinEditor } from "./PinEditor";
+import { PinEditorHost } from "./PinEditorHost";
 
 export const dynamic = "force-dynamic";
 
@@ -114,7 +114,7 @@ export default async function ManageListingPage({
           stay hidden until you confirm them.
         </p>
 
-        <PinEditor
+        <PinEditorHost
           images={listing.images}
           products={products}
           tagsTableReady={listing.tagsTableReady}

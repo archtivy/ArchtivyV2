@@ -152,6 +152,7 @@ export async function ProjectDetailRenderer({
       description?: string | null;
       brands_used?: { name?: string }[];
       taxonomy_slug_path?: string | null;
+      link_source?: "manual" | "photo_tag";
     };
     const brand = row.brands_used?.[0]?.name?.trim() ?? null;
     return {
@@ -161,6 +162,9 @@ export async function ProjectDetailRenderer({
       brand: brand || null,
       thumbnail: thumbnailMap[row.id] ?? null,
       taxonomy_slug_path: row.taxonomy_slug_path ?? null,
+      // Carried through from project_product_links.source — see the note in
+      // ProjectOverviewSidebar on why the reader is told which is which.
+      linkSource: row.link_source ?? "manual",
     };
   });
 

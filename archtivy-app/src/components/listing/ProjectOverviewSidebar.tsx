@@ -27,6 +27,12 @@ export interface UsedProductSidebarItem {
   brand?: string | null;
   thumbnail?: string | null;
   taxonomy_slug_path?: string | null;
+  /**
+   * Which relationship this is: 'manual' = the author listed it as used in the
+   * build, 'photo_tag' = it is pinned to a spot in one of the photos. Optional
+   * so existing callers keep compiling; absent reads as 'manual'.
+   */
+  linkSource?: "manual" | "photo_tag";
 }
 
 export interface MentionedSidebarItem {
@@ -56,7 +62,7 @@ export interface ProjectOverviewSidebarProps {
   teamMembersFallback?: { name: string; role: string }[];
   materials?: { id: string; name: string }[];
   documents?: ProjectDocumentItem[];
-  /** Verified products (admin image tags / manual links). Shown as primary "Used products (verified)". */
+  /** Verified products (photo tags / manual links). Shown as primary "Used products". */
   usedProducts?: UsedProductSidebarItem[];
   /** User-mentioned products (text pairs); resolved to links when matched. Shown as "Mentioned by submitter". */
   mentionedItems?: MentionedSidebarItem[];
@@ -206,6 +212,16 @@ export function ProjectOverviewSidebar({
                     <span className="ml-1 text-zinc-500 dark:text-zinc-400">· {p.brand.trim()}</span>
                   )}
                 </Link>
+                {/* Which of the two relationships this is. A product pinned to a
+                    spot in a photo is a different, more specific claim than one
+                    listed as specified for the build, and the reader can now
+                    tell them apart — the data always distinguished them
+                    (project_product_links.source), the page just never said. */}
+                {p.linkSource === "photo_tag" && (
+                  <span className="ml-1.5 align-middle text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                    in photo
+                  </span>
+                )}
               </li>
             ))}
           </ul>

@@ -7,6 +7,7 @@ import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { authorizeListingEdit } from "@/lib/auth/listingEditGuard";
+import { canManageListing } from "@/lib/auth/listingOwnership";
 import { ensureUniqueListingSlug } from "@/lib/db/listings";
 import { replaceGallery } from "@/lib/db/listingGallery";
 import { parseGalleryJson } from "@/lib/storage/types";
@@ -184,6 +185,63 @@ export async function createProductDraft(galleryJson: string): Promise<DraftResu
 
   revalidatePath("/me/listings");
   return { id: listingId };
+}
+
+/**
+ * Bring a DRAFT's listing_images rows in line with what the wizard is holding.
+ *
+ * ── WHY THIS EXISTS AT ALL ──────────────────────────────────────────────────
+ * The draft's gallery is written once, when the Images step completes. An author
+ * who then goes back and adds a photo has it in wizard state and in storage, but
+ * not yet as a listing_images row — and a pin attaches to a listing_image.id. So
+ * the tagging step would offer the wrong set of photos: the ones that existed
+ * when the draft was born, not the ones on screen.
+ *
+ * Called when the tagging step opens, so the two agree before anything can be
+ * pinned to a stale id.
+ *
+ * ── DRAFTS ONLY ─────────────────────────────────────────────────────────────
+ * A published listing's gallery is already persisted and is edited through the
+ * normal save path. Replacing it as a side effect of opening a step would let a
+ * half-finished edit take effect without the author pressing anything.
+ *
+ * replaceGallery diffs on image_url and keeps the rows for images that stayed,
+ * so existing pins survive a sync — that is the whole reason it was rewritten to
+ * diff rather than delete-and-reinsert.
+ */
+export async function syncDraftGallery(
+  listingId: string,
+  galleryJson: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const who = await currentAuthor();
+  if (!who.ok) return { ok: false, error: who.error };
+
+  const supabase = getSupabaseServiceClient();
+  const { data } = await supabase
+    .from("listings")
+    .select("id, status, owner_profile_id, owner_clerk_user_id, deleted_at")
+    .eq("id", listingId)
+    .maybeSingle();
+  const row = data as {
+    status?: string;
+    owner_profile_id?: string | null;
+    owner_clerk_user_id?: string | null;
+    deleted_at?: string | null;
+  } | null;
+
+  if (!row || row.deleted_at) return { ok: false, error: "Listing not found." };
+  if (!canManageListing(row, who.userId, who.profileId)) {
+    return { ok: false, error: "You can only edit your own listings." };
+  }
+  // Not an error — a published listing simply has nothing to scaffold.
+  if (row.status !== "DRAFT") return { ok: true };
+
+  const gallery = parseGalleryJson(galleryJson);
+  if (gallery.length === 0) return { ok: true };
+
+  const error = await replaceGallery(listingId, gallery);
+  if (error) return { ok: false, error };
+  return { ok: true };
 }
 
 /**
