@@ -9,7 +9,6 @@ import {
   ensureUniqueListingSlug,
   getListingById,
   updateListingCoverImage,
-  upsertListingForProduct,
 } from "@/lib/db/listings";
 import { addImages } from "@/lib/db/listingImages";
 import { addDocuments } from "@/lib/db/listingDocuments";
@@ -24,15 +23,12 @@ import { normaliseInstagramHandle } from "@/lib/publish/instagram";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { canManageListing } from "@/lib/auth/listingOwnership";
 import { parseGalleryJson } from "@/lib/storage/types";
-import { getProductCanonicalBySlug } from "@/lib/db/explore";
 import {
   createProjectRow,
   addProjectImages,
   addProductImages,
   deleteProjectRow,
   deleteProductRow,
-  getProductBySlug,
-  getProductImages,
   slugFromTitle,
 } from "@/lib/db/gallery";
 import type { TeamMember, BrandUsed } from "@/lib/types/listings";
@@ -835,43 +831,41 @@ export async function createProductCanonical(
   return { slug };
 }
 
-/**
- * Fetch product for the /products/[slug] page. Runs safety backfill in this server action only:
- * if a product exists in public.products but no listing exists, creates the listing row (and syncs
- * images) then refetches. Do not run backfill on page render (RSC); only via this action.
- * Returns product or null (caller should notFound() when null).
+/*
+ * ── REMOVED: getProductForProductPage / ensureListingForProductBySlug ────────
+ *
+ * These were a "safety backfill": if /products/[slug] found no listing, they
+ * read the `products` sidecar by slug and CREATED the missing listings row from
+ * it. That is not recovery, it is fabrication — the row was written with
+ *
+ *     owner_clerk_user_id: null,
+ *     owner_profile_id:    null,
+ *     status:              "APPROVED"   (upsertListingForProduct's default)
+ *
+ * so any orphaned sidecar row was one page view away from becoming a live,
+ * publicly indexed listing that, per canManageListing's documented fail-closed
+ * behaviour, nobody could then manage — not the brand, not an admin. And
+ * because this module is "use server", both functions were callable RPC
+ * endpoints: the slug did not even have to be visited, it could be posted.
+ *
+ * There is no legitimate case where the backfill should have succeeded:
+ *
+ *   1. It cannot resolve an owner, and neither can anything else. The sidecar
+ *      does have a brand_profile_id column, so this was measured rather than
+ *      assumed: it is populated on 0 of 81 rows, while 79 of those 81 have an
+ *      owner_profile_id on their listing. Ownership has only ever lived on
+ *      `listings`. There is nothing to recover from.
+ *   2. The failure it papered over can no longer happen. Orphans came from the
+ *      old three-step create (products insert → colour update → listings
+ *      upsert) failing partway. createProductCanonical now goes through the
+ *      create_product_with_sidecar RPC, which commits both rows or neither.
+ *
+ * A product with no listing row is therefore a data fault, and the honest
+ * response is the one the route already has for anything else it cannot find:
+ * 404. Deliberately NOT downgraded to PENDING or DRAFT instead — a safer status
+ * on a fabricated row is still a fabricated row, just a quieter one.
+ *
+ * The detail route now reads getProductCanonicalBySlug directly, which resolves
+ * through `listings` (type = product, deleted_at is null) and so cannot see an
+ * orphan at all.
  */
-export async function getProductForProductPage(slug: string) {
-  let product = await getProductCanonicalBySlug(slug);
-  if (!product) {
-    await ensureListingForProductBySlug(slug);
-    product = await getProductCanonicalBySlug(slug);
-  }
-  return product;
-}
-
-/**
- * Safety backfill: if a product exists in products but no listing exists, create the listing row
- * (and sync images to listing_images). Call only from server actions (e.g. getProductForProductPage).
- * Idempotent: if listing already exists, no-op.
- */
-export async function ensureListingForProductBySlug(slug: string): Promise<void> {
-  const productRow = await getProductBySlug(slug);
-  if (!productRow) return;
-  const productId = productRow.id;
-  const existing = await getListingById(productId);
-  if (existing.data) return;
-  await upsertListingForProduct(productId, {
-    slug: productRow.slug,
-    title: productRow.title,
-    description: productRow.subtitle ?? null,
-    owner_clerk_user_id: null,
-    owner_profile_id: null,
-  });
-  const images = await getProductImages(productId);
-  if (images.length > 0) {
-    const urls = images.map((img) => img.src);
-    await addImages(productId, urls);
-    await updateListingCoverImage(productId, urls[0]);
-  }
-}

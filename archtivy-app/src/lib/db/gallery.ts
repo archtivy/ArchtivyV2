@@ -67,8 +67,6 @@ export type GalleryImage = {
   regions?: ImageRegionMarker[];
 };
 export type ProjectRecord = { id: string; slug: string; title: string; description: string | null; created_at: string };
-export type ProductRecord = { id: string; slug: string; title: string; subtitle: string | null; created_at: string };
-export type RelatedProduct = { id: string; slug: string; title: string; subtitle: string | null };
 export type RelatedProject = { id: string; slug: string; title: string };
 
 const supabase = () => getSupabaseServiceClient();
@@ -89,38 +87,24 @@ export async function getProjectImages(projectId: string): Promise<GalleryImage[
   return (data ?? []) as GalleryImage[];
 }
 
-export async function getRelatedProducts(projectId: string): Promise<RelatedProduct[]> {
-  const { data: conns, error: connError } = await supabase()
-    .from("connections")
-    .select("to_id")
-    .eq("from_type", "project")
-    .eq("from_id", projectId)
-    .eq("to_type", "product");
-  if (connError || !conns?.length) return [];
-  const ids = conns.map((c) => c.to_id);
-  const { data: products, error } = await supabase()
-    .from("products")
-    .select("id,slug,title,subtitle")
-    .in("id", ids);
-  if (error) return [];
-  return (products ?? []) as RelatedProduct[];
-}
-
-export async function getProductBySlug(slug: string): Promise<ProductRecord | null> {
-  const { data, error } = await supabase().from("products").select("id,slug,title,subtitle,created_at").eq("slug", slug).single();
-  if (error || !data) return null;
-  return data as ProductRecord;
-}
-
-export async function getProductImages(productId: string): Promise<GalleryImage[]> {
-  const { data, error } = await supabase()
-    .from("product_images")
-    .select("id,src,alt,sort_order")
-    .eq("product_id", productId)
-    .order("sort_order", { ascending: true });
-  if (error) return [];
-  return (data ?? []) as GalleryImage[];
-}
+/*
+ * ── REMOVED: getRelatedProducts, getProductBySlug, getProductImages ─────────
+ *
+ * All three read the `products` sidecar (or its images) without ever touching
+ * `listings`, so they could return a row that is orphaned, soft-deleted, DRAFT
+ * or PENDING and present it as a real product. getProductBySlug was the actual
+ * entry point for that: it fed the /products/[slug] backfill that fabricated
+ * ownerless APPROVED listings. With the backfill gone it had no callers left,
+ * and getProductImages — its companion in that function — had none either.
+ *
+ * getRelatedProducts was already dead: zero consumers, and it resolves through
+ * a `connections` table that holds 1 row in production. Project↔product links
+ * live in project_product_links now.
+ *
+ * Anything that needs a product must go through listings (see
+ * getProductCanonicalBySlug in lib/db/explore.ts), which filters type, status
+ * and deleted_at. Reading the sidecar directly bypasses every one of those.
+ */
 
 export type ProductImageRow = {
   product_id: string;
@@ -219,16 +203,15 @@ export async function getFeaturedProjects(limit: number): Promise<ProjectRecord[
   return (data ?? []) as ProjectRecord[];
 }
 
-/** Featured products for homepage/explore, newest first. */
-export async function getFeaturedProducts(limit: number): Promise<ProductRecord[]> {
-  const { data, error } = await supabase()
-    .from("products")
-    .select("id,slug,title,subtitle,created_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (error) return [];
-  return (data ?? []) as ProductRecord[];
-}
+/*
+ * ── REMOVED: getFeaturedProducts ────────────────────────────────────────────
+ *
+ * Zero consumers, and the most dangerous shape of the lot: an unfiltered
+ * `products` read ordered by created_at, with no join to listings. Wired to a
+ * homepage rail it would have surfaced orphaned, soft-deleted, draft and
+ * pending products side by side with live ones. The live rails read listings
+ * with an explicit status = APPROVED filter.
+ */
 
 /**
  * Slugify a title for the public submission path.
