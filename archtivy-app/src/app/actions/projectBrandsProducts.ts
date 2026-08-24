@@ -7,12 +7,6 @@ import {
   setProjectBrands as dbSetProjectBrands,
   searchBrandProfiles,
 } from "@/lib/db/projectBrands";
-import {
-  getPhotoProductTagsByImageIds,
-  addPhotoProductTag as dbAddPhotoProductTag,
-  removePhotoProductTag as dbRemovePhotoProductTag,
-  getListingIdByTagId,
-} from "@/lib/db/photoProductTags";
 import { getListingSlugById } from "@/lib/db/listings";
 
 const PPL = "project_product_links";
@@ -132,66 +126,19 @@ export async function setProjectProductsManualAction(
   return { ok: true };
 }
 
-/** Server: add photo product tag and upsert PPL with source='photo_tag'. */
-export async function addPhotoProductTagAction(
-  listingImageId: string,
-  listingId: string,
-  productId: string,
-  x: number,
-  y: number
-): Promise<{ data: { id: string } | null; error: string | null }> {
-  console.log("[addPhotoProductTagAction] insert input", {
-    listingImageId,
-    listingId,
-    productId,
-    x,
-    y,
-  });
-  const res = await dbAddPhotoProductTag(listingImageId, listingId, productId, x, y);
-  console.log("[addPhotoProductTagAction] db result", {
-    hasData: !!res.data,
-    tagId: res.data?.id,
-    error: res.error ?? null,
-  });
-  if (res.error) return { data: null, error: res.error };
-  if (!res.data) return { data: null, error: "No tag returned from insert" };
-  revalidatePath(`/admin/projects/${listingId}`, "page");
-  const projectSlug = await getListingSlugById(listingId);
-  if (projectSlug) revalidatePath(`/projects/${projectSlug}`, "page");
-  return { data: { id: res.data.id }, error: null };
-}
+/*
+ * ── THE THREE PHOTO-TAG ACTIONS ARE GONE ────────────────────────────────────
+ *
+ * addPhotoProductTagAction, removePhotoProductTagAction and
+ * getPhotoProductTagsAction all went through photo_product_tags, which is
+ * retired. Pin mutations live in app/actions/productTags.ts against
+ * product_tags, which carries the verification workflow and an audit log, and
+ * keeps the project_product_links edge in step by itself — so the manual
+ * PPL upsert that used to live in addPhotoProductTagAction is no longer
+ * duplicated here.
+ *
+ * setProjectProductsManualAction below is untouched: it maintains the OTHER
+ * relationship, source='manual', which is the author's explicit "used in this
+ * project" list rather than anything inferred from a pin.
+ */
 
-/** Server: remove photo product tag. */
-export async function removePhotoProductTagAction(
-  tagId: string
-): Promise<ActionResult> {
-  const res = await dbRemovePhotoProductTag(tagId);
-  if (res.error) return { ok: false, error: res.error };
-  const listingId = await getListingIdByTagId(tagId);
-  if (listingId) {
-    const projectSlug = await getListingSlugById(listingId);
-    if (projectSlug) revalidatePath(`/projects/${projectSlug}`, "page");
-  }
-  return { ok: true };
-}
-
-/** Server: get photo product tags for listing image ids. */
-export async function getPhotoProductTagsAction(
-  listingImageIds: string[]
-): Promise<{
-  data: { id: string; listing_image_id: string; product_id: string; x: number; y: number }[] | null;
-  error: string | null;
-}> {
-  const res = await getPhotoProductTagsByImageIds(listingImageIds);
-  if (res.error) return { data: null, error: res.error };
-  return {
-    data: (res.data ?? []).map((t) => ({
-      id: t.id,
-      listing_image_id: t.listing_image_id,
-      product_id: t.product_id ?? "",
-      x: t.x,
-      y: t.y,
-    })),
-    error: null,
-  };
-}

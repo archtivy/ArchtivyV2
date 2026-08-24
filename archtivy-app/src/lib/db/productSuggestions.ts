@@ -1,307 +1,34 @@
+/**
+ * Product SUGGESTION helpers for the admin editorial workstation.
+ *
+ * ── THIS FILE WAS photoProductTags.ts ───────────────────────────────────────
+ * It held two unrelated things: CRUD against the photo_product_tags table, and
+ * a set of product search / alt-text scoring helpers that never touched that
+ * table at all. The table is retired — every row it held was already mirrored
+ * into product_tags, and its write paths had been broken since March, writing
+ * six columns the table never had.
+ *
+ * The CRUD is gone; pins now live in lib/db/productTags.ts and
+ * app/actions/productTags.ts. What remains is the half that was always about
+ * finding candidate products, so the file is named for that. Leaving it called
+ * photoProductTags.ts would have been the same claimed-vs-actual mismatch this
+ * change exists to remove.
+ */
+
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { batchResolveTaxonomySlugPaths } from "@/lib/taxonomy/resolve";
 
-const TABLE = "photo_product_tags";
 const PPL = "project_product_links";
 
 export type DbResult<T> =
   | { data: T; error: null }
   | { data: null; error: string };
 
-export interface PhotoProductTag {
-  id: string;
-  listing_image_id: string;
-  product_id: string | null;
-  x: number;
-  y: number;
-  created_at: string;
-  /** Admin-only metadata */
-  product_type_id?: string | null;
-  product_category_id?: string | null;
-  product_subcategory_id?: string | null;
-  category_text?: string | null;
-  color_text?: string | null;
-  material_id?: string | null;
-  feature_text?: string | null;
-  created_by_clerk_id?: string | null;
-}
 
-/** Product listing + product table data for a tag. product_id on tag = listings.id (product listing) = products.id. */
-export interface PhotoTagProduct {
-  id: string;
-  slug: string;
-  title: string | null;
-  brand?: string | null;
-  color_options?: string[] | null;
-  thumbnail?: string | null;
-  taxonomy_slug_path?: string | null;
-}
 
-/** Tag with joined product (listings + products + brand from profiles). For lightbox and public pages. */
-export interface PhotoProductTagWithProduct {
-  id: string;
-  listing_image_id: string;
-  product_id: string | null;
-  x: number;
-  y: number;
-  /** Joined: product listing (listings.id = product_id) + products (color_options) + brand from profiles. */
-  product: PhotoTagProduct | null;
-  created_at?: string;
-  product_type_id?: string | null;
-  product_category_id?: string | null;
-  product_subcategory_id?: string | null;
-  category_text?: string | null;
-  color_text?: string | null;
-  material_id?: string | null;
-  feature_text?: string | null;
-  created_by_clerk_id?: string | null;
-}
 
-/** Get all photo product tags for the given listing image ids, with product joined.
- * Joins: listings as product listing (listings.id = photo_product_tags.product_id), left join products (products.id = product_listing.id) for color_options, profiles for brand.
- * Returns tag.id, listing_image_id, product: { id, slug, title, brand, color_options, thumbnail }, x, y.
- */
-export async function getPhotoProductTagsByImageIds(
-  listingImageIds: string[]
-): Promise<DbResult<PhotoProductTagWithProduct[]>> {
-  if (listingImageIds.length === 0) return { data: [], error: null };
-  const supabase = getSupabaseServiceClient();
-  const cols = "id, listing_image_id, product_id, x, y, created_at";
-  const { data: tagRows, error } = await supabase
-    .from(TABLE)
-    .select(cols)
-    .in("listing_image_id", listingImageIds)
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    console.error("[getPhotoProductTagsByImageIds] error", error?.message);
-    return { data: null, error: error.message };
-  }
-  const tags = (tagRows ?? []) as PhotoProductTag[];
-  const productIds = Array.from(new Set(tags.map((t) => t.product_id).filter(Boolean))) as string[];
-  if (productIds.length === 0) {
-    return {
-      data: tags.map((t) => ({
-        ...t,
-        product: null,
-      })) as PhotoProductTagWithProduct[],
-      error: null,
-    };
-  }
-
-  const [listingsRes, productsRes] = await Promise.all([
-    supabase.from("listings").select("id, title, slug, cover_image_url, owner_profile_id").in("id", productIds),
-    supabase.from("products").select("id, color_options").in("id", productIds),
-  ]);
-  const listingRows = (listingsRes.data ?? []) as {
-    id: string;
-    title: string | null;
-    slug: string | null;
-    cover_image_url: string | null;
-    owner_profile_id: string | null;
-  }[];
-  const productRows = (productsRes.data ?? []) as { id: string; color_options?: string[] | null }[];
-  const ownerIds = Array.from(new Set(listingRows.map((r) => r.owner_profile_id).filter(Boolean))) as string[];
-  let brandByProfileId: Record<string, string> = {};
-  if (ownerIds.length > 0) {
-    const { data: profileRows } = await supabase.from("profiles").select("id, display_name, username").in("id", ownerIds);
-    for (const p of profileRows ?? []) {
-      const row = p as { id: string; display_name: string | null; username: string | null };
-      brandByProfileId[row.id] = (row.display_name ?? row.username ?? "").trim() || "";
-    }
-  }
-  const listingById: Record<string, (typeof listingRows)[0]> = {};
-  for (const r of listingRows) listingById[r.id] = r;
-  const productById: Record<string, { color_options?: string[] | null }> = {};
-  for (const r of productRows) productById[r.id] = { color_options: r.color_options ?? null };
-
-  // Batch resolve taxonomy slug paths
-  const taxMap = await batchResolveTaxonomySlugPaths(productIds);
-
-  const productMap: Record<string, PhotoTagProduct> = {};
-  for (const id of productIds) {
-    const list = listingById[id];
-    if (!list) continue;
-    const prod = productById[id];
-    productMap[id] = {
-      id,
-      slug: list.slug?.trim() ?? id,
-      title: list.title?.trim() ?? null,
-      brand: list.owner_profile_id ? (brandByProfileId[list.owner_profile_id] || null) : null,
-      color_options: prod?.color_options ?? null,
-      thumbnail: list.cover_image_url?.trim() || null,
-      taxonomy_slug_path: taxMap.get(id) ?? null,
-    };
-  }
-
-  const result: PhotoProductTagWithProduct[] = tags.map((t) => ({
-    ...t,
-    product: t.product_id ? productMap[t.product_id] ?? null : null,
-  }));
-  return { data: result, error: null };
-}
-
-/** Get the listing (project) id for a tag, via listing_images.listing_id. Used for revalidation. */
-export async function getListingIdByTagId(tagId: string): Promise<string | null> {
-  const supabase = getSupabaseServiceClient();
-  const { data: tag, error: tagErr } = await supabase
-    .from(TABLE)
-    .select("listing_image_id")
-    .eq("id", tagId)
-    .maybeSingle();
-  if (tagErr || !tag) return null;
-  const listingImageId = (tag as { listing_image_id: string }).listing_image_id;
-  const { data: row, error: imgErr } = await supabase
-    .from("listing_images")
-    .select("listing_id")
-    .eq("id", listingImageId)
-    .maybeSingle();
-  if (imgErr || !row) return null;
-  return (row as { listing_id: string }).listing_id;
-}
-
-/**
- * Add a photo product tag and optionally upsert project_product_links with source='photo_tag'.
- * Manual links take priority: if a project_product_links row already exists with source='manual',
- * it is left unchanged (manual > photo_tag).
- * x/y are clamped to 0..1 (normalized).
- */
-export async function addPhotoProductTag(
-  listingImageId: string,
-  listingId: string,
-  productId: string,
-  x: number,
-  y: number
-): Promise<DbResult<PhotoProductTag>> {
-  const supabase = getSupabaseServiceClient();
-  const xNorm = Math.max(0, Math.min(1, Number(x)));
-  const yNorm = Math.max(0, Math.min(1, Number(y)));
-  const insertPayload: Record<string, unknown> = {
-    listing_image_id: listingImageId,
-    product_id: productId,
-    x: xNorm,
-    y: yNorm,
-  };
-  console.log("[addPhotoProductTag] insert payload", insertPayload);
-
-  const { data: tag, error: tagError } = await supabase
-    .from(TABLE)
-    .insert(insertPayload)
-    .select("*")
-    .single();
-
-  console.log("[addPhotoProductTag] Supabase insert result", {
-    hasData: !!tag,
-    tagId: tag?.id,
-    created_at: tag?.created_at,
-    error: tagError?.message ?? null,
-  });
-  if (tagError) return { data: null, error: tagError.message };
-  if (!tag) return { data: null, error: "Insert returned no row" };
-
-  const { data: existing } = await supabase
-    .from(PPL)
-    .select("source")
-    .eq("project_id", listingId)
-    .eq("product_id", productId)
-    .maybeSingle();
-
-  if ((existing as { source?: string } | null)?.source === "manual") {
-    return { data: tag as PhotoProductTag, error: null };
-  }
-
-  await supabase
-    .from(PPL)
-    .upsert(
-      { project_id: listingId, product_id: productId, source: "photo_tag" },
-      { onConflict: "project_id,product_id" }
-    );
-
-  return { data: tag as PhotoProductTag, error: null };
-}
-
-/**
- * Create a placeholder tag (no product yet). Admin places hotspot then fills editor and picks product.
- * listingId is used to resolve listing_image -> listing for project_id when we later set product_id.
- */
-export async function createPhotoProductTagPlaceholder(
-  listingImageId: string,
-  listingId: string,
-  x: number,
-  y: number,
-  createdByClerkId: string
-): Promise<DbResult<PhotoProductTag>> {
-  const supabase = getSupabaseServiceClient();
-  const xNorm = Math.max(0, Math.min(1, Number(x)));
-  const yNorm = Math.max(0, Math.min(1, Number(y)));
-
-  const { data: tag, error } = await supabase
-    .from(TABLE)
-    .insert({
-      listing_image_id: listingImageId,
-      product_id: null,
-      x: xNorm,
-      y: yNorm,
-      created_by_clerk_id: createdByClerkId,
-    })
-    .select("id, listing_image_id, product_id, x, y, created_at, product_type_id, product_category_id, product_subcategory_id, category_text, color_text, material_id, feature_text, created_by_clerk_id")
-    .single();
-
-  if (error) return { data: null, error: error.message };
-  return { data: tag as PhotoProductTag, error: null };
-}
-
-export interface UpdatePhotoProductTagInput {
-  product_id?: string | null;
-  product_type_id?: string | null;
-  product_category_id?: string | null;
-  product_subcategory_id?: string | null;
-  category_text?: string | null;
-  color_text?: string | null;
-  material_id?: string | null;
-  feature_text?: string | null;
-}
 
 const TAG_SELECT_COLS = "id, listing_image_id, product_id, x, y, created_at, product_type_id, product_category_id, product_subcategory_id, category_text, color_text, material_id, feature_text, created_by_clerk_id";
-
-/** Update a photo product tag (admin metadata and/or product_id). */
-export async function updatePhotoProductTag(
-  tagId: string,
-  input: UpdatePhotoProductTagInput
-): Promise<DbResult<PhotoProductTag>> {
-  const supabase = getSupabaseServiceClient();
-  const payload: Record<string, unknown> = {};
-  if (input.product_id !== undefined) payload.product_id = input.product_id;
-  if (input.product_type_id !== undefined) payload.product_type_id = input.product_type_id;
-  if (input.product_category_id !== undefined) payload.product_category_id = input.product_category_id;
-  if (input.product_subcategory_id !== undefined) payload.product_subcategory_id = input.product_subcategory_id;
-  if (input.category_text !== undefined) payload.category_text = input.category_text;
-  if (input.color_text !== undefined) payload.color_text = input.color_text;
-  if (input.material_id !== undefined) payload.material_id = input.material_id;
-  if (input.feature_text !== undefined) payload.feature_text = input.feature_text;
-  if (Object.keys(payload).length === 0) {
-    const { data } = await supabase.from(TABLE).select(TAG_SELECT_COLS).eq("id", tagId).single();
-    return { data: data as PhotoProductTag, error: null };
-  }
-  const { data: tag, error } = await supabase
-    .from(TABLE)
-    .update(payload)
-    .eq("id", tagId)
-    .select(TAG_SELECT_COLS)
-    .single();
-  if (error) return { data: null, error: error.message };
-  return { data: tag as PhotoProductTag, error: null };
-}
-
-/** Remove a photo product tag by id. Does not remove project_product_links (product may still be linked manually). */
-export async function removePhotoProductTag(
-  tagId: string
-): Promise<DbResult<void>> {
-  const supabase = getSupabaseServiceClient();
-  const { error } = await supabase.from(TABLE).delete().eq("id", tagId);
-  if (error) return { data: null, error: error.message };
-  return { data: undefined, error: null };
-}
 
 export interface TagSuggestionProduct {
   id: string;
@@ -504,7 +231,7 @@ export async function getTagSubcategoryOptions(): Promise<DbResult<string[]>> {
 
 export interface WorkstationSuggestedProduct {
   id: string;
-  /** Product listing id (listings.id for type=product). Same as id when from listings table; use for photo_product_tags.product_id. */
+  /** Product listing id (listings.id for type=product). Same as id when the row came from the listings table. */
   listing_id?: string | null;
   title: string | null;
   slug: string | null;

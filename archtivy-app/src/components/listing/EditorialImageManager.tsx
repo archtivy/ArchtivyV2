@@ -10,9 +10,9 @@ import {
   setPrimaryListingImage,
   updateImageAltForListing,
 } from "@/app/(admin)/admin/_actions/media";
-import { updateTag, deleteTag, getSuggestedProductsForWorkstation } from "@/app/actions/smartProductTagging";
+import { getSuggestedProductsForWorkstation } from "@/app/actions/smartProductTagging";
 import type { WorkstationSuggestedProduct } from "@/app/actions/smartProductTagging";
-import { addPhotoProductTagAction } from "@/app/actions/projectBrandsProducts";
+import { createPin, deletePin } from "@/app/actions/productTags";
 import { COLOR_OPTIONS, getColorSwatch } from "@/lib/colors";
 import {
   PRODUCT_TAXONOMY,
@@ -120,6 +120,22 @@ export interface EditorialImage {
   existingTags: EditorialProductTag[];
 }
 
+/**
+ * A pin on one image, in the admin workstation's shape.
+ *
+ * ── SIX FIELDS ARE GONE, AND NEVER EXISTED ──────────────────────────────────
+ * This carried product_type_id, product_category_id, product_subcategory_id,
+ * color_text, material_id and feature_text. None of them were ever columns on
+ * photo_product_tags — that table has six columns and none of those are among
+ * them. Every write including them failed with 42703, and the UI swallowed the
+ * error, so an admin filled those inputs and watched them save nothing. They
+ * are removed rather than migrated: adding them to product_tags is a real
+ * product decision, not something to inherit from an implementation that never
+ * worked.
+ *
+ * x/y are PERCENTAGES (0–100) now, matching product_tags. The legacy table used
+ * 0–1, so anything that multiplied by 100 for display must not do so twice.
+ */
 export interface EditorialProductTag {
   id: string;
   listing_image_id: string;
@@ -128,12 +144,24 @@ export interface EditorialProductTag {
   y: number;
   product_title?: string | null;
   product_slug?: string | null;
-  product_type_id?: string | null;
-  product_category_id?: string | null;
-  product_subcategory_id?: string | null;
-  color_text?: string | null;
-  material_id?: string | null;
-  feature_text?: string | null;
+  verification_status?: string;
+  tag_source?: "owner" | "ai";
+}
+
+/**
+ * One image plus its pins, as the admin detail pages assemble it.
+ *
+ * Lived in ImageProductTaggingBlock, which was never rendered anywhere. Moved
+ * here — to the component that does render — so deleting the dead one does not
+ * take a type two live pages import with it.
+ */
+export interface ImageTaggingItem {
+  listingImageId: string;
+  imageUrl: string;
+  imageAlt: string;
+  imageTitle: string;
+  imageCaption: string;
+  existingTags: EditorialProductTag[];
 }
 
 export interface EditorialImageManagerProps {
@@ -841,7 +869,22 @@ function TaggingWorkstation({
     onTagSaveStatus("saving");
     let res: { data: { id: string } | null; error: string | null };
     try {
-      res = await addPhotoProductTagAction(listingImageId, listingId, productListingId, x, y);
+      // createPin, not the legacy action. The position sits in client state
+      // (lastClickXY) until a product is chosen, so a pin is only ever written
+      // WITH a product — which is what keeps product_tags.tagged_listing_id
+      // NOT NULL honest instead of needing a nullable placeholder row.
+      //
+      // Scale is the one conversion: the legacy table stored 0–1, product_tags
+      // stores 0–100.
+      const pinRes = await createPin({
+        listingImageId,
+        taggedListingId: productListingId,
+        xPercent: Math.min(100, Math.max(0, x * 100)),
+        yPercent: Math.min(100, Math.max(0, y * 100)),
+      });
+      res = pinRes.ok
+        ? { data: { id: pinRes.id }, error: null }
+        : { data: null, error: pinRes.error };
     } catch (err) {
       setAddingTag(false);
       onTagSaveStatus("idle");
@@ -872,12 +915,10 @@ function TaggingWorkstation({
       y,
       product_title: selectedCandidate.title ?? null,
       product_slug: selectedCandidate.slug ?? null,
-      product_type_id: selectedCandidate.product_type ?? null,
-      product_category_id: selectedCandidate.product_category ?? null,
-      product_subcategory_id: selectedCandidate.product_subcategory ?? null,
-      color_text: null,
-      material_id: null,
-      feature_text: tagFeatureDraft.trim() || null,
+      // An admin pinning on someone else's listing lands `verified`, not
+      // `official` — a moderator confirmed it, the owner did not state it.
+      verification_status: "verified",
+      tag_source: "owner",
     };
     onTagAdded(createdTag);
     onSelectedTagIdForEditChange(createdTag.id);
@@ -1112,11 +1153,8 @@ function TaggingWorkstation({
                 <div className="mt-3">
                   <ExistingTagEditPanel
                     tag={tag}
-                    listingId={listingId}
-                    materialOptions={materialOptions}
                     isHighlighted={highlightedTagId === tag.id}
                     onUpdate={onTagsChange}
-                    onSaveStatus={onTagSaveStatus}
                     onRemove={() => onSelectedTagIdForEditChange(null)}
                   />
                 </div>
@@ -1173,62 +1211,39 @@ function SuggestedProductCard({
   );
 }
 
+/**
+ * One existing pin, in the admin list beside the photo.
+ *
+ * ── THIS USED TO BE AN EDITOR ───────────────────────────────────────────────
+ * It carried a "Distinct feature" text input, a Material select and a Colour
+ * select, wired through updateTag -> updatePhotoProductTag. Those three wrote
+ * feature_text, material_id and color_text, which are not columns on the table
+ * and never have been, so every keystroke saved nothing and the failure was
+ * swallowed (`else onSaveStatus("idle")`) — the save indicator simply returned
+ * to idle. Removing them is what the panel honestly does.
+ *
+ * What is left is what the data actually supports: which product is pinned,
+ * whether the pin is publicly visible, and the ability to remove it.
+ */
 function ExistingTagEditPanel({
   tag,
-  listingId,
-  materialOptions,
   isHighlighted,
   onUpdate,
-  onSaveStatus,
   onRemove,
 }: {
   tag: EditorialProductTag;
-  listingId: string;
-  materialOptions: { id: string; display_name: string }[];
   isHighlighted: boolean;
   onUpdate: () => void;
-  onSaveStatus: (s: "idle" | "saving" | "saved") => void;
   onRemove: () => void;
 }) {
-  const [featureText, setFeatureText] = useState(tag.feature_text ?? "");
-  const [materialId, setMaterialId] = useState(tag.material_id ?? "");
-  const [colorText, setColorText] = useState(tag.color_text ?? "");
   const [removing, setRemoving] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const persistUpdate = useCallback(
-    (patch: { feature_text?: string | null; material_id?: string | null; color_text?: string | null }) => {
-      onSaveStatus("saving");
-      updateTag(tag.id, listingId, {
-        product_id: tag.product_id,
-        ...patch,
-      }).then((res) => {
-        if (res.ok) {
-          onUpdate();
-          onSaveStatus("saved");
-          if (debounceRef.current) clearTimeout(debounceRef.current);
-          debounceRef.current = setTimeout(() => onSaveStatus("idle"), 2000);
-        } else onSaveStatus("idle");
-      });
-    },
-    [tag.id, tag.product_id, listingId, onUpdate, onSaveStatus]
-  );
-
-  const handleFeatureBlur = () => {
-    if (featureText.trim() !== (tag.feature_text ?? "")) persistUpdate({ feature_text: featureText.trim() || null });
-  };
-  const handleMaterialChange = (v: string) => {
-    setMaterialId(v);
-    persistUpdate({ material_id: v || null });
-  };
-  const handleColorChange = (v: string) => {
-    setColorText(v);
-    persistUpdate({ color_text: v || null });
-  };
 
   const handleRemove = useCallback(async () => {
     setRemoving(true);
-    const res = await deleteTag(tag.id);
+    // deletePin reconciles project_product_links on the way out — removing the
+    // last public pin for a pair withdraws the photo_tag edge, and never
+    // touches a manual one. See lib/db/productTagLinks.ts.
+    const res = await deletePin(tag.id);
     setRemoving(false);
     if (res.ok) {
       onUpdate();
@@ -1236,7 +1251,8 @@ function ExistingTagEditPanel({
     }
   }, [tag.id, onUpdate, onRemove]);
 
-  const materialLabel = materialOptions.find((m) => m.id === tag.material_id)?.display_name ?? "";
+  const isPublic =
+    tag.verification_status === "verified" || tag.verification_status === "official";
 
   return (
     <div
@@ -1247,41 +1263,17 @@ function ExistingTagEditPanel({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="font-medium text-zinc-900 truncate">{tag.product_title ?? "\u2014"}</p>
-          <p className="text-xs text-zinc-500 truncate">{materialLabel || tag.color_text || "\u2014"}</p>
-          <div className="mt-2 space-y-1.5">
-            <input
-              type="text"
-              value={featureText}
-              onChange={(e) => setFeatureText(e.target.value)}
-              onBlur={handleFeatureBlur}
-              placeholder="Distinct feature"
-              className="w-full border border-zinc-200 rounded px-2 py-1.5 text-xs focus:border-zinc-400 focus:outline-none"
-            />
-            <div className="flex gap-2 flex-wrap">
-              <select
-                value={materialId}
-                onChange={(e) => handleMaterialChange(e.target.value)}
-                className="border border-zinc-200 rounded px-2 py-1 text-xs focus:outline-none"
-              >
-                <option value="">Material</option>
-                {materialOptions.map((m) => (
-                  <option key={m.id} value={m.id}>{m.display_name}</option>
-                ))}
-              </select>
-              <select
-                value={colorText}
-                onChange={(e) => handleColorChange(e.target.value)}
-                className="border border-zinc-200 rounded px-2 py-1 text-xs focus:outline-none"
-              >
-                <option value="">Color</option>
-                {COLOR_OPTIONS.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+          <p className="text-xs text-zinc-500">
+            {isPublic ? "Visible on the public page" : "Not shown publicly"}
+            {tag.tag_source === "ai" ? " \u00b7 AI suggested" : ""}
+          </p>
         </div>
-        <button type="button" onClick={handleRemove} disabled={removing} className="text-xs text-zinc-400 hover:text-red-600 shrink-0">
+        <button
+          type="button"
+          onClick={handleRemove}
+          disabled={removing}
+          className="text-xs text-zinc-400 hover:text-red-600 shrink-0"
+        >
           {removing ? "\u2026" : "Remove"}
         </button>
       </div>

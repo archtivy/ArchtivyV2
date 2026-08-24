@@ -4,10 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getAltTextSuggestions,
   searchProductsByText,
-  deleteTag,
   type ScoredProduct,
 } from "@/app/actions/smartProductTagging";
-import { addPhotoProductTagAction } from "@/app/actions/projectBrandsProducts";
+import { createPin, deletePin } from "@/app/actions/productTags";
 import type {
   EditorialImage,
   EditorialProductTag,
@@ -113,20 +112,23 @@ export function ImageProductTagSidebar({
       if (!selectedImage) return;
       setTaggingIds((prev) => new Set(prev).add(product.id));
       try {
-        const res = await addPhotoProductTagAction(
-          selectedImage.listingImageId,
-          listingId,
-          product.id,
-          0.5,
-          0.5
-        );
-        if (res.data && !res.error) {
+        // Centre of the image: this sidebar says "this product appears in this
+        // photo" without asking where, so 50/50 is an honest default rather
+        // than a claimed position. Percentages, not 0–1 — product_tags stores
+        // 0–100.
+        const res = await createPin({
+          listingImageId: selectedImage.listingImageId,
+          taggedListingId: product.id,
+          xPercent: 50,
+          yPercent: 50,
+        });
+        if (res.ok) {
           const newTag: EditorialProductTag = {
-            id: res.data.id,
+            id: res.id,
             listing_image_id: selectedImage.listingImageId,
             product_id: product.id,
-            x: 0.5,
-            y: 0.5,
+            x: 50,
+            y: 50,
             product_title: product.title,
             product_slug: product.slug,
           };
@@ -152,7 +154,7 @@ export function ImageProductTagSidebar({
       if (!tag) return;
       setRemovingIds((prev) => new Set(prev).add(productId));
       try {
-        const res = await deleteTag(tag.id);
+        const res = await deletePin(tag.id);
         if (res.ok) {
           onTagsChange();
         }

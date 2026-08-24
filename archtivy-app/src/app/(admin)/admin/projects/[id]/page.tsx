@@ -11,10 +11,10 @@ import {
 import { getListingForEdit } from "@/lib/db/listingEdit";
 import { getProductMaterialOptions } from "@/lib/db/materials";
 import { getListingImagesWithIds, sanitizeListingImageUrl } from "@/lib/db/listingImages";
-import { getPhotoProductTagsByImageIds } from "@/lib/db/photoProductTags";
+import { getProductTagsByImageIds } from "@/lib/db/productTags";
 import { ProjectWizard } from "@/app/(app)/add/project/ProjectWizard";
 import { EditorialImageManager } from "@/components/listing/EditorialImageManager";
-import type { ImageTaggingItem } from "@/components/listing/ImageProductTaggingBlock";
+import type { ImageTaggingItem } from "@/components/listing/EditorialImageManager";
 import { getWizardOwnerOptions } from "@/lib/admin/wizardOwnerOptions";
 import {
   getWizardTaxonomyNodes,
@@ -85,16 +85,12 @@ export default async function AdminProjectEditPage({
   const imagesWithIds = imagesWithIdsResult.data ?? [];
   let imageTaggingData: ImageTaggingItem[] = [];
   if (imagesWithIds.length > 0) {
-    const tagsResult = await getPhotoProductTagsByImageIds(imagesWithIds.map((i) => i.id));
-    type TagRow = {
-      id: string; listing_image_id: string; product_id: string | null; x: number; y: number;
-      product?: { id: string; slug: string; title: string | null } | null;
-      product_type_id?: string | null; product_category_id?: string | null; product_subcategory_id?: string | null;
-      color_text?: string | null; material_id?: string | null; feature_text?: string | null;
-    };
-    const tagsByImageId: Record<string, TagRow[]> = {};
-    for (const t of tagsResult.data ?? []) {
-      const tag = t as TagRow;
+    // product_tags, not the retired photo_product_tags sidecar. Same pins —
+    // every legacy row was already mirrored here — but this is the table with
+    // the verification workflow, and the one the public page reads.
+    const tags = await getProductTagsByImageIds(imagesWithIds.map((i) => i.id));
+    const tagsByImageId: Record<string, typeof tags> = {};
+    for (const tag of tags) {
       (tagsByImageId[tag.listing_image_id] ??= []).push(tag);
     }
     imageTaggingData = imagesWithIds.map((img) => ({
@@ -106,17 +102,15 @@ export default async function AdminProjectEditPage({
       existingTags: (tagsByImageId[img.id] ?? []).map((t) => ({
         id: t.id,
         listing_image_id: t.listing_image_id,
-        product_id: t.product_id ?? "",
-        x: t.x,
-        y: t.y,
-        product_title: t.product?.title ?? undefined,
-        product_slug: t.product?.slug ?? undefined,
-        product_type_id: t.product_type_id ?? null,
-        product_category_id: t.product_category_id ?? null,
-        product_subcategory_id: t.product_subcategory_id ?? null,
-        color_text: t.color_text ?? null,
-        material_id: t.material_id ?? null,
-        feature_text: t.feature_text ?? null,
+        product_id: t.product_id,
+        // Already percentages. The legacy table stored 0–1 and this mapping
+        // passed it straight through, so nothing here may rescale.
+        x: t.x_percent,
+        y: t.y_percent,
+        product_title: t.product_title ?? undefined,
+        product_slug: t.product_slug ?? undefined,
+        verification_status: t.verification_status,
+        tag_source: t.tag_source,
       })),
     }));
   }

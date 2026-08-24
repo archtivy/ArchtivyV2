@@ -306,3 +306,93 @@ export async function getTaggableProducts(): Promise<TaggableProduct[]> {
     cover: r.cover_image_url,
   }));
 }
+
+/**
+ * Tags for a set of images, keyed for the admin editorial workstation.
+ *
+ * ── REPLACES getPhotoProductTagsByImageIds ──────────────────────────────────
+ * The admin detail pages read the legacy photo_product_tags table. That table
+ * is retired: every one of its rows already existed in product_tags, and its
+ * write paths had been broken against the real schema since March (they wrote
+ * columns the table never had). This is the same read against the canonical
+ * table.
+ *
+ * ── EVERY STATUS, NOT ONLY THE PUBLIC ONES ──────────────────────────────────
+ * Unlike getHotspotsForListing, this returns unverified and rejected tags too.
+ * This is a moderation surface: an admin who cannot see the AI's unconfirmed
+ * suggestions cannot confirm or reject them, which is the whole job.
+ *
+ * Coordinates come back as PERCENTAGES (0–100), matching product_tags. The
+ * legacy table stored 0–1, so callers that used to multiply by 100 for display
+ * must not do it twice.
+ */
+export interface AdminImageTag {
+  id: string;
+  listing_image_id: string;
+  product_id: string;
+  x_percent: number;
+  y_percent: number;
+  verification_status: VerificationStatus;
+  tag_source: "owner" | "ai";
+  product_title: string | null;
+  product_slug: string | null;
+}
+
+export async function getProductTagsByImageIds(
+  listingImageIds: string[]
+): Promise<AdminImageTag[]> {
+  if (listingImageIds.length === 0) return [];
+  const sup = getSupabaseServiceClient();
+
+  const { data, error } = await sup
+    .from("product_tags")
+    .select(
+      "id, listing_image_id, tagged_listing_id, x_percent, y_percent, verification_status, tag_source"
+    )
+    .in("listing_image_id", listingImageIds)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("[productTags] admin tag read failed:", error.code, error.message);
+    return [];
+  }
+
+  const rows = (data ?? []) as {
+    id: string;
+    listing_image_id: string;
+    tagged_listing_id: string;
+    x_percent: string | number;
+    y_percent: string | number;
+    verification_status: string;
+    tag_source: string;
+  }[];
+  if (rows.length === 0) return [];
+
+  const productIds = [...new Set(rows.map((r) => r.tagged_listing_id))];
+  const { data: prodRows } = await sup
+    .from("listings")
+    .select("id, title, slug")
+    .in("id", productIds);
+  const products = new Map(
+    ((prodRows ?? []) as { id: string; title: string | null; slug: string | null }[]).map((p) => [
+      p.id,
+      p,
+    ])
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    listing_image_id: r.listing_image_id,
+    product_id: r.tagged_listing_id,
+    x_percent: Number(r.x_percent),
+    y_percent: Number(r.y_percent),
+    verification_status: (VERIFICATION_STATUSES as readonly string[]).includes(
+      r.verification_status
+    )
+      ? (r.verification_status as VerificationStatus)
+      : "unverified",
+    tag_source: r.tag_source === "ai" ? "ai" : "owner",
+    product_title: products.get(r.tagged_listing_id)?.title ?? null,
+    product_slug: products.get(r.tagged_listing_id)?.slug ?? null,
+  }));
+}

@@ -1,24 +1,33 @@
+/*
+ * ── createTag / updateTag / deleteTag ARE GONE ──────────────────────────────
+ *
+ * All three wrote to photo_product_tags, which is retired. Two of them could
+ * not have worked for months: createTag inserted product_id NULL into a NOT
+ * NULL column, and updateTag wrote feature_text / material_id / color_text /
+ * the three taxonomy id columns, none of which exist on that table. The last
+ * successful write to it was 2026-03-11.
+ *
+ * Pin mutations now live in app/actions/productTags.ts — createPin, deletePin,
+ * movePin, reviewPin — against product_tags, which has the verification
+ * workflow, an audit log, and maintains the project_product_links edge.
+ */
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin/guard";
 import {
-  createPhotoProductTagPlaceholder,
-  updatePhotoProductTag,
-  removePhotoProductTag,
-  getListingIdByTagId,
   searchSuggestedProducts as dbSearchSuggestedProducts,
   getTagCategoryOptions as dbGetTagCategoryOptions,
   getTagSubcategoryOptions as dbGetTagSubcategoryOptions,
   getSuggestedProductsForWorkstation as dbGetSuggestedProductsForWorkstation,
   getAltTextCandidates,
-  type UpdatePhotoProductTagInput,
   type TagSuggestionProduct,
   type SearchSuggestedProductsFilters,
   type WorkstationSuggestedProduct,
   type WorkstationSuggestedFilters,
-} from "@/lib/db/photoProductTags";
+  type AltTextCandidateFilters,
+} from "@/lib/db/productSuggestions";
 import { parseAltText } from "@/lib/altTextParser";
 import { scoreAndRank, type ScoredProduct } from "@/lib/scoring/productAltScore";
 
@@ -27,84 +36,8 @@ import { getListingSlugById } from "@/lib/db/listings";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import type { ActionResultSuccess } from "./types";
 
-const PPL = "project_product_links";
 
-/** Admin-only: create a placeholder tag (hotspot) at x,y. Returns tag id. */
-export async function createTag(
-  listingImageId: string,
-  listingId: string,
-  x: number,
-  y: number
-): Promise<ActionResultSuccess<{ id: string }>> {
-  try {
-    await requireAdmin();
-  } catch {
-    return { ok: false, error: "Unauthorized" };
-  }
-  const { userId } = await auth();
-  if (!userId) return { ok: false, error: "Not signed in" };
-  const res = await createPhotoProductTagPlaceholder(listingImageId, listingId, x, y, userId);
-  if (res.error) return { ok: false, error: res.error };
-  revalidatePath(`/admin/projects/[id]`, "page");
-  const projectSlug = await getListingSlugById(listingId);
-  if (projectSlug) revalidatePath(`/projects/${projectSlug}`, "page");
-  return { ok: true, data: { id: res.data!.id } };
-}
 
-/** Admin-only: update tag metadata and/or product_id. When product_id is set, upserts project_product_links. */
-export async function updateTag(
-  tagId: string,
-  listingId: string,
-  input: UpdatePhotoProductTagInput
-): Promise<ActionResultSuccess<{ id: string }>> {
-  try {
-    await requireAdmin();
-  } catch {
-    return { ok: false, error: "Unauthorized" };
-  }
-  const res = await updatePhotoProductTag(tagId, input);
-  if (res.error) return { ok: false, error: res.error };
-  const productId = res.data!.product_id ?? input.product_id;
-  if (productId && listingId) {
-    const supabase = getSupabaseServiceClient();
-    const { data: existing } = await supabase
-      .from(PPL)
-      .select("source")
-      .eq("project_id", listingId)
-      .eq("product_id", productId)
-      .maybeSingle();
-    if ((existing as { source?: string } | null)?.source !== "manual") {
-      await supabase
-        .from(PPL)
-        .upsert(
-          { project_id: listingId, product_id: productId, source: "photo_tag" },
-          { onConflict: "project_id,product_id" }
-        );
-    }
-  }
-  revalidatePath(`/admin/projects/[id]`, "page");
-  const projectSlug = await getListingSlugById(listingId);
-  if (projectSlug) revalidatePath(`/projects/${projectSlug}`, "page");
-  return { ok: true, data: { id: tagId } };
-}
-
-/** Admin-only: delete a tag. */
-export async function deleteTag(tagId: string): Promise<ActionResultSuccess<void>> {
-  try {
-    await requireAdmin();
-  } catch {
-    return { ok: false, error: "Unauthorized" };
-  }
-  const res = await removePhotoProductTag(tagId);
-  if (res.error) return { ok: false, error: res.error };
-  revalidatePath(`/admin/projects/[id]`, "page");
-  const listingId = await getListingIdByTagId(tagId);
-  if (listingId) {
-    const projectSlug = await getListingSlugById(listingId);
-    if (projectSlug) revalidatePath(`/projects/${projectSlug}`, "page");
-  }
-  return { ok: true };
-}
 
 /** Admin-only: search products for tag suggestions. */
 export async function searchSuggestedProducts(
