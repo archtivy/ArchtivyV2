@@ -5,7 +5,15 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getProfileByClerkId } from "@/lib/db/profiles";
-import type { VerificationStatus } from "@/lib/db/productTags";
+import { reconcilePhotoTagLink } from "@/lib/db/productTagLinks";
+import {
+  PUBLIC_STATUSES,
+  getManagedListing,
+  getTaggableProducts,
+  type ManagedImage,
+  type TaggableProduct,
+  type VerificationStatus,
+} from "@/lib/db/productTags";
 
 /**
  * Product pin mutations. Server Actions, matching how every other entity in
@@ -122,6 +130,41 @@ function bust(type: string, slug: string | null, listingId: string) {
   if (slug) revalidatePath(`/${type === "product" ? "products" : "projects"}/${slug}`);
 }
 
+/**
+ * Everything the pin editor needs for one listing, in one call.
+ *
+ * ── WHY THE WIZARD NEEDS AN ACTION AND THE MANAGE PAGE DOES NOT ─────────────
+ * The management page is a Server Component and reads getManagedListing
+ * directly. The wizard is a client component that only learns its draft's id at
+ * runtime — the row is created when the Images step completes — so it cannot be
+ * handed this as a prop. It fetches after the draft exists, and again after
+ * every pin change.
+ *
+ * Ownership is re-checked here rather than trusted: getManagedListing returns
+ * null when the profile does not own the listing, and null is reported the same
+ * way as "not found" so the two stay indistinguishable to a caller probing ids.
+ */
+export async function getListingTaggingData(listingId: string): Promise<
+  | { ok: true; images: ManagedImage[]; products: TaggableProduct[]; tagsTableReady: boolean }
+  | { ok: false; error: string }
+> {
+  const profile = await currentProfile();
+  if (!profile) return { ok: false, error: "Sign in first." };
+
+  const [listing, products] = await Promise.all([
+    getManagedListing(listingId, profile.id, profile.is_admin === true),
+    getTaggableProducts(),
+  ]);
+  if (!listing) return { ok: false, error: "Listing not found." };
+
+  return {
+    ok: true,
+    images: listing.images,
+    products,
+    tagsTableReady: listing.tagsTableReady,
+  };
+}
+
 /** Owner places a pin. Lands as `official` — the owner stating their own build. */
 export async function createPin(input: unknown): Promise<PinResult> {
   const profile = await currentProfile();
@@ -182,6 +225,9 @@ export async function createPin(input: unknown): Promise<PinResult> {
     actorProfileId: profile.id,
     metadata: { x: v.xPercent, y: v.yPercent, source: "owner", byOwner: access.isOwner },
   });
+  // The relational edge, which this path never wrote. A pin used to draw a
+  // hotspot and create no relationship — see lib/db/productTagLinks.ts.
+  await reconcilePhotoTagLink(access.listingId, v.taggedListingId);
   bust(access.type, access.slug, access.listingId);
   return { ok: true, id };
 }
@@ -243,12 +289,16 @@ export async function reviewPin(
   const sup = getSupabaseServiceClient();
   const { data: pin } = await sup
     .from("product_tags")
-    .select("id, listing_image_id, verification_status")
+    .select("id, listing_image_id, verification_status, tagged_listing_id")
     .eq("id", pinId)
     .maybeSingle();
   if (!pin) return { ok: false, error: "Pin not found." };
 
-  const row = pin as { listing_image_id: string; verification_status: VerificationStatus };
+  const row = pin as {
+    listing_image_id: string;
+    verification_status: VerificationStatus;
+    tagged_listing_id: string;
+  };
   const access = await assertCanEditImage(row.listing_image_id, profile.id, profile.is_admin === true);
   if (!access.ok) return { ok: false, error: access.error };
 
@@ -271,6 +321,15 @@ export async function reviewPin(
     toStatus,
     actorProfileId: profile.id,
   });
+  // Review moves a tag in and out of public visibility, so it moves the edge
+  // with it: confirming an AI suggestion creates the relationship, rejecting it
+  // takes it away. Both directions fall out of the same recompute.
+  await reconcilePhotoTagLink(access.listingId, row.tagged_listing_id, {
+    // A rejection is the only review outcome that can take an edge away, and
+    // only if the tag was publicly visible to begin with.
+    allowRemoval:
+      PUBLIC_STATUSES.includes(row.verification_status) && !PUBLIC_STATUSES.includes(toStatus),
+  });
   bust(access.type, access.slug, access.listingId);
   return { ok: true, id: pinId };
 }
@@ -282,12 +341,16 @@ export async function deletePin(pinId: string): Promise<PinResult> {
   const sup = getSupabaseServiceClient();
   const { data: pin } = await sup
     .from("product_tags")
-    .select("id, listing_image_id, verification_status")
+    .select("id, listing_image_id, verification_status, tagged_listing_id")
     .eq("id", pinId)
     .maybeSingle();
   if (!pin) return { ok: false, error: "Pin not found." };
 
-  const row = pin as { listing_image_id: string; verification_status: VerificationStatus };
+  const row = pin as {
+    listing_image_id: string;
+    verification_status: VerificationStatus;
+    tagged_listing_id: string;
+  };
   const access = await assertCanEditImage(row.listing_image_id, profile.id, profile.is_admin === true);
   if (!access.ok) return { ok: false, error: access.error };
 
@@ -303,6 +366,21 @@ export async function deletePin(pinId: string): Promise<PinResult> {
 
   const { error } = await sup.from("product_tags").delete().eq("id", pinId);
   if (error) return { ok: false, error: error.message };
+
+  /*
+   * AFTER the delete, so the recompute counts the world as it now is.
+   *
+   * It does not simply drop the edge: the same product may still be pinned in
+   * another photo of the same project, and one of five pins going away is not
+   * the product leaving the project. The count decides. A `manual` link is
+   * untouched either way.
+   */
+  await reconcilePhotoTagLink(access.listingId, row.tagged_listing_id, {
+    // Only a PUBLIC tag was holding the edge up, so only its removal may take
+    // the edge down. Deleting an already-hidden `unverified` suggestion changes
+    // nothing a visitor could see and must not withdraw a link.
+    allowRemoval: PUBLIC_STATUSES.includes(row.verification_status),
+  });
 
   bust(access.type, access.slug, access.listingId);
   return { ok: true, id: pinId };

@@ -36,6 +36,7 @@ import { createProjectDraft, publishListing } from "@/app/actions/listingDrafts"
 import type { ProjectEditData } from "@/lib/db/listingEdit";
 import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
 import { TaxonomyCascade } from "@/components/add/wizard/TaxonomyCascade";
+import { ProductsStep } from "@/components/add/wizard/ProductsStep";
 import { FacetPicker, type FacetForPicker } from "@/components/add/wizard/FacetPicker";
 import { DocumentsUploadCard } from "@/components/add/DocumentsUploadCard";
 import {
@@ -603,14 +604,16 @@ export function ProjectWizard({
               )}
 
               {step === 3 && (
-                <PickerStep
-                  kind="product"
-                  options={products.map((p) => ({ id: p.id, label: p.title, sub: p.brand, cover: p.cover }))}
-                  selected={productIds}
+                /* The footnote this replaces read "Once published, you'll be
+                   able to tag exactly where each product appears in your
+                   photos." That promise is what this step now keeps, in place,
+                   before publishing rather than after. */
+                <ProductsStep
+                  products={products}
+                  selectedIds={productIds}
                   onChange={setProductIds}
-                  placeholder="Search products by name or brand…"
-                  emptyHint="No products tagged yet."
-                  footnote="Once published, you’ll be able to tag exactly where each product appears in your photos."
+                  listingId={initial?.id ?? draftId}
+                  gallery={images}
                 />
               )}
 

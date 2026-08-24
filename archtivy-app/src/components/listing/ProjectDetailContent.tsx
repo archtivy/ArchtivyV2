@@ -15,6 +15,12 @@ export interface UsedProductItem {
   brand?: string | null;
   thumbnail?: string | null;
   taxonomy_slug_path?: string | null;
+  /**
+   * Which relationship this is: 'manual' = the author listed it as used in the
+   * build, 'photo_tag' = it is pinned to a spot in one of the photos. Optional
+   * so existing callers keep compiling; absent reads as 'manual'.
+   */
+  linkSource?: "manual" | "photo_tag";
 }
 
 export interface ProjectDetailContentProps {

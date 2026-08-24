@@ -3,7 +3,6 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Plus, Trash2, Check, X } from "lucide-react";
 import { createPin, deletePin, reviewPin } from "@/app/actions/productTags";
 import {
@@ -15,8 +14,26 @@ import {
 } from "@/lib/db/productTags";
 
 /**
- * Pin placement surface — the Products tab of the owner project-management page
- * (Image 1, scoped to this tab only for v1).
+ * Pin placement surface. Click a photo, pick a product, get a hotspot.
+ *
+ * ── ONE COMPONENT, TWO HOMES ────────────────────────────────────────────────
+ * This was PinEditor, private to /me/listings/[id]. The publish wizard now needs
+ * the same interaction inside its Products step, and click-to-place hotspot
+ * maths duplicated across two components is the kind of pair that drifts until
+ * one of them is subtly wrong. So it moved here and is shared.
+ *
+ * Two things had to change to make it portable:
+ *
+ *   1. REFRESHING IS THE CALLER'S JOB. It used to call router.refresh() itself,
+ *      which works on the management page because `images` is an RSC prop. In
+ *      the wizard the same data arrives from a server action, and router.refresh
+ *      would reload the route without touching it. `onChanged` lets each host
+ *      reload the way its own data actually arrives.
+ *
+ *   2. EDITORIAL TOKENS, NOT ZINC. The wizard is cream/ink and has no dark
+ *      counterpart, so the old zinc + dark: styling rendered as a grey slab
+ *      inside it. Restyling rather than forking means the management page picks
+ *      up the same look — a visible change to that page, made deliberately.
  *
  * Positions are stored as PERCENTAGES of the rendered image box, so a pin lands
  * in the same place at every viewport. Nothing here works in pixels.
@@ -26,16 +43,20 @@ import {
  * public — matching the RLS policy exactly, so what the owner sees marked
  * "public" is genuinely what a visitor sees.
  */
-export function PinEditor({
+export function ProductPinEditor({
   images,
   products,
   tagsTableReady,
+  onChanged,
+  emptyHint = "This listing has no images yet. Pins are placed on photos, so add images first.",
 }: {
   images: ManagedImage[];
   products: TaggableProduct[];
   tagsTableReady: boolean;
+  /** Called after any successful mutation so the host can reload its own data. */
+  onChanged: () => void;
+  emptyHint?: string;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [activeId, setActiveId] = useState(images[0]?.id ?? null);
   const [placing, setPlacing] = useState<{ x: number; y: number } | null>(null);
@@ -47,17 +68,24 @@ export function PinEditor({
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
+    // Already pinned here is not a candidate: the unique constraint would
+    // reject it, and offering it only to fail is a worse answer than hiding it.
     const taken = new Set(active?.pins.map((p) => p.taggedListingId) ?? []);
     return products
       .filter((p) => !taken.has(p.id))
-      .filter((p) => !q || p.title.toLowerCase().includes(q) || (p.brandName ?? "").toLowerCase().includes(q))
+      .filter(
+        (p) =>
+          !q ||
+          p.title.toLowerCase().includes(q) ||
+          (p.brandName ?? "").toLowerCase().includes(q)
+      )
       .slice(0, 8);
   }, [products, query, active]);
 
   if (images.length === 0) {
     return (
-      <p className="rounded-lg border border-zinc-200 px-6 py-12 text-center text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
-        This listing has no images yet. Pins are placed on photos, so add images first.
+      <p className="rounded-2xl border border-hairline px-6 py-12 text-center font-body text-[14px] text-muted">
+        {emptyHint}
       </p>
     );
   }
@@ -80,42 +108,39 @@ export function PinEditor({
     setError(null);
     startTransition(async () => {
       const result = await fn();
-      if (!result.ok) setError(result.error ?? "Something went wrong.");
-      else {
-        setPlacing(null);
-        router.refresh();
+      if (!result.ok) {
+        setError(result.error ?? "Something went wrong.");
+        return;
       }
+      setPlacing(null);
+      onChanged();
     });
   }
 
   return (
     <div className="space-y-6">
-      {/* This used to read "the product_tags table does not exist yet — apply
-          20260808_product_tags.REVIEW.sql". That migration has since been
-          applied (the table is live, with rows), so the message named a cause
-          that was no longer true. The flag it is driven by goes false on ANY
-          read failure, not only a missing table, so the copy no longer asserts
-          a specific reason it cannot actually know. */}
+      {/* The flag goes false on ANY read failure, not only a missing table, so
+          the copy does not assert a specific cause it cannot know. */}
       {!tagsTableReady && (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <p className="rounded-2xl border border-hairline bg-stone/40 px-4 py-3 font-body text-[13px] text-ink">
           Product tags couldn&rsquo;t be loaded, so tagging is unavailable right now. Existing
           pins are safe — reload in a moment, and if it persists this is worth reporting.
         </p>
       )}
 
       {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" className="rounded-xl bg-[#F6E4E4] px-3 py-2 font-body text-[13px] text-[#7A2222]">
           {error}
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
         <div>
           {/* ── Canvas ──────────────────────────────────────────────────── */}
           <div
             ref={canvasRef}
             onClick={onCanvasClick}
-            className={`relative aspect-[3/2] w-full overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-900 ${
+            className={`relative aspect-[3/2] w-full overflow-hidden rounded-2xl bg-stone/50 ${
               tagsTableReady ? "cursor-crosshair" : ""
             }`}
           >
@@ -126,7 +151,6 @@ export function PinEditor({
                 fill
                 sizes="(max-width: 1024px) 100vw, 60vw"
                 className="object-contain"
-                priority
               />
             )}
 
@@ -140,8 +164,8 @@ export function PinEditor({
                 >
                   <span
                     title={`${pin.productTitle} — ${STATUS_LABELS[pin.verificationStatus]}`}
-                    className={`block h-4 w-4 rounded-full border-2 border-white shadow ${
-                      isPublic ? "bg-zinc-900" : "bg-amber-500"
+                    className={`block h-4 w-4 rounded-full border-2 border-cream shadow ${
+                      isPublic ? "bg-ink" : "bg-[#B8860B]"
                     }`}
                   />
                 </span>
@@ -153,15 +177,15 @@ export function PinEditor({
                 className="absolute -translate-x-1/2 -translate-y-1/2"
                 style={{ left: `${placing.x}%`, top: `${placing.y}%` }}
               >
-                <span className="block h-4 w-4 animate-pulse rounded-full border-2 border-white bg-blue-600 shadow" />
+                <span className="block h-4 w-4 animate-pulse rounded-full border-2 border-cream bg-archtivy-primary shadow motion-reduce:animate-none" />
               </span>
             )}
           </div>
 
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 font-body text-[12px] text-muted">
             {tagsTableReady
               ? "Click anywhere on the photo to place a pin."
-              : "Placement disabled until the migration is applied."}
+              : "Placement is unavailable right now."}
           </p>
 
           {/* ── Image strip ─────────────────────────────────────────────── */}
@@ -176,13 +200,13 @@ export function PinEditor({
                       setPlacing(null);
                     }}
                     aria-pressed={img.id === active?.id}
-                    className={`relative block h-14 w-20 overflow-hidden rounded border-2 ${
-                      img.id === active?.id ? "border-zinc-900 dark:border-zinc-100" : "border-transparent"
+                    className={`relative block h-14 w-20 overflow-hidden rounded-lg border-2 ${
+                      img.id === active?.id ? "border-ink" : "border-transparent"
                     }`}
                   >
                     <Image src={img.url} alt="" fill sizes="80px" className="object-cover" />
                     {img.pins.length > 0 && (
-                      <span className="absolute bottom-0.5 right-0.5 rounded bg-zinc-900/80 px-1 text-[10px] text-white">
+                      <span className="absolute bottom-0.5 right-0.5 rounded bg-ink/80 px-1 font-body text-[10px] text-cream">
                         {img.pins.length}
                       </span>
                     )}
@@ -196,16 +220,14 @@ export function PinEditor({
         {/* ── Side panel ────────────────────────────────────────────────── */}
         <div className="space-y-4">
           {placing && (
-            <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+            <div className="rounded-2xl border border-hairline p-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                  Which product?
-                </h3>
+                <h3 className="font-body text-[14px] text-ink">Which product?</h3>
                 <button
                   type="button"
                   onClick={() => setPlacing(null)}
                   aria-label="Cancel"
-                  className="text-zinc-500"
+                  className="text-muted hover:text-ink"
                 >
                   <X strokeWidth={1.5} className="h-4 w-4" />
                 </button>
@@ -215,7 +237,7 @@ export function PinEditor({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search products…"
                 autoFocus
-                className="mt-2 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                className="mt-2 w-full rounded-lg border border-ink/25 bg-transparent px-3 py-2 font-body text-[14px] text-ink placeholder:text-muted focus:border-ink focus:outline-none"
               />
               <ul className="mt-2 max-h-64 space-y-1 overflow-y-auto">
                 {matches.map((p) => (
@@ -233,35 +255,37 @@ export function PinEditor({
                           })
                         )
                       }
-                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-zinc-50 disabled:opacity-50 dark:hover:bg-zinc-900"
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-stone/50 disabled:opacity-50"
                     >
-                      <Plus strokeWidth={1.5} className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                      <Plus strokeWidth={1.5} className="h-3.5 w-3.5 shrink-0 text-muted" />
                       <span className="min-w-0">
-                        <span className="block truncate text-zinc-900 dark:text-zinc-100">
+                        <span className="block truncate font-body text-[14px] text-ink">
                           {p.title}
                         </span>
                         {p.brandName && (
-                          <span className="block truncate text-xs text-zinc-500">{p.brandName}</span>
+                          <span className="block truncate font-body text-[12px] text-muted">
+                            {p.brandName}
+                          </span>
                         )}
                       </span>
                     </button>
                   </li>
                 ))}
                 {matches.length === 0 && (
-                  <li className="px-2 py-2 text-sm text-zinc-500">No matching product.</li>
+                  <li className="px-2 py-2 font-body text-[13px] text-muted">No matching product.</li>
                 )}
               </ul>
             </div>
           )}
 
-          <div className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              Pins on this photo{" "}
-              <span className="font-normal text-zinc-500">({active?.pins.length ?? 0})</span>
+          <div className="rounded-2xl border border-hairline p-4">
+            <h3 className="font-body text-[14px] text-ink">
+              Pinned on this photo{" "}
+              <span className="text-muted">({active?.pins.length ?? 0})</span>
             </h3>
 
             {(active?.pins.length ?? 0) === 0 ? (
-              <p className="mt-2 text-sm text-zinc-500">
+              <p className="mt-2 font-body text-[13px] text-muted">
                 Nothing pinned yet. Products pinned here appear on the public page.
               </p>
             ) : (
@@ -271,14 +295,14 @@ export function PinEditor({
                     <span className="min-w-0 flex-1">
                       <Link
                         href={pin.productHref}
-                        className="block truncate text-sm text-zinc-900 hover:underline dark:text-zinc-100"
+                        className="block truncate font-body text-[14px] text-ink hover:underline"
                       >
                         {pin.productTitle}
                       </Link>
                       <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
                         <StatusPill status={pin.verificationStatus} />
                         {pin.tagSource === "ai" && (
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-900">
+                          <span className="rounded bg-[#EADFC8] px-1.5 py-0.5 font-body text-[10px] text-[#5C4413]">
                             AI detected
                             {pin.aiConfidence != null &&
                               ` · ${Math.round(pin.aiConfidence * 100)}%`}
@@ -298,7 +322,7 @@ export function PinEditor({
                               disabled={pending}
                               onClick={() => run(() => reviewPin(pin.id, "confirm"))}
                               aria-label={`Confirm ${pin.productTitle}`}
-                              className="rounded p-1 text-zinc-600 hover:bg-zinc-100 disabled:opacity-50 dark:hover:bg-zinc-800"
+                              className="rounded-lg p-1 text-muted hover:bg-stone/50 hover:text-ink disabled:opacity-50"
                             >
                               <Check strokeWidth={1.5} className="h-4 w-4" />
                             </button>
@@ -307,7 +331,7 @@ export function PinEditor({
                               disabled={pending}
                               onClick={() => run(() => reviewPin(pin.id, "reject"))}
                               aria-label={`Reject ${pin.productTitle}`}
-                              className="rounded p-1 text-zinc-600 hover:bg-zinc-100 disabled:opacity-50 dark:hover:bg-zinc-800"
+                              className="rounded-lg p-1 text-muted hover:bg-stone/50 hover:text-ink disabled:opacity-50"
                             >
                               <X strokeWidth={1.5} className="h-4 w-4" />
                             </button>
@@ -318,7 +342,7 @@ export function PinEditor({
                         disabled={pending}
                         onClick={() => run(() => deletePin(pin.id))}
                         aria-label={`Remove ${pin.productTitle}`}
-                        className="rounded p-1 text-zinc-600 hover:bg-zinc-100 disabled:opacity-50 dark:hover:bg-zinc-800"
+                        className="rounded-lg p-1 text-muted hover:bg-stone/50 hover:text-ink disabled:opacity-50"
                       >
                         <Trash2 strokeWidth={1.5} className="h-4 w-4" />
                       </button>
@@ -338,12 +362,8 @@ function StatusPill({ status }: { status: VerificationStatus }) {
   const isPublic = PUBLIC_STATUSES.includes(status);
   return (
     <span
-      className={`rounded px-1.5 py-0.5 text-[10px] ${
-        isPublic
-          ? "bg-emerald-100 text-emerald-900"
-          : status === "rejected"
-            ? "bg-zinc-200 text-zinc-700"
-            : "bg-zinc-100 text-zinc-700"
+      className={`rounded px-1.5 py-0.5 font-body text-[10px] ${
+        isPublic ? "bg-ink text-cream" : "bg-stone text-ink"
       }`}
       title={isPublic ? "Visible on the public page" : "Not shown publicly"}
     >
