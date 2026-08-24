@@ -31,14 +31,41 @@
 --     which had zero consumers and has been deleted
 --
 -- ── THE VERIFICATION GUARD ──────────────────────────────────────────────────
--- This refuses to drop the table if a row ever appears without a product_tags
--- counterpart. Data loss is irreversible and a surprise row means the premise
--- of this migration no longer holds, so it stops rather than proceeding.
+-- Refuses to drop if a row ever appears without a product_tags counterpart.
+-- Data loss is irreversible and a surprise row means the premise of this
+-- migration no longer holds, so it stops rather than proceeding.
+--
+-- ── THE ARCHIVE, AND WHY IT LIVES INSIDE THE DO BLOCK ───────────────────────
+-- The 7 rows are copied to photo_product_tags_archive first, turning
+-- "recoverable only from a PITR snapshot" into "recoverable with one select".
+--
+-- It is executed inside the guarded block rather than written as a top-level
+-- CREATE TABLE ... AS SELECT, for two reasons:
+--
+--   1. It must only run once the guard has passed. A backup taken before the
+--      unmirrored check would be a backup of a state we just decided not to
+--      act on.
+--
+--   2. A top-level CTAS would break the re-run. `create table if not exists X
+--      as select * from Y` still resolves Y at parse-analysis, before the
+--      IF NOT EXISTS is considered — so on a second run, with the table already
+--      dropped, the statement would fail with "relation does not exist" rather
+--      than skipping. Inside the block it is never reached: the early return at
+--      the top handles the already-retired case.
+--
+-- ── THE ARCHIVE GETS RLS, DELIBERATELY ──────────────────────────────────────
+-- photo_product_tags has RLS enabled with NO policy, so anon and authenticated
+-- see zero rows through PostgREST despite holding the SELECT grant. CREATE
+-- TABLE AS produces a table with RLS DISABLED, which inherits the public-schema
+-- grants and would expose all 7 rows to the anon key — a table created to be
+-- cautious would have widened access. The archive is locked to the same shape:
+-- RLS on, no policy, service-role only.
 
 do $$
 declare
-  v_total     bigint;
+  v_total      bigint;
   v_unmirrored bigint;
+  v_archived   bigint;
 begin
   if to_regclass('public.photo_product_tags') is null then
     raise notice 'photo_product_tags does not exist — already retired';
@@ -63,6 +90,24 @@ begin
       '% legacy tag(s) have no product_tags counterpart — migrate them before dropping, not after',
       v_unmirrored;
   end if;
+
+  -- ── Archive, only now that the guard has passed ───────────────────────────
+  execute 'create table if not exists public.photo_product_tags_archive as
+             select * from public.photo_product_tags';
+  execute 'alter table public.photo_product_tags_archive enable row level security';
+  execute 'select count(*) from public.photo_product_tags_archive' into v_archived;
+
+  -- The backup is only a backup if it actually holds the rows. An archive left
+  -- behind by an earlier partial run would be skipped by IF NOT EXISTS and
+  -- could be short; that must stop the drop, not be assumed away.
+  if v_archived <> v_total then
+    raise exception
+      'archive holds % row(s) but photo_product_tags holds % — not dropping',
+      v_archived, v_total;
+  end if;
+
+  raise notice 'archived % row(s) into photo_product_tags_archive (RLS on, no policy)',
+    v_archived;
 end $$;
 
 -- No CASCADE, deliberately. Nothing should depend on this table; if something
@@ -76,5 +121,9 @@ begin
     raise notice 'after: photo_product_tags dropped';
   else
     raise exception 'photo_product_tags still exists after drop';
+  end if;
+
+  if to_regclass('public.photo_product_tags_archive') is null then
+    raise warning 'photo_product_tags_archive is missing — the rows are recoverable only from a snapshot';
   end if;
 end $$;
