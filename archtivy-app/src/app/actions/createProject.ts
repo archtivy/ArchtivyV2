@@ -454,58 +454,76 @@ export async function createProject(
     }
   }
 
-  // Notify followers of this designer — fire and forget
-  if (profile?.id) {
-    notifyDesignerPublishedProject(profile.id, listingId, title || "Untitled", slug).catch(() => {});
-  }
+  /*
+   * ── NOTHING IS ANNOUNCED FOR A DRAFT ────────────────────────────────────────
+   *
+   * Every notifier below, and the IndexNow ping, used to fire unconditionally —
+   * including when `draft=1` had just written status='DRAFT'. So saving a draft
+   * told every follower of the designer that a project had been published, told
+   * category and material followers the same, could tell nearby users about an
+   * "opportunity", and submitted the URL to search engines. All of it pointed at
+   * a row that 404s for everyone but its author.
+   *
+   * That was survivable while a draft was a rare, deliberate click. Draft-first
+   * persistence makes DRAFT the normal state of every listing being written, so
+   * the same code would broadcast on every wizard session. Announcements belong
+   * at the moment of publication — publishListing in actions/listingDrafts.ts
+   * fires them there.
+   */
+  if (!isDraft) {
+    // Notify followers of this designer — fire and forget
+    if (profile?.id) {
+      notifyDesignerPublishedProject(profile.id, listingId, title || "Untitled", slug).catch(() => {});
+    }
 
-  // Notify followers of this project's category and materials — fire and forget.
-  //
-  // These two notifiers already existed and had never been called from
-  // anywhere, because until now nothing in the UI could produce a category or
-  // material follow to receive them. Both are wired here rather than in the
-  // taxonomy helpers above so they fire once per publish, after the
-  // associations are actually persisted.
-  if (taxonomy_node_id) {
-    notifyFollowedCategoryNewListing(
-      taxonomy_node_id,
-      listingId,
-      title || "Untitled",
-      slug,
-      "project"
-    ).catch(() => {});
-  }
-  for (const materialNodeId of taxonomyMaterialIds) {
-    notifyFollowedMaterialNewListing(
-      materialNodeId,
-      listingId,
-      title || "Untitled",
-      slug,
-      "project"
-    ).catch(() => {});
-  }
+    // Notify followers of this project's category and materials — fire and forget.
+    //
+    // These two notifiers already existed and had never been called from
+    // anywhere, because until now nothing in the UI could produce a category or
+    // material follow to receive them. Both are wired here rather than in the
+    // taxonomy helpers above so they fire once per publish, after the
+    // associations are actually persisted.
+    if (taxonomy_node_id) {
+      notifyFollowedCategoryNewListing(
+        taxonomy_node_id,
+        listingId,
+        title || "Untitled",
+        slug,
+        "project"
+      ).catch(() => {});
+    }
+    for (const materialNodeId of taxonomyMaterialIds) {
+      notifyFollowedMaterialNewListing(
+        materialNodeId,
+        listingId,
+        title || "Untitled",
+        slug,
+        "project"
+      ).catch(() => {});
+    }
 
-  // Notify nearby users if this project is an opportunity — fire and forget
-  const projectOpportunities = detectProjectOpportunities(project_status, project_collaboration_status);
-  if (projectOpportunities.length > 0) {
-    notifyNearbyUsersOfOpportunity({
-      listingId,
-      listingSlug: slug,
-      listingType: "project",
-      listingTitle: title || "Untitled",
-      // Real coordinates, not city/country strings — the notifier now
-      // measures distance rather than matching place names.
-      locationLat: location_lat,
-      locationLng: location_lng,
-      ownerProfileId: profile?.id ?? null,
-      opportunity: projectOpportunities[0],
-    }).catch(() => {});
+    // Notify nearby users if this project is an opportunity — fire and forget
+    const projectOpportunities = detectProjectOpportunities(project_status, project_collaboration_status);
+    if (projectOpportunities.length > 0) {
+      notifyNearbyUsersOfOpportunity({
+        listingId,
+        listingSlug: slug,
+        listingType: "project",
+        listingTitle: title || "Untitled",
+        // Real coordinates, not city/country strings — the notifier now
+        // measures distance rather than matching place names.
+        locationLat: location_lat,
+        locationLng: location_lng,
+        ownerProfileId: profile?.id ?? null,
+        opportunity: projectOpportunities[0],
+      }).catch(() => {});
+    }
   }
 
   revalidatePath("/explore");
   revalidatePath("/explore/projects");
   revalidatePath("/");
-  notifySearchEngines([`/projects/${slug}`]).catch(() => {});
+  if (!isDraft) notifySearchEngines([`/projects/${slug}`]).catch(() => {});
   return {
     id: listingId,
     slug,

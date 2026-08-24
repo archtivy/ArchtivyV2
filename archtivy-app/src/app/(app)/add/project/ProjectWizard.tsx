@@ -32,6 +32,7 @@ import {
 import type { UploadedGalleryItem } from "@/lib/storage/types";
 import { createProject } from "@/app/actions/createProject";
 import { updateProjectCanonical } from "@/app/actions/updateListing";
+import { createProjectDraft, publishListing } from "@/app/actions/listingDrafts";
 import type { ProjectEditData } from "@/lib/db/listingEdit";
 import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
 import { TaxonomyCascade } from "@/components/add/wizard/TaxonomyCascade";
@@ -149,6 +150,15 @@ export function ProjectWizard({
   const [error, setError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
+  /*
+   * The DRAFT row's id, once it exists. Null while the author is still on the
+   * Images step, and in admin context always — see ensureDraft(). When editing,
+   * `initial.id` plays the same role and this stays null.
+   */
+  const [draftId, setDraftId] = useState<string | null>(null);
+  /** In-flight (or settled) draft creation. See ensureDraft's race note. */
+  const draftPromise = useRef<Promise<string | null> | null>(null);
+
   // ── Form state ────────────────────────────────────────────────────────────
   const [images, setImages] = useState<UploadedGalleryItem[]>(initial?.images ?? []);
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -221,10 +231,13 @@ export function ProjectWizard({
   }, [title, slugTouched]);
 
   // ── Autosave indicator ────────────────────────────────────────────────────
-  // Local-only for now: there is no draft row until the first submit, so this
-  // reflects "your input is retained", not "persisted to the server". It is
-  // deliberately quiet and never blocks. Wiring it to a real per-keystroke
-  // draft row is a fast-follow, noted in the report.
+  // Still local-only, and still honest about it. A draft ROW now exists from
+  // the Images step onward, but field edits are not written per keystroke —
+  // they persist on the next Save/Publish, through the update action. So this
+  // continues to mean "your input is retained", not "persisted to the server".
+  // Real per-field autosave would need its own debounce and conflict story and
+  // was deliberately left out of this change. ensureDraft() drives the
+  // indicator directly for the one moment that IS a server write.
   const firstRender = useRef(true);
   useEffect(() => {
     if (firstRender.current) {
@@ -274,8 +287,55 @@ export function ProjectWizard({
     ][i],
   }));
 
+  /*
+   * ── THE DRAFT ROW IS BORN HERE ──────────────────────────────────────────────
+   *
+   * Leaving the Images step forward, with at least one image, is the first
+   * moment there is anything worth persisting — and the first moment a
+   * listing_images row can exist, which is what product tagging pins to.
+   *
+   * Not at wizard start: a session that never chose a photo should not leave a
+   * row behind. Not in admin context: the owner is picked inside the form, and
+   * a listing written before that would have no owner at all.
+   *
+   * Idempotent by construction — draftId is set once and every later save goes
+   * through the update path, so bouncing back and forth over step 0 cannot
+   * create a second row.
+   */
+  async function ensureDraft(): Promise<string | null> {
+    if (admin || isEdit) return null;
+    /*
+     * The guard is a ref, not the draftId state, because go() calls this
+     * without awaiting: two quick clicks through the rail would both read the
+     * pre-update state and each create a row. A ref is written synchronously,
+     * so the second call sees it immediately.
+     */
+    if (draftPromise.current) return draftPromise.current;
+    if (images.length === 0) return null;
+
+    setSaveState("saving");
+    draftPromise.current = createProjectDraft(JSON.stringify(images)).then((result) => {
+      if ("error" in result) {
+        setError(result.error);
+        setSaveState("idle");
+        // Cleared so a later step can retry — a failed draft must not wedge
+        // the wizard into never trying again.
+        draftPromise.current = null;
+        return null;
+      }
+      setDraftId(result.id);
+      setSaveState("saved");
+      return result.id;
+    });
+    return draftPromise.current;
+  }
+
   const go = (next: number) => {
     if (next < 0 || next >= STEP_LABELS.length) return;
+    // Fire-and-forget: navigation must not wait on the network. A failure
+    // surfaces as an error and simply leaves the wizard in its old
+    // submit-at-the-end mode, which still works.
+    if (next > step && step === 0) void ensureDraft();
     setDirection(next > step ? 1 : -1);
     setStep(next);
     setError(null);
@@ -358,13 +418,42 @@ export function ProjectWizard({
       // entirely and keep whatever the listing already was. A draft stays a
       // draft; a published project is not silently unpublished.
       const fd = buildFormData(draft);
-      const result = admin
-        ? initial
-          ? await admin.onUpdate(initial.id, fd)
-          : await admin.onCreate(fd)
-        : initial
-          ? await updateProjectCanonical(initial.id, fd)
-          : await createProject({}, fd);
+
+      /*
+       * ── THREE PATHS, NOT TWO ──────────────────────────────────────────────
+       * · admin        — unchanged single-submit, see ensureDraft().
+       * · editing      — update in place, status untouched.
+       * · draft-first  — the row already exists from the Images step, so this
+       *                  is an update too, followed by a publish that is the
+       *                  only thing which assigns a slug and flips status.
+       *
+       * The final `createProject` fallback covers the case where draft
+       * creation failed: the wizard still works exactly as it did before.
+       */
+      // Awaited, not read from state: the author can reach Publish while the
+      // draft created on leaving the Images step is still in flight, and
+      // ensureDraft hands back that same promise rather than starting another.
+      const existingId = initial?.id ?? (admin ? null : await ensureDraft());
+      let result:
+        | Awaited<ReturnType<typeof updateProjectCanonical>>
+        | { error?: string }
+        | void;
+
+      if (admin) {
+        result = initial ? await admin.onUpdate(initial.id, fd) : await admin.onCreate(fd);
+      } else if (existingId) {
+        result = await updateProjectCanonical(existingId, fd);
+        if (!draft && !(result && "error" in result && result.error)) {
+          const published = await publishListing(existingId, "project");
+          if ("error" in published) {
+            setError(published.error);
+            return;
+          }
+        }
+      } else {
+        result = await createProject({}, fd);
+      }
+
       if (result && "error" in result && result.error) {
         setError(result.error);
         return;

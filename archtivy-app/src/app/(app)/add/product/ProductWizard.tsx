@@ -29,6 +29,7 @@ import { computeSeoScore, countWords, SEO_THRESHOLDS } from "@/lib/publish/seoSc
 import type { UploadedGalleryItem } from "@/lib/storage/types";
 import { createProductCanonical } from "@/app/actions/listings";
 import { updateProductCanonical } from "@/app/actions/updateListing";
+import { createProductDraft, publishListing } from "@/app/actions/listingDrafts";
 import type { ProductEditData } from "@/lib/db/listingEdit";
 import type { WizardAdminContext } from "@/components/add/wizard/adminContext";
 import { TaxonomyCascade } from "@/components/add/wizard/TaxonomyCascade";
@@ -137,6 +138,11 @@ export function ProductWizard({
   const [error, setError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
+  /** The DRAFT row's id, once it exists. See ensureDraft(). */
+  const [draftId, setDraftId] = useState<string | null>(null);
+  /** In-flight (or settled) draft creation. See ensureDraft's race note. */
+  const draftPromise = useRef<Promise<string | null> | null>(null);
+
   const [images, setImages] = useState<UploadedGalleryItem[]>(initial?.images ?? []);
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -238,8 +244,39 @@ export function ProductWizard({
     ][i],
   }));
 
+  /*
+   * ── THE DRAFT ROW IS BORN HERE ──────────────────────────────────────────────
+   * Mirrors ProjectWizard.ensureDraft; the full reasoning lives there. The one
+   * difference is downstream, not here: a product draft is created through
+   * create_product_with_sidecar with a machine-shaped `draft-<uuid>` slug,
+   * because that RPC refuses an empty one and bypassing it would reintroduce
+   * the split write that produced orphaned sidecar rows.
+   */
+  async function ensureDraft(): Promise<string | null> {
+    if (admin || isEdit) return null;
+    // Ref, not state — go() does not await, so two quick clicks would each
+    // read the stale state and create a row. See ProjectWizard for the note.
+    if (draftPromise.current) return draftPromise.current;
+    if (images.length === 0) return null;
+
+    setSaveState("saving");
+    draftPromise.current = createProductDraft(JSON.stringify(images)).then((result) => {
+      if ("error" in result) {
+        setError(result.error);
+        setSaveState("idle");
+        draftPromise.current = null;
+        return null;
+      }
+      setDraftId(result.id);
+      setSaveState("saved");
+      return result.id;
+    });
+    return draftPromise.current;
+  }
+
   const go = (next: number) => {
     if (next < 0 || next >= STEP_LABELS.length) return;
+    if (next > step && step === 0) void ensureDraft();
     setDirection(next > step ? 1 : -1);
     setStep(next);
     setError(null);
@@ -300,13 +337,36 @@ export function ProductWizard({
       // entirely and keeps whatever the listing already was. A draft stays a
       // draft; a published product is not silently pulled back for review.
       const fd = buildFormData(draft);
-      const result = admin
-        ? initial
-          ? await admin.onUpdate(initial.id, fd)
-          : await admin.onCreate(fd)
-        : initial
-          ? await updateProductCanonical(initial.id, fd)
-          : await createProductCanonical(null, fd);
+
+      /*
+       * Same three paths as ProjectWizard. The difference is where publish
+       * lands: a project goes to APPROVED, a product goes to PENDING and waits
+       * for review. publishListing preserves that gate — it is not this
+       * change's business to unify them.
+       */
+      // Awaited, not read from state — Publish can be reached while the draft
+      // created on leaving the Images step is still in flight.
+      const existingId = initial?.id ?? (admin ? null : await ensureDraft());
+      let result:
+        | Awaited<ReturnType<typeof updateProductCanonical>>
+        | { error?: string }
+        | void;
+
+      if (admin) {
+        result = initial ? await admin.onUpdate(initial.id, fd) : await admin.onCreate(fd);
+      } else if (existingId) {
+        result = await updateProductCanonical(existingId, fd);
+        if (!draft && !(result && "error" in result && result.error)) {
+          const published = await publishListing(existingId, "product");
+          if ("error" in published) {
+            setError(published.error);
+            return;
+          }
+        }
+      } else {
+        result = await createProductCanonical(null, fd);
+      }
+
       if (result && "error" in result && result.error) {
         setError(result.error);
         return;

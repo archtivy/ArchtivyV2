@@ -800,31 +800,46 @@ export async function createProductCanonical(
     }
   }
 
-  // Notify followers of this brand — fire and forget
-  if (profile?.id) {
-    notifyBrandPublishedProduct(profile.id, productId, title, slug).catch(() => {});
-  }
+  /*
+   * ── NOTHING IS ANNOUNCED FOR A DRAFT ────────────────────────────────────────
+   *
+   * These fired unconditionally, so "Save as draft" told every follower of the
+   * brand that a product had been published and pointed them at a row that
+   * 404s. See the fuller note on the same fix in createProject.ts.
+   *
+   * PENDING still notifies, deliberately. A product publishes to PENDING and
+   * waits for review, and nothing fires on approval — so suppressing PENDING
+   * too would silently end product notifications altogether. That review gate
+   * is existing intended behaviour and is left exactly as it was; only DRAFT,
+   * which the author has not finished writing, is silenced.
+   */
+  if (!isDraft) {
+    // Notify followers of this brand — fire and forget
+    if (profile?.id) {
+      notifyBrandPublishedProduct(profile.id, productId, title, slug).catch(() => {});
+    }
 
-  // Notify followers of this product's category and materials — fire and
-  // forget. Mirrors the project path in createProject.ts; see the note there
-  // on why these had never been called before.
-  if (taxonomyNodeId) {
-    notifyFollowedCategoryNewListing(
-      taxonomyNodeId,
-      productId,
-      title,
-      slug,
-      "product"
-    ).catch(() => {});
-  }
-  for (const materialNodeId of taxonomyMaterialIds) {
-    notifyFollowedMaterialNewListing(
-      materialNodeId,
-      productId,
-      title,
-      slug,
-      "product"
-    ).catch(() => {});
+    // Notify followers of this product's category and materials — fire and
+    // forget. Mirrors the project path in createProject.ts; see the note there
+    // on why these had never been called before.
+    if (taxonomyNodeId) {
+      notifyFollowedCategoryNewListing(
+        taxonomyNodeId,
+        productId,
+        title,
+        slug,
+        "product"
+      ).catch(() => {});
+    }
+    for (const materialNodeId of taxonomyMaterialIds) {
+      notifyFollowedMaterialNewListing(
+        materialNodeId,
+        productId,
+        title,
+        slug,
+        "product"
+      ).catch(() => {});
+    }
   }
 
   revalidatePath("/");

@@ -92,6 +92,11 @@ export async function getProductsForProject(
     .select("id, type, slug, title, description, created_at")
     .in("id", productIds)
     .eq("type", "product")
+    // A link is not a licence to render. This feeds the public project page's
+    // "Used products" strip, and without the status filter a DRAFT or PENDING
+    // product surfaced there by name the moment anything linked it. See the
+    // matching note in getProjectsForProduct.
+    .eq("status", "APPROVED")
     .is("deleted_at", null);
 
   if (listError) {
@@ -139,6 +144,20 @@ export async function getProjectsForProduct(
     .select(`${listingCardSelect}, slug`)
     .in("id", projectIds)
     .eq("type", "project")
+    /*
+     * THE ONE THAT DRAFT-FIRST AIMS AT.
+     *
+     * This feeds the public product page's "used in projects" rail. Before
+     * draft-first a draft was rare and short-lived, so an unfiltered read was
+     * nearly always harmless. Now a project exists as a DRAFT row from the
+     * Images step onward, and tagging a product in it writes a link — so
+     * without this filter an unpublished project would appear by name on that
+     * product's live page, for as long as the author took to finish.
+     *
+     * Every other public rail already filters status explicitly; these two
+     * queries were the exception.
+     */
+    .eq("status", "APPROVED")
     .is("deleted_at", null);
 
   if (listError) {
