@@ -18,7 +18,7 @@ import type { ProductDetailProject } from "@/lib/db/productDetail";
  * so it is a titled section rather than something behind a tab click.
  *
  * ── RENDERS NOTHING WHEN EMPTY ──────────────────────────────────────────────
- * Only 12 of 77 products have any project link (13 rows across 8 projects), so
+ * Only 15 of 79 products have any project link (16 rows across 7 projects), so
  * an always-present section would be an empty state on the large majority of
  * product pages. Returning null matches how the Downloads tab is already
  * conditional, and means the section self-activates the first time a link is
