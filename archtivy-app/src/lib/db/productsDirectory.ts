@@ -23,6 +23,7 @@
  */
 
 import { unstable_cache } from "next/cache";
+import { getCardBadgeCounts } from "@/lib/db/cardBadgeCounts";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { FacetValue } from "@/components/directory/FilterPrimitives";
@@ -36,6 +37,10 @@ export interface DirectoryProduct {
   imageCount: number;
   brand: string | null;
   brandId: string | null;
+  /** Brand logo for the shared card's chip. */
+  brandAvatar: string | null;
+  /** Shared-card badge: linked projects and the distinct studios behind them. */
+  badge: { related: number; owners: number };
   category: string | null;
   categoryLabel: string | null;
   typeLabel: string | null;
@@ -117,7 +122,7 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
     new Set(listings.map((l) => l.owner_profile_id).filter(Boolean) as string[])
   );
 
-  const [imgRes, taxRes, facetRes, matLinkRes, usageRes, docRes, brandRes] = await Promise.all([
+  const [imgRes, taxRes, facetRes, matLinkRes, usageRes, badgeCounts, docRes, brandRes] = await Promise.all([
     sup.from("listing_images").select("listing_id").in("listing_id", ids),
     sup
       .from("listing_taxonomy_node")
@@ -130,9 +135,19 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
     // No FK on product_material_links either — explicit two-step, same as projects.
     sup.from("product_material_links").select("product_id, material_id").in("product_id", ids),
     sup.from("project_product_links").select("product_id").in("product_id", ids),
+    // Batched badge counts — two queries for the page, same as the canonical
+    // fetchers. `usedInProjects` below already counts the edges; this adds the
+    // DISTINCT STUDIO half, which no existing helper could provide.
+    getCardBadgeCounts(ids, "product"),
     sup.from("listing_documents").select("listing_id").in("listing_id", ids),
     ownerIds.length > 0
-      ? sup.from("profiles").select("id, display_name, website").in("id", ownerIds)
+      ? sup
+          .from("profiles")
+          // avatar_url: the shared card renders the brand logo as a chip, and
+          // its absence from this select is why /products showed no logo while
+          // /projects did. Third instance of the same omission.
+          .select("id, display_name, website, avatar_url")
+          .in("id", ownerIds)
       : Promise.resolve({ data: [] as unknown[] }),
   ]);
 
@@ -153,13 +168,17 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
     ((docRes.data ?? []) as { listing_id: string }[]).map((r) => r.listing_id)
   );
 
-  const brands = new Map<string, { name: string | null; website: string | null }>();
+  const brands = new Map<string, { name: string | null; website: string | null; avatar: string | null }>();
   for (const b of (brandRes.data ?? []) as {
     id: string;
     display_name: string | null;
     website: string | null;
   }[]) {
-    brands.set(b.id, { name: b.display_name, website: b.website });
+    brands.set(b.id, {
+      name: b.display_name,
+      website: b.website,
+      avatar: (b as { avatar_url?: string | null }).avatar_url ?? null,
+    });
   }
 
   // Taxonomy: primary product node -> category root + type label.
@@ -245,6 +264,8 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
       cover: (l.cover_image_url as string | null) ?? null,
       imageCount: imageCounts.get(id) ?? 0,
       brand: brand?.name ?? null,
+      brandAvatar: brand?.avatar ?? null,
+      badge: badgeCounts[id] ?? { related: 0, owners: 0 },
       brandId: ownerId,
       category: cat?.root ?? null,
       categoryLabel: cat?.label ?? null,

@@ -21,6 +21,7 @@
  */
 
 import { unstable_cache } from "next/cache";
+import { getCardBadgeCounts, getCreditCounts } from "@/lib/db/cardBadgeCounts";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 
@@ -35,6 +36,10 @@ export interface DirectoryProject {
   country: string | null;
   architect: string | null;
   architectAvatar: string | null;
+  /** Shared-card badge: linked products and the distinct brands behind them. */
+  badge: { related: number; owners: number };
+  /** Profile-linked credits, for the card's connections row. */
+  creditCount: number;
   /** Primary project-taxonomy root, e.g. "residential". */
   buildingType: string | null;
   buildingTypeLabel: string | null;
@@ -126,7 +131,7 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
 
   const ids = listings.map((l) => String(l.id));
 
-  const [imagesRes, taxRes, matRes, prodRes, profRes] = await Promise.all([
+  const [imagesRes, taxRes, matRes, prodRes, badgeCounts, creditCounts, profRes] = await Promise.all([
     sup.from("listing_images").select("listing_id").in("listing_id", ids),
     sup
       .from("listing_taxonomy_node")
@@ -139,6 +144,12 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
     // Resolved with an explicit second lookup below instead.
     sup.from("project_material_links").select("project_id, material_id").in("project_id", ids),
     sup.from("project_product_links").select("project_id").in("project_id", ids),
+    // Badge and credit counts, batched exactly as the canonical fetchers do —
+    // two queries for the whole page, never one per card. This directory has
+    // its own fetcher rather than going through getProjectsCanonical, which is
+    // why the shared card rendered here without a badge until now.
+    getCardBadgeCounts(ids, "project"),
+    getCreditCounts(ids),
     sup
       .from("profiles")
       .select("id, display_name, avatar_url")
@@ -243,6 +254,8 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
       country: (l.location_country as string | null) ?? null,
       architect: owner?.display_name ?? null,
       architectAvatar: owner?.avatar_url ?? null,
+      badge: badgeCounts[id] ?? { related: 0, owners: 0 },
+      creditCount: creditCounts[id] ?? 0,
       buildingType: building?.root ?? null,
       buildingTypeLabel: building?.label ?? null,
       projectTypes: interventionsBy.get(id) ?? [],

@@ -215,8 +215,15 @@ export function ProductsDirectory({
                   title: p.title,
                   href: p.href,
                   imageUrl: p.cover,
+                  // "Lighting · Floor Lamp" — category then type. Both were
+                  // already fetched; only typeLabel was being passed, so the
+                  // line showed the narrow term with no context above it.
+                  categoryLabel: p.categoryLabel,
+                  metaLabel: p.typeLabel,
                   authorName: p.brand,
-                  categoryLabel: p.typeLabel,
+                  logoUrl: p.brandAvatar,
+                  relatedCount: p.badge.related,
+                  ownerCount: p.badge.owners,
                 }}
                 ratio="1/1"
                 priority={i < 5}

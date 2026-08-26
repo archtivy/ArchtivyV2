@@ -261,9 +261,16 @@ export function ProjectsDirectory({
                     title: p.title,
                     href: p.href,
                     imageUrl: p.cover,
+                    // First line is category · location. buildingTypeLabel was
+                    // already fetched here and simply never passed, so the line
+                    // rendered as location alone.
+                    categoryLabel: p.buildingTypeLabel,
                     metaLabel: p.locationText,
                     authorName: p.architect,
                     logoUrl: p.architectAvatar,
+                    relatedCount: p.badge.related,
+                    ownerCount: p.badge.owners,
+                    creditCount: p.creditCount,
                   }}
                   priority={i < 4}
                   sizes="(max-width: 640px) 45vw, (max-width: 1024px) 45vw, (max-width: 1280px) 30vw, 17vw"
