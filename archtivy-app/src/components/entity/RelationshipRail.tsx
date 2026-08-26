@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { EntityCard, initialsOf } from "@/components/home/EntityCard";
+import { ListingCardShared } from "@/components/listing/ListingCardShared";
 
 /**
  * Relationship Rail — the persistent right-hand panel stack (Blueprint §21).
@@ -152,14 +152,16 @@ export function RelatedPanel({
     <RailPanel title={reason}>
       <div className="grid grid-cols-2 gap-x-4 gap-y-5">
         {items.map((r) => (
-          <EntityCard
+          <ListingCardShared
             key={r.id}
-            href={r.href}
-            title={r.title}
-            subtitle={r.architect}
-            imageUrl={r.cover}
-            imageCount={r.imageCount}
-            avatarInitials={initialsOf(r.architect)}
+            model={{
+              id: r.id,
+              type: "project",
+              title: r.title,
+              href: r.href,
+              imageUrl: r.cover,
+              authorName: r.architect,
+            }}
             sizes="(max-width: 1024px) 45vw, 12vw"
           />
         ))}

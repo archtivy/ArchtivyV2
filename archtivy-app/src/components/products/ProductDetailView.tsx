@@ -7,7 +7,7 @@ import { HomeNav } from "@/components/home/HomeNav";
 import { HomeFooter } from "@/components/home/HomeFooter";
 import { Gallery } from "@/components/entity/Gallery";
 import { RailPanel, RelatedPanel } from "@/components/entity/RelationshipRail";
-import { EntityCard } from "@/components/home/EntityCard";
+import { ListingCardShared } from "@/components/listing/ListingCardShared";
 import { SaveToggle } from "@/components/home/SaveToggle";
 import { normaliseExternalUrl } from "@/lib/url/externalUrl";
 import { ProductStageBadge, CollaborationBadge } from "@/components/listing/StatusBadge";
@@ -272,12 +272,15 @@ export async function ProductDetailView({
 
             {detail.brand?.otherProduct && (
               <RailPanel title={`More from ${detail.brand.name}`}>
-                <EntityCard
-                  href={detail.brand.otherProduct.href}
-                  title={detail.brand.otherProduct.title}
-                  subtitle={detail.brand.otherProduct.brand}
-                  imageUrl={detail.brand.otherProduct.cover}
-                  imageCount={detail.brand.otherProduct.imageCount}
+                <ListingCardShared
+                  model={{
+                    id: detail.brand.otherProduct.id,
+                    type: "product",
+                    title: detail.brand.otherProduct.title,
+                    href: detail.brand.otherProduct.href,
+                    imageUrl: detail.brand.otherProduct.cover,
+                    authorName: detail.brand.otherProduct.brand,
+                  }}
                   ratio="1/1"
                   sizes="(max-width: 1024px) 45vw, 20vw"
                 />

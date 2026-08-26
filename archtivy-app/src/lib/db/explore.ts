@@ -8,6 +8,7 @@ import { projectListingSelect, productListingSelect } from "@/lib/db/selects";
 import { getImagesByListingIds, type ListingImageRow } from "@/lib/db/listingImages";
 import type { ProductImageRow } from "@/lib/db/gallery";
 import { getProfilesByClerkIds, getProfilesByIds } from "@/lib/db/profiles";
+import { getCardBadgeCounts, getCreditCounts } from "@/lib/db/cardBadgeCounts";
 import {
   isProjectListing,
   normalizeProject,
@@ -830,12 +831,17 @@ export async function getProjectsCanonical(
   const ids = rows.map((r) => String(r.id));
   const clerkIds = Array.from(new Set(rows.map((r) => r.owner_clerk_user_id as string | null).filter(Boolean) as string[]));
   const ownerProfileIds = Array.from(new Set(rows.map((r) => (r as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id).filter(Boolean) as string[]));
-  const [imageResult, profilesByClerk, profilesById, materialsMap, taxMap] = await Promise.all([
+  // Badge and credit counts join the existing fan-out rather than becoming a
+  // second stage: two more queries for the whole grid, regardless of its size.
+  // This is what keeps the shared card's badge off the N+1 path.
+  const [imageResult, profilesByClerk, profilesById, materialsMap, taxMap, badgeCounts, creditCounts] = await Promise.all([
     getImagesByListingIds(ids),
     clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
     ownerProfileIds.length > 0 ? getProfilesByIds(ownerProfileIds) : Promise.resolve({ data: [] }),
     getMaterialsByProjectIds(ids),
     getTaxonomySlugPaths(ids),
+    getCardBadgeCounts(ids, "project"),
+    getCreditCounts(ids),
   ]);
   const { data: imageRows, error: imgError } = imageResult;
   if (imgError && process.env.NODE_ENV === "development") {
@@ -872,6 +878,8 @@ export async function getProjectsCanonical(
     const clerkId = (row.owner_clerk_user_id as string) ?? null;
     project.owner = profileId ? ownerByProfileId[profileId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
     project.taxonomy_slug_path = taxMap.get(String(row.id)) ?? null;
+    project.cardBadge = badgeCounts[String(row.id)] ?? { related: 0, owners: 0 };
+    project.cardCreditCount = creditCounts[String(row.id)] ?? 0;
     result.push(project);
   }
   return result;
@@ -889,13 +897,14 @@ export async function getProductsCanonical(
   const ids = rows.map((r) => String(r.id));
   const clerkIds = Array.from(new Set(rows.map((r) => (r as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id).filter(Boolean) as string[]));
   const brandProfileIds = Array.from(new Set(rows.map((r) => (r as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id).filter(Boolean) as string[]));
-  const [imageResult, usedCounts, materialMap, profilesByClerk, profilesById, taxMap] = await Promise.all([
+  const [imageResult, usedCounts, materialMap, profilesByClerk, profilesById, taxMap, badgeCounts] = await Promise.all([
     getImagesByListingIds(ids),
     getUsedInProjectsCountByProductIds(ids),
     getMaterialsByProductIds(ids),
     clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
     brandProfileIds.length > 0 ? getProfilesByIds(brandProfileIds) : Promise.resolve({ data: [] }),
     getTaxonomySlugPaths(ids),
+    getCardBadgeCounts(ids, "product"),
   ]);
   const imageRows = imageResult.data ?? [];
   const ownerByClerkId: Record<string, ProjectOwner> = {};
@@ -925,6 +934,7 @@ export async function getProductsCanonical(
     const clerkId = (row as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id ?? null;
     product.owner = brandId ? ownerByProfileId[brandId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
     product.taxonomy_slug_path = taxMap.get(String(row.id)) ?? null;
+    product.cardBadge = badgeCounts[String(row.id)] ?? { related: 0, owners: 0 };
     return product;
   });
 }

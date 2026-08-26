@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { LayoutGrid, List, SlidersHorizontal, X } from "lucide-react";
-import { EntityCard } from "@/components/home/EntityCard";
+import { ListingCardShared } from "@/components/listing/ListingCardShared";
 import {
   ActiveFilterChips,
   DirectoryEmptyState,
@@ -207,16 +207,17 @@ export function ProductsDirectory({
           // per Blueprint §20.
           <div className="grid grid-cols-2 gap-x-5 gap-y-8 md:grid-cols-3 xl:grid-cols-5">
             {results.map((p, i) => (
-              <EntityCard
+              <ListingCardShared
                 key={p.id}
-                href={p.href}
-                title={p.title}
-                subtitle={p.brand}
-                meta={p.typeLabel}
-                imageUrl={p.cover}
-                imageCount={p.imageCount}
-                saveListingId={p.id}
-                saveEntityType="product"
+                model={{
+                  id: p.id,
+                  type: "product",
+                  title: p.title,
+                  href: p.href,
+                  imageUrl: p.cover,
+                  authorName: p.brand,
+                  categoryLabel: p.typeLabel,
+                }}
                 ratio="1/1"
                 priority={i < 5}
                 sizes="(max-width: 640px) 45vw, (max-width: 768px) 30vw, (max-width: 1280px) 30vw, 15vw"

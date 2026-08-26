@@ -1,4 +1,4 @@
-import { EntityCard, initialsOf } from "@/components/home/EntityCard";
+import { ListingCardShared } from "@/components/listing/ListingCardShared";
 import type { ProductDetailProject } from "@/lib/db/productDetail";
 
 /**
@@ -49,13 +49,15 @@ export function SeenInProjects({ projects }: { projects: ProductDetailProject[] 
       <ul className="grid grid-cols-2 gap-x-5 gap-y-8 lg:grid-cols-4">
         {projects.map((p) => (
           <li key={p.id}>
-            <EntityCard
-              href={p.href}
-              title={p.title}
-              subtitle={p.architect}
-              imageUrl={p.cover}
-              imageCount={p.imageCount}
-              avatarInitials={initialsOf(p.architect)}
+            <ListingCardShared
+              model={{
+                id: p.id,
+                type: "project",
+                title: p.title,
+                href: p.href,
+                imageUrl: p.cover,
+                authorName: p.architect,
+              }}
               sizes="(max-width: 640px) 45vw, 22vw"
             />
           </li>

@@ -1,58 +1,37 @@
-"use client";
-
 import type { ProjectCanonical } from "@/lib/canonical-models";
-import { getListingUrl } from "@/lib/canonical";
-import { getOwnerProfileHref } from "@/lib/cardUtils";
-import { getCityLabel } from "@/lib/cardUtils";
-import { ProjectListingCard } from "./ProjectListingCard";
+import { ListingCardShared } from "@/components/listing/ListingCardShared";
+import { projectToCardModel, type CardCounts } from "@/lib/cards/toListingCardModel";
 
+/**
+ * Project card for surfaces holding normalised ProjectCanonical data —
+ * explore, archive grids, the network feed, the 404 trending rail.
+ *
+ * Now a thin adapter over ListingCardShared. It keeps its name and its prop so
+ * the call sites did not all have to change in one commit, but it no longer
+ * owns any layout: everything visual lives in the shared card, and the mapping
+ * lives in projectToCardModel.
+ *
+ * `counts` is optional and arrives from the page, which calls
+ * getCardBadgeCounts once for the whole grid. A surface that has not wired them
+ * up renders without the badge rather than querying per card.
+ */
 export interface ProjectCardPremiumProps {
   project: ProjectCanonical;
+  counts?: CardCounts;
+  priority?: boolean;
+  initialSaved?: boolean;
 }
 
-const SQM_TO_SQFT = 10.7639;
-
-export function ProjectCardPremium({ project }: ProjectCardPremiumProps) {
-  const href = getListingUrl({ id: project.id, type: "project", slug: project.slug, taxonomySlugPath: project.taxonomy_slug_path });
-  const studioHref = project.owner ? getOwnerProfileHref(project.owner) : null;
-
-  // Location: city + country when both present, else one, else location_text
-  const city = getCityLabel(project);
-  const country = project.location?.country?.trim() ?? null;
-  const location = city && country ? `${city}, ${country}` : city || country || project.location_text?.trim() || null;
-  const locationHref = city
-    ? `/explore/projects?city=${encodeURIComponent(city)}`
-    : null;
-
-  const yearHref = project.year ? `/explore/projects?year=${project.year}` : null;
-
-  // Resolve area in sqft
-  const areaSqft =
-    project.area_sqft != null
-      ? project.area_sqft
-      : project.area_sqm != null
-      ? Math.round(project.area_sqm * SQM_TO_SQFT)
-      : null;
-
-  const teamAvatars = (project.team_members ?? []).map((m) => ({ name: m.name ?? "?" }));
-
+export function ProjectCardPremium({
+  project,
+  counts,
+  priority = false,
+  initialSaved = false,
+}: ProjectCardPremiumProps) {
   return (
-    <ProjectListingCard
-      image={project.cover}
-      imageAlt={project.title}
-      title={project.title}
-      href={href}
-      studioName={project.owner?.displayName ?? null}
-      studioHref={studioHref}
-      location={location}
-      locationHref={locationHref}
-      year={project.year}
-      yearHref={yearHref}
-      areaSqft={areaSqft}
-      connectionCount={project.connectionCount ?? 0}
-      teamAvatars={teamAvatars}
-      entityId={project.id}
-      entityTitle={project.title}
+    <ListingCardShared
+      model={projectToCardModel(project, counts, initialSaved)}
+      priority={priority}
     />
   );
 }

@@ -75,6 +75,19 @@ export interface ProjectCanonical {
   owner: ProjectOwner | null;
   /** team_members.length + brands_used.length. For "X connections" label. */
   connectionCount: number;
+  /**
+   * Shared-card badge counts: linked products, and distinct brands behind them.
+   *
+   * Populated by getProjectsCanonical via getCardBadgeCounts — batched once per
+   * grid, never per card. Undefined means "not fetched on this surface", which
+   * the card renders as no badge; it does NOT mean zero.
+   *
+   * Deliberately separate from connectionCount above, which is derived from the
+   * legacy jsonb columns and disagrees with the relational tables.
+   */
+  cardBadge?: { related: number; owners: number };
+  /** Profile-linked credits, for the card's "N connections" line. */
+  cardCreditCount?: number;
   created_at: string;
   updated_at: string | null;
   /** PENDING until admin approves; only APPROVED in public explore. */
@@ -124,6 +137,11 @@ export interface ProductCanonical {
   connectionCount: number;
   /** Number of projects this product is linked to (project_product_links). Set by explore layer. */
   usedInProjectsCount?: number;
+  /**
+   * Shared-card badge counts: linked projects, and distinct studios behind
+   * them. See the matching note on ProjectCanonical.
+   */
+  cardBadge?: { related: number; owners: number };
   created_at: string;
   /** Hydrated via product_material_links -> materials. Use for sidebar/cards. */
   materials: { id: string; name: string; slug: string }[];

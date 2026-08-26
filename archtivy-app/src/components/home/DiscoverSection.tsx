@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { EntityCard } from "@/components/home/EntityCard";
+import { ListingCardShared } from "@/components/listing/ListingCardShared";
 import { HomeSectionHeader } from "@/components/home/HomeSectionHeader";
 import type { ConnectedListing } from "@/lib/db/mostConnected";
 
@@ -15,8 +15,10 @@ import type { ConnectedListing } from "@/lib/db/mostConnected";
  * borrowed name. Connection count is real, varies, and is the thing the
  * platform is organised around — see lib/db/mostConnected.ts for the full note.
  *
- * The connection count rides on each card as a chip, so the ranking is legible
- * rather than asserted: a visitor can see why one card is above another.
+ * The ranking used to be justified by a "N connections" chip on each card.
+ * The shared listing card now carries the same information decomposed — the
+ * "Used in N projects" badge and, on project cards, the credited-people line —
+ * so the chip was removed rather than shown twice in two different shapes.
  *
  * ── EMPTY TABS ARE DROPPED, NOT SHOWN EMPTY ─────────────────────────────────
  * A tab with nothing behind it is removed from the tab strip, and if neither
@@ -86,20 +88,19 @@ export function DiscoverSection({ projects, products, hrefById }: DiscoverSectio
         role="tabpanel"
       >
         {current.items.slice(0, 5).map((item, i) => (
-          <EntityCard
+          <ListingCardShared
             key={item.id}
-            href={hrefById[item.id] ?? "#"}
-            title={item.title}
-            subtitle={item.subtitle}
-            location={item.location}
-            imageUrl={item.imageUrl}
+            model={{
+              id: item.id,
+              type: item.type,
+              title: item.title,
+              href: hrefById[item.id] ?? "#",
+              imageUrl: item.imageUrl,
+              metaLabel: item.location,
+              authorName: item.subtitle,
+            }}
             ratio={current.id === "products" ? "1/1" : "4/3"}
             priority={i < 2}
-            saveListingId={item.id}
-            saveEntityType={item.type}
-            chips={[
-              `${item.connections} ${item.connections === 1 ? "connection" : "connections"}`,
-            ]}
           />
         ))}
       </div>

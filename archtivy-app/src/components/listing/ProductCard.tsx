@@ -1,36 +1,41 @@
 import type { ListingCardData } from "@/lib/types/listings";
-import { getListingUrl } from "@/lib/canonical";
-import { ProductListingCard } from "./ProductListingCard";
+import { ListingCardShared } from "@/components/listing/ListingCardShared";
+import { listingRowToCardModel, type CardCounts } from "@/lib/cards/toListingCardModel";
 
+/**
+ * Product card for surfaces holding a raw `listings` row. The counterpart of
+ * ProjectCard; see the note there.
+ */
 export interface ProductCardProps {
   listing: ListingCardData;
   imageUrl?: string | null;
-  /** Override canonical product URL. */
+  /** Override canonical URL. */
   href?: string | null;
-  /** Owner display name (already resolved by caller). */
+  /** Brand display name (already resolved by caller). */
   postedBy?: string | null;
+  counts?: CardCounts;
+  initialSaved?: boolean;
 }
 
-export function ProductCard({ listing, imageUrl, href, postedBy }: ProductCardProps) {
-  const linkHref = href?.trim() || getListingUrl(listing);
-  const title = listing.title?.trim() || "Product";
-
-  // Build brand href from owner_profile_id when available (redirects to profile slug page)
-  const brandHref = listing.owner_profile_id
-    ? `/u/id/${listing.owner_profile_id}`
-    : null;
-
-  const connectionsCount = listing.used_in_projects_count ?? 0;
-
+export function ProductCard({
+  listing,
+  imageUrl,
+  href,
+  postedBy,
+  counts,
+  initialSaved = false,
+}: ProductCardProps) {
   return (
-    <ProductListingCard
-      image={imageUrl}
-      imageAlt={title}
-      brandName={postedBy ?? null}
-      brandHref={brandHref}
-      title={title}
-      href={linkHref}
-      connectionsCount={connectionsCount}
+    <ListingCardShared
+      model={listingRowToCardModel(listing, {
+        type: "product",
+        imageUrl,
+        href,
+        authorName: postedBy,
+        counts,
+        initialSaved,
+      })}
+      ratio="1/1"
     />
   );
 }

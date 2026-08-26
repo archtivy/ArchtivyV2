@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { LayoutGrid, List, SlidersHorizontal, X, MapPin } from "lucide-react";
-import { EntityCard, initialsOf } from "@/components/home/EntityCard";
+import { ListingCardShared } from "@/components/listing/ListingCardShared";
 import {
   ProjectsFilterRail,
   EMPTY_FILTERS,
@@ -253,19 +253,18 @@ export function ProjectsDirectory({
           ) : view === "grid" ? (
             <div className="grid grid-cols-2 gap-x-5 gap-y-8 lg:grid-cols-3 xl:grid-cols-4">
               {results.map((p, i) => (
-                <EntityCard
+                <ListingCardShared
                   key={p.id}
-                  href={p.href}
-                  title={p.title}
-                  location={p.locationText}
-                  subtitle={p.architect}
-                  imageUrl={p.cover}
-                  imageCount={p.imageCount}
-                  saveListingId={p.id}
-                saveEntityType="project"
-                  avatarUrl={p.architectAvatar}
-                  avatarInitials={initialsOf(p.architect)}
-                  chips={chipsFor(p)}
+                  model={{
+                    id: p.id,
+                    type: "project",
+                    title: p.title,
+                    href: p.href,
+                    imageUrl: p.cover,
+                    metaLabel: p.locationText,
+                    authorName: p.architect,
+                    logoUrl: p.architectAvatar,
+                  }}
                   priority={i < 4}
                   sizes="(max-width: 640px) 45vw, (max-width: 1024px) 45vw, (max-width: 1280px) 30vw, 17vw"
                 />

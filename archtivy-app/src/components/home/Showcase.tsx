@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ArrowRight, ArrowDown } from "lucide-react";
 import Link from "next/link";
-import { EntityCard } from "@/components/home/EntityCard";
+import { ListingCardShared } from "@/components/listing/ListingCardShared";
 
 /**
  * Projects Showcase / Products Showcase (Build Brief §7 and §8).
@@ -119,14 +119,18 @@ export function Showcase({
       ) : (
         <div className="grid grid-cols-2 gap-x-6 gap-y-8 lg:grid-cols-4">
           {shown.map((it) => (
-            <EntityCard
+            <ListingCardShared
               key={it.id}
-              href={it.href}
-              title={it.title}
-              subtitle={it.subtitle}
-              meta={it.meta}
-              location={it.location}
-              imageUrl={it.imageUrl}
+              model={{
+                id: it.id,
+                type: ratio === "1/1" ? "product" : "project",
+                title: it.title,
+                href: it.href,
+                imageUrl: it.imageUrl ?? null,
+                categoryLabel: it.meta,
+                metaLabel: it.location,
+                authorName: it.subtitle,
+              }}
               ratio={ratio}
               sizes="(max-width: 640px) 45vw, (max-width: 1024px) 45vw, 20vw"
             />
