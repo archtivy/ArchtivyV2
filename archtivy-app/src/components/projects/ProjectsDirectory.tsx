@@ -265,8 +265,14 @@ export function ProjectsDirectory({
                     // already fetched here and simply never passed, so the line
                     // rendered as location alone.
                     categoryLabel: p.buildingTypeLabel,
+                    categoryHref: p.buildingType ? `/projects/${p.buildingType}` : null,
                     metaLabel: p.locationText,
+                    // Country-level filter, matching what locationText now holds.
+                    metaHref: p.locationText
+                      ? `/explore/projects?city=${encodeURIComponent(p.locationText)}`
+                      : null,
                     authorName: p.architect,
+                    authorHref: p.architectHref,
                     logoUrl: p.architectAvatar,
                     relatedCount: p.badge.related,
                     ownerCount: p.badge.owners,

@@ -9,6 +9,7 @@ import { getImagesByListingIds, type ListingImageRow } from "@/lib/db/listingIma
 import type { ProductImageRow } from "@/lib/db/gallery";
 import { getProfilesByClerkIds, getProfilesByIds } from "@/lib/db/profiles";
 import { getCardBadgeCounts, getCreditCounts } from "@/lib/db/cardBadgeCounts";
+import { toOwner } from "@/lib/db/toOwner";
 import {
   isProjectListing,
   normalizeProject,
@@ -865,8 +866,8 @@ export async function getProjectsCanonical(
   }
   const ownerByProfileId: Record<string, ProjectOwner> = {};
   for (const p of profilesById.data ?? []) {
-    const o = toProjectOwner(p);
-    if (o.displayName) ownerByProfileId[p.id] = o;
+    const o = toOwner(p);
+    if (o) ownerByProfileId[p.id] = o;
   }
   const result: ProjectCanonical[] = [];
   for (const row of rows) {
@@ -920,8 +921,8 @@ export async function getProductsCanonical(
   }
   const ownerByProfileId: Record<string, ProjectOwner> = {};
   for (const p of profilesById.data ?? []) {
-    const o = toProjectOwner(p);
-    if (o.displayName) ownerByProfileId[p.id] = o;
+    const o = toOwner(p);
+    if (o) ownerByProfileId[p.id] = o;
   }
   return rows.map((row) => {
     const productImages = listingImagesToProductImageRows(String(row.id), imageRows);
@@ -998,8 +999,8 @@ export async function getProjectsCanonicalFiltered({
   }
   const ownerByProfileId: Record<string, ProjectOwner> = {};
   for (const p of profilesById.data ?? []) {
-    const o = toProjectOwner(p);
-    if (o.displayName) ownerByProfileId[p.id] = o;
+    const o = toOwner(p);
+    if (o) ownerByProfileId[p.id] = o;
   }
   const data: ProjectCanonical[] = [];
   for (const row of rows) {
@@ -1018,26 +1019,6 @@ export async function getProjectsCanonicalFiltered({
   return { data, total };
 }
 
-/** Build ProjectOwner from profile row (id, display_name, username). */
-function toProjectOwner(p: {
-  id: string;
-  display_name: string | null;
-  username: string | null;
-  avatar_url?: string | null;
-}): ProjectOwner {
-  const displayName =
-    (p.display_name && p.display_name.trim()) ||
-    (p.username && p.username.trim()) ||
-    "";
-  return {
-    displayName,
-    // Was hardcoded null, which is why explore cards had no logo chip: the card
-    // reads owner.avatarUrl and there was never anything in it.
-    avatarUrl: p.avatar_url?.trim() || null,
-    profileId: p.id,
-    username: p.username?.trim() || null,
-  };
-}
 
 /**
  * Get products with filters, sort, pagination. Returns canonical list and total count.
@@ -1103,8 +1084,8 @@ export async function getProductsCanonicalFiltered({
   }
   const ownerByProfileId: Record<string, ProjectOwner> = {};
   for (const p of profilesById.data ?? []) {
-    const o = toProjectOwner(p);
-    if (o.displayName) ownerByProfileId[p.id] = o;
+    const o = toOwner(p);
+    if (o) ownerByProfileId[p.id] = o;
   }
   const data = rows.map((row) => {
     const productImages = listingImagesToProductImageRows(String(row.id), imageRows);

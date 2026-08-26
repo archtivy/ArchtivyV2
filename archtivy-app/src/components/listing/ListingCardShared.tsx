@@ -48,6 +48,8 @@ export interface ListingCardModel {
   imageUrl: string | null;
   /** "Hospitality" for a project, "Lighting" for a product. */
   categoryLabel?: string | null;
+  /** Archive URL for the category, e.g. /projects/residential. */
+  categoryHref?: string | null;
   /** Second half of the meta line: location for a project, sub-type for a product. */
   metaLabel?: string | null;
   /** Filter link for the meta label. Project cards only — products have no city. */
@@ -181,18 +183,33 @@ export function ListingCardShared({
       </div>
 
       <div className="mt-3 min-w-0">
+        {/* ── EVERY PART OF THIS LINE IS ITS OWN DESTINATION ──────────────
+            Category and location each link somewhere different from the card,
+            so they are real <a> elements rather than text inside one big link.
+
+            This is safe because the card root is an <article>, not an anchor:
+            the image and the title carry their own links to the detail page,
+            and nothing wraps the whole card. Anchors therefore never nest, and
+            no click-handler shim is needed to fake it. */}
         {metaParts.length > 0 && (
           <p className="truncate font-body text-[12px] leading-[16px] text-muted">
-            {model.metaHref && model.metaLabel ? (
-              <>
-                {model.categoryLabel && <>{model.categoryLabel} &middot; </>}
+            {model.categoryLabel &&
+              (model.categoryHref ? (
+                <Link href={model.categoryHref} className="hover:text-ink hover:underline">
+                  {model.categoryLabel}
+                </Link>
+              ) : (
+                <span>{model.categoryLabel}</span>
+              ))}
+            {model.categoryLabel && model.metaLabel && <> &middot; </>}
+            {model.metaLabel &&
+              (model.metaHref ? (
                 <Link href={model.metaHref} className="hover:text-ink hover:underline">
                   {model.metaLabel}
                 </Link>
-              </>
-            ) : (
-              metaParts.join(" · ")
-            )}
+              ) : (
+                <span>{model.metaLabel}</span>
+              ))}
           </p>
         )}
 

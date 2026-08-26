@@ -22,6 +22,8 @@
 
 import { unstable_cache } from "next/cache";
 import { getCardBadgeCounts, getCreditCounts } from "@/lib/db/cardBadgeCounts";
+import { toOwner, type OwnerProfileRow } from "@/lib/db/toOwner";
+import { getOwnerProfileHref } from "@/lib/cardUtils";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 
@@ -36,6 +38,8 @@ export interface DirectoryProject {
   country: string | null;
   architect: string | null;
   architectAvatar: string | null;
+  /** Profile URL for the owning studio, or null when it has no public page. */
+  architectHref: string | null;
   /** Shared-card badge: linked products and the distinct brands behind them. */
   badge: { related: number; owners: number };
   /** Profile-linked credits, for the card's connections row. */
@@ -152,7 +156,9 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
     getCreditCounts(ids),
     sup
       .from("profiles")
-      .select("id, display_name, avatar_url")
+      // username so the card can link to /u/{username}; without it
+      // getOwnerProfileHref falls back to the noindexed /u/id/{uuid} form.
+      .select("id, display_name, username, avatar_url")
       .in(
         "id",
         Array.from(
@@ -227,13 +233,19 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
     }
   }
 
-  const profiles = new Map<string, { display_name: string | null; avatar_url: string | null }>();
+  const profiles = new Map<string, OwnerProfileRow>();
   for (const p of (profRes.data ?? []) as {
     id: string;
     display_name: string | null;
+    username: string | null;
     avatar_url: string | null;
   }[]) {
-    profiles.set(p.id, { display_name: p.display_name, avatar_url: p.avatar_url });
+    profiles.set(p.id, {
+      id: p.id,
+      display_name: p.display_name,
+      username: p.username,
+      avatar_url: p.avatar_url,
+    });
   }
 
   const projects: DirectoryProject[] = listings.map((l) => {
@@ -250,10 +262,20 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
       href: `/projects/${slug ?? id}`,
       cover: (l.cover_image_url as string | null) ?? null,
       imageCount: imageCounts.get(id) ?? 0,
-      locationText: (l.location as string | null) ?? null,
+      // City when we have one, else country alone — never the raw free-text
+      // address, which rendered as "Residential · London, Greater London,
+      // England, United Kingdom" and was cut off by CSS. Same rule as
+      // getCityLabel so the directory and the canonical card paths agree.
+      locationText:
+        ((l.location_city as string | null)?.trim() ||
+          (l.location_country as string | null)?.trim() ||
+          null),
       country: (l.location_country as string | null) ?? null,
       architect: owner?.display_name ?? null,
       architectAvatar: owner?.avatar_url ?? null,
+      // Same resolver the canonical layer uses, so the directory and explore
+      // agree on what an owner is and where it links.
+      architectHref: getOwnerProfileHref(toOwner(owner ?? null)),
       badge: badgeCounts[id] ?? { related: 0, owners: 0 },
       creditCount: creditCounts[id] ?? 0,
       buildingType: building?.root ?? null,

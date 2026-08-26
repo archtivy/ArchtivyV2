@@ -219,8 +219,10 @@ export function ProductsDirectory({
                   // already fetched; only typeLabel was being passed, so the
                   // line showed the narrow term with no context above it.
                   categoryLabel: p.categoryLabel,
+                  categoryHref: p.category ? `/products/${p.category}` : null,
                   metaLabel: p.typeLabel,
                   authorName: p.brand,
+                  authorHref: p.brandHref,
                   logoUrl: p.brandAvatar,
                   relatedCount: p.badge.related,
                   ownerCount: p.badge.owners,

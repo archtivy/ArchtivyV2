@@ -24,6 +24,8 @@
 
 import { unstable_cache } from "next/cache";
 import { getCardBadgeCounts } from "@/lib/db/cardBadgeCounts";
+import { toOwner, type OwnerProfileRow } from "@/lib/db/toOwner";
+import { getOwnerProfileHref } from "@/lib/cardUtils";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { FacetValue } from "@/components/directory/FilterPrimitives";
@@ -37,6 +39,8 @@ export interface DirectoryProduct {
   imageCount: number;
   brand: string | null;
   brandId: string | null;
+  /** Profile URL for the owning brand, or null when it has no public page. */
+  brandHref: string | null;
   /** Brand logo for the shared card's chip. */
   brandAvatar: string | null;
   /** Shared-card badge: linked projects and the distinct studios behind them. */
@@ -146,7 +150,7 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
           // avatar_url: the shared card renders the brand logo as a chip, and
           // its absence from this select is why /products showed no logo while
           // /projects did. Third instance of the same omission.
-          .select("id, display_name, website, avatar_url")
+          .select("id, display_name, username, website, avatar_url")
           .in("id", ownerIds)
       : Promise.resolve({ data: [] as unknown[] }),
   ]);
@@ -168,7 +172,10 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
     ((docRes.data ?? []) as { listing_id: string }[]).map((r) => r.listing_id)
   );
 
-  const brands = new Map<string, { name: string | null; website: string | null; avatar: string | null }>();
+  const brands = new Map<
+    string,
+    { name: string | null; website: string | null; avatar: string | null; href: string | null }
+  >();
   for (const b of (brandRes.data ?? []) as {
     id: string;
     display_name: string | null;
@@ -178,6 +185,7 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
       name: b.display_name,
       website: b.website,
       avatar: (b as { avatar_url?: string | null }).avatar_url ?? null,
+      href: getOwnerProfileHref(toOwner(b as OwnerProfileRow)),
     });
   }
 
@@ -265,6 +273,7 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
       imageCount: imageCounts.get(id) ?? 0,
       brand: brand?.name ?? null,
       brandAvatar: brand?.avatar ?? null,
+      brandHref: brand?.href ?? null,
       badge: badgeCounts[id] ?? { related: 0, owners: 0 },
       brandId: ownerId,
       category: cat?.root ?? null,

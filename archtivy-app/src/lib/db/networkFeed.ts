@@ -9,6 +9,7 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getFollowingByProfile, type FollowRow } from "@/lib/db/follows";
 import { getImagesByListingIds } from "@/lib/db/listingImages";
 import { getProfilesByIds } from "@/lib/db/profiles";
+import { toOwner } from "@/lib/db/toOwner";
 import { getMaterialsByProjectIds, getMaterialsByProductIds } from "@/lib/db/materials";
 import { projectListingSelect, productListingSelect } from "@/lib/db/selects";
 import {
@@ -80,18 +81,6 @@ function listingRowToRawProductRow(row: Record<string, unknown>): RawProductRow 
   } as RawProductRow;
 }
 
-function toProjectOwner(p: { id: string; display_name: string | null; username: string | null }): ProjectOwner {
-  const displayName =
-    (p.display_name && p.display_name.trim()) ||
-    (p.username && p.username.trim()) ||
-    "";
-  return {
-    displayName,
-    avatarUrl: null,
-    profileId: p.id,
-    username: p.username?.trim() || null,
-  };
-}
 
 export async function getNetworkFeed(profileId: string): Promise<NetworkFeedResult> {
   // 1. Get all follows
@@ -384,8 +373,10 @@ async function hydrateProjects(
 
   const ownerByProfileId: Record<string, ProjectOwner> = {};
   for (const p of profilesById.data ?? []) {
-    const o = toProjectOwner(p);
-    if (o.displayName) ownerByProfileId[p.id] = o;
+    // toOwner returns null for a nameless row, which is the same rows the old
+    // `if (o.displayName)` check was dropping — the guard moved into the helper.
+    const o = toOwner(p);
+    if (o) ownerByProfileId[p.id] = o;
   }
 
   const items: NetworkFeedItem[] = [];
@@ -429,8 +420,10 @@ async function hydrateProducts(
 
   const ownerByProfileId: Record<string, ProjectOwner> = {};
   for (const p of profilesById.data ?? []) {
-    const o = toProjectOwner(p);
-    if (o.displayName) ownerByProfileId[p.id] = o;
+    // toOwner returns null for a nameless row, which is the same rows the old
+    // `if (o.displayName)` check was dropping — the guard moved into the helper.
+    const o = toOwner(p);
+    if (o) ownerByProfileId[p.id] = o;
   }
 
   const items: NetworkFeedItem[] = [];

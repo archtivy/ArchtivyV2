@@ -27,10 +27,23 @@ import type { ListingCardData } from "@/lib/types/listings";
 import type { CardBadgeCount } from "@/lib/db/cardBadgeCounts";
 import { getListingUrl } from "@/lib/canonical";
 import { getCityLabel, getOwnerProfileHref } from "@/lib/cardUtils";
+import { getArchiveCategoryUrl } from "@/lib/archive/urls";
 
 export interface CardCounts {
   badge?: CardBadgeCount;
   credits?: number;
+}
+
+/**
+ * Archive URL for the ROOT of a taxonomy path.
+ *
+ * `taxonomy_slug_path` can be deep ("residential/houses"), but the label shown
+ * on the card is the root's, so the link has to point at the root too — a link
+ * whose text says "Residential" must not land on a narrower archive.
+ */
+function rootArchiveUrl(type: "project" | "product", slugPath: string | null | undefined): string | null {
+  const root = slugPath?.split("/")[0]?.trim();
+  return root ? getArchiveCategoryUrl(type, root) : null;
 }
 
 /** Boards use "1 project", "0 projects" — never "null". */
@@ -44,10 +57,12 @@ export function projectToCardModel(
   counts: CardCounts = {},
   initialSaved = false
 ): ListingCardModel {
+  // City + country when a real city exists, country alone otherwise. The raw
+  // free-text location is deliberately NOT a fallback any more — see the note
+  // on getCityLabel for why its first segment is often a street.
   const city = getCityLabel(project);
   const country = cleanText(project.location?.country);
-  const location =
-    city && country ? `${city}, ${country}` : city || country || cleanText(project.location_text);
+  const location = city && country ? `${city}, ${country}` : city || country;
 
   return {
     id: project.id,
@@ -61,6 +76,10 @@ export function projectToCardModel(
     }),
     imageUrl: project.cover,
     categoryLabel: cleanText(project.taxonomy_label) ?? cleanText(project.category),
+    // Archive route for the category root, e.g. /projects/residential. Built
+    // only from a real taxonomy slug_path — never from the display label, which
+    // would produce a URL that does not resolve.
+    categoryHref: rootArchiveUrl("project", project.taxonomy_slug_path),
     metaLabel: location,
     // City filter, kept from the previous cards — a working discovery entry
     // point the mockup does not show but that visitors already use.
@@ -98,6 +117,7 @@ export function productToCardModel(
     }),
     imageUrl: product.cover,
     categoryLabel: cleanText(product.taxonomy_label) ?? cleanText(product.category),
+    categoryHref: rootArchiveUrl("product", product.taxonomy_slug_path),
     // The product's sub-type. No href: unlike a project's city there is no
     // equivalent single-value filter route for it.
     metaLabel: cleanText(product.product_category),
