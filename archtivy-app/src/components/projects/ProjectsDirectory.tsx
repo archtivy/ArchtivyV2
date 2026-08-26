@@ -251,7 +251,7 @@ export function ProjectsDirectory({
               }}
             />
           ) : view === "grid" ? (
-            <div className="grid grid-cols-2 gap-x-5 gap-y-8 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-x-5 gap-y-8 lg:grid-cols-3">
               {results.map((p, i) => (
                 <ListingCardShared
                   key={p.id}

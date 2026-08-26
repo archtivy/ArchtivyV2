@@ -140,7 +140,18 @@ export function ListingCardShared({
               sizes={sizes}
               priority={priority}
               className={[
-                model.type === "product" ? "object-contain p-4" : "object-cover",
+                // Both types fill their frame. Products used object-contain with
+                // padding, which left the stone tile visible around every
+                // catalogue shot — a letterboxed image inside a card reads as a
+                // loading state, not a design.
+                //
+                // The crop is biased UP rather than centred. A 4/3 window on an
+                // architectural photograph, centred, reliably cuts the top off
+                // the building — the part the photograph is usually about.
+                // Pulling the focal point to 35% keeps roofline and sky and
+                // gives up foreground, which is the cheaper half of the frame.
+                "object-cover",
+                model.type === "product" ? "object-center" : "object-[50%_35%]",
                 "transition-transform duration-200 ease-out group-hover:scale-[1.02]",
                 "motion-reduce:transition-none motion-reduce:group-hover:scale-100",
               ].join(" ")}
