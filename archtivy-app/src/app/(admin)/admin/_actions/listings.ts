@@ -1266,11 +1266,71 @@ export async function updateProductAction(
   redirect(`/admin/products/${listingId}?saved=1`);
 }
 
-/** Admin-only: approve a pending listing (set status = APPROVED). */
+/**
+ * Admin-only: approve a pending listing (set status = APPROVED).
+ *
+ * ── A PRODUCT IS TWO ROWS, AND THIS ONLY EVER UPDATED ONE ───────────────────
+ * A product is a `listings` row plus a `products` sidecar sharing its id, and
+ * both carry a `status`. Every other status writer maintains the pair —
+ * publishListing updates the sidecar immediately after the listing, and admin
+ * create goes through create_product_with_sidecar, which writes both. Approval
+ * did not: it wrote `listings` alone, so every product an admin ever approved
+ * was left with `products.status` frozen at its pre-approval value.
+ *
+ * Two live rows were sitting in that state when this was found (otoo-chair and
+ * deneme-rn, both APPROVED/PENDING). Nothing broke, because no reader consults
+ * `products.status` today — which is exactly why it went unnoticed since
+ * 2026-02-16. A column that two paths write, one path skips and nothing reads
+ * is dormant, not harmless: the first reader added would inherit wrong rows.
+ *
+ * ── SIDECAR FIRST, DELIBERATELY ─────────────────────────────────────────────
+ * The sidecar is written BEFORE the listing, and a failure aborts without
+ * approving anything. There is no transaction across two PostgREST calls, so
+ * the only real choice is which way a partial failure can land:
+ *
+ *   sidecar first  → sidecar ahead, listing behind. Nothing is published; the
+ *                    admin sees an error and can retry. Converges.
+ *   listing first  → listing published, sidecar behind. Silently public with a
+ *                    stale sidecar — the precise state being repaired here.
+ *
+ * The first is the safe direction, and a retry resolves it either way.
+ *
+ * Not returning an error on sidecar failure would be pointless anyway:
+ * approveListingFormActionVoid discards the result, so a logged warning would
+ * reach nobody. Aborting is the only signal that actually surfaces.
+ */
 export async function approveListingAction(listingId: string) {
   const admin = await ensureAdmin();
   if (!admin.ok) return { ok: false as const, error: admin.error };
   const supabase = getSupabaseServiceClient();
+
+  // Read before writing: the sidecar exists only for products, and the slug and
+  // type are needed for the IndexNow ping further down. Approval does not
+  // change either, so reading them first is equivalent to reading them after
+  // and saves a second round trip.
+  const { data: target, error: targetError } = await supabase
+    .from("listings")
+    .select("slug, type")
+    .eq("id", listingId)
+    .maybeSingle();
+  if (targetError) return { ok: false as const, error: targetError.message };
+  if (!target) return { ok: false as const, error: "Listing not found" };
+  const approved = target as { slug: string | null; type: string | null };
+
+  if (approved.type === "product") {
+    const { error: sidecarError } = await supabase
+      .from("products")
+      .update({ status: "APPROVED" })
+      .eq("id", listingId);
+    // Abort rather than approve half of it. See the note above on ordering.
+    if (sidecarError) {
+      return {
+        ok: false as const,
+        error: `Sidecar status update failed, nothing approved: ${sidecarError.message}`,
+      };
+    }
+  }
+
   const { error } = await supabase.from("listings").update({ status: "APPROVED" }).eq("id", listingId);
   if (error) return { ok: false as const, error: error.message };
   await createAuditLog({
@@ -1293,13 +1353,9 @@ export async function approveListingAction(listingId: string) {
   revalidateTag(CACHE_TAGS.listings);
   revalidateTag(CACHE_TAGS.explore);
 
-  // Notify search engines — fire and forget
-  const { data: approved } = await supabase
-    .from("listings")
-    .select("slug, type")
-    .eq("id", listingId)
-    .maybeSingle();
-  if (approved?.slug) {
+  // Notify search engines — fire and forget. Reuses the row read at the top;
+  // approval changes neither slug nor type, so re-reading them said nothing new.
+  if (approved.slug) {
     const prefix = approved.type === "product" ? "/products" : "/projects";
     notifySearchEngines([`${prefix}/${approved.slug}`]).catch(() => {});
   }
