@@ -5,7 +5,6 @@ export const revalidate = 3600; // ISR: revalidate every hour
 import { getProjectsCanonical, getProductsCanonical } from "@/lib/db/explore";
 import { HomeNav } from "@/components/home/HomeNav";
 import { HeroBand } from "@/components/home/HeroBand";
-import { CategoryPillBar } from "@/components/home/CategoryPillBar";
 import { DiscoverSection } from "@/components/home/DiscoverSection";
 import { ConnectSection } from "@/components/home/ConnectSection";
 import { PopularProfilesSection } from "@/components/home/PopularProfilesSection";
@@ -218,8 +217,10 @@ export default async function Home() {
       ))}
 
       <HomeNav />
+      {/* The category pill bar that used to sit here has moved INTO the hero.
+          Rendering CategoryPillBar as well would show the same six categories
+          twice, a few pixels apart. */}
       <HeroBand />
-      <CategoryPillBar />
 
       <div className="mx-auto max-w-content px-4 md:px-12 lg:px-24">
         {/* 01 — Discover, ranked by connection count */}
