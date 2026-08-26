@@ -217,9 +217,9 @@ export default async function Home() {
       ))}
 
       <HomeNav />
-      {/* The category pill bar that used to sit here has moved INTO the hero.
-          Rendering CategoryPillBar as well would show the same six categories
-          twice, a few pixels apart. */}
+      {/* The category pill strip that used to sit here has moved INTO the hero.
+          Keeping it as well would have shown the same six categories twice, a
+          few pixels apart, so the component was removed rather than restyled. */}
       <HeroBand />
 
       <div className="mx-auto max-w-content px-4 md:px-12 lg:px-24">
