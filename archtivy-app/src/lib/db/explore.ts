@@ -966,12 +966,18 @@ export async function getProjectsCanonicalFiltered({
   const ids = rows.map((r) => String(r.id));
   const clerkIds = Array.from(new Set(rows.map((r) => r.owner_clerk_user_id as string | null).filter(Boolean) as string[]));
   const ownerProfileIds = Array.from(new Set(rows.map((r) => (r as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id).filter(Boolean) as string[]));
-  const [imageResult, profilesByClerk, profilesById, materialsMap, taxMap] = await Promise.all([
+  // Badge counts, same as the unfiltered fetcher. This function is a near-copy
+  // of getProjectsCanonicalFiltered's sibling, and wiring only one of the pair
+  // is exactly how the badge came out empty on /explore after the shared card
+  // shipped: the grid used the FILTERED path, which nobody had touched.
+  const [imageResult, profilesByClerk, profilesById, materialsMap, taxMap, badgeCounts, creditCounts] = await Promise.all([
     getImagesByListingIds(ids),
     clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
     ownerProfileIds.length > 0 ? getProfilesByIds(ownerProfileIds) : Promise.resolve({ data: [] }),
     getMaterialsByProjectIds(ids),
     getTaxonomySlugPaths(ids),
+    getCardBadgeCounts(ids, "project"),
+    getCreditCounts(ids),
   ]);
   const { data: imageRows } = imageResult;
   const byListingId: Record<string, { listing_id: string; image_url: string; alt: string | null; sort_order: number }[]> = {};
@@ -1005,6 +1011,8 @@ export async function getProjectsCanonicalFiltered({
     const clerkId = (row.owner_clerk_user_id as string) ?? null;
     project.owner = profileId ? ownerByProfileId[profileId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
     project.taxonomy_slug_path = taxMap.get(String(row.id)) ?? null;
+    project.cardBadge = badgeCounts[String(row.id)] ?? { related: 0, owners: 0 };
+    project.cardCreditCount = creditCounts[String(row.id)] ?? 0;
     data.push(project);
   }
   return { data, total };
@@ -1061,13 +1069,18 @@ export async function getProductsCanonicalFiltered({
         .filter(Boolean) as string[]
     )
   );
-  const [imageResult, usedCounts, materialMap, profilesByClerk, profilesById, taxMap] = await Promise.all([
+  // Badge counts, same as the unfiltered fetcher. This function is a near-copy
+  // of getProjectsCanonicalFiltered's sibling, and wiring only one of the pair
+  // is exactly how the badge came out empty on /explore after the shared card
+  // shipped: the grid used the FILTERED path, which nobody had touched.
+  const [imageResult, usedCounts, materialMap, profilesByClerk, profilesById, taxMap, badgeCounts] = await Promise.all([
     getImagesByListingIds(ids),
     getUsedInProjectsCountByProductIds(ids),
     getMaterialsByProductIds(ids),
     clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
     brandProfileIds.length > 0 ? getProfilesByIds(brandProfileIds) : Promise.resolve({ data: [] }),
     getTaxonomySlugPaths(ids),
+    getCardBadgeCounts(ids, "product"),
   ]);
   const imageRows = imageResult.data ?? [];
   const ownerByClerkId: Record<string, ProjectOwner> = {};
@@ -1101,6 +1114,7 @@ export async function getProductsCanonicalFiltered({
         ? ownerByClerkId[clerkId] ?? null
         : null;
     product.taxonomy_slug_path = taxMap.get(String(row.id)) ?? null;
+    product.cardBadge = badgeCounts[String(row.id)] ?? { related: 0, owners: 0 };
     return product;
   });
   return { data, total };
