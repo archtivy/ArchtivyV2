@@ -6,15 +6,17 @@ import { getProjectsCanonical, getProductsCanonical } from "@/lib/db/explore";
 import { HomeNav } from "@/components/home/HomeNav";
 import { HeroBand } from "@/components/home/HeroBand";
 import { CategoryPillBar } from "@/components/home/CategoryPillBar";
-import { FeaturedProjects } from "@/components/home/FeaturedProjects";
-import { FindByConnection } from "@/components/home/FindByConnection";
-import { FeaturedDesigners } from "@/components/home/FeaturedDesigners";
-import { FeaturedBrands } from "@/components/home/FeaturedBrands";
+import { DiscoverSection } from "@/components/home/DiscoverSection";
+import { ConnectSection } from "@/components/home/ConnectSection";
+import { PopularProfilesSection } from "@/components/home/PopularProfilesSection";
 import { Showcase, type ShowcaseItem } from "@/components/home/Showcase";
 import { JoinArchtivy } from "@/components/home/JoinArchtivy";
 import { HomeFooter } from "@/components/home/HomeFooter";
 import { MaintenanceLanding } from "@/components/home/MaintenanceLanding";
 import { getHomepagePromotedListingIds } from "@/lib/promote/campaigns";
+import { getMostConnected } from "@/lib/db/mostConnected";
+import { getConnectChain } from "@/lib/db/connectShowcase";
+import { getPopularProfiles } from "@/lib/db/popularProfiles";
 import { getListingUrl } from "@/lib/canonical";
 import { getBaseUrl } from "@/lib/canonical";
 import { isMaintenanceMode } from "@/lib/maintenance";
@@ -105,11 +107,33 @@ export default async function Home() {
     return <MaintenanceLanding />;
   }
 
-  const [projects, products, promotedIds] = await Promise.all([
-    getProjectsCanonical(PROJECTS_LIMIT),
-    getProductsCanonical(PRODUCTS_LIMIT),
-    getHomepagePromotedListingIds(),
-  ]);
+  const [projects, products, promotedIds, mostConnected, connectChain, popular] =
+    await Promise.all([
+      getProjectsCanonical(PROJECTS_LIMIT),
+      getProductsCanonical(PRODUCTS_LIMIT),
+      getHomepagePromotedListingIds(),
+      getMostConnected(),
+      getConnectChain(),
+      getPopularProfiles(),
+    ]);
+
+  /*
+   * Canonical hrefs are resolved HERE, not inside DiscoverSection.
+   *
+   * That component is a client component (the tab strip is interactive), and
+   * getListingUrl reads taxonomy data that belongs on the server. Passing
+   * finished hrefs down keeps the URL rule in one place and keeps the client
+   * bundle free of the canonical-URL module.
+   */
+  const discoverHrefById: Record<string, string> = {};
+  for (const item of [...mostConnected.projects, ...mostConnected.products]) {
+    discoverHrefById[item.id] = getListingUrl({
+      id: item.id,
+      slug: item.slug,
+      type: item.type,
+      taxonomySlugPath: item.taxonomySlugPath,
+    });
+  }
 
   // Promoted listings surface first, as before.
   const promotedSet = new Set(promotedIds);
@@ -198,21 +222,17 @@ export default async function Home() {
       <CategoryPillBar />
 
       <div className="mx-auto max-w-content px-4 md:px-12 lg:px-24">
-        {/* §4 — Featured Projects + Find by Connection (70/30) */}
-        <section className="mt-16 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-8">
-          <div className="min-w-0 lg:col-span-8">
-            <FeaturedProjects projects={sortedProjects.slice(0, 4)} />
-          </div>
-          <div className="min-w-0 lg:col-span-4">
-            <FindByConnection />
-          </div>
-        </section>
+        {/* 01 — Discover, ranked by connection count */}
+        <div className="mt-4">
+          <DiscoverSection
+            projects={mostConnected.projects}
+            products={mostConnected.products}
+            hrefById={discoverHrefById}
+          />
+        </div>
 
-        {/* §5 — Featured Designers + Featured Brands (50/50) */}
-        <section className="mt-24 grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-8">
-          <FeaturedDesigners />
-          <FeaturedBrands />
-        </section>
+        {/* 02 — Connect: one real chain, selected from the graph */}
+        <ConnectSection chain={connectChain} />
 
         {/* §7 — Projects Showcase */}
         <div className="mt-24">
@@ -236,6 +256,9 @@ export default async function Home() {
             ratio="1/1"
           />
         </div>
+
+        {/* 05 — Popular brands and designers (replaces the mockup's editorial band) */}
+        <PopularProfilesSection brands={popular.brands} designers={popular.designers} />
 
         {/* §9 — Join Archtivy */}
         <div className="mt-24">

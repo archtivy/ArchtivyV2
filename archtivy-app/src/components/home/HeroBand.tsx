@@ -2,8 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { HeroSearch } from "@/components/home/HeroSearch";
 import { HeroStatPanel } from "@/components/home/HeroStatPanel";
+import { HeroConnectionMetric } from "@/components/home/HeroConnectionMetric";
 import { getHeroFeature } from "@/lib/db/heroFeature";
 import { getPlatformTotals } from "@/lib/db/platformTotals";
+import { getConnectionsMapped } from "@/lib/db/connectionsMetric";
 import { getHomeCategories, toPopularSearches } from "@/lib/db/homeCategories";
 
 /**
@@ -16,14 +18,15 @@ import { getHomeCategories, toPopularSearches } from "@/lib/db/homeCategories";
  * search — an architecture platform should not use someone's building as
  * anonymous wallpaper (Blueprint §19: attribution is a first-class UI element).
  *
- * All three data sources are cached with domain tags, so the homepage keeps its
+ * All four data sources are cached with domain tags, so the homepage keeps its
  * ISR behaviour and costs no DB round trips on a cache hit.
  */
 export async function HeroBand() {
-  const [feature, totals, categories] = await Promise.all([
+  const [feature, totals, categories, connections] = await Promise.all([
     getHeroFeature(),
     getPlatformTotals(),
     getHomeCategories(),
+    getConnectionsMapped(),
   ]);
 
   const popular = toPopularSearches(categories, 6);
@@ -83,6 +86,8 @@ export async function HeroBand() {
             <div className="mt-8">
               <HeroSearch popularSearches={popular} />
             </div>
+
+            <HeroConnectionMetric connections={connections} />
 
             {feature && (
               <p className="mt-8 font-body text-[12px] leading-[16px] text-cream/45">
