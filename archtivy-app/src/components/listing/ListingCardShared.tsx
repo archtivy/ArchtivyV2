@@ -92,16 +92,19 @@ function BadgeOverlay({ model }: { model: ListingCardModel }) {
   const Icon = isProject ? Box : CircleDashed;
 
   return (
-    <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-2.5 rounded-lg bg-ink/65 py-2 pl-2 pr-3.5 backdrop-blur-sm">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-cream/15">
-        <Icon strokeWidth={1.5} className="h-4 w-4 text-cream" aria-hidden />
+    // Deliberately lighter than the first pass. The badge sits ON the
+    // photograph, so every pixel it takes is one the image loses; it should
+    // read as an annotation, not a banner.
+    <div className="pointer-events-none absolute bottom-2.5 left-2.5 z-10 flex items-center gap-2 rounded-md bg-ink/65 py-1.5 pl-1.5 pr-2.5 backdrop-blur-sm">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-cream/15">
+        <Icon strokeWidth={1.5} className="h-3.5 w-3.5 text-cream" aria-hidden />
       </span>
       <span className="min-w-0">
-        <span className="block truncate font-body text-[13px] font-medium leading-[17px] text-cream">
+        <span className="block truncate font-body text-[12px] font-medium leading-[15px] text-cream">
           {line1}
         </span>
         {line2 && (
-          <span className="block truncate font-body text-[12px] leading-[16px] text-cream/70">
+          <span className="block truncate font-body text-[11px] leading-[14px] text-cream/70">
             {line2}
           </span>
         )}
@@ -163,11 +166,17 @@ export function ListingCardShared({
 
         <BadgeOverlay model={model} />
 
+        {/* Always visible, not hover-revealed. Saving is a primary action on a
+            card, and a control that only exists once a mouse is over it is
+            invisible to touch users at rest and absent from any screenshot —
+            which is exactly how it read as "missing" twice during review. */}
         <SaveToggle
           listingId={model.id}
           entityType={model.type}
           entityTitle={model.title}
           initialSaved={model.initialSaved}
+          alwaysVisible
+          tone="dark"
         />
       </div>
 
@@ -249,10 +258,20 @@ export function ListingCardShared({
             actually credited — the divider comes with the row rather than
             drawing a line under nothing. */}
         {model.type === "project" && credits > 0 && (
-          <div className="mt-3 flex items-center gap-2 border-t border-hairline pt-3">
-            <Users strokeWidth={1.5} className="h-4 w-4 shrink-0 text-muted" aria-hidden />
-            <span className="font-body text-[12px] leading-[16px] text-muted">
-              {credits} {credits === 1 ? "connection" : "connections"}
+          <div className="mt-3 border-t border-hairline pt-3">
+            {/* Same chip language as the image badge — rounded container, icon
+                block, text — at a smaller weight. Previously this was bare text
+                floating under a rule, which read as a caption that had lost its
+                container rather than a deliberate element. One visual grammar
+                for both counts, rather than a pill on the image and loose text
+                beneath it. */}
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-stone py-1 pl-1 pr-2.5">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-ink/[0.06]">
+                <Users strokeWidth={1.5} className="h-3 w-3 text-muted" aria-hidden />
+              </span>
+              <span className="font-body text-[11px] leading-[14px] text-muted">
+                {credits} {credits === 1 ? "connection" : "connections"}
+              </span>
             </span>
           </div>
         )}

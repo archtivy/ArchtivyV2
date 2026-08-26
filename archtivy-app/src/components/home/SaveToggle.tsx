@@ -35,6 +35,8 @@ export function SaveToggle({
   initialSaved = false,
   variant = "card",
   align = "right",
+  alwaysVisible = false,
+  tone = "light",
 }: {
   listingId: string;
   /** Drives the label and what folder_items records. No default, deliberately. */
@@ -55,6 +57,21 @@ export function SaveToggle({
   variant?: "card" | "inline";
   /** Popover edge alignment; flip to "left" for triggers near the right edge. */
   align?: "left" | "right";
+  /**
+   * Card variant only. Show the control at all times instead of revealing it on
+   * hover. Opt-in rather than the default, because the hover behaviour is
+   * deliberate everywhere else: on a dense grid a permanent control on every
+   * tile competes with the images. The shared listing card asks for it because
+   * saving is a primary action there and a hover-only control is invisible to
+   * anyone who has not moved a mouse over the card — including in a screenshot.
+   */
+  alwaysVisible?: boolean;
+  /**
+   * Card variant only. `light` is a cream button with a dark glyph; `dark` is a
+   * dark translucent circle with a cream glyph, which reads better over a
+   * photograph and is what the card mockup shows.
+   */
+  tone?: "light" | "dark";
 }) {
   const [saved, setSaved] = useState(initialSaved);
   const [open, setOpen] = useState(false);
@@ -83,10 +100,12 @@ export function SaveToggle({
               ].join(" ")
             : [
                 "absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full",
-                "bg-cream/90 text-ink backdrop-blur-sm transition-opacity",
+                "backdrop-blur-sm transition-opacity",
+                tone === "dark" ? "bg-ink/55 text-cream" : "bg-cream/90 text-ink",
                 // Hidden until intent on pointer devices; always visible on touch,
-                // on keyboard focus, once saved, and while the picker is open.
-                saved || open
+                // on keyboard focus, once saved, while the picker is open, and
+                // whenever the caller opts into alwaysVisible.
+                alwaysVisible || saved || open
                   ? "opacity-100"
                   : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
                 "[@media(hover:none)]:opacity-100",
