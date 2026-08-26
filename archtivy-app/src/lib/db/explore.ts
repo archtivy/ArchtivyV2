@@ -1019,14 +1019,21 @@ export async function getProjectsCanonicalFiltered({
 }
 
 /** Build ProjectOwner from profile row (id, display_name, username). */
-function toProjectOwner(p: { id: string; display_name: string | null; username: string | null }): ProjectOwner {
+function toProjectOwner(p: {
+  id: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_url?: string | null;
+}): ProjectOwner {
   const displayName =
     (p.display_name && p.display_name.trim()) ||
     (p.username && p.username.trim()) ||
     "";
   return {
     displayName,
-    avatarUrl: null,
+    // Was hardcoded null, which is why explore cards had no logo chip: the card
+    // reads owner.avatarUrl and there was never anything in it.
+    avatarUrl: p.avatar_url?.trim() || null,
     profileId: p.id,
     username: p.username?.trim() || null,
   };

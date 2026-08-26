@@ -131,15 +131,23 @@ export async function getProfileById(
  */
 export async function getProfilesByIds(
   ids: string[]
-): Promise<DbResult<Pick<Profile, "id" | "display_name" | "username">[]>> {
+): Promise<DbResult<Pick<Profile, "id" | "display_name" | "username" | "avatar_url">[]>> {
   if (ids.length === 0) return { data: [], error: null };
   const unique = Array.from(new Set(ids.filter(Boolean)));
+  // avatar_url rides along because the shared listing card renders the owner's
+  // logo as a chip. Without it toProjectOwner had nothing to return and every
+  // explore card was missing its logo while the /projects directory — which
+  // fetches avatars by another path — showed them. Additive: existing callers
+  // that never read it are unaffected.
   const { data, error } = await supabase
     .from(TABLE)
-    .select("id, display_name, username")
+    .select("id, display_name, username, avatar_url")
     .in("id", unique);
   if (error) return { data: null, error: error.message };
-  return { data: (data ?? []) as Pick<Profile, "id" | "display_name" | "username">[], error: null };
+  return {
+    data: (data ?? []) as Pick<Profile, "id" | "display_name" | "username" | "avatar_url">[],
+    error: null,
+  };
 }
 
 /**
