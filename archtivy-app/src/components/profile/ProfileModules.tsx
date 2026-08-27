@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Eye } from "lucide-react";
 import { initialsOf } from "@/components/home/EntityCard";
+import { ListingCardShared } from "@/components/listing/ListingCardShared";
 import { getListingUrl } from "@/lib/canonical";
 import { documentDownloadHref } from "@/lib/documents/downloadHref";
 import { TYPE, SURFACE, BTN_PRIMARY } from "@/components/admin/ui/tokens";
@@ -107,51 +107,39 @@ function listingHref(c: ProfileListingCard): string {
   });
 }
 
-function formatViews(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K`;
-  return String(n);
-}
 
 export function ListingCard({ card }: { card: ProfileListingCard }) {
-  // Only the pieces this listing actually has. Products carry no location or
-  // area at all, so their line is often just a year — or nothing.
-  const meta = [
-    card.year ? String(card.year) : null,
-    card.categoryLabel,
-    card.areaSqft ? `${new Intl.NumberFormat("en-US").format(card.areaSqft)} sqft` : null,
-  ].filter(Boolean);
-
+  /*
+   * ── THIS USED TO BE ITS OWN CARD ─────────────────────────────────────────
+   * A locally-defined component, also called ListingCard, with rounded-xl
+   * instead of rounded-lg, a 15px title instead of 17px, no bookmark, no
+   * relationship badge, no owner logo and no connections row. It is why the
+   * profile page's cards looked unlike every other card on the site, and why a
+   * name-based grep for card components never found it: nothing imported it.
+   *
+   * It now maps to the shared card like everywhere else. ProfileListingCard
+   * carries every field the model needs, so no data change was required.
+   *
+   * The view count this card used to show is dropped: views_count is populated
+   * on 11 of 51 projects and 13 of 77 products, and the shared card has no
+   * slot for a number that is absent four times out of five.
+   */
   return (
-    <Link href={listingHref(card)} className="group block">
-      <span className="relative block aspect-[4/3] w-full overflow-hidden rounded-xl bg-stone">
-        {card.cover && (
-          <Image
-            src={card.cover}
-            alt=""
-            fill
-            sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 24vw"
-            className="object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-          />
-        )}
-      </span>
-      <span className="mt-3 block truncate font-body text-[15px] text-ink">{card.title}</span>
-      {card.locationText && (
-        <span className="mt-0.5 block truncate font-body text-[13px] text-muted">
-          {card.locationText}
-        </span>
-      )}
-      {meta.length > 0 && (
-        <span className="mt-1 block truncate font-body text-[12px] text-muted">
-          {meta.join(" · ")}
-        </span>
-      )}
-      {card.views != null && (
-        <span className="mt-2 inline-flex items-center gap-1.5 font-body text-[12px] text-muted">
-          <Eye strokeWidth={1.5} className="h-3.5 w-3.5" aria-hidden />
-          {formatViews(card.views)}
-        </span>
-      )}
-    </Link>
+    <ListingCardShared
+      model={{
+        id: card.id,
+        type: card.type,
+        title: card.title,
+        href: listingHref(card),
+        imageUrl: card.cover,
+        categoryLabel: card.categoryLabel,
+        metaLabel: card.type === "project" ? card.locationText : null,
+        authorName: card.byline,
+        year: card.type === "project" ? card.year : null,
+      }}
+      ratio={card.type === "product" ? "1/1" : "4/3"}
+      sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 24vw"
+    />
   );
 }
 
