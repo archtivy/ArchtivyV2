@@ -192,16 +192,16 @@ export async function getBookmarkState(
   return !!data;
 }
 
-/** Featured projects for homepage/explore, newest first. */
-export async function getFeaturedProjects(limit: number): Promise<ProjectRecord[]> {
-  const { data, error } = await supabase()
-    .from("projects")
-    .select("id,slug,title,description,created_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (error) return [];
-  return (data ?? []) as ProjectRecord[];
-}
+/*
+ * ── REMOVED: getFeaturedProjects ────────────────────────────────────────────
+ *
+ * Zero callers, and it read the abandoned `projects` table rather than
+ * `listings` — so anything wired to it would have rendered rows that no live
+ * surface knows about, with no status or deleted_at filter. Same shape and
+ * same reason as getFeaturedProducts above.
+ *
+ * ProjectRecord is kept: getProjectBySlug still uses it.
+ */
 
 /*
  * ── REMOVED: getFeaturedProducts ────────────────────────────────────────────
