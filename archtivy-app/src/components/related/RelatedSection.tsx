@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import { ListingCardShared } from "@/components/listing/ListingCardShared";
 import { getListingUrl } from "@/lib/canonical";
 
 export interface RelatedSectionItem {
@@ -43,45 +43,34 @@ export function RelatedSection({
   const total = totalCount ?? items.length;
   const moreCount = Math.max(total - shown, 0);
 
-  const renderInlineCard = (item: RelatedSectionItem) => {
-    const href = getListingUrl({ id: item.id, type: variant, slug: item.slug, taxonomy_slug_path: item.taxonomy_slug_path });
-    return (
-      <Link
-        key={item.id}
-        href={href}
-        className="group flex flex-col focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
-        style={{ borderRadius: 4 }}
-      >
-        <div
-          className={`relative w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800 ${CARD_ASPECT}`}
-          style={{ borderRadius: 4 }}
-        >
-          {item.thumbnail ? (
-            <Image
-              src={item.thumbnail}
-              alt=""
-              fill
-              className="object-cover transition-opacity group-hover:opacity-95"
-              sizes="(max-width: 1023px) 78vw, 25vw"
-              unoptimized={String(item.thumbnail).startsWith("http")}
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-sm text-zinc-400 dark:text-zinc-500">
-              —
-            </div>
-          )}
-        </div>
-        <span className="mt-2 truncate text-sm font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-[#002abf] dark:group-hover:text-[#002abf]">
-          {item.title}
-        </span>
-        {variant === "project" && item.location && (
-          <span className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
-            {item.location}
-          </span>
-        )}
-      </Link>
-    );
-  };
+  /*
+   * Was a hand-rolled card in the legacy zinc + dark: palette with inline
+   * borderRadius:4 and #002abf focus rings, at aspect-[3/2] — a ratio no other
+   * card on the site used, which is why it read as a different design. It now
+   * delegates to the shared card and inherits 4/3 (projects) or 1/1
+   * (products) with everything else.
+   */
+  const renderInlineCard = (item: RelatedSectionItem) => (
+    <ListingCardShared
+      key={item.id}
+      model={{
+        id: item.id,
+        type: variant,
+        title: item.title,
+        href: getListingUrl({
+          id: item.id,
+          type: variant,
+          slug: item.slug,
+          taxonomy_slug_path: item.taxonomy_slug_path,
+        }),
+        imageUrl: item.thumbnail ?? null,
+        metaLabel: variant === "project" ? item.location ?? null : null,
+        authorName: item.postedBy ?? null,
+      }}
+      ratio={variant === "product" ? "1/1" : "4/3"}
+      sizes="(max-width: 1023px) 78vw, 25vw"
+    />
+  );
 
   const headerRight = (
     <div className="flex flex-wrap items-center justify-end gap-2">
