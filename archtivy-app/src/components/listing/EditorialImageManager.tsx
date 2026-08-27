@@ -926,7 +926,11 @@ function TaggingWorkstation({
     setTagFeatureDraft("");
     setTimeout(() => onTagsChange(), 300);
     requestAnimationFrame(() => addAnotherButtonRef.current?.focus());
-  }, [selectedImage, selectedCandidate, lastClickXY, listingId, tagFeatureDraft, onTagSaveStatus, onTagsChange, onTagAdded, onSelectedTagIdForEditChange]);
+    // listingId and tagFeatureDraft removed: neither is read in the body —
+    // tagFeatureDraft is only WRITTEN here, via setTagFeatureDraft(""), and a
+    // setter is stable. Listing them re-created the callback on every keystroke
+    // in that field.
+  }, [selectedImage, selectedCandidate, lastClickXY, onTagSaveStatus, onTagsChange, onTagAdded, onSelectedTagIdForEditChange]);
 
   if (!selectedImage) return null;
 

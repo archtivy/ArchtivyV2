@@ -143,7 +143,9 @@ export function ImageProductTagSidebar({
         });
       }
     },
-    [selectedImage, listingId, onTagAdded, onTagsChange]
+    // listingId removed: the callback body does not read it, so listing it
+    // only re-created the callback whenever the prop changed identity.
+    [selectedImage, onTagAdded, onTagsChange]
   );
 
   // ── Remove a tag ────────────────────────────────────────────────────────
