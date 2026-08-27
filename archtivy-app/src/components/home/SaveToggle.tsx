@@ -80,7 +80,33 @@ export function SaveToggle({
   const noun = entityType === "product" ? "Product" : "Project";
 
   return (
-    <span className="relative inline-flex">
+    /*
+     * ── THE POSITIONING LIVES HERE, NOT ON THE BUTTON ─────────────────────────
+     * This wrapper is `relative` so the board popover can anchor to it. That
+     * also made it the offsetParent of anything absolutely positioned INSIDE
+     * it — and the card variant's button carried `absolute right-3 top-3`.
+     * So the button positioned itself against this span, which is 0x0 and sits
+     * in normal flow after the card's image, instead of against the image
+     * container. Measured in a headless browser: image container y 700-946,
+     * button rendered at y 952-984, x 372 vs the container's 416 — outside the
+     * container's bounds, and the container has overflow-hidden, so it was
+     * clipped away entirely.
+     *
+     * It had been invisible the whole time. `opacity-0` until hover hid the
+     * fact that hovering revealed a button nobody could see, so the save
+     * control on cards never worked. Making it always-visible did not break
+     * it; it removed the cloak.
+     *
+     * The fix is to position the WRAPPER and let the button fill it. `absolute`
+     * is itself a positioned value, so the popover keeps its anchor.
+     */
+    <span
+      className={
+        variant === "inline"
+          ? "relative inline-flex"
+          : "absolute right-3 top-3 z-10 inline-flex"
+      }
+    >
       <button
         type="button"
         onClick={(e) => {
@@ -99,7 +125,8 @@ export function SaveToggle({
                 "bg-ink text-cream hover:opacity-90",
               ].join(" ")
             : [
-                "absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full",
+                // No positioning classes: the wrapper owns placement now.
+                "flex h-8 w-8 items-center justify-center rounded-full",
                 "backdrop-blur-sm transition-opacity",
                 tone === "dark" ? "bg-ink/55 text-cream" : "bg-cream/90 text-ink",
                 // Hidden until intent on pointer devices; always visible on touch,
