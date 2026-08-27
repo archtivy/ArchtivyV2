@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { ListingCardShared } from "@/components/listing/ListingCardShared";
 import { FileText, Download } from "lucide-react";
 import { documentDownloadHref } from "@/lib/documents/downloadHref";
 import type { ProjectDetail } from "@/lib/db/projectDetail";
@@ -133,23 +134,22 @@ function ProductsPanel({ project }: { project: ProjectDetail }) {
     <ul className="grid grid-cols-2 gap-x-5 gap-y-8 lg:grid-cols-4">
       {project.products.map((p) => (
         <li key={p.id}>
-          <Link href={p.href} className="group block">
-            <span className="relative block aspect-square overflow-hidden rounded-lg bg-stone">
-              {p.cover && (
-                <Image
-                  src={p.cover}
-                  alt=""
-                  fill
-                  sizes="(max-width: 640px) 45vw, 22vw"
-                  className="object-cover transition-transform duration-200 ease-out group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-                />
-              )}
-            </span>
-            <span className="mt-3 block font-body text-[14px] text-ink">{p.title}</span>
-            {p.category && (
-              <span className="mt-0.5 block font-body text-[12px] text-muted">{p.category}</span>
-            )}
-          </Link>
+          {/* Was an inline card at 14px with no bookmark and no brand line.
+              Already used the current palette, so this is a structural swap
+              rather than a re-theme. */}
+          <ListingCardShared
+            model={{
+              id: p.id,
+              type: "product",
+              title: p.title,
+              href: p.href,
+              imageUrl: p.cover ?? null,
+              categoryLabel: p.category ?? null,
+              authorName: p.brand ?? null,
+            }}
+            ratio="1/1"
+            sizes="(max-width: 640px) 45vw, 22vw"
+          />
         </li>
       ))}
     </ul>

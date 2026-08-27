@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ListingCardShared } from "@/components/listing/ListingCardShared";
 import Image from "next/image";
 import { getListingUrl } from "@/lib/canonical";
 import type { CountryProjectItem, CountryDesignerItem } from "@/lib/db/networkDiscovery";
@@ -41,52 +42,33 @@ export function CountryProjectsSection({ country, items }: CountryProjectsProps)
           View all &rarr;
         </Link>
       </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
+      {/* Legacy zinc + dark: card replaced by the shared one. Location here is
+          location_city, which is exactly the field the site-wide location rule
+          now uses, so this rail agrees with every other card by construction. */}
+      <div className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
         {items.map((item) => {
-          const href = getListingUrl({ id: item.id, type: "project", slug: item.slug, taxonomy_slug_path: item.taxonomy_slug_path });
-          const locationParts: string[] = [];
           const city = item.location_city != null ? String(item.location_city).trim() : "";
-          if (city) locationParts.push(city);
-          if (item.year != null) locationParts.push(String(item.year));
-          const subtitle = locationParts.join(" · ") || null;
-          const hasImage = isValidImageUrl(item.cover_image_url);
-
           return (
-            <Link
+            <ListingCardShared
               key={item.id}
-              href={href}
-              className="group flex flex-col rounded-lg focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:focus:ring-offset-zinc-950"
-            >
-              <div className="relative w-full overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800 aspect-[4/3]">
-                {hasImage ? (
-                  <Image
-                    src={item.cover_image_url as string}
-                    alt=""
-                    fill
-                    className="object-cover transition-opacity group-hover:opacity-95"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                    unoptimized
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-sm text-zinc-400 dark:text-zinc-500">
-                    —
-                  </div>
-                )}
-              </div>
-              <span className="mt-2 truncate text-sm font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-[#002abf] dark:group-hover:text-[#002abf]">
-                {item.title}
-              </span>
-              {subtitle && (
-                <span className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
-                  {subtitle}
-                </span>
-              )}
-              {item.owner_display_name && (
-                <span className="mt-0.5 truncate text-xs text-zinc-400 dark:text-zinc-500">
-                  {item.owner_display_name}
-                </span>
-              )}
-            </Link>
+              model={{
+                id: item.id,
+                type: "project",
+                title: item.title,
+                href: getListingUrl({
+                  id: item.id,
+                  type: "project",
+                  slug: item.slug,
+                  taxonomy_slug_path: item.taxonomy_slug_path,
+                }),
+                imageUrl: isValidImageUrl(item.cover_image_url)
+                  ? (item.cover_image_url as string)
+                  : null,
+                metaLabel: city || null,
+                year: item.year ?? null,
+              }}
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            />
           );
         })}
       </div>
