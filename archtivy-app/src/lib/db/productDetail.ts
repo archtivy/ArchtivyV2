@@ -95,7 +95,6 @@ export interface ProductDetail {
     location: string | null;
     website: string | null;
     productCount: number;
-    followerCount: number;
     /** One other product by the same brand, for the rail. */
     otherProduct: ProductDetailRelated | null;
   } | null;
@@ -343,7 +342,10 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   }
 
   if (ownerId) {
-    const [{ data: prof }, { count: productCount }, { count: followerCount }, { data: siblings }] =
+    // followerCount was removed with the brand rail's Followers stat: the
+    // `follows` table holds 9 rows platform-wide and none are product-related,
+    // so this was a per-page count query feeding a number nothing renders.
+    const [{ data: prof }, { count: productCount }, { data: siblings }] =
       await Promise.all([
         sup
           .from("profiles")
@@ -357,11 +359,6 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
           .eq("type", "product")
           .eq("status", "APPROVED")
           .is("deleted_at", null),
-        sup
-          .from("follows")
-          .select("id", { count: "exact", head: true })
-          .eq("target_type", "brand")
-          .eq("target_id", ownerId),
         sup
           .from("listings")
           .select("id")
@@ -387,7 +384,6 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
         location: loc || null,
         website: (pr.website as string | null) ?? null,
         productCount: productCount ?? 0,
-        followerCount: followerCount ?? 0,
         otherProduct: others[0] ?? null,
       };
     }

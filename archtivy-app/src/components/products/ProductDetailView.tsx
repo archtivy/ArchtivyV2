@@ -15,6 +15,8 @@ import { ProductCollaborationSection } from "@/components/listing/CollaborationS
 import { RequestQuoteButton } from "@/components/products/RequestQuoteButton";
 import { ProductDetailTabs } from "@/components/products/ProductDetailTabs";
 import { SeenInProjects } from "@/components/products/SeenInProjects";
+import { OftenSpecifiedWith } from "@/components/products/OftenSpecifiedWith";
+import { getOftenSpecifiedWith } from "@/lib/db/oftenSpecifiedWith";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildProductJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
@@ -35,7 +37,22 @@ import type { ProductCanonical } from "@/lib/canonical-models";
  *   "Verified Product" badge   no verification column anywhere
  *   ratings / review count     no reviews table
  *   affiliate disclosure       no affiliate program or link data
- *   brand follower count       model exists but max 1 per brand; omitted at 0
+ *   brand follower count       REMOVED — `follows` holds 9 rows platform-wide,
+ *                              none product-related; the mockup's "3.2k" was
+ *                              decoration
+ *   save count                 saves_count is 0 on all 80 live products
+ *   "Verified Product" badge   no verification column exists on products or
+ *                              profiles; claim_status is the profile-claim
+ *                              workflow, not a product attestation. The blue
+ *                              check beside the brand name goes for the same
+ *                              reason.
+ *   finish / colour swatches   products.color_options is populated on 2 of 80,
+ *                              and holds bare strings with no hex or swatch
+ *                              image to render
+ *   Q&A tab                    no questions/answers tables anywhere
+ *   "Made In"                  no such column
+ *   price                      no price column on products or listings; every
+ *                              figure in the mockup was invented
  */
 export async function ProductDetailView({
   product,
@@ -46,6 +63,10 @@ export async function ProductDetailView({
 }) {
   const detail = await getProductDetail(product.id);
   if (!detail) return null;
+
+  // Fetched here rather than passed in: this component already owns its own
+  // data fetching, and the module is self-suppressing when it finds nothing.
+  const oftenSpecifiedWith = await getOftenSpecifiedWith(product.id);
 
   const canonicalUrl = getAbsoluteUrl(canonicalPath);
   const brandHrefAbs = detail.brand?.username
@@ -244,18 +265,19 @@ export async function ProductDetailView({
                   </span>
                 </div>
 
-                {/* Stats, each independently real-or-omitted. Followers is
-                    dropped at 0 rather than shown as "0 Followers"; the follow
-                    model is real but carries at most 1 row per brand today. */}
+                {/* Stats, each independently real-or-omitted.
+                    FOLLOWERS IS GONE. The mockup showed "3.2k Followers"; the
+                    `follows` table holds 9 rows platform-wide and none are
+                    product-related, so the number could only ever have been
+                    decoration. Products and projects-featuring are both counted
+                    from ownership and project_product_links, the same way the
+                    homepage brand section counts them. */}
                 <dl className="mt-5 grid grid-cols-2 gap-4">
                   {detail.brand.productCount > 0 && (
                     <Stat label="Products" value={detail.brand.productCount} />
                   )}
                   {detail.projects.length > 0 && (
                     <Stat label="Projects featuring" value={detail.projects.length} />
-                  )}
-                  {detail.brand.followerCount > 0 && (
-                    <Stat label="Followers" value={detail.brand.followerCount} />
                   )}
                 </dl>
 
@@ -303,6 +325,8 @@ export async function ProductDetailView({
 
         {/* ── Seen in Projects ────────────────────────────────────────── */}
         <SeenInProjects projects={detail.projects} />
+
+        <OftenSpecifiedWith items={oftenSpecifiedWith} />
       </div>
 
       <HomeFooter />
