@@ -128,7 +128,15 @@ function DetailsPanel({ product }: { product: ProductDetail }) {
     rows.push({ label: "Materials", value: product.materials.join(", ") });
   if (product.dimensions) rows.push({ label: "Dimensions", value: product.dimensions });
   if (product.year) rows.push({ label: "Year", value: String(product.year) });
-  if (product.brand?.location) rows.push({ label: "Made in", value: product.brand.location });
+  /*
+   * NO "Made in" ROW. It read product.brand.location -- the brand PROFILE's
+   * city and country -- and printed it as a manufacturing origin, so a brand
+   * headquartered in Meda asserted "Made in Meda, Italy" about every product
+   * it lists, whoever actually made them. There is no origin column anywhere
+   * in the schema (listings.location_country is null on all 80 products), and
+   * the specification table on this same page omits the field for exactly that
+   * reason. Leaving it here would have made the page contradict itself.
+   */
 
   if (rows.length === 0) {
     return <p className="font-body text-[14px] text-muted">No specifications recorded yet.</p>;

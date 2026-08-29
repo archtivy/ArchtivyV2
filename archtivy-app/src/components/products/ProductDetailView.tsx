@@ -50,7 +50,16 @@ import type { ProductCanonical } from "@/lib/canonical-models";
  *                              and holds bare strings with no hex or swatch
  *                              image to render
  *   Q&A tab                    no questions/answers tables anywhere
- *   "Made In"                  no such column
+ *   "Made In"                  no such column; listings.location_country is
+ *                              null on all 80 products and a brand's HQ is not
+ *                              a manufacturing origin
+ *   "Collection"               no column, no taxonomy domain, no facet. The
+ *                              `collections` table is the Inspiration
+ *                              saved-query construct, not a product line
+ *   brand founding year        the mockup's "Italy - 1934" -- profiles has no
+ *                              founding-year column, and Molteni&C carries
+ *                              neither a city nor a country, so both halves of
+ *                              that line were invented
  *   price                      no price column on products or listings; every
  *                              figure in the mockup was invented
  */
@@ -243,6 +252,23 @@ export async function ProductDetailView({
                     ? { label: "Materials", value: detail.materials.join(", ") }
                     : null,
                   detail.dimensions ? { label: "Dimensions", value: detail.dimensions } : null,
+                  /* Design credits, from listing_team_members -- the same table
+                     Project Detail reads for its Credits block, and the second
+                     best covered field on this page after Category (38 of 80).
+                     Linked only when the credited profile actually resolves:
+                     37 of the 38 are unclaimed stubs with no username, so a
+                     link would 404. With several credits the row stays plain
+                     text rather than linking one name out of four. */
+                  detail.designers.length > 0
+                    ? {
+                        label: detail.designers.length > 1 ? "Designers" : "Designer",
+                        value: detail.designers.map((d) => d.name).join(", "),
+                        href:
+                          detail.designers.length === 1 && detail.designers[0].username
+                            ? `/u/${detail.designers[0].username}`
+                            : undefined,
+                      }
+                    : null,
                   detail.year ? { label: "Year", value: String(detail.year) } : null,
                 ]}
               />
@@ -289,15 +315,23 @@ export async function ProductDetailView({
                     FOLLOWERS IS GONE. The mockup showed "3.2k Followers"; the
                     `follows` table holds 9 rows platform-wide and none are
                     product-related, so the number could only ever have been
-                    decoration. Products and projects-featuring are both counted
-                    from ownership and project_product_links, the same way the
-                    homepage brand section counts them. */}
+                    decoration.
+                    BOTH FIGURES ARE BRAND-WIDE. Projects-featuring used to read
+                    detail.projects.length -- projects featuring this one
+                    PRODUCT -- beside a brand-wide product count, so a panel
+                    headed "Brand" mixed two scopes: Gillis Armchair showed
+                    12 / 1 where the brand-wide answer is 3. The product-scoped
+                    list is not lost; "Seen in Projects" lower down shows it in
+                    full. */}
                 <dl className="mt-5 grid grid-cols-2 gap-4">
                   {detail.brand.productCount > 0 && (
                     <Stat label="Products" value={detail.brand.productCount} />
                   )}
-                  {detail.projects.length > 0 && (
-                    <Stat label="Projects featuring" value={detail.projects.length} />
+                  {detail.brand.projectsFeaturingCount > 0 && (
+                    <Stat
+                      label="Projects featuring"
+                      value={detail.brand.projectsFeaturingCount}
+                    />
                   )}
                 </dl>
 

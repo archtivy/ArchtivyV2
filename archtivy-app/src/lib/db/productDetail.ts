@@ -16,6 +16,22 @@
  *   PROJECTS FEATURING  project_product_links, 12   -> per-product conditional
  *   BRAND FOLLOWERS     follows.target_type='brand'
  *                       exists but max 1 per brand  -> omitted below 1; see note
+ *   DESIGNER            listing_team_members, 38/80 -> per-product row, name
+ *                                                    only (the role column is
+ *                                                    unusable on products)
+ *   COLLECTION          no column, no taxonomy
+ *                       domain, no facet; the
+ *                       `collections` table is the
+ *                       Inspiration saved-query
+ *                       construct (1 row), unrelated
+ *                       to a brand's product line   -> omitted entirely
+ *   MADE IN             no column. listings
+ *                       .location_country is null on
+ *                       all 80 products, and a
+ *                       brand's HQ is not where a
+ *                       thing is manufactured       -> omitted entirely
+ *   BRAND FOUNDED       no founding-year column on
+ *                       profiles at all             -> omitted entirely
  *   DIMENSIONS          listings.dimensions, 15/76  -> per-product row
  *   MATERIALS           18/76 via links             -> per-product row
  *   STYLE               8/76                        -> per-product row
@@ -54,6 +70,28 @@ export interface ProductDetailRelated {
   imageCount: number;
 }
 
+/**
+ * A design credit on the product, read from `listing_team_members` — the same
+ * table and the same three columns Project Detail already reads for its
+ * Credits block.
+ *
+ * NAME ONLY, NO ROLE. The table's `title` column is the role slot, and on
+ * project rows it holds real roles (Architect x79, Photographer x29,
+ * Structural Engineer x12). On PRODUCT rows the importer wrote the taxonomy
+ * CATEGORY into it instead: Furniture x32, Lighting x4, Decorative Elements
+ * x3, Textiles x1, and exactly one genuine "Furniture Designer". Rendering it
+ * would print "Vincent Van Duysen - Furniture", which is both wrong and a
+ * restatement of the Category row directly above. `title` is therefore not
+ * selected here at all. Logged as its own data-quality item.
+ *
+ * `username` is null on 37 of the 38 credited profiles: they are unclaimed
+ * credit stubs with no /u/ route, so the row links only where one resolves.
+ */
+export interface ProductDetailDesigner {
+  name: string;
+  username: string | null;
+}
+
 export interface ProductDetail {
   id: string;
   slug: string | null;
@@ -66,6 +104,8 @@ export interface ProductDetail {
   typeLabel: string | null;
   styleLabel: string | null;
   materials: string[];
+  /** Design credits. 38 of 80 live products carry at least one. */
+  designers: ProductDetailDesigner[];
   dimensions: string | null;
   colorOptions: string[];
   year: number | null;
@@ -95,6 +135,17 @@ export interface ProductDetail {
     location: string | null;
     website: string | null;
     productCount: number;
+    /**
+     * Projects featuring ANY product by this brand.
+     *
+     * Was `detail.projects.length` at the call site — projects featuring THIS
+     * PRODUCT — rendered under a panel headed "Brand" beside a brand-wide
+     * product count. Two different scopes under one heading: Gillis Armchair
+     * showed "12 Products / 1 Projects featuring" when the brand-wide figure
+     * is 3. The product-scoped number is not lost; it is what the "Seen in
+     * Projects" rail lower down the page already lists in full.
+     */
+    projectsFeaturingCount: number;
     /** One other product by the same brand, for the rail. */
     otherProduct: ProductDetailRelated | null;
   } | null;
@@ -123,7 +174,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   const one = <T,>(v: T | T[] | null | undefined): T | null =>
     Array.isArray(v) ? v[0] ?? null : v ?? null;
 
-  const [imgRes, docRes, taxRes, matLinkRes, projLinkRes, sidecarRes] = await Promise.all([
+  const [imgRes, docRes, taxRes, matLinkRes, projLinkRes, sidecarRes, creditRes] = await Promise.all([
     sup
       .from("listing_images")
       .select("id, image_url, alt, sort_order")
@@ -143,6 +194,13 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
     // color_options lives on the products sidecar, NOT on listings — selecting
     // it off listings would 42703 and null the whole row.
     sup.from("products").select("subtitle, color_options").eq("id", listingId).maybeSingle(),
+    // Design credits. Joins the existing fan-out rather than adding a round
+    // trip; `title` is deliberately not selected -- see ProductDetailDesigner.
+    sup
+      .from("listing_team_members")
+      .select("display_name, profile_id, sort_order")
+      .eq("listing_id", listingId)
+      .order("sort_order", { ascending: true }),
   ]);
 
   // Symmetric with Project Detail. No product currently carries a pin — all 7
@@ -239,6 +297,37 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   if (materialIds.length > 0) {
     const { data: mats } = await sup.from("materials").select("name").in("id", materialIds);
     materials = ((mats ?? []) as { name: string }[]).map((m) => m.name).filter(Boolean);
+  }
+
+  // ── Design credits ───────────────────────────────────────────────────────
+  // Two steps rather than a PostgREST embed: the credit rows are the source of
+  // truth for the NAME (display_name is set on every row, including for
+  // profiles that are bare stubs), and profiles is consulted only to find out
+  // whether that person has a reachable page.
+  const creditRows = ((creditRes.data ?? []) as {
+    display_name: string | null;
+    profile_id: string | null;
+  }[]).filter((r) => r.display_name?.trim());
+
+  let designers: ProductDetailDesigner[] = [];
+  if (creditRows.length > 0) {
+    const creditProfileIds = Array.from(
+      new Set(creditRows.map((r) => r.profile_id).filter(Boolean) as string[])
+    );
+    const usernames = new Map<string, string | null>();
+    if (creditProfileIds.length > 0) {
+      const { data: cps } = await sup
+        .from("profiles")
+        .select("id, username")
+        .in("id", creditProfileIds);
+      for (const cp of (cps ?? []) as { id: string; username: string | null }[]) {
+        usernames.set(cp.id, cp.username);
+      }
+    }
+    designers = creditRows.map((r) => ({
+      name: (r.display_name as string).trim(),
+      username: r.profile_id ? usernames.get(r.profile_id) ?? null : null,
+    }));
   }
 
   const sidecar = (sidecarRes.data ?? null) as {
@@ -345,36 +434,55 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
     // followerCount was removed with the brand rail's Followers stat: the
     // `follows` table holds 9 rows platform-wide and none are product-related,
     // so this was a per-page count query feeding a number nothing renders.
-    const [{ data: prof }, { count: productCount }, { data: siblings }] =
-      await Promise.all([
-        sup
-          .from("profiles")
-          .select("id, display_name, username, avatar_url, website, location_city, location_country")
-          .eq("id", ownerId)
-          .maybeSingle(),
-        sup
+    // One id list replaces the previous head-count plus limit(1) pair: the
+    // brand-wide "projects featuring" figure needs the ids anyway, and no brand
+    // has more than 12 live products.
+    const [{ data: prof }, { data: brandProducts }] = await Promise.all([
+      sup
+        .from("profiles")
+        .select("id, display_name, username, avatar_url, website, location_city, location_country")
+        .eq("id", ownerId)
+        .maybeSingle(),
+      sup
+        .from("listings")
+        .select("id")
+        .eq("owner_profile_id", ownerId)
+        .eq("type", "product")
+        .eq("status", "APPROVED")
+        .is("deleted_at", null),
+    ]);
+
+    const brandProductIds = ((brandProducts ?? []) as { id: string }[]).map((r) => r.id);
+    const productCount = brandProductIds.length;
+    const siblings = brandProductIds.filter((id) => id !== listingId).slice(0, 1);
+
+    // Distinct live projects reached by ANY of this brand's products. Liveness
+    // is enforced on the far end, exactly as the product-scoped `projects` list
+    // above does, so a draft or soft-deleted project inflates neither number.
+    let projectsFeaturingCount = 0;
+    if (brandProductIds.length > 0) {
+      const { data: brandLinks } = await sup
+        .from("project_product_links")
+        .select("project_id")
+        .in("product_id", brandProductIds);
+      const reachedProjectIds = Array.from(
+        new Set(((brandLinks ?? []) as { project_id: string }[]).map((r) => r.project_id))
+      );
+      if (reachedProjectIds.length > 0) {
+        const { count } = await sup
           .from("listings")
           .select("id", { count: "exact", head: true })
-          .eq("owner_profile_id", ownerId)
-          .eq("type", "product")
+          .in("id", reachedProjectIds)
+          .eq("type", "project")
           .eq("status", "APPROVED")
-          .is("deleted_at", null),
-        sup
-          .from("listings")
-          .select("id")
-          .eq("owner_profile_id", ownerId)
-          .eq("type", "product")
-          .eq("status", "APPROVED")
-          .is("deleted_at", null)
-          .neq("id", listingId)
-          .limit(1),
-      ]);
+          .is("deleted_at", null);
+        projectsFeaturingCount = count ?? 0;
+      }
+    }
 
     const pr = prof as Record<string, unknown> | null;
     if (pr) {
-      const others = await hydrateProducts(
-        ((siblings ?? []) as { id: string }[]).map((s) => s.id)
-      );
+      const others = await hydrateProducts(siblings);
       const loc = [pr.location_city, pr.location_country].filter(Boolean).join(", ");
       brand = {
         id: String(pr.id),
@@ -383,7 +491,8 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
         avatarUrl: (pr.avatar_url as string | null) ?? null,
         location: loc || null,
         website: (pr.website as string | null) ?? null,
-        productCount: productCount ?? 0,
+        productCount,
+        projectsFeaturingCount,
         otherProduct: others[0] ?? null,
       };
     }
@@ -447,6 +556,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
     typeLabel,
     styleLabel,
     materials,
+    designers,
     dimensions: (l.dimensions as string | null) ?? null,
     colorOptions: (sidecar?.color_options ?? []).filter(Boolean),
     year: (l.year as number | null) ?? null,
