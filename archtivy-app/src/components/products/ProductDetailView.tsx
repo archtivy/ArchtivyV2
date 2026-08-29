@@ -149,12 +149,20 @@ export async function ProductDetailView({
           <span className="text-ink">{detail.title}</span>
         </nav>
 
+        {/* Three columns on desktop: gallery, product information, brand rail.
+            The gallery previously spanned two thirds with the title beneath it,
+            which pushed the quote button and the specification below the fold on
+            a laptop. Side by side, the decision-making information sits next to
+            the photograph it describes. */}
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-8">
-          {/* ── Gallery + tabs ─────────────────────────────────────────── */}
-          <div className="min-w-0 lg:col-span-8">
-            <Gallery images={detail.images} title={detail.title} />
+          {/* ── Gallery ────────────────────────────────────────────────── */}
+          <div className="min-w-0 lg:col-span-5">
+            <Gallery images={detail.images} title={detail.title} thumbPosition="left" />
+          </div>
 
-            <div className="mt-8">
+          {/* ── Product information ────────────────────────────────────── */}
+          <div className="min-w-0 lg:col-span-4">
+            <div>
               {/* Brand line. No verification checkmark: no verification flag
                   exists on any table, and brand claim_status is 'unclaimed'
                   for all 15 brands. */}
@@ -210,35 +218,39 @@ export async function ProductDetailView({
                 <RequestQuoteButton listingId={detail.id} listingTitle={detail.title} />
               </div>
 
-              {/* Colour options only when this product genuinely has more than
-                  one — no placeholder swatches. Real for 2 of 76 products. */}
-              {detail.colorOptions.length > 1 && (
-                <div className="mt-6">
-                  <p className="font-body text-[12px] text-muted">Finish / Colour</p>
-                  <ul className="mt-2 flex flex-wrap gap-2">
-                    {detail.colorOptions.map((c) => (
-                      <li
-                        key={c}
-                        className="rounded-full border border-hairline px-3 py-1 font-body text-[12px] text-ink"
-                      >
-                        {c}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {/* Finish / Colour swatches are gone. products.color_options is
+                  populated on 2 of 80 products and holds bare strings — no hex,
+                  no swatch image — so the mockup's three circles had nothing
+                  behind them and the row was absent on 97.5% of pages anyway. */}
+
+              {/* ── Specification table ───────────────────────────────────
+                  Every row is independently real-or-omitted, the same rule the
+                  lifecycle badges follow. Coverage across 80 live products:
+                  category 69, materials 22 (product_material_links, the
+                  canonical source), dimensions 16. Rows the mockup showed that
+                  have NO column behind them — Style, Made In, price — are not
+                  here at all rather than rendered empty. */}
+              <SpecTable
+                rows={[
+                  detail.categoryLabel && detail.categoryRoot
+                    ? {
+                        label: "Category",
+                        value: detail.categoryLabel,
+                        href: `/products/${detail.categoryRoot}`,
+                      }
+                    : null,
+                  detail.materials.length > 0
+                    ? { label: "Materials", value: detail.materials.join(", ") }
+                    : null,
+                  detail.dimensions ? { label: "Dimensions", value: detail.dimensions } : null,
+                  detail.year ? { label: "Year", value: String(detail.year) } : null,
+                ]}
+              />
             </div>
-
-            <ProductDetailTabs product={detail} />
-
-            <ProductCollaborationSection
-              product_collaboration_status={detail.collaborationStatus}
-              product_looking_for={detail.lookingFor}
-            />
           </div>
 
           {/* ── Relationship Rail: Brand ───────────────────────────────── */}
-          <aside className="min-w-0 space-y-5 lg:col-span-4">
+          <aside className="min-w-0 space-y-5 lg:col-span-3">
             {detail.brand && (
               <RailPanel title="Brand">
                 <div className="flex items-center gap-3">
@@ -323,6 +335,18 @@ export async function ProductDetailView({
           </aside>
         </div>
 
+        {/* Tabs run the full width below the grid rather than inside the
+            information column. About/Details/Downloads are prose and document
+            lists; at a third of the page they wrapped every other word. */}
+        <div className="mt-14">
+          <ProductDetailTabs product={detail} />
+        </div>
+
+        <ProductCollaborationSection
+          product_collaboration_status={detail.collaborationStatus}
+          product_looking_for={detail.lookingFor}
+        />
+
         {/* ── Seen in Projects ────────────────────────────────────────── */}
         <SeenInProjects projects={detail.projects} />
 
@@ -331,6 +355,42 @@ export async function ProductDetailView({
 
       <HomeFooter />
     </div>
+  );
+}
+
+/**
+ * Specification table. Rows are passed in already resolved-or-null, so the
+ * decision about whether a field is real stays with the caller that knows the
+ * data, and this only decides how to draw what survived.
+ *
+ * Renders nothing when every row is null — which is the honest outcome for a
+ * product carrying none of these fields, rather than a table of blank cells.
+ */
+function SpecTable({
+  rows,
+}: {
+  rows: ({ label: string; value: string; href?: string } | null)[];
+}) {
+  const present = rows.filter(Boolean) as { label: string; value: string; href?: string }[];
+  if (present.length === 0) return null;
+
+  return (
+    <dl className="mt-6 border-t border-hairline">
+      {present.map((r) => (
+        <div key={r.label} className="flex gap-4 border-b border-hairline py-2.5">
+          <dt className="w-[104px] shrink-0 font-body text-[13px] text-muted">{r.label}</dt>
+          <dd className="min-w-0 font-body text-[13px] text-ink">
+            {r.href ? (
+              <Link href={r.href} className="hover:underline">
+                {r.value}
+              </Link>
+            ) : (
+              r.value
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

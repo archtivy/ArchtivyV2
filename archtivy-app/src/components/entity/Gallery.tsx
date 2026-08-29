@@ -45,6 +45,16 @@ export interface GalleryProps {
   title: string;
   /** How many thumbnails to show before collapsing the rest into "+N". */
   visibleThumbs?: number;
+  /**
+   * Where the thumbnail rail sits.
+   *
+   * `below` (default) keeps the horizontal strip every existing caller renders.
+   * `left` puts it in a vertical column beside the main image, which is what
+   * the product detail layout uses. Opt-in rather than a new default, because
+   * the project detail page's 16/10 hero would lose width to a side rail for no
+   * gain — it has fewer, larger images.
+   */
+  thumbPosition?: "below" | "left";
   priority?: boolean;
 }
 
@@ -53,6 +63,7 @@ export function Gallery({
   title,
   visibleThumbs = 6,
   priority = true,
+  thumbPosition = "below",
 }: GalleryProps) {
   const [index, setIndex] = useState(0);
   const total = images.length;
@@ -148,8 +159,16 @@ export function Gallery({
     .slice(visibleThumbs)
     .some((i) => (i.hotspots?.length ?? 0) > 0);
 
+  const railLeft = thumbPosition === "left" && total > 1;
+
   return (
-    <div>
+    <div className={railLeft ? "flex flex-col gap-3 sm:flex-row-reverse" : undefined}>
+      {/* The rail comes AFTER the image in the DOM and is flipped visually with
+          flex-row-reverse, so it paints on the left while keyboard and
+          screen-reader order still reach the main image first. Below `sm` it is
+          a plain column: image, then a horizontal strip beneath it — a vertical
+          rail on a phone would eat a third of the width. */}
+      <div className={railLeft ? "min-w-0 flex-1" : undefined}>
       <div
         role="group"
         aria-roledescription="carousel"
@@ -261,8 +280,16 @@ export function Gallery({
         </div>
       )}
 
+      </div>
+
       {total > 1 && (
-        <ul className="mt-3 flex gap-2 overflow-x-auto">
+        <ul
+          className={
+            railLeft
+              ? "flex shrink-0 gap-2 overflow-x-auto sm:w-[76px] sm:flex-col sm:overflow-x-visible sm:overflow-y-auto"
+              : "mt-3 flex gap-2 overflow-x-auto"
+          }
+        >
           {thumbs.map((img, i) => (
             <li key={img.url + i} className="shrink-0">
               <button
