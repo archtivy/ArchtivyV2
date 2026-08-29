@@ -58,7 +58,6 @@ export interface ProductDetailProject {
   href: string;
   cover: string | null;
   architect: string | null;
-  imageCount: number;
 }
 
 export interface ProductDetailRelated {
@@ -67,7 +66,6 @@ export interface ProductDetailRelated {
   href: string;
   cover: string | null;
   brand: string | null;
-  imageCount: number;
 }
 
 /**
@@ -146,8 +144,15 @@ export interface ProductDetail {
      * Projects" rail lower down the page already lists in full.
      */
     projectsFeaturingCount: number;
-    /** One other product by the same brand, for the rail. */
-    otherProduct: ProductDetailRelated | null;
+    /**
+     * Other products by the same brand, for the "More from {brand}" rail.
+     *
+     * Was a single product, because the rail lived in a one-card-wide sidebar.
+     * The rail is now a full-width row below the fold, where one lonely card
+     * would read as a rendering failure, so it carries up to four. The ids come
+     * from the list already fetched for productCount — no extra query.
+     */
+    otherProducts: ProductDetailRelated[];
   } | null;
 }
 
@@ -355,19 +360,12 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   );
   let projects: ProductDetailProject[] = [];
   if (projectIds.length > 0) {
-    const [{ data: projRows }, { data: projImgs }] = await Promise.all([
-      sup
-        .from("listings")
-        .select("id, slug, title, cover_image_url, owner_profile_id")
-        .in("id", projectIds)
-        .eq("status", "APPROVED")
-        .is("deleted_at", null),
-      sup.from("listing_images").select("listing_id").in("listing_id", projectIds),
-    ]);
-    const counts = new Map<string, number>();
-    for (const i of (projImgs ?? []) as { listing_id: string }[]) {
-      counts.set(i.listing_id, (counts.get(i.listing_id) ?? 0) + 1);
-    }
+    const { data: projRows } = await sup
+      .from("listings")
+      .select("id, slug, title, cover_image_url, owner_profile_id")
+      .in("id", projectIds)
+      .eq("status", "APPROVED")
+      .is("deleted_at", null);
     const ownerIds = Array.from(
       new Set(
         ((projRows ?? []) as Record<string, unknown>[])
@@ -388,7 +386,6 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
       href: `/projects/${(r.slug as string) ?? String(r.id)}`,
       cover: (r.cover_image_url as string | null) ?? null,
       architect: r.owner_profile_id ? owners.get(String(r.owner_profile_id)) ?? null : null,
-      imageCount: counts.get(String(r.id)) ?? 0,
     }));
   }
 
@@ -398,14 +395,10 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
 
   async function hydrateProducts(ids: string[]): Promise<ProductDetailRelated[]> {
     if (ids.length === 0) return [];
-    const [{ data: rows }, { data: imgs }] = await Promise.all([
-      sup.from("listings").select("id, slug, title, cover_image_url, owner_profile_id").in("id", ids),
-      sup.from("listing_images").select("listing_id").in("listing_id", ids),
-    ]);
-    const counts = new Map<string, number>();
-    for (const i of (imgs ?? []) as { listing_id: string }[]) {
-      counts.set(i.listing_id, (counts.get(i.listing_id) ?? 0) + 1);
-    }
+    const { data: rows } = await sup
+      .from("listings")
+      .select("id, slug, title, cover_image_url, owner_profile_id")
+      .in("id", ids);
     const ownerIds = Array.from(
       new Set(
         ((rows ?? []) as Record<string, unknown>[])
@@ -426,7 +419,6 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
       href: `/products/${(r.slug as string) ?? String(r.id)}`,
       cover: (r.cover_image_url as string | null) ?? null,
       brand: r.owner_profile_id ? owners.get(String(r.owner_profile_id)) ?? null : null,
-      imageCount: counts.get(String(r.id)) ?? 0,
     }));
   }
 
@@ -454,7 +446,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
 
     const brandProductIds = ((brandProducts ?? []) as { id: string }[]).map((r) => r.id);
     const productCount = brandProductIds.length;
-    const siblings = brandProductIds.filter((id) => id !== listingId).slice(0, 1);
+    const siblings = brandProductIds.filter((id) => id !== listingId).slice(0, 4);
 
     // Distinct live projects reached by ANY of this brand's products. Liveness
     // is enforced on the far end, exactly as the product-scoped `projects` list
@@ -493,7 +485,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
         website: (pr.website as string | null) ?? null,
         productCount,
         projectsFeaturingCount,
-        otherProduct: others[0] ?? null,
+        otherProducts: others,
       };
     }
   }
@@ -530,19 +522,14 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
     }
   }
 
-  if (related.length === 0 && brand) {
-    const { data: sameBrand } = await sup
-      .from("listings")
-      .select("id")
-      .eq("owner_profile_id", brand.id)
-      .eq("type", "product")
-      .eq("status", "APPROVED")
-      .is("deleted_at", null)
-      .neq("id", listingId)
-      .limit(4);
-    related = await hydrateProducts(((sameBrand ?? []) as { id: string }[]).map((r) => r.id));
-    if (related.length > 0) relatedReason = `More from ${brand.name}`;
-  }
+  /*
+   * NO SAME-BRAND FALLBACK ANY MORE. `related` used to fall back to other
+   * products by the same brand under the heading "More from {brand}" — which
+   * is now a section of its own, built from brand.otherProducts and rendered
+   * lower on the page. Keeping the fallback would have printed the same four
+   * products twice under the same heading. When there is no category signal,
+   * `related` is simply empty and the module suppresses itself.
+   */
 
   return {
     id: String(l.id),

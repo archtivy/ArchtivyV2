@@ -6,8 +6,7 @@ import { getAbsoluteUrl } from "@/lib/canonical";
 import { HomeNav } from "@/components/home/HomeNav";
 import { HomeFooter } from "@/components/home/HomeFooter";
 import { Gallery } from "@/components/entity/Gallery";
-import { RailPanel, RelatedPanel } from "@/components/entity/RelationshipRail";
-import { ListingCardShared } from "@/components/listing/ListingCardShared";
+import { RailPanel } from "@/components/entity/RelationshipRail";
 import { SaveToggle } from "@/components/home/SaveToggle";
 import { normaliseExternalUrl } from "@/lib/url/externalUrl";
 import { ProductStageBadge, CollaborationBadge } from "@/components/listing/StatusBadge";
@@ -16,6 +15,7 @@ import { RequestQuoteButton } from "@/components/products/RequestQuoteButton";
 import { ProductDetailTabs } from "@/components/products/ProductDetailTabs";
 import { SeenInProjects } from "@/components/products/SeenInProjects";
 import { OftenSpecifiedWith } from "@/components/products/OftenSpecifiedWith";
+import { ProductRail } from "@/components/products/ProductRail";
 import { getOftenSpecifiedWith } from "@/lib/db/oftenSpecifiedWith";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -23,15 +23,26 @@ import { buildProductJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
 import type { ProductCanonical } from "@/lib/canonical-models";
 
 /**
- * Product Detail — Entity Detail Layout archetype (Blueprint §8), the same
- * archetype as Project Detail: hero gallery + tabs + persistent right-hand
- * Relationship Rail (here Product → Brand).
+ * Product Detail — Entity Detail Layout archetype (Blueprint §8).
  *
- * GALLERY: uses components/entity/Gallery.tsx unchanged — horizontal thumbnail
- * strip below the hero. The reference screenshot shows a VERTICAL thumbnail
- * rail; that is a deliberate deviation in favour of one gallery component
- * across Project, Product and Professional (Blueprint §19). Not forked, and
- * no layout prop added — see the note reported alongside this build.
+ * ── LAYOUT ──────────────────────────────────────────────────────────────────
+ * Row 1: gallery | product information.
+ * Row 2: About / Details / Downloads tabs | brand card.
+ * Below: Seen in Projects, then the product rails.
+ *
+ * The brand card sits beside the TABS, not beside the product information, so
+ * the specification can use the full right-hand half of the first row where it
+ * is read. This also ends the height problem the previous three-column row
+ * had: the sidebar carried three stacked panels, CSS Grid sized the row to the
+ * tallest item, and ~648px of dead space opened under the gallery. The sidebar
+ * is one short card now, so no row-spanning or height-capping is needed.
+ *
+ * GALLERY: horizontal thumbnail strip below the hero, the same orientation
+ * every other caller uses. A vertical side rail was tried and removed —
+ * stacked thumbnails are taller than the photograph they belong to, which
+ * needed absolute positioning inside a flex track to stop the rail setting the
+ * row height. A strip below has no such failure mode, and the prop and that
+ * machinery are gone rather than left behind unused.
  *
  * NOT RENDERED, because nothing backs them (see lib/db/productDetail.ts):
  *   "Verified Product" badge   no verification column anywhere
@@ -158,19 +169,19 @@ export async function ProductDetailView({
           <span className="text-ink">{detail.title}</span>
         </nav>
 
-        {/* Three columns on desktop: gallery, product information, brand rail.
-            The gallery previously spanned two thirds with the title beneath it,
-            which pushed the quote button and the specification below the fold on
-            a laptop. Side by side, the decision-making information sits next to
-            the photograph it describes. */}
+        {/* Two items per row on desktop, both rows sharing one 12-column grid:
+            gallery + product information, then tabs + brand card. Keeping them
+            in a single grid rather than two stacked flex rows means the tabs
+            column lines up under the gallery and the brand card under the
+            specification, with no second set of width values to keep in sync. */}
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-start lg:gap-8">
           {/* ── Gallery ────────────────────────────────────────────────── */}
-          <div className="min-w-0 lg:col-span-5">
-            <Gallery images={detail.images} title={detail.title} thumbPosition="left" />
+          <div className="min-w-0 lg:col-span-7">
+            <Gallery images={detail.images} title={detail.title} />
           </div>
 
           {/* ── Product information ────────────────────────────────────── */}
-          <div className="min-w-0 lg:col-span-4">
+          <div className="min-w-0 lg:col-span-5">
             <div>
               {/* Brand line. No verification checkmark: no verification flag
                   exists on any table, and brand claim_status is 'unclaimed'
@@ -275,7 +286,26 @@ export async function ProductDetailView({
             </div>
           </div>
 
-          {/* ── Relationship Rail: Brand ───────────────────────────────── */}
+          {/* ── Tabs ───────────────────────────────────────────────────────
+              Second row, columns 1-8. The About panel keeps a 68ch reading
+              measure; an eight-column track is about 800px wide, so the prose
+              now fills roughly 85% of its column instead of reading as a narrow
+              island in a full-width field. The explicit max-w-[860px] that used
+              to do that job is gone — the column is narrower than the cap, so
+              the cap never applied and was one more number to keep in sync. */}
+          <div className="min-w-0 lg:col-span-8">
+            <ProductDetailTabs product={detail} />
+            <ProductCollaborationSection
+              product_collaboration_status={detail.collaborationStatus}
+              product_looking_for={detail.lookingFor}
+            />
+          </div>
+
+          {/* ── Brand card ─────────────────────────────────────────────────
+              One panel, beside the tabs. "More from {brand}" and the related
+              products used to stack under it here; both are now full-width
+              rails below the fold, where a product card gets a readable width
+              instead of a sidebar's worth. */}
           {/* Spans BOTH grid rows on desktop. Previously the aside sat in a
               single row, and CSS Grid sized that row to its tallest item — the
               rail's three stacked panels, 1072px — while the gallery and
@@ -284,7 +314,7 @@ export async function ProductDetailView({
               under the gallery. Spanning the rail across both rows lets the
               tabs start immediately after the gallery/info row while the
               sidebar simply continues alongside them. */}
-          <aside className="min-w-0 space-y-5 lg:col-span-3 lg:row-span-2">
+          <aside className="min-w-0 lg:col-span-4">
             {detail.brand && (
               <RailPanel title="Brand">
                 <div className="flex items-center gap-3">
@@ -346,59 +376,37 @@ export async function ProductDetailView({
               </RailPanel>
             )}
 
-            {detail.brand?.otherProduct && (
-              <RailPanel title={`More from ${detail.brand.name}`}>
-                <ListingCardShared
-                  model={{
-                    id: detail.brand.otherProduct.id,
-                    type: "product",
-                    title: detail.brand.otherProduct.title,
-                    href: detail.brand.otherProduct.href,
-                    imageUrl: detail.brand.otherProduct.cover,
-                    authorName: detail.brand.otherProduct.brand,
-                  }}
-                  ratio="1/1"
-                  sizes="(max-width: 1024px) 45vw, 20vw"
-                />
-              </RailPanel>
-            )}
-
-            <RelatedPanel
-              items={detail.related.map((r) => ({
-                id: r.id,
-                title: r.title,
-                href: r.href,
-                cover: r.cover,
-                architect: r.brand,
-                imageCount: r.imageCount,
-              }))}
-              reason={detail.relatedReason}
-            />
           </aside>
 
-        {/* Second grid row, columns 1-9. Tabs sit below the grid, but CAPPED — not full-bleed.
-            Moving them out of the information column fixed the wrapping, and
-            introduced the opposite problem: the About panel keeps a 68ch
-            reading measure (686px, correct typography), and inside a 1248px
-            container that read as a narrow island in a large empty field.
-            Measured in a headless browser: 686 of 1248 = 55%.
-            Capping the container puts the measure at ~80% of its column, so
-            the text reads as a column rather than as something that failed to
-            fill the page. The measure itself is unchanged; widening prose past
-            ~75ch would trade one legibility problem for another. */}
-          <div className="mt-6 min-w-0 max-w-[860px] lg:col-span-9">
-            <ProductDetailTabs product={detail} />
-            <ProductCollaborationSection
-              product_collaboration_status={detail.collaborationStatus}
-              product_looking_for={detail.lookingFor}
-            />
-          </div>
         </div>
 
         {/* ── Seen in Projects ────────────────────────────────────────── */}
         <SeenInProjects projects={detail.projects} />
 
         <OftenSpecifiedWith items={oftenSpecifiedWith} />
+
+        {detail.brand && (
+          <ProductRail
+            title={`More from ${detail.brand.name}`}
+            items={detail.brand.otherProducts}
+          />
+        )}
+
+        {/* Last in the stack, and deduplicated against everything above it.
+            `related` is a same-category list, and so is the fallback tier of
+            "Often specified with" — on a product with no co-occurrence data
+            the two queries return substantially the same products, and the
+            page would print them twice under two headings. Filtering by id
+            leaves this row showing only what is genuinely additional; when
+            that is nothing, ProductRail renders nothing. */}
+        <ProductRail
+          title={detail.relatedReason}
+          items={detail.related.filter(
+            (r) =>
+              !oftenSpecifiedWith.some((o) => o.id === r.id) &&
+              !(detail.brand?.otherProducts ?? []).some((b) => b.id === r.id)
+          )}
+        />
       </div>
 
       <HomeFooter />

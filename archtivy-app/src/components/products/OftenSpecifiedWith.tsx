@@ -1,5 +1,4 @@
-import { ListingCardShared } from "@/components/listing/ListingCardShared";
-import { HomeSectionHeader } from "@/components/home/HomeSectionHeader";
+import { ProductRail } from "@/components/products/ProductRail";
 import { getListingUrl } from "@/lib/canonical";
 import type { OftenSpecifiedWithItem } from "@/lib/db/oftenSpecifiedWith";
 
@@ -17,37 +16,30 @@ import type { OftenSpecifiedWithItem } from "@/lib/db/oftenSpecifiedWith";
  * editorial link, same-category is an admission that it is only a category
  * match. When the list mixes both, the weaker claim wins.
  *
- * Renders nothing when empty, like every other conditional module here.
+ * The rendering itself is ProductRail, shared with the two other product rows
+ * that now sit below this one. Only the heading, the subtitle and the query
+ * are this module's own.
  */
 export function OftenSpecifiedWith({ items }: { items: OftenSpecifiedWithItem[] }) {
   if (items.length === 0) return null;
 
   const allCoOccurrence = items.every((i) => i.basis === "co_occurrence");
-  const subtitle = allCoOccurrence
-    ? "Specified alongside this product in real projects."
-    : "From the same category.";
 
   return (
-    <section className="mt-20" aria-labelledby="often-specified-with-heading">
-      <HomeSectionHeader title="Often specified with" />
-      <p className="-mt-4 mb-6 font-body text-[13px] text-muted">{subtitle}</p>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4">
-        {items.map((item) => (
-          <ListingCardShared
-            key={item.id}
-            model={{
-              id: item.id,
-              type: "product",
-              title: item.title,
-              href: getListingUrl({ id: item.id, type: "product", slug: item.slug }),
-              imageUrl: item.cover,
-              authorName: item.brand,
-            }}
-            ratio="1/1"
-            sizes="(max-width: 640px) 45vw, 22vw"
-          />
-        ))}
-      </div>
-    </section>
+    <ProductRail
+      title="Often specified with"
+      subtitle={
+        allCoOccurrence
+          ? "Specified alongside this product in real projects."
+          : "From the same category."
+      }
+      items={items.map((i) => ({
+        id: i.id,
+        title: i.title,
+        href: getListingUrl({ id: i.id, type: "product", slug: i.slug }),
+        cover: i.cover,
+        brand: i.brand,
+      }))}
+    />
   );
 }

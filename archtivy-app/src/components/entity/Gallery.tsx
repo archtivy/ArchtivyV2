@@ -45,16 +45,6 @@ export interface GalleryProps {
   title: string;
   /** How many thumbnails to show before collapsing the rest into "+N". */
   visibleThumbs?: number;
-  /**
-   * Where the thumbnail rail sits.
-   *
-   * `below` (default) keeps the horizontal strip every existing caller renders.
-   * `left` puts it in a vertical column beside the main image, which is what
-   * the product detail layout uses. Opt-in rather than a new default, because
-   * the project detail page's 16/10 hero would lose width to a side rail for no
-   * gain — it has fewer, larger images.
-   */
-  thumbPosition?: "below" | "left";
   priority?: boolean;
 }
 
@@ -63,7 +53,6 @@ export function Gallery({
   title,
   visibleThumbs = 6,
   priority = true,
-  thumbPosition = "below",
 }: GalleryProps) {
   const [index, setIndex] = useState(0);
   const total = images.length;
@@ -159,11 +148,6 @@ export function Gallery({
     .slice(visibleThumbs)
     .some((i) => (i.hotspots?.length ?? 0) > 0);
 
-  const railLeft = thumbPosition === "left" && total > 1;
-
-  /* One implementation of the thumbnails, rendered in either orientation.
-     Duplicating this for the two layouts is precisely how two card families
-     drifted apart earlier in this codebase. */
   const thumbItems = (
     <>
         {thumbs.map((img, i) => (
@@ -224,13 +208,7 @@ export function Gallery({
   );
 
   return (
-    <div className={railLeft ? "flex flex-col gap-3 sm:flex-row-reverse" : undefined}>
-      {/* The rail comes AFTER the image in the DOM and is flipped visually with
-          flex-row-reverse, so it paints on the left while keyboard and
-          screen-reader order still reach the main image first. Below `sm` it is
-          a plain column: image, then a horizontal strip beneath it — a vertical
-          rail on a phone would eat a third of the width. */}
-      <div className={railLeft ? "min-w-0 flex-1" : undefined}>
+    <div>
       <div
         role="group"
         aria-roledescription="carousel"
@@ -342,30 +320,7 @@ export function Gallery({
         </div>
       )}
 
-      </div>
-
-      {total > 1 &&
-        (railLeft ? (
-          /* THE RAIL MUST NOT SET THE ROW HEIGHT.
-             Stacked vertically, six thumbnails are taller than the photograph
-             they belong to — measured at 424px against a 258px image, so the
-             rail ran 166px past the bottom of its own picture and the mockup's
-             tidy image-height column became a ragged overhang.
-
-             This track is a plain flex child, so `align-items: stretch` sizes it
-             to the row — and the row is set by the IMAGE alone, because the list
-             inside is absolutely positioned and contributes no intrinsic height.
-             The list then scrolls within exactly the image's height, whether the
-             product has three thumbnails or thirty. The "+N" collapse is
-             unchanged and still caps how many are rendered. */
-          <div className="relative shrink-0 sm:w-[76px]">
-            <ul className="flex gap-2 overflow-x-auto sm:absolute sm:inset-0 sm:flex-col sm:overflow-x-visible sm:overflow-y-auto">
-              {thumbItems}
-            </ul>
-          </div>
-        ) : (
-          <ul className="mt-3 flex gap-2 overflow-x-auto">{thumbItems}</ul>
-        ))}
+      {total > 1 && <ul className="mt-3 flex gap-2 overflow-x-auto">{thumbItems}</ul>}
     </div>
   );
 }
