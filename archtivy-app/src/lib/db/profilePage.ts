@@ -31,6 +31,7 @@
  * today, which is expected and is why the empty state matters more than they do.
  */
 
+import { getCardBadgeCounts, getCreditCounts } from "@/lib/db/cardBadgeCounts";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 
 const supa = () => getSupabaseServiceClient();
@@ -59,7 +60,26 @@ export interface ProfileListingCard {
   year: number | null;
   areaSqft: number | null;
   categoryLabel: string | null;
+  /** Second half of the taxonomy line, when the primary node has a parent. */
+  typeLabel: string | null;
   views: number | null;
+  /**
+   * Shared-card badge — "Used in N projects / by N studios" on a product,
+   * "Used N products / from N brands" on a project — and, for projects, the
+   * profile-linked credit count behind the connections row.
+   *
+   * These are the canonical card's own fields. Without them the same
+   * ListingCardShared draws a visibly poorer card here than it does on
+   * /projects, which reads as a second card design; the relationship badge is
+   * the platform's whole differentiator and is exactly what a profile page
+   * should be showing off.
+   */
+  badge: { related: number; owners: number };
+  creditCount: number;
+  /** Owner avatar for the card's logo chip. */
+  ownerAvatar: string | null;
+  /** Archive route for the category, when the taxonomy resolves one. */
+  categoryHref: string | null;
 }
 
 export interface ProfileMiniProfile {
@@ -206,7 +226,12 @@ async function getProfilesByIds(ids: string[]): Promise<Map<string, ProfileMiniP
 function toCard(
   r: ListingRow,
   byline: string | null,
-  categoryLabel: string | null = null
+  category: { rootLabel: string | null; typeLabel: string } | null = null,
+  extras: {
+    badge?: { related: number; owners: number };
+    credits?: number;
+    ownerAvatar?: string | null;
+  } = {}
 ): ProfileListingCard {
   // location_city is set on only 7 of 51 projects while `location` is set on
   // all of them, so the free-text field is the reliable one and the structured
@@ -223,28 +248,85 @@ function toCard(
     locationText: r.location?.trim() || structured || null,
     year: r.year ?? null,
     areaSqft: r.area_sqft && r.area_sqft > 0 ? r.area_sqft : null,
-    categoryLabel,
+    // "Furniture · Bed frame" on a product; the type sits in metaLabel at the
+    // render site, so both halves reach the card the way the directory sends
+    // them. Falls back to the type alone when the node has no distinct root.
+    categoryLabel: category?.rootLabel ?? category?.typeLabel ?? null,
+    typeLabel: category?.rootLabel ? category.typeLabel : null,
     views: r.views_count && r.views_count > 0 ? r.views_count : null,
+    badge: extras.badge ?? { related: 0, owners: 0 },
+    creditCount: extras.credits ?? 0,
+    ownerAvatar: extras.ownerAvatar ?? null,
+    // Root of the taxonomy path — a link whose text says "Residential" must
+    // not land on a narrower archive.
+    categoryHref: r.taxonomy_slug_path
+      ? `/${r.type === "product" ? "products" : "projects"}/${r.taxonomy_slug_path.split("/")[0]}`
+      : null,
   };
 }
 
 /** Primary category label per listing, for the card metadata line. */
-async function getCategoryLabels(listingIds: string[]): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
+/**
+ * Primary taxonomy label per listing, AND its root's label.
+ *
+ * The card's first line is "root · type" — "Furniture · Bed frame" — exactly as
+ * the products directory renders it. Returning only the primary node's label
+ * gave a profile card "Bed frame" with no parent above it, so the same
+ * component read differently depending on which page you found the product on.
+ * The root label comes from taxonomy_nodes rather than title-casing the slug,
+ * because several roots carry punctuation a slug cannot ("Walls, Ceilings &
+ * Facades", "Public / Civic").
+ */
+async function getCategoryLabels(
+  listingIds: string[]
+): Promise<Map<string, { rootLabel: string | null; typeLabel: string }>> {
+  const out = new Map<string, { rootLabel: string | null; typeLabel: string }>();
   if (listingIds.length === 0) return out;
   const { data } = await supa()
     .from("listing_taxonomy_node")
-    .select("listing_id, is_primary, taxonomy_nodes:taxonomy_node_id(domain, label)")
+    .select("listing_id, is_primary, taxonomy_nodes:taxonomy_node_id(domain, label, slug_path)")
     .in("listing_id", listingIds);
+
+  type Node = { domain: string; label: string; slug_path: string | null };
+  const primary = new Map<string, Node>();
   for (const row of (data ?? []) as unknown as {
     listing_id: string; is_primary: boolean;
-    taxonomy_nodes: { domain: string; label: string } | { domain: string; label: string }[] | null;
+    taxonomy_nodes: Node | Node[] | null;
   }[]) {
     const n = Array.isArray(row.taxonomy_nodes) ? row.taxonomy_nodes[0] : row.taxonomy_nodes;
     if (!n?.label) continue;
     if (n.domain !== "project" && n.domain !== "product") continue;
     // First primary wins; otherwise the first node of the right domain.
-    if (row.is_primary || !out.has(row.listing_id)) out.set(row.listing_id, n.label);
+    if (row.is_primary || !primary.has(row.listing_id)) primary.set(row.listing_id, n);
+  }
+
+  const rootPaths = [
+    ...new Set(
+      [...primary.values()]
+        .map((n) => n.slug_path?.split("/")[0])
+        .filter(Boolean) as string[]
+    ),
+  ];
+  const rootLabels = new Map<string, string>();
+  if (rootPaths.length > 0) {
+    const { data: roots } = await supa()
+      .from("taxonomy_nodes")
+      .select("slug_path, label")
+      .in("slug_path", rootPaths);
+    for (const r of (roots ?? []) as { slug_path: string; label: string }[]) {
+      rootLabels.set(r.slug_path, r.label);
+    }
+  }
+
+  for (const [id, n] of primary) {
+    const root = n.slug_path?.split("/")[0] ?? null;
+    const rootLabel = root ? rootLabels.get(root) ?? null : null;
+    out.set(id, {
+      // When the primary node IS the root, there is no parent to state and the
+      // line is the root alone — never "Furniture · Furniture".
+      rootLabel: rootLabel && rootLabel !== n.label ? rootLabel : null,
+      typeLabel: n.label,
+    });
   }
   return out;
 }
@@ -266,9 +348,37 @@ export async function getProfilePageData(
   const projectRows = owned.filter((l) => l.type === "project");
   const productRows = owned.filter((l) => l.type === "product");
 
-  const ownCategories = await getCategoryLabels(owned.map((l) => l.id));
-  const projects = projectRows.map((r) => toCard(r, null, ownCategories.get(r.id) ?? null));
-  const products = productRows.map((r) => toCard(r, null, ownCategories.get(r.id) ?? null));
+  /*
+   * Batched once for the whole page, never per card: getCardBadgeCounts issues
+   * two queries regardless of grid size, and getCreditCounts one. Resolving
+   * these per card is the fan-out those helpers exist to prevent.
+   */
+  const [ownCategories, projectBadges, productBadges, projectCredits, ownerRow] =
+    await Promise.all([
+      getCategoryLabels(owned.map((l) => l.id)),
+      getCardBadgeCounts(projectRows.map((r) => r.id), "project"),
+      getCardBadgeCounts(productRows.map((r) => r.id), "product"),
+      getCreditCounts(projectRows.map((r) => r.id)),
+      supa().from("profiles").select("avatar_url").eq("id", profileId).maybeSingle(),
+    ]);
+
+  // Every listing here is owned by the profile being viewed, so the card's logo
+  // chip is that profile's own avatar — no per-card owner lookup needed.
+  const ownerAvatar = (ownerRow.data as { avatar_url: string | null } | null)?.avatar_url ?? null;
+
+  const projects = projectRows.map((r) =>
+    toCard(r, null, ownCategories.get(r.id) ?? null, {
+      badge: projectBadges[r.id],
+      credits: projectCredits[r.id],
+      ownerAvatar,
+    })
+  );
+  const products = productRows.map((r) =>
+    toCard(r, null, ownCategories.get(r.id) ?? null, {
+      badge: productBadges[r.id],
+      ownerAvatar,
+    })
+  );
 
   // No cover column on `profiles` — the hero image is the profile's own first
   // piece of work, preferring a project because product shots are often

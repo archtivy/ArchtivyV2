@@ -126,6 +126,11 @@ export function ListingCard({ card }: { card: ProfileListingCard }) {
    */
   return (
     <ListingCardShared
+      /* The FULL canonical model. This used to omit the category link, the
+         owner logo chip, the year link and — most importantly — the
+         relationship badge, so the same ListingCardShared drew a poorer card
+         on a profile than on /projects. A stripped model makes one component
+         look like an inferior variant of itself. */
       model={{
         id: card.id,
         type: card.type,
@@ -133,9 +138,20 @@ export function ListingCard({ card }: { card: ProfileListingCard }) {
         href: listingHref(card),
         imageUrl: card.cover,
         categoryLabel: card.categoryLabel,
-        metaLabel: card.type === "project" ? card.locationText : null,
+        categoryHref: card.categoryHref,
+        // Project: the place. Product: the type under its root, so the line
+        // reads "Furniture · Bed frame" exactly as it does on /products.
+        metaLabel: card.type === "project" ? card.locationText : card.typeLabel,
         authorName: card.byline,
+        logoUrl: card.ownerAvatar,
         year: card.type === "project" ? card.year : null,
+        yearHref:
+          card.type === "project" && card.year
+            ? `/projects?year_min=${card.year}&year_max=${card.year}`
+            : null,
+        relatedCount: card.badge.related,
+        ownerCount: card.badge.owners,
+        creditCount: card.creditCount,
       }}
       ratio={card.type === "product" ? "1/1" : "4/3"}
       sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 24vw"

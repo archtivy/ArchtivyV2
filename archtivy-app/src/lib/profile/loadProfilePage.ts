@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { isFollowing } from "@/lib/db/follows";
 import { getProfilePageData } from "@/lib/db/profilePage";
+import { getProfileMetrics } from "@/lib/db/profileMetrics";
 import type { ProfilePageViewProps } from "@/components/profile/ProfilePageView";
 import type { Profile } from "@/lib/types/profiles";
 
@@ -23,8 +24,9 @@ export async function loadProfilePageProps(
     userId && (userId === profile.clerk_user_id || userId === ownerClerkId)
   );
 
-  const [data, initialFollowing] = await Promise.all([
+  const [data, metrics, initialFollowing] = await Promise.all([
     getProfilePageData(profile.id, profile.role),
+    getProfileMetrics(profile.id),
     (async () => {
       // Only meaningful for a signed-in visitor who is not the owner.
       if (!userId || isOwner) return false;
@@ -45,6 +47,7 @@ export async function loadProfilePageProps(
 
   return {
     data,
+    metrics,
     isOwner,
     initialFollowing,
     contactListing: first

@@ -2,13 +2,8 @@ import Link from "next/link";
 import Image from "next/image";
 // lucide-react dropped its brand glyphs, so Instagram/LinkedIn use neutral
 // icons rather than pulling in a second icon dependency for two links.
-import { AtSign, BadgeCheck, Globe, Link2, MapPin } from "lucide-react";
-import { FollowButton } from "@/components/follow/FollowButton";
-import { ProfileContactButton } from "@/components/profile/ProfileContactButton";
-import { initialsOf } from "@/components/home/EntityCard";
-import { normaliseInstagramHandle } from "@/lib/publish/instagram";
-import { TYPE } from "@/components/admin/ui/tokens";
 import { ProfileTabs, type ProfileTab } from "@/components/profile/ProfileTabs";
+import { ProfileRail, type RailSection } from "@/components/profile/ProfileRail";
 import {
   Panel,
   InfoRows,
@@ -18,6 +13,7 @@ import {
   CompactListingList,
   ProfileEmptyState,
 } from "@/components/profile/ProfileModules";
+import type { ProfileMetrics } from "@/lib/db/profileMetrics";
 import type { ProfilePageData } from "@/lib/db/profilePage";
 import type { Profile } from "@/lib/types/profiles";
 
@@ -59,6 +55,8 @@ import type { Profile } from "@/lib/types/profiles";
 export interface ProfilePageViewProps {
   profile: Profile;
   data: ProfilePageData;
+  /** Listings / Connections / Followers. See lib/db/profileMetrics. */
+  metrics: ProfileMetrics;
   isOwner: boolean;
   /** Viewer's follow state, resolved server-side. */
   initialFollowing: boolean;
@@ -68,63 +66,11 @@ export interface ProfilePageViewProps {
 
 /* ── Identity ────────────────────────────────────────────────────────────── */
 
-function SocialLinks({ profile }: { profile: Profile }) {
-  // profiles.instagram is NOT normalised in the database — it holds whatever was
-  // pasted, in practice a full URL, unlike listings.instagram which has a CHECK
-  // enforcing a bare handle. Normalising at render was the chosen fix (no
-  // migration); the format split is logged as DATA_INTEGRITY_LOG item 8.
-  const igHandle = profile.instagram ? normaliseInstagramHandle(profile.instagram) : null;
-
-  const links = [
-    profile.website && { key: "web", href: profile.website, Icon: Globe, label: "Website" },
-    igHandle && {
-      key: "ig",
-      href: `https://instagram.com/${igHandle}`,
-      Icon: AtSign,
-      label: `@${igHandle}`,
-    },
-    profile.linkedin && { key: "li", href: profile.linkedin, Icon: Link2, label: "LinkedIn" },
-  ].filter(Boolean) as { key: string; href: string; Icon: typeof Globe; label: string }[];
-
-  if (links.length === 0) return null;
-
-  return (
-    <ul className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-      {links.map(({ key, href, Icon, label }) => (
-        <li key={key}>
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer me"
-            className="inline-flex items-center gap-2 font-body text-[13px] text-muted transition-colors hover:text-ink"
-          >
-            <Icon strokeWidth={1.5} className="h-4 w-4" aria-hidden />
-            {label}
-          </a>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /** "https://www.molteni.it/en/" -> "molteni.it/en" — the raw URL overflows. */
 function prettyUrl(url: string | null | undefined): string | null {
   const raw = url?.trim();
   if (!raw) return null;
   return raw.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/+$/, "") || null;
-}
-
-function roleLabelFor(profile: Profile): string {
-  if (profile.role === "designer") {
-    const show =
-      (profile as { show_designer_discipline?: boolean }).show_designer_discipline !== false;
-    return (show && profile.designer_discipline) || "Architect / Designer";
-  }
-  if (profile.role === "brand") {
-    const show = (profile as { show_brand_type?: boolean }).show_brand_type !== false;
-    return (show && profile.brand_type) || "Brand";
-  }
-  return "Member";
 }
 
 function ProfileHeader({
@@ -134,18 +80,8 @@ function ProfileHeader({
   initialFollowing,
   contactListing,
 }: ProfilePageViewProps) {
-  const displayName = profile.display_name ?? profile.username ?? "Profile";
-  const showLocation =
-    (profile as { location_visibility?: string }).location_visibility !== "private";
-  const location = showLocation
-    ? [profile.location_city, profile.location_country].filter(Boolean).join(", ") || null
-    : null;
-
-  // Verification ties to claim_status: a claimed profile is one a real person
-  // proved they control. Nothing is claimed today (all 199 rows are
-  // 'unclaimed'), so this renders for nobody and self-activates as claims land.
-  const isVerified = (profile as { claim_status?: string }).claim_status === "claimed";
-
+  /* Name, location and verification all render in the rail now — see
+     ProfileRail. This header owns the cover, the statement and the chips. */
   return (
     <header>
       {/* Cover. No cover column exists on `profiles`, so this is the profile's
@@ -164,91 +100,40 @@ function ProfileHeader({
         )}
       </div>
 
-      <div className="relative px-1 sm:px-6">
-        {/* Avatar overlaps the cover's bottom-left, per the reference. */}
-        <div className="-mt-12 flex flex-col gap-5 sm:-mt-14 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex items-end gap-4">
-            <span className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border-4 border-cream bg-stone sm:h-28 sm:w-28">
-              {profile.avatar_url ? (
-                <Image
-                  src={profile.avatar_url}
-                  alt=""
-                  fill
-                  sizes="112px"
-                  className="object-cover"
-                  priority
-                />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center font-display text-[28px] text-muted">
-                  {initialsOf(displayName)}
-                </span>
-              )}
-            </span>
-          </div>
+      {/* Statement + expertise chips, sitting under the cover as in the
+          reference. Identity, actions and metrics all moved to the persistent
+          rail; repeating the name beside it would say it twice.
 
-          {/* Follow / Message, top-right of the identity block. Follower count
-              is deliberately absent, here and everywhere on this page. */}
-          {!isOwner ? (
-            <div className="flex flex-wrap items-center gap-2.5 pb-1">
-              <FollowButton
-                targetType={profile.role === "brand" ? "brand" : "designer"}
-                targetId={profile.id}
-                initialFollowing={initialFollowing}
-              />
-              {contactListing && (
-                <ProfileContactButton
-                  listingId={contactListing.id}
-                  listingType={contactListing.type}
-                  listingTitle={contactListing.title}
-                />
-              )}
-            </div>
-          ) : (
-            <div className="pb-1">
-              <Link
-                href="/me/profile"
-                className="font-body text-[13px] text-muted underline-offset-4 hover:text-ink hover:underline"
-              >
-                Edit profile
-              </Link>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-5">
-          <p className={TYPE.meta}>{roleLabelFor(profile)}</p>
-          <h1 className="mt-1 flex items-center gap-2 font-display text-[30px] leading-[1.1] tracking-[-0.02em] text-ink sm:text-[36px]">
-            <span className="min-w-0">{displayName}</span>
-            {isVerified && (
-              <BadgeCheck
-                strokeWidth={1.5}
-                className="h-5 w-5 shrink-0 text-archtivy-primary"
-                aria-label="Verified profile"
-              />
-            )}
-          </h1>
-
-          {location && (
-            <p className="mt-2 inline-flex items-center gap-1.5 font-body text-[14px] text-muted">
-              <MapPin strokeWidth={1.5} className="h-4 w-4" aria-hidden />
-              {location}
-            </p>
-          )}
-
-          {/* Clamped to 5 lines. The reference assumes a ~3-line bio, but real
-              ones are unbounded — Schmidt Hammer Lassen's runs 25 lines and
-              pushed the tabs and the entire grid below the fold. The full text
-              stays in the DOM, so it is intact for screen readers and for SEO;
-              only the visual height is capped. */}
+          The bio is clamped to 3 lines here. Real ones are unbounded — Schmidt
+          Hammer Lassen's runs 25 — and the reference assumes a single
+          sentence. The full text stays in the DOM for screen readers and for
+          SEO; only the visual height is capped. */}
+      {(profile.bio || data.styleTags.length > 0) && (
+        <div className="mt-6 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           {profile.bio && (
-            <p className="mt-4 line-clamp-5 max-w-[62ch] font-body text-[15px] leading-[26px] text-ink/85">
+            <p className="line-clamp-3 max-w-[54ch] font-body text-[17px] leading-[28px] text-ink">
               {profile.bio}
             </p>
           )}
 
-          <SocialLinks profile={profile} />
+          {/* Expertise chips are the profile's own most frequent style and
+              discipline nodes, not an authored list — there is no expertise
+              column. Capped at five so a heavily tagged studio does not push
+              the tabs down. */}
+          {data.styleTags.length > 0 && (
+            <ul className="flex flex-wrap gap-2 lg:justify-end">
+              {data.styleTags.slice(0, 5).map((t) => (
+                <li
+                  key={t}
+                  className="rounded-full border border-hairline px-3.5 py-1.5 font-body text-[13px] text-ink"
+                >
+                  {t}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-      </div>
+      )}
 
       {/* SLOT: Promote / Featured CTA. Blocked on Stripe — intentionally not
           rendered rather than shown as a button that cannot complete. */}
@@ -359,7 +244,7 @@ function BrandPanels({ profile, data }: { profile: Profile; data: ProfilePageDat
 /* ── Page ────────────────────────────────────────────────────────────────── */
 
 export function ProfilePageView(props: ProfilePageViewProps) {
-  const { profile, data, isOwner } = props;
+  const { profile, data, metrics, isOwner, initialFollowing, contactListing } = props;
   const displayName = profile.display_name ?? profile.username ?? "Profile";
   const hasWork = data.projects.length > 0 || data.products.length > 0;
 
@@ -377,23 +262,79 @@ export function ProfilePageView(props: ProfilePageViewProps) {
       : []),
   ];
 
+  /*
+   * Rail nav is derived from what actually rendered, and only from anchors
+   * that exist in the DOM.
+   *
+   * The reference lists Projects and Products as separate nav entries. Here
+   * they are TABS — one panel is visible at a time — so two anchors pointing
+   * at the same block would be two links to one place. A single entry names
+   * the block instead: the tab's own label when there is one tab, "Work" when
+   * there are two. The detail panels below get the second anchor.
+   */
+  const hasPanels =
+    (isDesigner && (profile.bio || data.brandsUsed.length > 0 || data.collaborators.length > 0)) ||
+    (isBrand && (data.seenInProjects.length > 0 || data.specifiedBy.length > 0 || data.documents.length > 0));
+
+  const sections: RailSection[] = [
+    ...(tabs.length > 0
+      ? [{ id: "profile-work", label: tabs.length === 1 ? tabs[0].label : "Work" }]
+      : []),
+    ...(hasPanels ? [{ id: "profile-details", label: "Details" }] : []),
+  ];
+
+  /* Claimable only while unclaimed. A claimed profile has nothing to claim,
+     and the route would be a dead end. */
+  const claimHref =
+    (profile as { claim_status?: string }).claim_status === "unclaimed" && profile.username
+      ? `/u/${encodeURIComponent(profile.username)}/claim`
+      : null;
+
   return (
     <div className="min-h-screen bg-cream font-body text-ink">
       <div className="mx-auto max-w-[1400px] px-5 pb-24 pt-6 md:px-10 lg:px-14">
-        <ProfileHeader {...props} />
+        {/* Two columns, as in the reference: a persistent identity rail and the
+            content beside it. Below `lg` the rail falls into document flow
+            above the content, which is the order the page is read in — the
+            name before the work. */}
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-10">
+          <div className="min-w-0 lg:col-span-3">
+            <ProfileRail
+              profile={profile}
+              metrics={metrics}
+              sections={sections}
+              isOwner={isOwner}
+              initialFollowing={initialFollowing}
+              contactListing={contactListing}
+              claimHref={claimHref}
+            />
+          </div>
 
-        <div className="mt-12">
-          {hasWork ? (
-            <>
-              <ProfileTabs tabs={tabs} />
-              {/* `reader` and any future role get the skeleton only — they own
-                  no listings, so every role panel would be empty anyway. */}
-              {isDesigner && <DesignerPanels profile={profile} data={data} />}
-              {isBrand && <BrandPanels profile={profile} data={data} />}
-            </>
-          ) : (
-            <ProfileEmptyState isOwner={isOwner} displayName={displayName} role={profile.role} />
-          )}
+          <div className="min-w-0 lg:col-span-9">
+            <ProfileHeader {...props} />
+
+            <div className="mt-10">
+              {hasWork ? (
+                <>
+                  <section id="profile-work" className="scroll-mt-[100px]">
+                    <ProfileTabs tabs={tabs} />
+                  </section>
+                  {/* `reader` and any future role get the skeleton only — they
+                      own no listings, so every role panel would be empty. */}
+                  <div id="profile-details" className="scroll-mt-[100px]">
+                    {isDesigner && <DesignerPanels profile={profile} data={data} />}
+                    {isBrand && <BrandPanels profile={profile} data={data} />}
+                  </div>
+                </>
+              ) : (
+                <ProfileEmptyState
+                  isOwner={isOwner}
+                  displayName={displayName}
+                  role={profile.role}
+                />
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
