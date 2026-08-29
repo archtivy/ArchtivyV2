@@ -161,6 +161,68 @@ export function Gallery({
 
   const railLeft = thumbPosition === "left" && total > 1;
 
+  /* One implementation of the thumbnails, rendered in either orientation.
+     Duplicating this for the two layouts is precisely how two card families
+     drifted apart earlier in this codebase. */
+  const thumbItems = (
+    <>
+        {thumbs.map((img, i) => (
+          <li key={img.url + i} className="shrink-0">
+            <button
+              type="button"
+              onClick={() => setIndex(i)}
+              aria-label={
+                (img.hotspots?.length ?? 0) > 0
+                  ? `Show image ${i + 1}, has ${img.hotspots!.length} tagged ${
+                      img.hotspots!.length === 1 ? "product" : "products"
+                    }`
+                  : `Show image ${i + 1}`
+              }
+              aria-current={i === index}
+              className={[
+                "relative block h-16 w-24 overflow-hidden rounded bg-stone transition-opacity",
+                i === index ? "ring-2 ring-ink" : "opacity-70 hover:opacity-100",
+              ].join(" ")}
+            >
+              <Image src={img.url} alt="" fill sizes="96px" className="object-cover" />
+              {(img.hotspots?.length ?? 0) > 0 && (
+                <span
+                  className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-ink/80 text-cream"
+                  aria-hidden
+                >
+                  <Tag strokeWidth={2} className="h-2.5 w-2.5" />
+                </span>
+              )}
+            </button>
+          </li>
+        ))}
+        {remainder > 0 && (
+          <li className="shrink-0">
+            <button
+              type="button"
+              onClick={() => setIndex(visibleThumbs)}
+              aria-label={
+                hiddenPinned
+                  ? `Show ${remainder} more images, some with tagged products`
+                  : `Show ${remainder} more images`
+              }
+              className="relative flex h-16 w-24 items-center justify-center rounded bg-stone font-body text-[13px] text-ink transition-colors hover:bg-stone/70"
+            >
+              +{remainder}
+              {hiddenPinned && (
+                <span
+                  className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-ink/80 text-cream"
+                  aria-hidden
+                >
+                  <Tag strokeWidth={2} className="h-2.5 w-2.5" />
+                </span>
+              )}
+            </button>
+          </li>
+        )}
+    </>
+  );
+
   return (
     <div className={railLeft ? "flex flex-col gap-3 sm:flex-row-reverse" : undefined}>
       {/* The rail comes AFTER the image in the DOM and is flipped visually with
@@ -282,70 +344,28 @@ export function Gallery({
 
       </div>
 
-      {total > 1 && (
-        <ul
-          className={
-            railLeft
-              ? "flex shrink-0 gap-2 overflow-x-auto sm:w-[76px] sm:flex-col sm:overflow-x-visible sm:overflow-y-auto"
-              : "mt-3 flex gap-2 overflow-x-auto"
-          }
-        >
-          {thumbs.map((img, i) => (
-            <li key={img.url + i} className="shrink-0">
-              <button
-                type="button"
-                onClick={() => setIndex(i)}
-                aria-label={
-                  (img.hotspots?.length ?? 0) > 0
-                    ? `Show image ${i + 1}, has ${img.hotspots!.length} tagged ${
-                        img.hotspots!.length === 1 ? "product" : "products"
-                      }`
-                    : `Show image ${i + 1}`
-                }
-                aria-current={i === index}
-                className={[
-                  "relative block h-16 w-24 overflow-hidden rounded bg-stone transition-opacity",
-                  i === index ? "ring-2 ring-ink" : "opacity-70 hover:opacity-100",
-                ].join(" ")}
-              >
-                <Image src={img.url} alt="" fill sizes="96px" className="object-cover" />
-                {(img.hotspots?.length ?? 0) > 0 && (
-                  <span
-                    className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-ink/80 text-cream"
-                    aria-hidden
-                  >
-                    <Tag strokeWidth={2} className="h-2.5 w-2.5" />
-                  </span>
-                )}
-              </button>
-            </li>
-          ))}
-          {remainder > 0 && (
-            <li className="shrink-0">
-              <button
-                type="button"
-                onClick={() => setIndex(visibleThumbs)}
-                aria-label={
-                  hiddenPinned
-                    ? `Show ${remainder} more images, some with tagged products`
-                    : `Show ${remainder} more images`
-                }
-                className="relative flex h-16 w-24 items-center justify-center rounded bg-stone font-body text-[13px] text-ink transition-colors hover:bg-stone/70"
-              >
-                +{remainder}
-                {hiddenPinned && (
-                  <span
-                    className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-ink/80 text-cream"
-                    aria-hidden
-                  >
-                    <Tag strokeWidth={2} className="h-2.5 w-2.5" />
-                  </span>
-                )}
-              </button>
-            </li>
-          )}
-        </ul>
-      )}
+      {total > 1 &&
+        (railLeft ? (
+          /* THE RAIL MUST NOT SET THE ROW HEIGHT.
+             Stacked vertically, six thumbnails are taller than the photograph
+             they belong to — measured at 424px against a 258px image, so the
+             rail ran 166px past the bottom of its own picture and the mockup's
+             tidy image-height column became a ragged overhang.
+
+             This track is a plain flex child, so `align-items: stretch` sizes it
+             to the row — and the row is set by the IMAGE alone, because the list
+             inside is absolutely positioned and contributes no intrinsic height.
+             The list then scrolls within exactly the image's height, whether the
+             product has three thumbnails or thirty. The "+N" collapse is
+             unchanged and still caps how many are rendered. */
+          <div className="relative shrink-0 sm:w-[76px]">
+            <ul className="flex gap-2 overflow-x-auto sm:absolute sm:inset-0 sm:flex-col sm:overflow-x-visible sm:overflow-y-auto">
+              {thumbItems}
+            </ul>
+          </div>
+        ) : (
+          <ul className="mt-3 flex gap-2 overflow-x-auto">{thumbItems}</ul>
+        ))}
     </div>
   );
 }

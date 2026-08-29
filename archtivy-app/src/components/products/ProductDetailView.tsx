@@ -154,7 +154,7 @@ export async function ProductDetailView({
             which pushed the quote button and the specification below the fold on
             a laptop. Side by side, the decision-making information sits next to
             the photograph it describes. */}
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-8">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-start lg:gap-8">
           {/* ── Gallery ────────────────────────────────────────────────── */}
           <div className="min-w-0 lg:col-span-5">
             <Gallery images={detail.images} title={detail.title} thumbPosition="left" />
@@ -250,7 +250,15 @@ export async function ProductDetailView({
           </div>
 
           {/* ── Relationship Rail: Brand ───────────────────────────────── */}
-          <aside className="min-w-0 space-y-5 lg:col-span-3">
+          {/* Spans BOTH grid rows on desktop. Previously the aside sat in a
+              single row, and CSS Grid sized that row to its tallest item — the
+              rail's three stacked panels, 1072px — while the gallery and
+              information columns held only 424px and 287px of content. The tabs
+              then began after the whole grid, leaving ~648px of dead space
+              under the gallery. Spanning the rail across both rows lets the
+              tabs start immediately after the gallery/info row while the
+              sidebar simply continues alongside them. */}
+          <aside className="min-w-0 space-y-5 lg:col-span-3 lg:row-span-2">
             {detail.brand && (
               <RailPanel title="Brand">
                 <div className="flex items-center gap-3">
@@ -333,9 +341,8 @@ export async function ProductDetailView({
               reason={detail.relatedReason}
             />
           </aside>
-        </div>
 
-        {/* Tabs sit below the grid, but CAPPED — not full-bleed.
+        {/* Second grid row, columns 1-9. Tabs sit below the grid, but CAPPED — not full-bleed.
             Moving them out of the information column fixed the wrapping, and
             introduced the opposite problem: the About panel keeps a 68ch
             reading measure (686px, correct typography), and inside a 1248px
@@ -345,14 +352,14 @@ export async function ProductDetailView({
             the text reads as a column rather than as something that failed to
             fill the page. The measure itself is unchanged; widening prose past
             ~75ch would trade one legibility problem for another. */}
-        <div className="mt-14 max-w-[860px]">
-          <ProductDetailTabs product={detail} />
+          <div className="mt-6 min-w-0 max-w-[860px] lg:col-span-9">
+            <ProductDetailTabs product={detail} />
+            <ProductCollaborationSection
+              product_collaboration_status={detail.collaborationStatus}
+              product_looking_for={detail.lookingFor}
+            />
+          </div>
         </div>
-
-        <ProductCollaborationSection
-          product_collaboration_status={detail.collaborationStatus}
-          product_looking_for={detail.lookingFor}
-        />
 
         {/* ── Seen in Projects ────────────────────────────────────────── */}
         <SeenInProjects projects={detail.projects} />
