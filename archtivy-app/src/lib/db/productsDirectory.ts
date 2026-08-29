@@ -49,7 +49,17 @@ export interface DirectoryProduct {
   categoryLabel: string | null;
   typeLabel: string | null;
   colors: string[];
+  /**
+   * Material SLUGS. The filter vocabulary has to match the links that point at
+   * it — a facet keyed on "Oak Wood" matches nothing for ?materials=oak-wood.
+   */
   materials: string[];
+  /** Display names for the same materials, in the same order. */
+  materialLabels: string[];
+  /** Full product-taxonomy path, e.g. "furniture/seating/armchair". */
+  taxonomySlugPath: string | null;
+  /** listings.views_count — real above zero on 26 of 80. Drives "Most Viewed". */
+  viewsCount: number;
   finishes: string[];
   sustainability: string[];
   usedInProjects: number;
@@ -97,7 +107,7 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
 
   const { data: rows } = await sup
     .from("listings")
-    .select("id, slug, title, cover_image_url, created_at, owner_profile_id")
+    .select("id, slug, title, cover_image_url, views_count, created_at, owner_profile_id")
     .eq("type", "product")
     .eq("status", "APPROVED")
     .is("deleted_at", null)
@@ -130,7 +140,9 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
     sup.from("listing_images").select("listing_id").in("listing_id", ids),
     sup
       .from("listing_taxonomy_node")
-      .select("listing_id, is_primary, taxonomy_nodes:taxonomy_node_id(domain, slug_path, label)")
+      // `slug` as well as `slug_path`: the material domain is addressed by slug
+      // everywhere that links to it, while the product domain uses the path.
+      .select("listing_id, is_primary, taxonomy_nodes:taxonomy_node_id(domain, slug, slug_path, label)")
       .in("listing_id", ids),
     sup
       .from("listing_facets")
@@ -190,20 +202,49 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
   }
 
   // Taxonomy: primary product node -> category root + type label.
-  type TaxNode = { domain: string; slug_path: string; label: string };
-  const catBy = new Map<string, { root: string; label: string; typeLabel: string }>();
+  type TaxNode = { domain: string; slug: string | null; slug_path: string; label: string };
+  const catBy = new Map<string, { root: string; label: string; typeLabel: string; slugPath: string }>();
+  /*
+   * ── THE SECOND MATERIAL SYSTEM, ON THE PRODUCT SIDE TOO ────────────────────
+   * Exactly the split found on projects, and just as complete:
+   *
+   *   A  materials + product_material_links     45 product-material pairs
+   *   B  taxonomy_nodes(domain='material')
+   *      + listing_taxonomy_node                62 pairs
+   *
+   * Intersection: ZERO. 45 + 62 = 107 = the union. Reading A alone — which is
+   * all this facet did — showed 22 of the 80 products as having any material
+   * when 57 do, and offered 16 material slugs where 25 exist.
+   *
+   * Neither source is a superset, so both are unioned and deduplicated by
+   * slug. Collected here rather than in a second query: these taxonomy rows
+   * were already being fetched for the product domain and the material ones
+   * were falling through the loop unread.
+   */
+  const taxMaterialsBy = new Map<string, { slug: string; name: string }[]>();
   for (const r of (taxRes.data ?? []) as unknown as {
     listing_id: string;
     is_primary: boolean;
     taxonomy_nodes: TaxNode | TaxNode[] | null;
   }[]) {
     const n = one(r.taxonomy_nodes);
-    if (!n || n.domain !== "product") continue;
+    if (!n) continue;
+    if (n.domain === "material") {
+      const slug = (n.slug ?? n.slug_path.split("/").pop() ?? "").trim();
+      if (slug) {
+        const list = taxMaterialsBy.get(r.listing_id) ?? [];
+        if (!list.some((m) => m.slug === slug)) list.push({ slug, name: n.label });
+        taxMaterialsBy.set(r.listing_id, list);
+      }
+      continue;
+    }
+    if (n.domain !== "product") continue;
     if (r.is_primary || !catBy.has(r.listing_id)) {
       catBy.set(r.listing_id, {
         root: n.slug_path.split("/")[0],
         label: titleize(n.slug_path.split("/")[0]),
         typeLabel: n.label,
+        slugPath: n.slug_path,
       });
     }
   }
@@ -241,21 +282,33 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
 
   // Materials, two-step.
   const matLinks = (matLinkRes.data ?? []) as { product_id: string; material_id: string }[];
-  const materialNames = new Map<string, string>();
+  const materialNames = new Map<string, { name: string; slug: string }>();
   const materialIds = Array.from(new Set(matLinks.map((r) => r.material_id).filter(Boolean)));
   if (materialIds.length > 0) {
-    const { data: mats } = await sup.from("materials").select("id, name").in("id", materialIds);
-    for (const m of (mats ?? []) as { id: string; name: string }[]) {
-      materialNames.set(m.id, m.name);
+    const { data: mats } = await sup
+      .from("materials")
+      .select("id, name, slug")
+      .in("id", materialIds);
+    for (const m of (mats ?? []) as { id: string; name: string; slug: string | null }[]) {
+      materialNames.set(m.id, { name: m.name, slug: m.slug ?? m.name.toLowerCase() });
     }
   }
-  const materialsBy = new Map<string, string[]>();
+  // Side A of the union; side B (the material taxonomy) was collected in the
+  // taxonomy loop above and is folded in below.
+  const materialsBy = new Map<string, { slug: string; name: string }[]>();
   for (const r of matLinks) {
-    const name = materialNames.get(r.material_id);
-    if (!name) continue;
+    const m = materialNames.get(r.material_id);
+    if (!m) continue;
     const list = materialsBy.get(r.product_id) ?? [];
-    list.push(name);
+    if (!list.some((x) => x.slug === m.slug)) list.push(m);
     materialsBy.set(r.product_id, list);
+  }
+
+  // Fold side B in, deduplicating by slug.
+  for (const [pid, mats] of taxMaterialsBy) {
+    const list = materialsBy.get(pid) ?? [];
+    for (const m of mats) if (!list.some((x) => x.slug === m.slug)) list.push(m);
+    materialsBy.set(pid, list);
   }
 
   const products: DirectoryProduct[] = listings.map((l) => {
@@ -280,7 +333,10 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
       categoryLabel: cat?.label ?? null,
       typeLabel: cat?.typeLabel ?? null,
       colors: colorsBy.get(id) ?? [],
-      materials: materialsBy.get(id) ?? [],
+      materials: (materialsBy.get(id) ?? []).map((m) => m.slug),
+      materialLabels: (materialsBy.get(id) ?? []).map((m) => m.name),
+      taxonomySlugPath: cat?.slugPath ?? null,
+      viewsCount: (l.views_count as number | null) ?? 0,
       finishes: finishBy.get(id) ?? [],
       sustainability: sustBy.get(id) ?? [],
       usedInProjects: usage.get(id) ?? 0,
@@ -298,7 +354,13 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
     ),
     brands: tally(products.map((p) => p.brandId).filter(Boolean) as string[], brandLabels),
     colors: tally(products.flatMap((p) => p.colors), facetLabels),
-    materials: tally(products.flatMap((p) => p.materials)),
+    // Facet VALUE is the slug (what a URL carries); LABEL is the real name.
+    materials: tally(
+      products.flatMap((p) => p.materials),
+      new Map(
+        products.flatMap((p) => p.materials.map((slug, i) => [slug, p.materialLabels[i]] as [string, string]))
+      )
+    ),
     finishes: tally(products.flatMap((p) => p.finishes), facetLabels),
     sustainability: tally(products.flatMap((p) => p.sustainability), facetLabels),
     withDocuments: products.filter((p) => docListings.has(p.id)).length,

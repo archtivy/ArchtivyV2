@@ -198,36 +198,6 @@ export function countActiveFilters(f: FilterState): number {
   );
 }
 
-/**
- * Does this URL represent an internal SEARCH RESULT rather than a canonical
- * archive page?
- *
- * ── THE INDEXATION RULE ─────────────────────────────────────────────────────
- * /projects and /projects/{taxonomy} are archives: stable, editorially
- * meaningful, and already indexable under the existing policy — the archive
- * route sets `robots: { index: true, follow: true }` explicitly and canonicals
- * to itself. Those are unchanged.
- *
- * Anything with a query on it — ?q=house, ?materials=wood&country=Italy — is a
- * result set a visitor assembled, not a page anyone authored. There is a
- * combinatorial number of them, they duplicate each other and the archive they
- * were built from, and indexing them would spread authority across thousands
- * of near-identical URLs instead of concentrating it on the taxonomy pages.
- *
- * So: any query at all makes the page `noindex, follow`. FOLLOW matters — the
- * project links on a search result page are the same canonical detail URLs as
- * everywhere else, and they should still be crawled from here. The canonical
- * tag continues to point at the clean archive path, so whatever equity these
- * URLs attract lands on the page that deserves it.
- *
- * Deliberately conservative: it keys on "is there any parameter", not on a
- * list of which ones, so a filter added later cannot quietly become indexable
- * by being forgotten here.
- */
-export function isSearchResultUrl(sp: URLSearchParams | Record<string, string | string[] | undefined>): boolean {
-  const keys =
-    sp instanceof URLSearchParams ? [...sp.keys()] : Object.keys(sp);
-  // `view` is a display preference, not a different result set — a grid/list
-  // toggle should not de-index an otherwise canonical archive page.
-  return keys.some((k) => k !== "view" && k.length > 0);
-}
+// The indexation rule is shared with the products directory — see
+// lib/discovery/indexation.ts. Re-exported so existing importers keep working.
+export { isSearchResultUrl } from "@/lib/discovery/indexation";

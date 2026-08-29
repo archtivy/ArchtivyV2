@@ -31,7 +31,7 @@ export function TopNavLinks() {
         Projects
       </Link>
       <Link
-        href="/explore/products"
+        href="/products"
         className={`${baseClass} ${isProducts ? activeClass : ""}`}
       >
         Products

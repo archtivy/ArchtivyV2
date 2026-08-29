@@ -3,9 +3,10 @@ export const revalidate = 3600;
 import type { Metadata } from "next";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { getProductsDirectory } from "@/lib/db/productsDirectory";
+import { parseProductDirectoryState } from "@/lib/products/directoryParams";
+import { isSearchResultUrl, toSearchParams } from "@/lib/discovery/indexation";
 import { HomeNav } from "@/components/home/HomeNav";
 import { HomeFooter } from "@/components/home/HomeFooter";
-import { ProductsHeaderBand } from "@/components/products/ProductsHeaderBand";
 import { ProductsDirectory } from "@/components/products/ProductsDirectory";
 import { ProductsTrustStrip } from "@/components/products/ProductsTrustStrip";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -27,7 +28,7 @@ import { buildCollectionPageJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/json
  * BreadcrumbList JSON-LD, same revalidate window.
  */
 
-export const metadata: Metadata = {
+const BASE_METADATA: Metadata = {
   title: "Architecture Products — Browse by Category | Archtivy",
   description:
     "Explore architecture and design products by category: furniture, lighting, surfaces, and more. Discover products on Archtivy.",
@@ -46,8 +47,35 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function ProductsIndexPage() {
+/**
+ * ── INDEXATION ──────────────────────────────────────────────────────────────
+ * /products is a canonical archive and stays indexable. /products with any
+ * query on it is a result set a visitor assembled, and there is a
+ * combinatorial number of those: `noindex, follow`, canonical still pointing
+ * at the clean /products path. Identical to the rule on /projects — the logic
+ * lives in lib/discovery/indexation so the two cannot drift.
+ */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<Metadata> {
+  const sp = await searchParams;
+  if (!isSearchResultUrl(sp)) return BASE_METADATA;
+  return { ...BASE_METADATA, robots: { index: false, follow: true } };
+}
+
+export default async function ProductsIndexPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
   const { products, facets, total } = await getProductsDirectory();
+
+  /* Parsed on the SERVER, so /products?q=chair renders its results in the HTML
+     rather than after hydration. */
+  const state = parseProductDirectoryState(toSearchParams(sp));
 
   const canonicalUrl = getAbsoluteUrl("/products");
   const collectionJsonLd = buildCollectionPageJsonLd({
@@ -67,10 +95,22 @@ export default async function ProductsIndexPage() {
       <HomeNav variant="solid" />
 
       <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
-        <ProductsHeaderBand total={total} facets={facets} />
+        {/* ── NO HERO BAND ───────────────────────────────────────────────
+            Removed for the same reason as the projects one: the control bar is
+            the page's entry point, and a stats-and-photograph band above it
+            pushed the first product most of a viewport down. The h1 stays,
+            because the band carried this page's only one. */}
+        <h1 className="font-display text-[28px] leading-none tracking-tight text-ink sm:text-[32px]">
+          Products
+        </h1>
 
-        <div className="mt-10">
-          <ProductsDirectory products={products} facets={facets} />
+        <div className="mt-8">
+          <ProductsDirectory
+            products={products}
+            facets={facets}
+            total={total}
+            state={state}
+          />
         </div>
 
         <ProductsTrustStrip

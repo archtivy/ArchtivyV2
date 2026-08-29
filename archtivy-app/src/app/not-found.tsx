@@ -51,7 +51,7 @@ export default async function NotFound() {
             Explore Projects
           </Link>
           <Link
-            href="/explore/products"
+            href="/products"
             className="inline-flex items-center rounded border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-900 transition hover:border-[#002abf] hover:text-[#002abf] focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-[#5b7cff] dark:hover:text-[#5b7cff]"
           >
             Explore Products

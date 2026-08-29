@@ -1,67 +1,114 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
-import Image from "next/image";
-import { LayoutGrid, List, SlidersHorizontal, X } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { SlidersHorizontal, ChevronDown, X } from "lucide-react";
 import { ListingCardShared } from "@/components/listing/ListingCardShared";
+import { DirectorySearchBar } from "@/components/directory/DirectorySearchBar";
+import { DirectoryCategoryRail } from "@/components/directory/DirectoryCategoryRail";
 import {
-  ActiveFilterChips,
-  DirectoryEmptyState,
-} from "@/components/directory/FilterPrimitives";
+  DirectoryFilterPanel,
+  FilterToggle,
+  type FilterColumn,
+} from "@/components/directory/DirectoryFilterPanel";
 import {
-  ProductsFilterRail,
   EMPTY_PRODUCT_FILTERS,
+  PRODUCT_SORTS,
+  PRODUCT_TABS,
+  countActiveProductFilters,
+  serializeProductDirectoryState,
+  type ProductDirectoryState,
   type ProductFilterState,
-} from "@/components/products/ProductsFilterRail";
+  type ProductSortKey,
+  type ProductTabKey,
+} from "@/lib/products/directoryParams";
 import type { DirectoryProduct, ProductFacets } from "@/lib/db/productsDirectory";
 
 /**
- * Products directory body (brief §2).
+ * Products directory — the sibling of ProjectsDirectory, sharing its control
+ * bar, filter panel, category rail and search field rather than restating them.
  *
- * Same structure as ProjectsDirectory, sharing the filter primitives, chips and
- * empty state. Differences are only what the data requires: a 5-across grid
- * (Blueprint §20 — product grids may run denser), product-specific facets, and
- * product-specific sorts.
+ * ── URL IS THE STATE, AND THE SERVER READS IT ───────────────────────────────
+ * Query, filters, sort and tab round-trip through the query string via
+ * lib/products/directoryParams. The parsed state arrives as a PROP from the
+ * server, not from useSearchParams: that hook opts a component out of server
+ * rendering, which is what once left /projects?q=house serving an empty grid to
+ * a crawler. Next re-renders the server component on every navigation, so the
+ * prop updates on its own when this component pushes a new URL.
  *
- * Client-side filtering: 76 products ship once and filter instantly. Beyond a
- * few hundred this should move server-side.
+ * ── THE CARD IS UNTOUCHED ───────────────────────────────────────────────────
+ * ListingCardShared, with the full canonical model — taxonomy line, product
+ * type, brand, brand logo chip, and the "Used in N projects / by N studios"
+ * badge. Six columns are reached through the grid and its gutters; nothing
+ * about the card's width, padding, ratio or type is overridden here, and no
+ * directory-specific card variant exists.
  */
 
-type SortKey = "recent" | "alphabetical" | "used" | "brand";
-
-/**
- * Sorts limited to signals that exist.
- * "Most Popular" is omitted — listing_views has 0 rows platform-wide, the same
- * reason "Most Viewed" was omitted from the Projects Index.
- * "Most Relevant" is omitted absent a query; default is Most Recent.
- */
-const SORTS: { key: SortKey; label: string }[] = [
-  { key: "recent", label: "Most Recent" },
-  { key: "alphabetical", label: "Alphabetical" },
-  { key: "brand", label: "Brand" },
-  { key: "used", label: "Most Used in Projects" },
-];
+const NUMBER = new Intl.NumberFormat("en-US");
+const PAGE = 24;
 
 export function ProductsDirectory({
   products,
   facets,
+  total,
+  state,
+  scope,
 }: {
   products: DirectoryProduct[];
   facets: ProductFacets;
+  total: number;
+  /** Parsed from the request URL on the server. */
+  state: ProductDirectoryState;
+  /** Set on a category archive, where the URL already fixes the category. */
+  scope?: { slugPath: string; label: string; basePath: string } | null;
 }) {
-  const [filters, setFilters] = useState<ProductFilterState>(EMPTY_PRODUCT_FILTERS);
-  const [sort, setSort] = useState<SortKey>("recent");
-  const [view, setView] = useState<"grid" | "list">("grid");
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const router = useRouter();
+  const filterBtn = useRef<HTMLButtonElement>(null);
 
-  const usedInProjectsCount = useMemo(
-    () => products.filter((p) => p.usedInProjects > 0).length,
-    [products]
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [shown, setShown] = useState(PAGE);
+
+  const { filters, sort, tab } = state;
+  const basePath = scope?.basePath ?? "/products";
+
+  const write = useCallback(
+    (next: Partial<ProductDirectoryState>, mode: "replace" | "push" = "replace") => {
+      const qs = serializeProductDirectoryState({ ...state, ...next });
+      router[mode](qs ? `${basePath}?${qs}` : basePath, { scroll: false });
+      setShown(PAGE);
+    },
+    [router, state, basePath]
+  );
+
+  /*
+   * Push for a discrete filter change so Back undoes it; replace while typing,
+   * because one push per keystroke would bury the previous page under "c",
+   * "ch", "cha". The query still lands in the URL on every keystroke, so the
+   * address bar stays shareable throughout.
+   */
+  const setFilters = useCallback(
+    (f: ProductFilterState) => write({ filters: f }, "push"),
+    [write]
+  );
+  const setQuery = useCallback(
+    (q: string) => write({ filters: { ...filters, q } }, "replace"),
+    [write, filters]
   );
 
   const results = useMemo(() => {
+    const needle = filters.q.trim().toLowerCase();
+
     const out = products.filter((p) => {
+      if (scope && !(p.taxonomySlugPath ?? "").startsWith(scope.slugPath)) return false;
+      if (needle) {
+        // The fields a visitor would expect "chair" to reach: name, brand,
+        // category, product type and material names.
+        const hay = [p.title, p.brand, p.categoryLabel, p.typeLabel, ...p.materialLabels]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
       if (filters.categories.length && !filters.categories.includes(p.category ?? "")) return false;
       if (filters.brands.length && !filters.brands.includes(p.brandId ?? "")) return false;
       if (filters.colors.length && !p.colors.some((c) => filters.colors.includes(c))) return false;
@@ -71,243 +118,288 @@ export function ProductsDirectory({
         return false;
       if (
         filters.sustainability.length &&
-        !p.sustainability.some((s) => filters.sustainability.includes(s))
+        !p.sustainability.some((x) => filters.sustainability.includes(x))
       )
         return false;
       if (filters.usedInProjectsOnly && p.usedInProjects === 0) return false;
       return true;
     });
 
-    return out.sort((a, b) => {
+    /* "Most Viewed" narrows the ORDER, not the archive: products with no views
+       yet keep their place at the end rather than disappearing. */
+    if (tab === "viewed") {
+      return [...out].sort((a, b) => (b.viewsCount ?? 0) - (a.viewsCount ?? 0));
+    }
+
+    return [...out].sort((a, b) => {
       if (sort === "alphabetical") return a.title.localeCompare(b.title);
       if (sort === "used") return b.usedInProjects - a.usedInProjects;
       if (sort === "brand") return (a.brand ?? "").localeCompare(b.brand ?? "");
       return b.createdAt.localeCompare(a.createdAt);
     });
-  }, [products, filters, sort]);
+  }, [products, filters, sort, tab, scope]);
 
-  const labelFor = (group: keyof Omit<ProductFilterState, "usedInProjectsOnly">, value: string) => {
-    const source =
-      group === "categories"
-        ? facets.categories
-        : group === "brands"
-          ? facets.brands
-          : group === "colors"
-            ? facets.colors
-            : group === "materials"
-              ? facets.materials
-              : group === "finishes"
-                ? facets.finishes
-                : facets.sustainability;
-    return source.find((f) => f.value === value)?.label ?? value;
+  const activeCount = countActiveProductFilters(filters);
+
+  const toggle = (key: keyof ProductFilterState, value: string) => {
+    const cur = filters[key] as string[];
+    setFilters({
+      ...filters,
+      [key]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value],
+    });
   };
 
+  const columns: FilterColumn[] = (
+    [
+      { title: "Category", key: "categories" as const, values: facets.categories },
+      { title: "Brand", key: "brands" as const, values: facets.brands },
+      { title: "Materials", key: "materials" as const, values: facets.materials },
+      { title: "Colour", key: "colors" as const, values: facets.colors },
+      { title: "Finish", key: "finishes" as const, values: facets.finishes },
+      { title: "Sustainability", key: "sustainability" as const, values: facets.sustainability },
+    ]
+      // A facet with no values renders no column, and Category is dropped on an
+      // archive route where the URL already fixes it.
+      .filter((c) => c.values.length > 0 && !(scope && c.key === "categories"))
+  ).map((c) => ({
+    title: c.title,
+    values: c.values,
+    selected: filters[c.key] as string[],
+    onToggle: (v: string) => toggle(c.key, v),
+  }));
+
+  /** Active filters as individually removable chips. */
   const chips: { label: string; clear: () => void }[] = [];
-  const groups = [
-    "categories",
-    "brands",
-    "colors",
-    "materials",
-    "finishes",
-    "sustainability",
+  const listKeys = [
+    ["categories", facets.categories],
+    ["brands", facets.brands],
+    ["materials", facets.materials],
+    ["colors", facets.colors],
+    ["finishes", facets.finishes],
+    ["sustainability", facets.sustainability],
   ] as const;
-  for (const g of groups) {
-    for (const v of filters[g]) {
+  for (const [key, values] of listKeys) {
+    for (const v of filters[key]) {
       chips.push({
-        label: labelFor(g, v),
-        clear: () => setFilters((f) => ({ ...f, [g]: f[g].filter((x) => x !== v) })),
+        label: values.find((f) => f.value === v)?.label ?? v,
+        clear: () => setFilters({ ...filters, [key]: filters[key].filter((x) => x !== v) }),
       });
     }
   }
   if (filters.usedInProjectsOnly) {
     chips.push({
       label: "Used in projects",
-      clear: () => setFilters((f) => ({ ...f, usedInProjectsOnly: false })),
+      clear: () => setFilters({ ...filters, usedInProjectsOnly: false }),
     });
   }
 
-  const rail = (
-    <ProductsFilterRail
-      facets={facets}
-      filters={filters}
-      onChange={setFilters}
-      onReset={() => setFilters(EMPTY_PRODUCT_FILTERS)}
-      usedInProjectsCount={usedInProjectsCount}
-    />
-  );
+  const visible = results.slice(0, shown);
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-      <aside className="hidden lg:col-span-3 lg:block">{rail}</aside>
-
-      <div className="min-w-0 lg:col-span-9">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <p className="font-body text-[14px] text-ink">
-            {results.length} {results.length === 1 ? "product" : "products"}
-          </p>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setDrawerOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-3 py-1.5 font-body text-[13px] text-ink lg:hidden"
-            >
-              <SlidersHorizontal strokeWidth={1.5} className="h-3.5 w-3.5" aria-hidden />
-              Sort &amp; Filter
-            </button>
-
-            <div className="hidden items-center gap-1 rounded-lg border border-hairline p-0.5 sm:flex">
-              <button
-                type="button"
-                onClick={() => setView("grid")}
-                aria-label="Grid view"
-                aria-pressed={view === "grid"}
-                className={`rounded p-1.5 ${view === "grid" ? "bg-ink text-cream" : "text-muted"}`}
-              >
-                <LayoutGrid strokeWidth={1.5} className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setView("list")}
-                aria-label="List view"
-                aria-pressed={view === "list"}
-                className={`rounded p-1.5 ${view === "list" ? "bg-ink text-cream" : "text-muted"}`}
-              >
-                <List strokeWidth={1.5} className="h-4 w-4" />
-              </button>
-            </div>
-
-            <label className="hidden sm:block">
-              <span className="sr-only">Sort products</span>
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as SortKey)}
-                className="rounded-lg border border-hairline bg-cream px-3 py-2 font-body text-[13px] text-ink"
-              >
-                {SORTS.map((s) => (
-                  <option key={s.key} value={s.key}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </div>
-
-        <ActiveFilterChips chips={chips} onClearAll={() => setFilters(EMPTY_PRODUCT_FILTERS)} />
-
-        {results.length === 0 ? (
-          <DirectoryEmptyState
-            noun="products"
-            chips={chips}
-            onClearAll={() => setFilters(EMPTY_PRODUCT_FILTERS)}
+    <div>
+      {/* ── Control bar ─────────────────────────────────────────────────── */}
+      <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <button
+          ref={filterBtn}
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          aria-haspopup="dialog"
+          className={[
+            "inline-flex shrink-0 items-center gap-2 rounded-full border px-5 py-3 font-body text-[14px] transition-colors",
+            activeCount > 0 || panelOpen
+              ? "border-ink/40 text-ink"
+              : "border-hairline text-ink hover:border-ink/30",
+          ].join(" ")}
+        >
+          <SlidersHorizontal strokeWidth={1.5} className="h-4 w-4" aria-hidden />
+          Filter
+          {activeCount > 0 && (
+            <span className="font-body text-[13px] text-muted">· {activeCount}</span>
+          )}
+          <ChevronDown
+            strokeWidth={1.5}
+            className={`h-4 w-4 text-muted transition-transform ${panelOpen ? "rotate-180" : ""}`}
+            aria-hidden
           />
-        ) : view === "grid" ? (
-          // 5-across on wide desktop — denser than the 4-across Projects grid,
-          // per Blueprint §20.
-          <div className="grid grid-cols-2 gap-x-5 gap-y-8 md:grid-cols-3 lg:grid-cols-4">
-            {results.map((p, i) => (
-              <ListingCardShared
-                key={p.id}
-                model={{
-                  id: p.id,
-                  type: "product",
-                  title: p.title,
-                  href: p.href,
-                  imageUrl: p.cover,
-                  // "Lighting · Floor Lamp" — category then type. Both were
-                  // already fetched; only typeLabel was being passed, so the
-                  // line showed the narrow term with no context above it.
-                  categoryLabel: p.categoryLabel,
-                  categoryHref: p.category ? `/products/${p.category}` : null,
-                  metaLabel: p.typeLabel,
-                  authorName: p.brand,
-                  authorHref: p.brandHref,
-                  logoUrl: p.brandAvatar,
-                  relatedCount: p.badge.related,
-                  ownerCount: p.badge.owners,
-                }}
-                ratio="1/1"
-                priority={i < 5}
-                sizes="(max-width: 640px) 45vw, (max-width: 768px) 30vw, (max-width: 1280px) 30vw, 15vw"
-              />
+        </button>
+
+        {/* No camera button: there is no product image-search endpoint in this
+            codebase, so it could only open a picker that leads nowhere. */}
+        <DirectorySearchBar
+          value={filters.q}
+          onChange={setQuery}
+          placeholder="Search products, brands, materials, categories…"
+          label="Search products"
+        />
+
+        <label className="relative shrink-0">
+          <span className="sr-only">Sort products</span>
+          <select
+            value={sort}
+            onChange={(e) => write({ sort: e.target.value as ProductSortKey }, "push")}
+            className="appearance-none rounded-full border border-hairline bg-cream py-3 pl-5 pr-11 font-body text-[14px] text-ink focus:border-ink/40 focus:outline-none"
+          >
+            {PRODUCT_SORTS.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
             ))}
-          </div>
-        ) : (
-          <ul className="divide-y divide-hairline border-y border-hairline">
-            {results.map((p) => (
-              <li key={p.id}>
-                <Link href={p.href} className="group flex items-center gap-4 py-4">
-                  <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded bg-stone">
-                    {p.cover && (
-                      <Image src={p.cover} alt="" fill sizes="64px" className="object-cover" />
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-body text-[15px] text-ink">{p.title}</span>
-                    {p.brand && (
-                      <span className="block truncate font-body text-[13px] text-muted">
-                        {p.brand}
-                      </span>
-                    )}
-                  </span>
-                  {p.typeLabel && (
-                    <span className="hidden shrink-0 rounded border border-hairline px-2 py-0.5 font-body text-[11px] text-muted sm:inline">
-                      {p.typeLabel}
-                    </span>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          </select>
+          <ChevronDown
+            strokeWidth={1.5}
+            className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+            aria-hidden
+          />
+        </label>
+
+        {panelOpen && (
+          <DirectoryFilterPanel
+            columns={columns}
+            activeCount={activeCount}
+            onClear={() => setFilters(EMPTY_PRODUCT_FILTERS)}
+            onClose={() => setPanelOpen(false)}
+            triggerRef={filterBtn}
+            title="Filter products"
+            extras={
+              facets.categories.length > 0 ? (
+                <FilterToggle
+                  title="Projects"
+                  label="Used in projects"
+                  checked={filters.usedInProjectsOnly}
+                  onChange={() =>
+                    setFilters({ ...filters, usedInProjectsOnly: !filters.usedInProjectsOnly })
+                  }
+                />
+              ) : null
+            }
+          />
         )}
       </div>
 
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-ink/40"
-            onClick={() => setDrawerOpen(false)}
-            aria-hidden
-          />
-          <div className="absolute inset-y-0 right-0 w-full max-w-sm overflow-y-auto bg-cream p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-body text-[15px] text-ink">Sort &amp; Filter</h2>
-              <button
-                type="button"
-                onClick={() => setDrawerOpen(false)}
-                aria-label="Close filters"
-                className="text-ink"
-              >
-                <X strokeWidth={1.5} className="h-5 w-5" />
-              </button>
-            </div>
+      {/* ── Category rail ───────────────────────────────────────────────── */}
+      <div className="mt-4">
+        <DirectoryCategoryRail
+          categories={facets.categories}
+          total={total}
+          basePath="/products"
+          allLabel="All Products"
+          ariaLabel="Product categories"
+          activeSlug={scope ? scope.slugPath.split("/")[0] : null}
+        />
+      </div>
 
-            <label className="mb-4 block">
-              <span className="sr-only">Sort products</span>
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as SortKey)}
-                className="w-full rounded-lg border border-hairline bg-cream px-3 py-2 font-body text-[13px] text-ink"
-              >
-                {SORTS.map((s) => (
-                  <option key={s.key} value={s.key}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+      {/* ── Results header + tabs ───────────────────────────────────────── */}
+      <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-hairline">
+        <p className="font-body text-[15px] text-ink">
+          {NUMBER.format(results.length)}
+          {results.length !== total && (
+            <span className="text-muted"> of {NUMBER.format(total)}</span>
+          )}{" "}
+          {results.length === 1 ? "Product" : "Products"}
+        </p>
 
-            {rail}
+        {/* Featured and Most Saved are absent, not disabled — featured_slots
+            does not exist and every save table is empty. See PRODUCT_TABS. */}
+        <ul className="flex gap-6" role="tablist">
+          {PRODUCT_TABS.map((t) => {
+            const on = t.key === tab;
+            return (
+              <li key={t.key}>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => write({ tab: t.key as ProductTabKey }, "push")}
+                  className={[
+                    "border-b-2 pb-3 font-body text-[14px] transition-colors",
+                    on ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink",
+                  ].join(" ")}
+                >
+                  {t.label}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
 
+      {chips.length > 0 && (
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          {chips.map((c) => (
             <button
+              key={c.label}
               type="button"
-              onClick={() => setDrawerOpen(false)}
-              className="mt-4 w-full rounded-full bg-ink py-3 font-body text-[14px] text-cream"
+              onClick={c.clear}
+              className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-3 py-1.5 font-body text-[12px] text-ink transition-colors hover:border-ink/30"
             >
-              Show {results.length} {results.length === 1 ? "product" : "products"}
+              {c.label}
+              <X strokeWidth={1.5} className="h-3 w-3 text-muted" aria-hidden />
             </button>
-          </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setFilters(EMPTY_PRODUCT_FILTERS)}
+            className="font-body text-[12px] text-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
+      {/* ── Grid ────────────────────────────────────────────────────────────
+          Denser than the projects grid by one column, per the product mockup.
+          The step-down is driven by what the canonical card stays readable at:
+          a product card carries a two-part taxonomy line, a title, a brand and
+          a logo chip, and below roughly 170px the title clamps to almost
+          nothing. Six columns only appear at 2xl, where the container gives
+          each card ~200px; at xl it is five, at lg four, at md three, and two
+          on a phone. The card itself is never narrowed to make a column count
+          fit. */}
+      {visible.length === 0 ? (
+        <p className="mt-12 font-body text-[14px] text-muted">
+          {filters.q
+            ? `No products match “${filters.q}”${activeCount > 0 ? " with these filters" : ""}.`
+            : "No products match these filters."}
+        </p>
+      ) : (
+        <div className="mt-8 grid grid-cols-2 gap-x-3 gap-y-9 sm:gap-x-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+          {visible.map((p, i) => (
+            <ListingCardShared
+              key={p.id}
+              model={{
+                id: p.id,
+                type: "product",
+                title: p.title,
+                href: p.href,
+                imageUrl: p.cover,
+                categoryLabel: p.categoryLabel,
+                categoryHref: p.category ? `/products/${p.category}` : null,
+                metaLabel: p.typeLabel,
+                authorName: p.brand,
+                authorHref: p.brandHref,
+                logoUrl: p.brandAvatar,
+                relatedCount: p.badge.related,
+                ownerCount: p.badge.owners,
+              }}
+              ratio="1/1"
+              priority={i < 6}
+              sizes="(max-width: 640px) 45vw, (max-width: 768px) 30vw, (max-width: 1024px) 24vw, (max-width: 1536px) 19vw, 16vw"
+            />
+          ))}
+        </div>
+      )}
+
+      {visible.length < results.length && (
+        <div className="mt-12 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setShown((n) => n + PAGE)}
+            className="inline-flex items-center gap-2 rounded-full border border-hairline px-6 py-3 font-body text-[14px] text-ink transition-colors hover:border-ink/30"
+          >
+            Load more
+            <ChevronDown strokeWidth={1.5} className="h-4 w-4 text-muted" aria-hidden />
+          </button>
         </div>
       )}
     </div>

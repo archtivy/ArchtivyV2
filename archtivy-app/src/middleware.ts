@@ -73,6 +73,54 @@ const clerk = clerkMiddleware(async (auth, req) => {
  */
 const EXPLORE_SORT_TO_DIRECTORY: Record<string, string> = { newest: "recent" };
 
+/**
+ * /explore/products → /products, on the same terms as the projects redirect
+ * above.
+ *
+ * ── VOCABULARY COMPARED BEFORE REDIRECTING ──────────────────────────────────
+ * Explore and the products directory name most things identically, so most
+ * params pass straight through: `q`, `category`, `materials`, `color`,
+ * `brands`, `sustainability`. Two need translating — explore's single `year`
+ * has no directory equivalent at all on the product side (there is no year
+ * filter in the product facets), and `sort: newest` becomes `recent`.
+ *
+ * `year`, `year_min`, `year_max`, `designers`, `taxonomy_materials`,
+ * `material_type`, `area_bucket`, `product_stage` and `collaboration` have no
+ * product-directory filter behind them. They are carried across UNTOUCHED
+ * rather than deleted, so the URL still records what the visitor asked for and
+ * nothing is silently discarded; they simply do not narrow the results yet.
+ */
+function productDiscoveryRedirect(req: NextRequest): NextResponse | undefined {
+  const { pathname, searchParams } = req.nextUrl;
+  if (pathname !== "/explore/products" && !pathname.startsWith("/explore/products/")) {
+    return undefined;
+  }
+
+  const slugPath = pathname.slice("/explore/products".length).replace(/^\/+|\/+$/g, "");
+  const out = new URLSearchParams();
+
+  const handled = new Set(["sort", "page", "category"]);
+  for (const [k, v] of searchParams.entries()) {
+    if (handled.has(k)) continue;
+    if (v.trim()) out.set(k, v.trim());
+  }
+
+  // A slug segment scopes the path, so a `category` param beside it would be a
+  // second, conflicting scope.
+  const category = searchParams.get("category")?.trim();
+  if (category && !slugPath) out.set("category", category);
+
+  const sort = searchParams.get("sort")?.trim();
+  if (sort && EXPLORE_SORT_TO_DIRECTORY[sort]) {
+    out.set("sort", EXPLORE_SORT_TO_DIRECTORY[sort]);
+  }
+
+  const url = req.nextUrl.clone();
+  url.pathname = slugPath ? `/products/${slugPath}` : "/products";
+  url.search = out.toString() ? `?${out.toString()}` : "";
+  return NextResponse.redirect(url, 308);
+}
+
 function projectDiscoveryRedirect(req: NextRequest): NextResponse | undefined {
   const { pathname, searchParams } = req.nextUrl;
   if (pathname !== "/explore/projects" && !pathname.startsWith("/explore/projects/")) {
@@ -151,7 +199,7 @@ export default function middleware(req: NextRequest, event: NextFetchEvent) {
 
   // Before Clerk: this is a pure URL rewrite with no session dependency, and
   // running it first means the redirect costs no auth lookup.
-  const unified = projectDiscoveryRedirect(req);
+  const unified = projectDiscoveryRedirect(req) ?? productDiscoveryRedirect(req);
   if (unified) return unified;
 
   return clerk(req, event);

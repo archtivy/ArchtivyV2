@@ -36,7 +36,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // canonical project discovery URL. Listing a permanent redirect in a
     // sitemap points crawlers at a URL that only exists to send them somewhere
     // else.
-    { url: `${base}/explore/products`,   lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
+    // /explore/products is absent for the same reason as /explore/projects:
+    // it now 308s to /products. Listing a permanent redirect in a sitemap
+    // points crawlers at a URL that exists only to send them elsewhere.
     { url: `${base}/designers`,  lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
     { url: `${base}/brands`,     lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
 

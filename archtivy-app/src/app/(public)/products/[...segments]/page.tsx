@@ -12,6 +12,9 @@ import { getProfileByClerkId } from "@/lib/db/profiles";
 import { canManageListing } from "@/lib/auth/listingOwnership";
 import { getListingUrl } from "@/lib/canonical";
 import { fetchProductArchive } from "@/lib/archive/fetchArchiveData";
+import { getProductsDirectory } from "@/lib/db/productsDirectory";
+import { parseProductDirectoryState } from "@/lib/products/directoryParams";
+import { isSearchResultUrl, toSearchParams } from "@/lib/discovery/indexation";
 import { ProductCategoryArchive } from "@/components/archive/ProductCategoryArchive";
 import { getListingTaxonomyPath } from "@/lib/taxonomy/resolve";
 import { buildProductDetailMetadata } from "@/app/(public)/products/_lib/productDetailRenderer";
@@ -116,9 +119,18 @@ async function authCheckPending(product: {
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ segments: string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
+  const sp = await searchParams;
+  /* A category archive is indexable; the same archive with a query on it is an
+     internal search result, and there is a combinatorial number of those.
+     `noindex, follow` on any query, canonical still the clean archive path. */
+  const searchRobots = isSearchResultUrl(sp)
+    ? ({ index: false, follow: true } as const)
+    : ({ index: true, follow: true } as const);
   const { segments } = await params;
   if (segments.length > MAX_SEGMENTS) return {};
 
@@ -133,7 +145,7 @@ export async function generateMetadata({
         title: node.seo_title || `${node.label} Products | Archtivy`,
         description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} products on Archtivy.`,
         alternates: { canonical: `/products/${node.slug_path}` },
-        robots: { index: true, follow: true },
+        robots: searchRobots,
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
       };
     }
@@ -148,7 +160,7 @@ export async function generateMetadata({
         title: node.seo_title || `${node.label} Products | Archtivy`,
         description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} products on Archtivy.`,
         alternates: { canonical: `/products/${node.slug_path}` },
-        robots: { index: true, follow: true },
+        robots: searchRobots,
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
       };
     }
@@ -171,27 +183,33 @@ export default async function ProductSegmentsPage({
   searchParams,
 }: {
   params: Promise<{ segments: string[] }>;
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { segments } = await params;
-  const { page: pageParam } = await searchParams;
+  const sp = await searchParams;
 
   if (segments.length > MAX_SEGMENTS) notFound();
 
   // ── Try as archive page first ──────────────────────────────────────────
   const fullSlugPath = segments.join("/");
-  const pageNum = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
-  const fullArchive = await fetchProductArchive(fullSlugPath, pageNum);
+  const fullArchive = await fetchProductArchive(fullSlugPath);
   if (fullArchive) {
+    /*
+     * The archive keeps its taxonomy node — title, intro, breadcrumb,
+     * subcategory links, JSON-LD — and hands the RESULTS to the same directory
+     * body /products renders, scoped to this node's slug_path. `page` is no
+     * longer read: the directory ships the whole set and reveals it with Load
+     * more, so a page number has nothing left to address.
+     */
+    const directory = await getProductsDirectory();
     return (
       <ProductCategoryArchive
         node={fullArchive.node}
         ancestors={fullArchive.ancestors}
         childNodes={fullArchive.childNodes}
-        listings={fullArchive.listings}
         total={fullArchive.total}
-        page={fullArchive.page}
-        totalPages={fullArchive.totalPages}
+        directory={directory}
+        state={parseProductDirectoryState(toSearchParams(sp))}
       />
     );
   }
