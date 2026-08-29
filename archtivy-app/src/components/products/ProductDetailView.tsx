@@ -335,10 +335,17 @@ export async function ProductDetailView({
           </aside>
         </div>
 
-        {/* Tabs run the full width below the grid rather than inside the
-            information column. About/Details/Downloads are prose and document
-            lists; at a third of the page they wrapped every other word. */}
-        <div className="mt-14">
+        {/* Tabs sit below the grid, but CAPPED — not full-bleed.
+            Moving them out of the information column fixed the wrapping, and
+            introduced the opposite problem: the About panel keeps a 68ch
+            reading measure (686px, correct typography), and inside a 1248px
+            container that read as a narrow island in a large empty field.
+            Measured in a headless browser: 686 of 1248 = 55%.
+            Capping the container puts the measure at ~80% of its column, so
+            the text reads as a column rather than as something that failed to
+            fill the page. The measure itself is unchanged; widening prose past
+            ~75ch would trade one legibility problem for another. */}
+        <div className="mt-14 max-w-[860px]">
           <ProductDetailTabs product={detail} />
         </div>
 
