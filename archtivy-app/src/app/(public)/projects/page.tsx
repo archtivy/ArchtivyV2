@@ -6,7 +6,6 @@ import { getAbsoluteUrl } from "@/lib/canonical";
 import { getProjectsDirectory } from "@/lib/db/projectsDirectory";
 import { HomeNav } from "@/components/home/HomeNav";
 import { HomeFooter } from "@/components/home/HomeFooter";
-import { ProjectsHeaderBand } from "@/components/projects/ProjectsHeaderBand";
 import { ProjectsDirectory } from "@/components/projects/ProjectsDirectory";
 import { RequestProjectBand } from "@/components/projects/RequestProjectBand";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -71,9 +70,20 @@ export default async function ProjectsIndexPage() {
       <HomeNav variant="solid" />
 
       <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
-        <ProjectsHeaderBand total={total} facets={facets} />
+        {/* ── NO HERO BAND ───────────────────────────────────────────────
+            The stats-and-photograph band that used to open this page is gone;
+            the control bar is the first thing under the nav now.
 
-        <div className="mt-10">
+            A plain h1 stays. The band carried the page's ONLY h1, so removing
+            it outright would have left /projects with no heading at all — a
+            document-outline and SEO regression, not a layout simplification.
+            This is the heading, not a hero: no image, no stat panel, no second
+            search field. */}
+        <h1 className="font-display text-[28px] leading-none tracking-tight text-ink sm:text-[32px]">
+          Projects
+        </h1>
+
+        <div className="mt-8">
           {/* ProjectsDirectory reads its filter, sort and tab state from the
               query string, and useSearchParams opts a component out of static
               rendering unless a Suspense boundary marks where the client takes
