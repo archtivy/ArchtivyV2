@@ -131,7 +131,14 @@ export function ListingCardShared({
 
   return (
     <article className="group flex min-w-0 flex-col">
-      <div className="relative w-full overflow-hidden rounded-lg bg-stone">
+      {/* Product tiles are WHITE, project tiles are stone. See the note on the
+          image below — the field colour is half of the catalogue treatment. */}
+      <div
+        className={[
+          "relative w-full overflow-hidden rounded-lg",
+          model.type === "product" ? "bg-white" : "bg-stone",
+        ].join(" ")}
+      >
         <Link
           href={model.href}
           className={ratio === "1/1" ? "block aspect-square" : "block aspect-[4/3]"}
@@ -145,18 +152,33 @@ export function ListingCardShared({
               sizes={sizes}
               priority={priority}
               className={[
-                // Both types fill their frame. Products used object-contain with
-                // padding, which left the stone tile visible around every
-                // catalogue shot — a letterboxed image inside a card reads as a
-                // loading state, not a design.
-                //
-                // The crop is biased UP rather than centred. A 4/3 window on an
-                // architectural photograph, centred, reliably cuts the top off
-                // the building — the part the photograph is usually about.
-                // Pulling the focal point to 35% keeps roofline and sky and
-                // gives up foreground, which is the cheaper half of the frame.
-                "object-cover",
-                model.type === "product" ? "object-center" : "object-[50%_35%]",
+                /*
+                 * TWO DOMAINS, TWO TREATMENTS — deliberately not one rule.
+                 *
+                 * PRODUCTS are catalogue photography, and they are shot
+                 * inconsistently: some are tight cutouts on white, some are wide
+                 * lifestyle interiors. object-cover made the boxes identical and
+                 * the CONTENT wildly uneven — a cutout scaled up hard next to a
+                 * cropped room. Measured on one rail: four identical 300x300
+                 * frames that read as four different sizes.
+                 *
+                 * So products get the catalogue treatment the trade actually
+                 * uses (Vitra, Herman Miller): centred, uncropped, on a neutral
+                 * WHITE field. White specifically, not stone — most product
+                 * photography is already cut out on white, so the tile
+                 * disappears into the source instead of framing it in grey.
+                 * Padding keeps the object off the edges.
+                 *
+                 * PROJECTS keep object-cover. Architecture photography is
+                 * composed to fill a frame, and contain would letterbox every
+                 * building. Their crop stays biased UP: a centred 4/3 window
+                 * reliably cuts the top off the building, so pulling the focal
+                 * point to 35% keeps roofline and sky and gives up foreground,
+                 * which is the cheaper half of the frame.
+                 */
+                model.type === "product"
+                  ? "object-contain p-4"
+                  : "object-cover object-[50%_35%]",
                 "transition-transform duration-200 ease-out group-hover:scale-[1.02]",
                 "motion-reduce:transition-none motion-reduce:group-hover:scale-100",
               ].join(" ")}
