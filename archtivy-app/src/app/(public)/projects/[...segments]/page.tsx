@@ -12,6 +12,7 @@ import { getProfileByClerkId } from "@/lib/db/profiles";
 import { canManageListing } from "@/lib/auth/listingOwnership";
 import { getListingUrl } from "@/lib/canonical";
 import { fetchProjectArchive } from "@/lib/archive/fetchArchiveData";
+import { getProjectsDirectory } from "@/lib/db/projectsDirectory";
 import { ProjectCategoryArchive } from "@/components/archive/ProjectCategoryArchive";
 import { getListingTaxonomyPath } from "@/lib/taxonomy/resolve";
 import { buildProjectDetailMetadata } from "@/app/(public)/projects/_lib/projectDetailRenderer";
@@ -152,24 +153,28 @@ export default async function ProjectSegmentsPage({
   searchParams: Promise<{ page?: string }>;
 }) {
   const { segments } = await params;
-  const { page: pageParam } = await searchParams;
 
   if (segments.length > MAX_SEGMENTS) notFound();
 
   // ── Try as archive page first ──────────────────────────────────────────
   const fullSlugPath = segments.join("/");
-  const pageNum = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
-  const fullArchive = await fetchProjectArchive(fullSlugPath, pageNum);
+  const fullArchive = await fetchProjectArchive(fullSlugPath);
   if (fullArchive) {
+    /*
+     * The archive keeps its taxonomy node — title, intro, breadcrumb,
+     * subcategory links, JSON-LD — and hands the RESULTS to the same directory
+     * body /projects renders, scoped to this node's slug_path. `page` is no
+     * longer read: the directory ships the whole set and reveals it with Load
+     * more, so there is nothing left for a page number to address.
+     */
+    const directory = await getProjectsDirectory();
     return (
       <ProjectCategoryArchive
         node={fullArchive.node}
         ancestors={fullArchive.ancestors}
         childNodes={fullArchive.childNodes}
-        listings={fullArchive.listings}
         total={fullArchive.total}
-        page={fullArchive.page}
-        totalPages={fullArchive.totalPages}
+        directory={directory}
       />
     );
   }

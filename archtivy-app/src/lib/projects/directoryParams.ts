@@ -22,11 +22,31 @@
  */
 
 export interface FilterState {
+  /**
+   * Free-text query. Part of the SAME parameter model as every filter, not a
+   * separate search system: /projects?q=house&category=residential composes
+   * exactly like any two filters, and one parse/serialise pair owns both.
+   */
+  q: string;
+  /**
+   * City, matched against DirectoryProject.locationText — which is
+   * `location_city || location_country`, the same value the canonical card
+   * prints and links. Kept distinct from `locations` (country) because the
+   * card's own meta link and every /explore/projects?city= URL in the wild use
+   * this one, and dropping it on redirect would lose a real filter.
+   */
+  city: string | null;
   locations: string[];
   buildingTypes: string[];
   projectTypes: string[];
   styles: string[];
   materials: string[];
+  /**
+   * listings.project_status. Added when the project detail sidebar's Status
+   * link stopped resolving through /explore/projects — a link shipped as
+   * "verified 200" must keep filtering after its destination moves.
+   */
+  statuses: string[];
   yearMin: number | null;
   yearMax: number | null;
   areaMin: number | null;
@@ -35,11 +55,14 @@ export interface FilterState {
 }
 
 export const EMPTY_FILTERS: FilterState = {
+  q: "",
+  city: null,
   locations: [],
   buildingTypes: [],
   projectTypes: [],
   styles: [],
   materials: [],
+  statuses: [],
   yearMin: null,
   yearMax: null,
   areaMin: null,
@@ -107,11 +130,14 @@ export function parseDirectoryState(sp: URLSearchParams): DirectoryState {
   const tab = TABS.find((t) => t.key === sp.get("tab"))?.key ?? "all";
   return {
     filters: {
+      q: (sp.get("q") ?? "").trim(),
+      city: (sp.get("city") ?? "").trim() || null,
       locations: list(sp.get("country")),
       buildingTypes: list(sp.get("category")),
       projectTypes: list(sp.get("intervention")),
       styles: list(sp.get("style")),
       materials: list(sp.get("materials")),
+      statuses: list(sp.get("project_status")),
       yearMin: num(sp.get("year_min")),
       yearMax: num(sp.get("year_max")),
       areaMin: num(sp.get("area_min")),
@@ -130,11 +156,14 @@ export function serializeDirectoryState(s: DirectoryState): string {
   const put = (k: string, v: string[]) => {
     if (v.length) p.set(k, v.join(","));
   };
+  if (s.filters.q) p.set("q", s.filters.q);
+  if (s.filters.city) p.set("city", s.filters.city);
   put("country", s.filters.locations);
   put("category", s.filters.buildingTypes);
   put("intervention", s.filters.projectTypes);
   put("style", s.filters.styles);
   put("materials", s.filters.materials);
+  put("project_status", s.filters.statuses);
   if (s.filters.yearMin != null) p.set("year_min", String(s.filters.yearMin));
   if (s.filters.yearMax != null) p.set("year_max", String(s.filters.yearMax));
   if (s.filters.areaMin != null) p.set("area_min", String(s.filters.areaMin));
@@ -147,13 +176,22 @@ export function serializeDirectoryState(s: DirectoryState): string {
 }
 
 /** How many filters are active, for the badge on the Filter button. */
+/**
+ * How many filters are active, for the badge on the Filter button.
+ *
+ * `q` is deliberately NOT counted: it has its own always-visible input in the
+ * control bar, so counting it would make the Filter button claim a filter the
+ * panel does not contain.
+ */
 export function countActiveFilters(f: FilterState): number {
   return (
+    (f.city ? 1 : 0) +
     f.locations.length +
     f.buildingTypes.length +
     f.projectTypes.length +
     f.styles.length +
     f.materials.length +
+    f.statuses.length +
     (f.yearMin != null || f.yearMax != null ? 1 : 0) +
     (f.areaMin != null || f.areaMax != null ? 1 : 0) +
     (f.withProductsOnly ? 1 : 0)

@@ -261,8 +261,8 @@ export async function ProjectDetailView({
                 title={`More projects in ${detail.nearby.label}`}
                 href={
                   detail.nearby.level === "city"
-                    ? `/explore/projects?city=${encodeURIComponent(detail.nearby.label)}`
-                    : `/explore/projects?country=${encodeURIComponent(detail.nearby.label)}`
+                    ? `/projects?city=${encodeURIComponent(detail.nearby.label)}`
+                    : `/projects?country=${encodeURIComponent(detail.nearby.label)}`
                 }
                 linkLabel={`View all in ${detail.nearby.label}`}
                 items={nearbyModels}

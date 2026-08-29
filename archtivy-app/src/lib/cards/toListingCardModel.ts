@@ -83,12 +83,12 @@ export function projectToCardModel(
     metaLabel: location,
     // City filter, kept from the previous cards — a working discovery entry
     // point the mockup does not show but that visitors already use.
-    metaHref: city ? `/explore/projects?city=${encodeURIComponent(city)}` : null,
+    metaHref: city ? `/projects?city=${encodeURIComponent(city)}` : null,
     authorName: cleanText(project.owner?.displayName),
     authorHref: project.owner ? getOwnerProfileHref(project.owner) : null,
     logoUrl: project.owner?.avatarUrl ?? null,
     year: project.year ?? null,
-    yearHref: project.year ? `/explore/projects?year=${project.year}` : null,
+    yearHref: project.year ? `/projects?year_min=${project.year}&year_max=${project.year}` : null,
     // Explicit counts win; otherwise fall back to what the canonical layer
     // already batched onto the object. Surfaces that go through
     // getProjectsCanonical therefore get the badge with no prop plumbing at
@@ -172,12 +172,12 @@ export function projectRowToCardModel(
     categoryLabel: cleanText(row.taxonomy_label),
     categoryHref: rootArchiveUrl("project", row.taxonomy_slug_path),
     metaLabel: location,
-    metaHref: city ? `/explore/projects?city=${encodeURIComponent(city)}` : null,
+    metaHref: city ? `/projects?city=${encodeURIComponent(city)}` : null,
     authorName: cleanText(row.owner?.displayName),
     authorHref: row.owner ? getOwnerProfileHref(row.owner) : null,
     logoUrl: row.owner?.avatarUrl ?? null,
     year: row.year ?? null,
-    yearHref: row.year ? `/explore/projects?year=${row.year}` : null,
+    yearHref: row.year ? `/projects?year_min=${row.year}&year_max=${row.year}` : null,
     relatedCount: counts.badge?.related ?? 0,
     ownerCount: counts.badge?.owners ?? 0,
     creditCount: counts.credits ?? 0,
@@ -268,12 +268,12 @@ export function listingRowToCardModel(
     categoryLabel: cleanText(listing.category),
     metaLabel: isProject ? location : cleanText(listing.product_category),
     metaHref:
-      isProject && city ? `/explore/projects?city=${encodeURIComponent(city)}` : null,
+      isProject && city ? `/projects?city=${encodeURIComponent(city)}` : null,
     authorName: cleanText(options.authorName),
     authorHref: null,
     logoUrl: null,
     year: isProject ? listing.year ?? null : null,
-    yearHref: isProject && listing.year ? `/explore/projects?year=${listing.year}` : null,
+    yearHref: isProject && listing.year ? `/projects?year_min=${listing.year}&year_max=${listing.year}` : null,
     relatedCount: options.counts?.badge?.related ?? 0,
     ownerCount: options.counts?.badge?.owners ?? 0,
     creditCount: isProject ? options.counts?.credits ?? 0 : 0,

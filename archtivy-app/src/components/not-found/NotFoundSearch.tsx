@@ -12,7 +12,7 @@ export function NotFoundSearch() {
       e.preventDefault();
       const q = query.trim();
       if (!q) return;
-      router.push(`/explore/projects?q=${encodeURIComponent(q)}`);
+      router.push(`/projects?q=${encodeURIComponent(q)}`);
     },
     [query, router]
   );

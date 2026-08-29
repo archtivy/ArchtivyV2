@@ -46,12 +46,28 @@ export interface DirectoryProject {
   creditCount: number;
   /** Primary project-taxonomy root, e.g. "residential". */
   buildingType: string | null;
+  /**
+   * Full taxonomy path, e.g. "residential/apartment". The root alone cannot
+   * scope a subcategory archive, and every archive depth now renders through
+   * the same directory body.
+   */
+  taxonomySlugPath: string | null;
   buildingTypeLabel: string | null;
   /** intervention_type slugs, e.g. ["renovation","restoration"]. */
   projectTypes: string[];
   /** style slugs, e.g. ["contemporary"]. */
   styles: string[];
+  /**
+   * Material SLUGS, not names. The filter vocabulary has to match the links
+   * that point at it: the project detail sidebar and every redirected
+   * /explore/projects?materials= URL address a material by slug, so a facet
+   * keyed on "Concrete" would silently match nothing for `?materials=concrete`.
+   */
   materials: string[];
+  /** Display names for the same materials, in the same order. */
+  materialLabels: string[];
+  /** listings.project_status, e.g. "completed". Real on 33 of 53. */
+  projectStatus: string | null;
   year: number | null;
   areaSqft: number | null;
   productCount: number;
@@ -76,6 +92,8 @@ export interface DirectoryFacets {
   projectTypes: FacetValue[];
   styles: FacetValue[];
   materials: FacetValue[];
+  /** listings.project_status values present in the archive. */
+  statuses: FacetValue[];
   /** null when no project carries a year. */
   yearRange: { min: number; max: number; histogram: { year: number; count: number }[] } | null;
   /** null when no project carries a usable area. */
@@ -113,7 +131,7 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
   const { data: rows } = await sup
     .from("listings")
     .select(
-      "id, slug, title, cover_image_url, location, location_country, location_city, year, area_sqft, views_count, created_at, taxonomy_node_id, owner_profile_id, owner_clerk_user_id"
+      "id, slug, title, cover_image_url, location, location_country, location_city, year, area_sqft, views_count, project_status, created_at, taxonomy_node_id, owner_profile_id, owner_clerk_user_id"
     )
     .eq("type", "project")
     .eq("status", "APPROVED")
@@ -131,6 +149,7 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
         projectTypes: [],
         styles: [],
         materials: [],
+        statuses: [],
         yearRange: null,
         areaRange: null,
         projectsWithProducts: 0,
@@ -190,28 +209,28 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
     Array.isArray(v) ? v[0] ?? null : v ?? null;
 
   const matLinks = (matRes.data ?? []) as { project_id: string; material_id: string }[];
-  const materialNames = new Map<string, string>();
+  const materialNames = new Map<string, { name: string; slug: string }>();
   const materialIds = Array.from(new Set(matLinks.map((r) => r.material_id).filter(Boolean)));
   if (materialIds.length > 0) {
     const { data: mats } = await sup
       .from("materials")
-      .select("id, name")
+      .select("id, name, slug")
       .in("id", materialIds);
-    for (const m of (mats ?? []) as { id: string; name: string }[]) {
-      materialNames.set(m.id, m.name);
+    for (const m of (mats ?? []) as { id: string; name: string; slug: string | null }[]) {
+      materialNames.set(m.id, { name: m.name, slug: m.slug ?? m.name.toLowerCase() });
     }
   }
 
-  const materialsBy = new Map<string, string[]>();
+  const materialsBy = new Map<string, { slug: string; name: string }[]>();
   for (const r of matLinks) {
-    const name = materialNames.get(r.material_id);
-    if (!name) continue;
+    const m = materialNames.get(r.material_id);
+    if (!m) continue;
     const list = materialsBy.get(r.project_id) ?? [];
-    list.push(name);
+    list.push(m);
     materialsBy.set(r.project_id, list);
   }
 
-  const buildingBy = new Map<string, { root: string; label: string }>();
+  const buildingBy = new Map<string, { root: string; label: string; slugPath: string }>();
   const stylesBy = new Map<string, string[]>();
   const interventionsBy = new Map<string, string[]>();
   type TaxNode = { domain: string; slug_path: string; label: string };
@@ -226,7 +245,7 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
       const root = n.slug_path.split("/")[0];
       // Primary wins; otherwise first seen.
       if (r.is_primary || !buildingBy.has(r.listing_id)) {
-        buildingBy.set(r.listing_id, { root, label: titleize(root) });
+        buildingBy.set(r.listing_id, { root, label: titleize(root), slugPath: n.slug_path });
       }
     } else if (n.domain === "style") {
       const list = stylesBy.get(r.listing_id) ?? [];
@@ -285,10 +304,13 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
       badge: badgeCounts[id] ?? { related: 0, owners: 0 },
       creditCount: creditCounts[id] ?? 0,
       buildingType: building?.root ?? null,
+      taxonomySlugPath: building?.slugPath ?? null,
       buildingTypeLabel: building?.label ?? null,
       projectTypes: interventionsBy.get(id) ?? [],
       styles: stylesBy.get(id) ?? [],
-      materials: materialsBy.get(id) ?? [],
+      materials: (materialsBy.get(id) ?? []).map((m) => m.slug),
+      materialLabels: (materialsBy.get(id) ?? []).map((m) => m.name),
+      projectStatus: (l.project_status as string | null) ?? null,
       year: (l.year as number | null) ?? null,
       areaSqft: (l.area_sqft as number | null) ?? null,
       productCount: productCounts.get(id) ?? 0,
@@ -314,8 +336,15 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
     locations: tally(projects.map((p) => p.country)),
     buildingTypes: tally(projects.map((p) => p.buildingType)),
     projectTypes: tally(projects.flatMap((p) => p.projectTypes)),
+    statuses: tally(projects.map((p) => p.projectStatus)),
     styles: tally(projects.flatMap((p) => p.styles)),
-    materials: tally(projects.flatMap((p) => p.materials), Object.create(null)),
+    // Facet VALUE is the slug (what a URL carries); LABEL is the real name.
+    materials: tally(
+      projects.flatMap((p) => p.materials),
+      Object.fromEntries(
+        projects.flatMap((p) => p.materials.map((slug, i) => [slug, p.materialLabels[i]]))
+      )
+    ),
     yearRange:
       years.length > 0
         ? {

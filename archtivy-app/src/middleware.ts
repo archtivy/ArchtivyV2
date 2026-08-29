@@ -37,6 +37,79 @@ const clerk = clerkMiddleware(async (auth, req) => {
   return NextResponse.rewrite(new URL(COMING_SOON_PATH, req.url));
 });
 
+/**
+ * /explore/projects → /projects, 308, with the query translated.
+ *
+ * ── WHY IT LIVES HERE AND NOT IN THE PAGE ───────────────────────────────────
+ * A page-level `permanentRedirect` was tried first and did not fire: the route
+ * is an optional catch-all with no dynamic data of its own, so Next evaluated
+ * it once at build time against an empty searchParams and served that single
+ * prerendered result for every query string. `force-dynamic` did not change
+ * it. Middleware runs before routing, sees the real URL every time, and is the
+ * canonical place for a route-level redirect anyway.
+ *
+ * ── WHY REDIRECT AT ALL ─────────────────────────────────────────────────────
+ * There were three project result surfaces — /projects, the
+ * /projects/{taxonomy} archive, and the Explore results UI — all drawing the
+ * same listings differently, and every project search in the app submitted to
+ * /explore/projects?q=. Searching from the new directory landed you in the old
+ * one. /projects is now the single canonical project discovery route.
+ *
+ * 308 rather than 302: this route's own metadata ALREADY declared
+ * /projects/{slug_path} as its canonical URL, so it was self-identifying as
+ * duplicate content before today, and it has been removed from sitemap.ts in
+ * the same change. A permanent redirect passes the link equity of indexed and
+ * external /explore/projects URLs to the page that now serves them, instead of
+ * stranding them on a duplicate.
+ *
+ * ── NO FILTER IS SILENTLY DROPPED ───────────────────────────────────────────
+ * Explore and the directory grew separate parameter vocabularies. Names that
+ * mean the same thing pass straight through; `year` becomes the directory's
+ * min and max of the same value; explore's `newest` becomes `recent`. Its
+ * `year_desc` and `area_desc` have no directory equivalent and are dropped
+ * from `sort` rather than mapped onto an order that would sort differently
+ * while claiming to be the same. Everything else is carried across untouched,
+ * so the URL still records what the visitor asked for.
+ */
+const EXPLORE_SORT_TO_DIRECTORY: Record<string, string> = { newest: "recent" };
+
+function projectDiscoveryRedirect(req: NextRequest): NextResponse | undefined {
+  const { pathname, searchParams } = req.nextUrl;
+  if (pathname !== "/explore/projects" && !pathname.startsWith("/explore/projects/")) {
+    return undefined;
+  }
+
+  const slugPath = pathname.slice("/explore/projects".length).replace(/^\/+|\/+$/g, "");
+  const out = new URLSearchParams();
+
+  // A slug segment scopes the path itself, so a `category` param alongside it
+  // would be a second, conflicting scope.
+  const handled = new Set(["year", "sort", "page", "category"]);
+  for (const [k, v] of searchParams.entries()) {
+    if (handled.has(k)) continue;
+    if (v.trim()) out.set(k, v.trim());
+  }
+
+  const category = searchParams.get("category")?.trim();
+  if (category && !slugPath) out.set("category", category);
+
+  const year = searchParams.get("year")?.trim();
+  if (year && !out.has("year_min")) {
+    out.set("year_min", year);
+    out.set("year_max", year);
+  }
+
+  const sort = searchParams.get("sort")?.trim();
+  if (sort && EXPLORE_SORT_TO_DIRECTORY[sort]) {
+    out.set("sort", EXPLORE_SORT_TO_DIRECTORY[sort]);
+  }
+
+  const url = req.nextUrl.clone();
+  url.pathname = slugPath ? `/projects/${slugPath}` : "/projects";
+  url.search = out.toString() ? `?${out.toString()}` : "";
+  return NextResponse.redirect(url, 308);
+}
+
 /** Paths that must remain reachable during maintenance. */
 function isMaintenancePassthrough(pathname: string): boolean {
   if (pathname === "/") return true;
@@ -75,6 +148,11 @@ export default function middleware(req: NextRequest, event: NextFetchEvent) {
   if (isMaintenanceMode() && !isMaintenancePassthrough(req.nextUrl.pathname)) {
     return maintenanceResponse();
   }
+
+  // Before Clerk: this is a pure URL rewrite with no session dependency, and
+  // running it first means the redirect costs no auth lookup.
+  const unified = projectDiscoveryRedirect(req);
+  if (unified) return unified;
 
   return clerk(req, event);
 }

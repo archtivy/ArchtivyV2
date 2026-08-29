@@ -98,7 +98,7 @@ export async function HomeHero() {
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
               <Link
-                href="/explore/projects"
+                href="/projects"
                 className="inline-block rounded-[20px] px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 focus:ring-offset-transparent"
                 style={{ backgroundColor: "#002abf" }}
               >

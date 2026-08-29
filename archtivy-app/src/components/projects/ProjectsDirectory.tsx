@@ -50,10 +50,19 @@ export function ProjectsDirectory({
   projects,
   facets,
   total,
+  scope,
 }: {
   projects: DirectoryProject[];
   facets: DirectoryFacets;
   total: number;
+  /**
+   * Set on a category archive route. The taxonomy path is fixed by the URL
+   * there, so the Category facet is removed from the panel rather than offered
+   * as a control that would contradict the page you are on. Every OTHER
+   * filter, the search and the sort keep working, and they compose onto the
+   * archive's own path: /projects/residential?q=house&country=Italy.
+   */
+  scope?: { slugPath: string; label: string; basePath: string } | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -68,21 +77,65 @@ export function ProjectsDirectory({
   );
   const { filters, sort, tab } = state;
 
+  const basePath = scope?.basePath ?? "/projects";
+
   const write = useCallback(
     (next: Partial<DirectoryState>, mode: "replace" | "push" = "replace") => {
       const qs = serializeDirectoryState({ ...state, ...next });
-      router[mode](qs ? `/projects?${qs}` : "/projects", { scroll: false });
+      router[mode](qs ? `${basePath}?${qs}` : basePath, { scroll: false });
       // A changed result set should start at the top of itself, not wherever
       // the previous, longer list had been scrolled to.
       setShown(PAGE);
     },
-    [router, state]
+    [router, state, basePath]
   );
 
-  const setFilters = useCallback((f: FilterState) => write({ filters: f }), [write]);
+  /*
+   * ── PUSH FOR FILTERS, REPLACE FOR TYPING ──────────────────────────────────
+   * A discrete filter change — ticking a facet, clearing a chip, changing the
+   * sort or the tab — is a step the visitor took, so it gets a history entry
+   * and Back undoes it. Typing in the search box does not: one push per
+   * keystroke would bury the previous page under "h", "ho", "hou", "hous",
+   * "house" and make Back useless. The query still lands in the URL on every
+   * keystroke, so the address bar stays shareable throughout; only the history
+   * entry is coalesced.
+   */
+  const setFilters = useCallback(
+    (f: FilterState) => write({ filters: f }, "push"),
+    [write]
+  );
+  const setQuery = useCallback(
+    (q: string) => write({ filters: { ...filters, q } }, "replace"),
+    [write, filters]
+  );
 
   const results = useMemo(() => {
+    /*
+     * Keyword match across the fields a visitor would expect "house" to reach:
+     * the title, the studio, the place, the category and the materials. It is
+     * a substring match over 53 rows already in memory, not a search engine —
+     * when this archive outgrows client-side filtering the whole pipeline
+     * moves server-side, where getProjectsCanonicalFiltered already waits.
+     */
+    const needle = filters.q.trim().toLowerCase();
+
     const out = projects.filter((p) => {
+      if (scope && !(p.taxonomySlugPath ?? "").startsWith(scope.slugPath)) return false;
+      if (needle) {
+        const hay = [
+          p.title,
+          p.architect,
+          p.locationText,
+          p.country,
+          p.buildingTypeLabel,
+          ...p.materialLabels,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      if (filters.city && p.locationText !== filters.city) return false;
       if (filters.buildingTypes.length && !filters.buildingTypes.includes(p.buildingType ?? ""))
         return false;
       if (filters.locations.length && !filters.locations.includes(p.country ?? "")) return false;
@@ -93,6 +146,8 @@ export function ProjectsDirectory({
         return false;
       if (filters.styles.length && !p.styles.some((s) => filters.styles.includes(s))) return false;
       if (filters.materials.length && !p.materials.some((m) => filters.materials.includes(m)))
+        return false;
+      if (filters.statuses.length && !filters.statuses.includes(p.projectStatus ?? ""))
         return false;
       if (filters.yearMin !== null && (p.year ?? -Infinity) < filters.yearMin) return false;
       if (filters.yearMax !== null && (p.year ?? Infinity) > filters.yearMax) return false;
@@ -117,13 +172,13 @@ export function ProjectsDirectory({
       if (sort === "products") return b.productCount - a.productCount;
       return b.createdAt.localeCompare(a.createdAt);
     });
-  }, [projects, filters, sort, tab]);
+  }, [projects, filters, sort, tab, scope]);
 
   const activeCount = countActiveFilters(filters);
 
   /** Active filters as individually removable chips. */
   const chips: { label: string; clear: () => void }[] = [];
-  const listKeys = ["buildingTypes", "locations", "projectTypes", "styles", "materials"] as const;
+  const listKeys = ["buildingTypes", "locations", "projectTypes", "styles", "materials", "statuses"] as const;
   for (const key of listKeys) {
     for (const v of filters[key]) {
       const facetList =
@@ -135,7 +190,9 @@ export function ProjectsDirectory({
               ? facets.projectTypes
               : key === "styles"
                 ? facets.styles
-                : facets.materials;
+                : key === "materials"
+                  ? facets.materials
+                  : facets.statuses;
       chips.push({
         label: facetList.find((f) => f.value === v)?.label ?? v,
         clear: () => setFilters({ ...filters, [key]: filters[key].filter((x) => x !== v) }),
@@ -158,6 +215,15 @@ export function ProjectsDirectory({
     chips.push({
       label: "With products",
       clear: () => setFilters({ ...filters, withProductsOnly: false }),
+    });
+  }
+  // `city` arrives from a card's own meta link and from redirected
+  // /explore/projects?city= URLs, so it needs a way out that is not the
+  // filter panel — it has no column there.
+  if (filters.city) {
+    chips.push({
+      label: filters.city,
+      clear: () => setFilters({ ...filters, city: null }),
     });
   }
 
@@ -192,13 +258,13 @@ export function ProjectsDirectory({
           />
         </button>
 
-        <ProjectsSearchBar />
+        <ProjectsSearchBar value={filters.q} onChange={setQuery} />
 
         <label className="relative shrink-0">
           <span className="sr-only">Sort projects</span>
           <select
             value={sort}
-            onChange={(e) => write({ sort: e.target.value as SortKey })}
+            onChange={(e) => write({ sort: e.target.value as SortKey }, "push")}
             className="appearance-none rounded-full border border-hairline bg-cream py-3 pl-5 pr-11 font-body text-[14px] text-ink focus:border-ink/40 focus:outline-none"
           >
             {SORTS.map((s) => (
@@ -217,6 +283,7 @@ export function ProjectsDirectory({
         {panelOpen && (
           <ProjectsFilterPanel
             facets={facets}
+            hideCategory={Boolean(scope)}
             filters={filters}
             onChange={setFilters}
             onClose={() => setPanelOpen(false)}
@@ -227,7 +294,11 @@ export function ProjectsDirectory({
 
       {/* ── Category rail ───────────────────────────────────────────────── */}
       <div className="mt-4">
-        <ProjectsCategoryRail categories={facets.buildingTypes} total={total} />
+        <ProjectsCategoryRail
+          categories={facets.buildingTypes}
+          total={total}
+          activeSlug={scope ? scope.slugPath.split("/")[0] : null}
+        />
       </div>
 
       {/* ── Results header + tabs ───────────────────────────────────────── */}
@@ -291,7 +362,9 @@ export function ProjectsDirectory({
       {/* ── Grid ────────────────────────────────────────────────────────── */}
       {visible.length === 0 ? (
         <p className="mt-12 font-body text-[14px] text-muted">
-          No projects match these filters.
+          {filters.q
+            ? `No projects match “${filters.q}”${activeCount > 0 ? " with these filters" : ""}.`
+            : "No projects match these filters."}
         </p>
       ) : (
         <div className="mt-8 grid grid-cols-2 gap-x-3 gap-y-9 sm:gap-x-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -308,13 +381,13 @@ export function ProjectsDirectory({
                 categoryHref: p.buildingType ? `/projects/${p.buildingType}` : null,
                 metaLabel: p.locationText,
                 metaHref: p.locationText
-                  ? `/explore/projects?city=${encodeURIComponent(p.locationText)}`
+                  ? `/projects?city=${encodeURIComponent(p.locationText)}`
                   : null,
                 authorName: p.architect,
                 authorHref: p.architectHref,
                 logoUrl: p.architectAvatar,
                 year: p.year,
-                yearHref: p.year ? `/explore/projects?year=${p.year}` : null,
+                yearHref: p.year ? `/projects?year_min=${p.year}&year_max=${p.year}` : null,
                 relatedCount: p.badge.related,
                 ownerCount: p.badge.owners,
                 creditCount: p.creditCount,

@@ -41,12 +41,15 @@ import { EMPTY_FILTERS, countActiveFilters, type FilterState } from "@/lib/proje
  */
 export function ProjectsFilterPanel({
   facets,
+  hideCategory = false,
   filters,
   onChange,
   onClose,
   triggerRef,
 }: {
   facets: DirectoryFacets;
+  /** Set on a category archive, where the URL already fixes the category. */
+  hideCategory?: boolean;
   filters: FilterState;
   onChange: (next: FilterState) => void;
   onClose: () => void;
@@ -76,7 +79,15 @@ export function ProjectsFilterPanel({
     };
   }, [onClose, triggerRef]);
 
-  const toggle = (key: "buildingTypes" | "locations" | "projectTypes" | "styles" | "materials", value: string) => {
+  type ListKey =
+    | "buildingTypes"
+    | "locations"
+    | "projectTypes"
+    | "styles"
+    | "materials"
+    | "statuses";
+
+  const toggle = (key: ListKey, value: string) => {
     const cur = filters[key] as string[];
     onChange({
       ...filters,
@@ -86,7 +97,6 @@ export function ProjectsFilterPanel({
 
   const active = countActiveFilters(filters);
 
-  type ListKey = "buildingTypes" | "locations" | "projectTypes" | "styles" | "materials";
   const columns: { title: string; key: ListKey; values: typeof facets.locations }[] = (
     [
       { title: "Category", key: "buildingTypes", values: facets.buildingTypes },
@@ -94,8 +104,9 @@ export function ProjectsFilterPanel({
       { title: "Project Type", key: "projectTypes", values: facets.projectTypes },
       { title: "Style", key: "styles", values: facets.styles },
       { title: "Materials", key: "materials", values: facets.materials },
+      { title: "Status", key: "statuses", values: facets.statuses },
     ] as { title: string; key: ListKey; values: typeof facets.locations }[]
-  ).filter((c) => c.values.length > 0);
+  ).filter((c) => c.values.length > 0 && !(hideCategory && c.key === "buildingTypes"));
 
   return (
     <div

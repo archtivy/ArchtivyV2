@@ -32,7 +32,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/products`,           lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.9 },
     // /explore (the map tool) is intentionally absent: noindex, ~184 chars of
     // server-rendered content, no crawlable entity links. See C-6.
-    { url: `${base}/explore/projects`,   lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
+    // /explore/projects is absent: it now 308s to /projects, which is the one
+    // canonical project discovery URL. Listing a permanent redirect in a
+    // sitemap points crawlers at a URL that only exists to send them somewhere
+    // else.
     { url: `${base}/explore/products`,   lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
     { url: `${base}/designers`,  lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },
     { url: `${base}/brands`,     lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.8 },

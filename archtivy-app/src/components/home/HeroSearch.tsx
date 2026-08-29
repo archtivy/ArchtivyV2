@@ -27,7 +27,10 @@ export function HeroSearch({ popularSearches }: HeroSearchProps) {
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const q = value.trim();
-    router.push(q ? `/explore/projects?q=${encodeURIComponent(q)}` : "/explore/projects");
+    // /projects is the canonical project discovery route. This used to
+    // push to /explore/projects, which is now a 308 to exactly this URL —
+    // going straight there saves every visitor a redirect hop.
+    router.push(q ? `/projects?q=${encodeURIComponent(q)}` : "/projects");
   }
 
   return (

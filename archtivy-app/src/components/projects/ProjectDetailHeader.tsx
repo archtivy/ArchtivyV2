@@ -79,7 +79,7 @@ export function ProjectDetailHeader({
                 <span>
                   {locationCity && (
                     <Link
-                      href={`/explore/projects?city=${encodeURIComponent(locationCity)}`}
+                      href={`/projects?city=${encodeURIComponent(locationCity)}`}
                       className="underline-offset-4 transition-colors hover:text-ink hover:underline"
                     >
                       {locationCity}
@@ -88,7 +88,7 @@ export function ProjectDetailHeader({
                   {locationCity && locationCountry && ", "}
                   {locationCountry && (
                     <Link
-                      href={`/explore/projects?country=${encodeURIComponent(locationCountry)}`}
+                      href={`/projects?country=${encodeURIComponent(locationCountry)}`}
                       className="underline-offset-4 transition-colors hover:text-ink hover:underline"
                     >
                       {locationCountry}
@@ -104,7 +104,7 @@ export function ProjectDetailHeader({
             <li className="flex items-center gap-1.5 font-body text-[13px] text-muted">
               <Calendar strokeWidth={1.5} className="h-3.5 w-3.5 shrink-0" aria-hidden />
               <Link
-                href={`/explore/projects?year=${year}`}
+                href={`/projects?year_min=${year}&year_max=${year}`}
                 className="underline-offset-4 transition-colors hover:text-ink hover:underline"
               >
                 {year}

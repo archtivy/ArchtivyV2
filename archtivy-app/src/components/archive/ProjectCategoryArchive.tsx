@@ -1,15 +1,15 @@
+import { Suspense } from "react";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { getArchiveHubUrl, getArchiveCategoryUrl, buildArchiveBreadcrumbSegments } from "@/lib/archive/urls";
 import type { TaxonomyNode } from "@/lib/taxonomy/taxonomyDb";
-import type { ProjectCanonical } from "@/lib/canonical-models";
 import { Container } from "@/components/layout/Container";
 import { TopNav } from "@/components/layout/TopNav";
 import { Footer } from "@/components/layout/Footer";
 import { ArchiveHeader } from "./ArchiveHeader";
 import { ArchiveBreadcrumb } from "./ArchiveBreadcrumb";
 import { SubcategoryLinks, type SubcategoryLinkItem } from "./SubcategoryLinks";
-import { ArchiveListingGrid } from "./ArchiveListingGrid";
-import { ArchivePagination } from "./ArchivePagination";
+import { ProjectsDirectory } from "@/components/projects/ProjectsDirectory";
+import type { ProjectsDirectoryData } from "@/lib/db/projectsDirectory";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildCollectionPageJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
 
@@ -17,20 +17,34 @@ interface ProjectCategoryArchiveProps {
   node: TaxonomyNode;
   ancestors: TaxonomyNode[];
   childNodes: SubcategoryLinkItem[];
-  listings: ProjectCanonical[];
   total: number;
-  page: number;
-  totalPages: number;
+  /** Every live project plus its facets — the same payload /projects uses. */
+  directory: ProjectsDirectoryData;
 }
 
+/**
+ * ── ONE RESULTS UI, NOT THREE ───────────────────────────────────────────────
+ * The grid and pagination that used to sit here are gone. This page, /projects
+ * and /explore/projects each rendered project results differently, so the same
+ * archive looked like a different product depending on how you arrived. The
+ * results body is now ProjectsDirectory — the same control bar, filter panel,
+ * category rail, tabs, canonical cards and Load more — scoped to this node.
+ *
+ * Everything that made this page an ARCHIVE stays: the SEO title and intro
+ * from the taxonomy node, the breadcrumb, the subcategory links, the
+ * CollectionPage and BreadcrumbList JSON-LD, and the canonical URL. Only the
+ * way results are drawn changed.
+ *
+ * ArchivePagination goes with the grid. The directory ships every live project
+ * to the client and reveals them with Load more, so a page-2 URL would now
+ * paginate a set that is already fully present. Nothing is unreachable.
+ */
 export function ProjectCategoryArchive({
   node,
   ancestors,
   childNodes,
-  listings,
   total,
-  page,
-  totalPages,
+  directory,
 }: ProjectCategoryArchiveProps) {
   const isSubcategory = node.depth > 0;
   const title = node.seo_title || `${node.label} Projects`;
@@ -79,12 +93,20 @@ export function ProjectCategoryArchive({
           {!isSubcategory && childNodes.length > 0 && (
             <SubcategoryLinks baseSegment="projects" items={childNodes} />
           )}
-          <ArchiveListingGrid type="project" items={listings} />
-          <ArchivePagination
-            currentPage={page}
-            totalPages={totalPages}
-            basePath={archivePath}
-          />
+          <div className="mt-8">
+            <Suspense fallback={<div className="min-h-[60vh]" aria-hidden />}>
+              <ProjectsDirectory
+                projects={directory.projects}
+                facets={directory.facets}
+                total={directory.total}
+                scope={{
+                  slugPath: node.slug_path,
+                  label: node.label,
+                  basePath: archivePath,
+                }}
+              />
+            </Suspense>
+          </div>
         </Container>
       </main>
       <Footer />

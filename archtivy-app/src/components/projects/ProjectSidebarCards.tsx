@@ -37,9 +37,9 @@ export function ProjectLocationCard({
 
   const deepest = city ?? country;
   const href = city
-    ? `/explore/projects?city=${encodeURIComponent(city)}`
+    ? `/projects?city=${encodeURIComponent(city)}`
     : country
-      ? `/explore/projects?country=${encodeURIComponent(country)}`
+      ? `/projects?country=${encodeURIComponent(country)}`
       : null;
 
   return (

@@ -14,12 +14,13 @@ import { SidebarCard } from "@/components/projects/SidebarCard";
  * rather than being dressed as a link:
  *
  *   Type        -> /projects/{taxonomy slug_path}   archive route, real
- *   Location    -> /explore/projects?city= / ?country=   both filter on
- *                  listings.location_city / location_country (explore.ts)
- *   Completed   -> /explore/projects?year=          eq on listings.year
- *   Status      -> /explore/projects?project_status=  in() on the same column
- *   Materials   -> /explore/projects?materials={slug}  ONE LINK PER MATERIAL,
- *                  resolved by slug through getProjectIdsByMaterialSlugs
+ *   Location    -> /projects?city= / ?country=      the directory's own
+ *                  filters, on location_city / location_country
+ *   Completed   -> /projects?year_min=&year_max=    the same year both ends
+ *   Status      -> /projects?project_status=        listings.project_status
+ *   Materials   -> /projects?materials={slug}       ONE LINK PER MATERIAL,
+ *                  matched on slug, which is why the directory facet is keyed
+ *                  on slugs rather than display names
  *   Photographer-> /u/{username} or /u/id/{id}      the credit is a team
  *                  member row, so it carries a real profile
  *   Website     -> the project's own site, through normaliseExternalUrl
@@ -90,13 +91,13 @@ export function ProjectDetailsPanel({ detail }: { detail: ProjectDetail }) {
         detail.locationCity || detail.locationCountry ? (
           <>
             {detail.locationCity && (
-              <RowLink href={`/explore/projects?city=${encodeURIComponent(detail.locationCity)}`}>
+              <RowLink href={`/projects?city=${encodeURIComponent(detail.locationCity)}`}>
                 {detail.locationCity}
               </RowLink>
             )}
             {detail.locationCity && detail.locationCountry && <span className="text-muted">, </span>}
             {detail.locationCountry && (
-              <RowLink href={`/explore/projects?country=${encodeURIComponent(detail.locationCountry)}`}>
+              <RowLink href={`/projects?country=${encodeURIComponent(detail.locationCountry)}`}>
                 {detail.locationCountry}
               </RowLink>
             )}
@@ -111,7 +112,7 @@ export function ProjectDetailsPanel({ detail }: { detail: ProjectDetail }) {
     rows.push({
       label: "Completed",
       icon: Calendar,
-      value: <RowLink href={`/explore/projects?year=${detail.year}`}>{String(detail.year)}</RowLink>,
+      value: <RowLink href={`/projects?year_min=${detail.year}&year_max=${detail.year}`}>{String(detail.year)}</RowLink>,
     });
   }
 
@@ -130,7 +131,7 @@ export function ProjectDetailsPanel({ detail }: { detail: ProjectDetail }) {
       label: "Status",
       icon: CircleDot,
       value: (
-        <RowLink href={`/explore/projects?project_status=${encodeURIComponent(detail.projectStatus)}`}>
+        <RowLink href={`/projects?project_status=${encodeURIComponent(detail.projectStatus)}`}>
           {statusLabel(detail.projectStatus)}
         </RowLink>
       ),
@@ -152,7 +153,7 @@ export function ProjectDetailsPanel({ detail }: { detail: ProjectDetail }) {
             <span key={m.slug ?? m.name}>
               {i > 0 && <span className="text-muted">, </span>}
               {m.slug ? (
-                <RowLink href={`/explore/projects?materials=${encodeURIComponent(m.slug)}`}>
+                <RowLink href={`/projects?materials=${encodeURIComponent(m.slug)}`}>
                   {m.name}
                 </RowLink>
               ) : (
