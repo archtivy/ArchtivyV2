@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import { HeroSearch } from "@/components/home/HeroSearch";
 import { HeroStatPanel } from "@/components/home/HeroStatPanel";
 import { getPlatformTotals } from "@/lib/db/platformTotals";
 import { getHeroFeature } from "@/lib/db/heroFeature";
@@ -56,11 +55,26 @@ export async function ProjectsHeaderBand({
             studios around the world.
           </p>
 
-          {/* HeroSearch renders cream-on-dark chips; on this light band the
-              popular-search row is rendered separately below instead. */}
-          <div className="mt-7 [&_a]:border-ink/20 [&_a]:text-ink [&_a:hover]:bg-ink/5 [&_span]:text-muted">
-            <HeroSearch popularSearches={popular} />
-          </div>
+          {/* ── NO SEARCH FIELD HERE ANY MORE ──────────────────────────────
+              The directory's control bar directly below now carries the
+              dominant search, and two identical inputs 300px apart — going to
+              the same place — is noise, not redundancy. The popular searches
+              stay: they are links into real facet vocabulary, not a second
+              search box, and they are the part of this band that actually
+              starts a journey. */}
+          <ul className="mt-7 flex flex-wrap items-center gap-2">
+            <li className="font-body text-[13px] text-muted">Popular searches:</li>
+            {popular.map((p) => (
+              <li key={p.label}>
+                <Link
+                  href={p.href}
+                  className="inline-flex rounded-full border border-ink/20 px-3 py-1.5 font-body text-[13px] text-ink transition-colors hover:bg-ink/5"
+                >
+                  {p.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="relative min-h-[220px] lg:col-span-5">

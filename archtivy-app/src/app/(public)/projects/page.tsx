@@ -1,5 +1,6 @@
 export const revalidate = 3600;
 
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { getProjectsDirectory } from "@/lib/db/projectsDirectory";
@@ -73,7 +74,17 @@ export default async function ProjectsIndexPage() {
         <ProjectsHeaderBand total={total} facets={facets} />
 
         <div className="mt-10">
-          <ProjectsDirectory projects={projects} facets={facets} />
+          {/* ProjectsDirectory reads its filter, sort and tab state from the
+              query string, and useSearchParams opts a component out of static
+              rendering unless a Suspense boundary marks where the client takes
+              over. This page is statically rendered with revalidate=3600, so
+              the boundary is what keeps the shell prerendered while the
+              filtered grid hydrates from the URL. */}
+          <Suspense
+            fallback={<div className="min-h-[60vh]" aria-hidden />}
+          >
+            <ProjectsDirectory projects={projects} facets={facets} total={total} />
+          </Suspense>
         </div>
 
         <RequestProjectBand />

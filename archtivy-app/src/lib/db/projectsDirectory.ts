@@ -55,6 +55,12 @@ export interface DirectoryProject {
   year: number | null;
   areaSqft: number | null;
   productCount: number;
+  /**
+   * listings.views_count, written by ListingViewTracker on the detail page.
+   * Real and non-zero on 21 of 53 projects, which is what makes the
+   * "Most Viewed" tab a ranking rather than a column of zeroes.
+   */
+  viewsCount: number;
   createdAt: string;
 }
 
@@ -107,7 +113,7 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
   const { data: rows } = await sup
     .from("listings")
     .select(
-      "id, slug, title, cover_image_url, location, location_country, location_city, year, area_sqft, created_at, taxonomy_node_id, owner_profile_id, owner_clerk_user_id"
+      "id, slug, title, cover_image_url, location, location_country, location_city, year, area_sqft, views_count, created_at, taxonomy_node_id, owner_profile_id, owner_clerk_user_id"
     )
     .eq("type", "project")
     .eq("status", "APPROVED")
@@ -286,6 +292,7 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
       year: (l.year as number | null) ?? null,
       areaSqft: (l.area_sqft as number | null) ?? null,
       productCount: productCounts.get(id) ?? 0,
+      viewsCount: (l.views_count as number | null) ?? 0,
       createdAt: String(l.created_at),
     };
   });
