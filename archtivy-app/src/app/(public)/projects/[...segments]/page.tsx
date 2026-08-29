@@ -13,6 +13,7 @@ import { canManageListing } from "@/lib/auth/listingOwnership";
 import { getListingUrl } from "@/lib/canonical";
 import { fetchProjectArchive } from "@/lib/archive/fetchArchiveData";
 import { getProjectsDirectory } from "@/lib/db/projectsDirectory";
+import { parseDirectoryState, isSearchResultUrl } from "@/lib/projects/directoryParams";
 import { ProjectCategoryArchive } from "@/components/archive/ProjectCategoryArchive";
 import { getListingTaxonomyPath } from "@/lib/taxonomy/resolve";
 import { buildProjectDetailMetadata } from "@/app/(public)/projects/_lib/projectDetailRenderer";
@@ -95,10 +96,25 @@ async function authCheckPending(project: {
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ segments: string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
   const { segments } = await params;
+  const sp = await searchParams;
+  /*
+   * A category archive is indexable; the SAME archive with a query on it —
+   * /projects/residential?q=house — is an internal search result, and there is
+   * a combinatorial number of those. `noindex, follow` on any query, so the
+   * archive keeps its authority and the result pages still get crawled for the
+   * project links on them. The canonical stays on the clean archive path.
+   * See isSearchResultUrl for why this keys on "any parameter" rather than a
+   * list that a future filter could be forgotten from.
+   */
+  const searchRobots = isSearchResultUrl(sp)
+    ? ({ index: false, follow: true } as const)
+    : ({ index: true, follow: true } as const);
   if (segments.length > MAX_SEGMENTS) return {};
 
   const listingSlug = segments[segments.length - 1];
@@ -112,7 +128,7 @@ export async function generateMetadata({
         title: node.seo_title || `${node.label} Projects | Archtivy`,
         description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} architecture projects on Archtivy.`,
         alternates: { canonical: `/projects/${node.slug_path}` },
-        robots: { index: true, follow: true },
+        robots: searchRobots,
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
       };
     }
@@ -127,7 +143,7 @@ export async function generateMetadata({
         title: node.seo_title || `${node.label} Projects | Archtivy`,
         description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} architecture projects on Archtivy.`,
         alternates: { canonical: `/projects/${node.slug_path}` },
-        robots: { index: true, follow: true },
+        robots: searchRobots,
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
       };
     }
@@ -150,9 +166,10 @@ export default async function ProjectSegmentsPage({
   searchParams,
 }: {
   params: Promise<{ segments: string[] }>;
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { segments } = await params;
+  const sp = await searchParams;
 
   if (segments.length > MAX_SEGMENTS) notFound();
 
@@ -168,6 +185,13 @@ export default async function ProjectSegmentsPage({
      * more, so there is nothing left for a page number to address.
      */
     const directory = await getProjectsDirectory();
+    const state = parseDirectoryState(
+      new URLSearchParams(
+        Object.entries(sp).flatMap(([k, v]) =>
+          v === undefined ? [] : [[k, Array.isArray(v) ? v[0] : v] as [string, string]]
+        )
+      )
+    );
     return (
       <ProjectCategoryArchive
         node={fullArchive.node}
@@ -175,6 +199,7 @@ export default async function ProjectSegmentsPage({
         childNodes={fullArchive.childNodes}
         total={fullArchive.total}
         directory={directory}
+        state={state}
       />
     );
   }

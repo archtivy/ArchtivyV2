@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { SlidersHorizontal, ChevronDown, X } from "lucide-react";
 import { ListingCardShared } from "@/components/listing/ListingCardShared";
 import { ProjectsFilterPanel } from "@/components/projects/ProjectsFilterPanel";
@@ -12,7 +12,6 @@ import {
   SORTS,
   TABS,
   countActiveFilters,
-  parseDirectoryState,
   serializeDirectoryState,
   type DirectoryState,
   type FilterState,
@@ -24,17 +23,23 @@ import type { DirectoryProject, DirectoryFacets } from "@/lib/db/projectsDirecto
 /**
  * Projects directory.
  *
- * ── URL IS THE STATE ────────────────────────────────────────────────────────
- * Filters, sort and tab used to live in React state alone: nothing was
- * shareable, a reload lost everything, and the back button left the page
- * instead of undoing a filter. All of it now round-trips through the query
- * string via lib/projects/directoryParams, written with router.replace so a
- * filter session does not bury the previous page under fifty history entries —
- * except the tab, which is a navigation and gets a real push.
+ * ── URL IS THE STATE, AND THE SERVER READS IT ───────────────────────────────
+ * Filters, sort, tab and the query round-trip through the query string via
+ * lib/projects/directoryParams. The parsed state arrives as a PROP from the
+ * server rather than from useSearchParams, which is the difference between a
+ * result set that exists in the HTML and one that only appears after
+ * hydration: that hook opts a component out of server rendering, so the whole
+ * grid used to sit behind a Suspense fallback and a crawler — or a visitor on
+ * a slow connection — saw an empty page at /projects?q=house.
  *
- * Results are still derived client-side. With 53 projects the whole set ships
- * once and filtering is instant; past a few hundred this moves server-side,
- * where getProjectsCanonicalFiltered already waits.
+ * Next re-renders the server component on every navigation, so the prop
+ * updates on its own when this component pushes a new URL. The URL is
+ * therefore sufficient to reproduce the result set on a fresh request, which
+ * is exactly the guarantee a shareable filter link needs.
+ *
+ * Results are derived here rather than in the query. With 53 projects the
+ * whole set ships once and filtering is instant; past a few hundred this moves
+ * server-side, where getProjectsCanonicalFiltered already waits.
  *
  * ── THE CARD IS THE CANONICAL ONE ───────────────────────────────────────────
  * ListingCardShared with the full model — taxonomy line, location, year,
@@ -50,11 +55,14 @@ export function ProjectsDirectory({
   projects,
   facets,
   total,
+  state,
   scope,
 }: {
   projects: DirectoryProject[];
   facets: DirectoryFacets;
   total: number;
+  /** Parsed from the request URL on the server. See the note above. */
+  state: DirectoryState;
   /**
    * Set on a category archive route. The taxonomy path is fixed by the URL
    * there, so the Category facet is removed from the panel rather than offered
@@ -65,16 +73,11 @@ export function ProjectsDirectory({
   scope?: { slugPath: string; label: string; basePath: string } | null;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const filterBtn = useRef<HTMLButtonElement>(null);
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [shown, setShown] = useState(PAGE);
 
-  const state: DirectoryState = useMemo(
-    () => parseDirectoryState(new URLSearchParams(searchParams.toString())),
-    [searchParams]
-  );
   const { filters, sort, tab } = state;
 
   const basePath = scope?.basePath ?? "/projects";

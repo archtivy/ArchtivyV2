@@ -1,9 +1,9 @@
 export const revalidate = 3600;
 
-import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { getProjectsDirectory } from "@/lib/db/projectsDirectory";
+import { parseDirectoryState, isSearchResultUrl } from "@/lib/projects/directoryParams";
 import { HomeNav } from "@/components/home/HomeNav";
 import { HomeFooter } from "@/components/home/HomeFooter";
 import { ProjectsDirectory } from "@/components/projects/ProjectsDirectory";
@@ -30,7 +30,7 @@ import { buildCollectionPageJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/json
  * CollectionPage + BreadcrumbList JSON-LD, same revalidate window.
  */
 
-export const metadata: Metadata = {
+const BASE_METADATA: Metadata = {
   title: "Architecture Projects — Browse by Category | Archtivy",
   description:
     "Explore architecture projects by category: residential, hospitality, commercial, cultural, and more. Discover built work on Archtivy.",
@@ -49,8 +49,62 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function ProjectsIndexPage() {
+/**
+ * ── INDEXATION ──────────────────────────────────────────────────────────────
+ * /projects itself is a canonical archive and stays indexable. /projects with
+ * ANY query on it — ?q=house, ?materials=wood&country=Italy — is a result set
+ * a visitor assembled, and there is a combinatorial number of those. They are
+ * `noindex, follow`: not indexed, because they duplicate each other and the
+ * archive they were built from and would spread authority across thousands of
+ * near-identical URLs; still followed, because the project links on them are
+ * the same canonical detail URLs as everywhere else and should be crawled.
+ *
+ * The canonical tag stays on the clean /projects path either way, so whatever
+ * equity a shared search URL attracts lands on the page that deserves it. The
+ * rule keys on "is there a query at all" rather than a list of parameters, so
+ * a filter added later cannot become indexable by being forgotten — see
+ * isSearchResultUrl.
+ *
+ * Reading searchParams here makes this route dynamic. That is the cost of
+ * emitting a correct robots tag per URL; the underlying data is still served
+ * from getProjectsDirectory's unstable_cache, so the work per request is
+ * rendering, not querying.
+ */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<Metadata> {
+  const sp = await searchParams;
+  if (!isSearchResultUrl(sp)) return BASE_METADATA;
+  return {
+    ...BASE_METADATA,
+    robots: { index: false, follow: true },
+  };
+}
+
+export default async function ProjectsIndexPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
   const { projects, facets, total } = await getProjectsDirectory();
+
+  /*
+   * Parsed on the SERVER and handed down, so /projects?q=house renders its
+   * results in the HTML rather than after hydration. The directory used to
+   * read the query with useSearchParams, which opts a component out of server
+   * rendering entirely — the grid sat behind a Suspense fallback and a crawler
+   * saw an empty page.
+   */
+  const state = parseDirectoryState(
+    new URLSearchParams(
+      Object.entries(sp).flatMap(([k, v]) =>
+        v === undefined ? [] : [[k, Array.isArray(v) ? v[0] : v] as [string, string]]
+      )
+    )
+  );
 
   const canonicalUrl = getAbsoluteUrl("/projects");
   const collectionJsonLd = buildCollectionPageJsonLd({
@@ -84,17 +138,12 @@ export default async function ProjectsIndexPage() {
         </h1>
 
         <div className="mt-8">
-          {/* ProjectsDirectory reads its filter, sort and tab state from the
-              query string, and useSearchParams opts a component out of static
-              rendering unless a Suspense boundary marks where the client takes
-              over. This page is statically rendered with revalidate=3600, so
-              the boundary is what keeps the shell prerendered while the
-              filtered grid hydrates from the URL. */}
-          <Suspense
-            fallback={<div className="min-h-[60vh]" aria-hidden />}
-          >
-            <ProjectsDirectory projects={projects} facets={facets} total={total} />
-          </Suspense>
+          <ProjectsDirectory
+            projects={projects}
+            facets={facets}
+            total={total}
+            state={state}
+          />
         </div>
 
         <RequestProjectBand />

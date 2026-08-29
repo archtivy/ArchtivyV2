@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { getArchiveHubUrl, getArchiveCategoryUrl, buildArchiveBreadcrumbSegments } from "@/lib/archive/urls";
 import type { TaxonomyNode } from "@/lib/taxonomy/taxonomyDb";
@@ -10,6 +9,7 @@ import { ArchiveBreadcrumb } from "./ArchiveBreadcrumb";
 import { SubcategoryLinks, type SubcategoryLinkItem } from "./SubcategoryLinks";
 import { ProjectsDirectory } from "@/components/projects/ProjectsDirectory";
 import type { ProjectsDirectoryData } from "@/lib/db/projectsDirectory";
+import type { DirectoryState } from "@/lib/projects/directoryParams";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildCollectionPageJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
 
@@ -20,6 +20,8 @@ interface ProjectCategoryArchiveProps {
   total: number;
   /** Every live project plus its facets — the same payload /projects uses. */
   directory: ProjectsDirectoryData;
+  /** Directory state parsed from the request URL on the server. */
+  state: DirectoryState;
 }
 
 /**
@@ -45,6 +47,7 @@ export function ProjectCategoryArchive({
   childNodes,
   total,
   directory,
+  state,
 }: ProjectCategoryArchiveProps) {
   const isSubcategory = node.depth > 0;
   const title = node.seo_title || `${node.label} Projects`;
@@ -94,18 +97,17 @@ export function ProjectCategoryArchive({
             <SubcategoryLinks baseSegment="projects" items={childNodes} />
           )}
           <div className="mt-8">
-            <Suspense fallback={<div className="min-h-[60vh]" aria-hidden />}>
-              <ProjectsDirectory
-                projects={directory.projects}
-                facets={directory.facets}
-                total={directory.total}
-                scope={{
-                  slugPath: node.slug_path,
-                  label: node.label,
-                  basePath: archivePath,
-                }}
-              />
-            </Suspense>
+            <ProjectsDirectory
+              projects={directory.projects}
+              facets={directory.facets}
+              total={directory.total}
+              state={state}
+              scope={{
+                slugPath: node.slug_path,
+                label: node.label,
+                basePath: archivePath,
+              }}
+            />
           </div>
         </Container>
       </main>
