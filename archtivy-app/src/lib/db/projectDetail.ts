@@ -93,6 +93,21 @@ export interface ProjectDetail {
   related: DetailRelated[];
   /** Plain-language basis for `related`. No similarity score, no AI. */
   relatedReason: string;
+  /** Other live projects by the same studio. Ids only — cards are resolved
+   *  through getProjectRailCards like every other rail on the page. */
+  studioProjectIds: string[];
+  /**
+   * Projects near this one, and the geographic level the match was made at.
+   *
+   * City first. Only 7 of 53 live projects carry a location_city, so a
+   * city-only rule would render this on almost nothing; country is the
+   * fallback because it is the only other level `listings` actually stores
+   * (location_city, location_country, location_country_code, lat/lng — there
+   * is no region or state column on a listing, whatever profiles has). The
+   * label names whichever level was used, so the heading never claims a
+   * closeness the match does not have.
+   */
+  nearby: { ids: string[]; level: "city" | "country"; label: string } | null;
   /**
    * Lifecycle and collaboration. Columns existed and the admin form wrote
    * them, but no detail loader ever selected them — so nothing could be shown
@@ -421,8 +436,17 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
     }
   }
 
-  if (related.length === 0 && l.owner_profile_id) {
-    const { data: sameArchitect } = await sup
+  /*
+   * NO SAME-STUDIO FALLBACK ANY MORE. `related` used to fall back to other
+   * projects by the same studio under the heading "More from {studio}" —
+   * which is now a section of its own, below. Keeping the fallback would print
+   * the same projects twice under the same heading.
+   */
+
+  // ── More from this studio ────────────────────────────────────────────────
+  let studioProjectIds: string[] = [];
+  if (l.owner_profile_id) {
+    const { data: sameStudio } = await sup
       .from("listings")
       .select("id")
       .eq("type", "project")
@@ -430,11 +454,42 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
       .is("deleted_at", null)
       .eq("owner_profile_id", l.owner_profile_id as string)
       .neq("id", listingId)
-      .limit(4);
-    related = await hydrateRelated(((sameArchitect ?? []) as { id: string }[]).map((r) => r.id));
-    if (related.length > 0 && ownerProf?.display_name) {
-      relatedReason = `More from ${ownerProf.display_name}`;
-    }
+      .limit(8);
+    studioProjectIds = ((sameStudio ?? []) as { id: string }[]).map((r) => r.id);
+  }
+
+  // ── Projects nearby ──────────────────────────────────────────────────────
+  // City is an exact match on listings.location_city, the same column
+  // /explore/projects?city= filters on, so the section and the "see more" link
+  // it sits beside can never disagree about what "in this city" means.
+  const city = ((l.location_city as string | null) ?? "").trim() || null;
+  const country = ((l.location_country as string | null) ?? "").trim() || null;
+  const NEARBY_MIN = 3;
+
+  async function projectsIn(column: "location_city" | "location_country", value: string) {
+    const { data } = await sup
+      .from("listings")
+      .select("id")
+      .eq("type", "project")
+      .eq("status", "APPROVED")
+      .is("deleted_at", null)
+      .eq(column, value)
+      .neq("id", listingId)
+      .limit(8);
+    return ((data ?? []) as { id: string }[]).map((r) => r.id);
+  }
+
+  let nearby: ProjectDetail["nearby"] = null;
+  if (city) {
+    const ids = await projectsIn("location_city", city);
+    // Below the threshold a "More projects in X" rail is one lonely card
+    // claiming a scene. Falling through to the country is the honest wider
+    // answer; the heading changes with it.
+    if (ids.length >= NEARBY_MIN) nearby = { ids, level: "city", label: city };
+  }
+  if (!nearby && country) {
+    const ids = await projectsIn("location_country", country);
+    if (ids.length >= NEARBY_MIN) nearby = { ids, level: "country", label: country };
   }
 
   return {
@@ -476,6 +531,8 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
     documents,
     related,
     relatedReason,
+    studioProjectIds,
+    nearby,
     projectStatus: (l.project_status as string | null) ?? null,
     collaborationStatus: (l.project_collaboration_status as string | null) ?? null,
     lookingFor: Array.isArray(l.project_looking_for) ? (l.project_looking_for as string[]) : [],

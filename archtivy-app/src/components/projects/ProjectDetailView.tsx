@@ -8,6 +8,7 @@ import { HomeNav } from "@/components/home/HomeNav";
 import { HomeFooter } from "@/components/home/HomeFooter";
 import { Gallery } from "@/components/entity/Gallery";
 import { ProjectDetailHeader } from "@/components/projects/ProjectDetailHeader";
+import { ProjectHeaderActions } from "@/components/projects/ProjectHeaderActions";
 import { ProjectDetailsPanel } from "@/components/projects/ProjectDetailsPanel";
 import { SidebarCard } from "@/components/projects/SidebarCard";
 import {
@@ -17,6 +18,7 @@ import {
 } from "@/components/projects/ProjectSidebarCards";
 import { ProjectTeam } from "@/components/projects/ProjectTeam";
 import { ProjectDrawings } from "@/components/projects/ProjectDrawings";
+import { ProjectRail } from "@/components/projects/ProjectRail";
 import { ListingCardShared } from "@/components/listing/ListingCardShared";
 import { ProjectCollaborationSection } from "@/components/listing/CollaborationSection";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
@@ -79,14 +81,32 @@ export async function ProjectDetailView({
    */
   const [productCards, projectCards] = await Promise.all([
     getProductRailCards(detail.products.map((p) => p.id)),
-    getProjectRailCards(detail.related.map((r) => r.id)),
+    getProjectRailCards([
+      ...detail.related.map((r) => r.id),
+      ...detail.studioProjectIds,
+      ...(detail.nearby?.ids ?? []),
+    ]),
   ]);
   const productModels = detail.products
     .map((p) => productCards.get(p.id))
     .filter(Boolean) as NonNullable<ReturnType<typeof productCards.get>>[];
-  const relatedModels = detail.related
-    .map((r) => projectCards.get(r.id))
-    .filter(Boolean) as NonNullable<ReturnType<typeof projectCards.get>>[];
+  type ProjectModel = NonNullable<ReturnType<typeof projectCards.get>>;
+  const toProjects = (ids: string[]) =>
+    ids.map((id) => projectCards.get(id)).filter(Boolean) as ProjectModel[];
+
+  const studioModels = toProjects(detail.studioProjectIds);
+  /*
+   * Each discovery rail is deduplicated against the ones above it, so a studio
+   * that works in one city does not show the same four projects under three
+   * headings. Order matters and follows the page: studio, then location, then
+   * the category-based related rail last.
+   */
+  const seen = new Set(studioModels.map((m) => m.id));
+  const nearbyModels = toProjects(detail.nearby?.ids ?? []).filter((m) => !seen.has(m.id));
+  nearbyModels.forEach((m) => seen.add(m.id));
+  const relatedModels = toProjects(detail.related.map((r) => r.id)).filter(
+    (m) => !seen.has(m.id)
+  );
 
   const canonicalUrl = getAbsoluteUrl(canonicalPath);
   const mainJsonLd = buildProjectJsonLd(project, canonicalUrl);
@@ -113,7 +133,12 @@ export async function ProjectDetailView({
       <HomeNav variant="solid" />
 
       <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
-        <nav aria-label="Breadcrumb" className="mb-6 font-body text-[12px] text-muted">
+        {/* Breadcrumb and actions share the top line. The actions used to sit
+            under the title as three bordered buttons, where they outweighed
+            the project name; up here they frame the header instead of
+            competing with it. */}
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <nav aria-label="Breadcrumb" className="min-w-0 font-body text-[12px] text-muted">
           <Link href="/" className="hover:text-ink">
             Home
           </Link>
@@ -129,19 +154,21 @@ export async function ProjectDetailView({
               </Link>
             </>
           )}
-          <span className="px-2">/</span>
-          <span className="text-ink">{detail.title}</span>
-        </nav>
+            <span className="px-2">/</span>
+            <span className="text-ink">{detail.title}</span>
+          </nav>
+
+          <ProjectHeaderActions listingId={detail.id} title={detail.title} />
+        </div>
 
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-start lg:gap-10">
           {/* ── Main column ──────────────────────────────────────────────── */}
           <div className="min-w-0 lg:col-span-8">
             <ProjectDetailHeader
-              listingId={detail.id}
               title={detail.title}
-              location={detail.location}
-              architect={detail.architect}
-              architectHref={architectHref}
+              locationCity={detail.locationCity}
+              locationCountry={detail.locationCountry}
+              locationFallback={detail.location}
               year={detail.year}
               buildingType={detail.buildingTypeLabel}
               buildingTypeHref={categoryHref}
@@ -176,6 +203,10 @@ export async function ProjectDetailView({
               )}
             </section>
 
+            {/* No "View all N team members" href is passed: there is no page
+                that lists one project's credits, and inventing a route to
+                satisfy the affordance would be a dead link. The rail carries
+                every member, so nothing is unreachable. */}
             <ProjectTeam team={detail.team} />
 
             {/* ── Products Used ──────────────────────────────────────────
@@ -218,23 +249,29 @@ export async function ProjectDetailView({
               </section>
             )}
 
-            <ProjectDrawings documents={detail.documents} listingId={detail.id} />
+            <ProjectRail
+              title={detail.architect ? `More from ${detail.architect}` : "More from this studio"}
+              href={architectHref}
+              linkLabel="View studio profile"
+              items={studioModels}
+            />
 
-            {relatedModels.length > 0 && (
-              <section className="mt-16" aria-labelledby="related-projects-heading">
-                <h2
-                  id="related-projects-heading"
-                  className="mb-6 font-display text-[24px] tracking-tight text-ink"
-                >
-                  {detail.relatedReason}
-                </h2>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-4 md:grid-cols-3 lg:grid-cols-4">
-                  {relatedModels.map((m) => (
-                    <ListingCardShared key={m.id} model={m} sizes="(max-width: 640px) 45vw, 22vw" />
-                  ))}
-                </div>
-              </section>
+            {detail.nearby && (
+              <ProjectRail
+                title={`More projects in ${detail.nearby.label}`}
+                href={
+                  detail.nearby.level === "city"
+                    ? `/explore/projects?city=${encodeURIComponent(detail.nearby.label)}`
+                    : `/explore/projects?country=${encodeURIComponent(detail.nearby.label)}`
+                }
+                linkLabel={`View all in ${detail.nearby.label}`}
+                items={nearbyModels}
+              />
             )}
+
+            <ProjectRail title={detail.relatedReason} items={relatedModels} />
+
+            <ProjectDrawings documents={detail.documents} listingId={detail.id} />
 
             <ProjectCollaborationSection
               project_collaboration_status={detail.collaborationStatus}

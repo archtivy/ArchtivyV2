@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ArrowRight, ExternalLink } from "lucide-react";
+import { HorizontalRail } from "@/components/entity/HorizontalRail";
 import type { DetailTeamMember } from "@/lib/db/projectDetail";
 
 /**
@@ -15,6 +16,19 @@ import type { DetailTeamMember } from "@/lib/db/projectDetail";
  * listings, not people. So this is a small local presentation of the credit
  * itself, lifted out of the retired tabs unchanged rather than redrawn.
  *
+ * ── A RAIL, NOT A WRAPPING GRID ─────────────────────────────────────────────
+ * The four-across grid this replaces laid six credits out as a row of four and
+ * a row of two, leaving half a row of empty space beside the last two cards —
+ * and the ragged half grows with the count. Widening the cards to fill it
+ * would make a credit look like a feature; stretching the final row would make
+ * two cards twice the size of the other four.
+ *
+ * A rail has no second row to leave ragged. Six, ten or fifteen credits are
+ * one row that scrolls further, roughly four or five visible at desktop width,
+ * and the arrows only appear when there is something past the edge. The
+ * HorizontalRail primitive carries the scrolling; this file still owns how a
+ * credit looks.
+ *
  * ── THE WHOLE CARD IS THE LINK, WHEN THERE IS ONE ───────────────────────────
  * The retired tab put a separate "View" link at the right of each row. Here
  * the card itself is the link whenever the credit resolves to a profile, which
@@ -24,9 +38,12 @@ import type { DetailTeamMember } from "@/lib/db/projectDetail";
  */
 export function ProjectTeam({
   team,
+  viewAllHref,
   headingId = "project-team-heading",
 }: {
   team: DetailTeamMember[];
+  /** Where "View all N team members" goes. Omitted when there is no such page. */
+  viewAllHref?: string | null;
   headingId?: string;
 }) {
   if (team.length === 0) return null;
@@ -38,9 +55,22 @@ export function ProjectTeam({
           The Team
           <span className="ml-2.5 font-body text-[16px] text-muted">{team.length}</span>
         </h2>
+
+        {/* Only offered when there is something the rail does not already
+            show. "View all 4 team members" beside four visible cards is a
+            link to what you are looking at. */}
+        {viewAllHref && team.length > 4 && (
+          <Link
+            href={viewAllHref}
+            className="inline-flex shrink-0 items-center gap-1.5 font-body text-[13px] text-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
+          >
+            View all {team.length} team members
+            <ArrowRight strokeWidth={1.5} className="h-3.5 w-3.5" aria-hidden />
+          </Link>
+        )}
       </div>
 
-      <ul className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+      <HorizontalRail ariaLabel="Project team">
         {team.map((t) => {
           const href = t.profileUsername
             ? `/u/${t.profileUsername}`
@@ -74,7 +104,10 @@ export function ProjectTeam({
           );
 
           return (
-            <li key={t.id}>
+            <li
+              key={t.id}
+              className="w-[160px] shrink-0 snap-start sm:w-[184px]"
+            >
               {href ? (
                 <Link
                   href={href}
@@ -95,7 +128,7 @@ export function ProjectTeam({
             </li>
           );
         })}
-      </ul>
+      </HorizontalRail>
     </section>
   );
 }
