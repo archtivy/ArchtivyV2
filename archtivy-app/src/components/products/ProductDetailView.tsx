@@ -26,16 +26,38 @@ import type { ProductCanonical } from "@/lib/canonical-models";
  * Product Detail — Entity Detail Layout archetype (Blueprint §8).
  *
  * ── LAYOUT ──────────────────────────────────────────────────────────────────
- * Row 1: gallery | product information.
- * Row 2: About / Details / Downloads tabs | brand card.
- * Below: Seen in Projects, then the product rails.
+ * Two columns, one grid row:
  *
- * The brand card sits beside the TABS, not beside the product information, so
- * the specification can use the full right-hand half of the first row where it
- * is read. This also ends the height problem the previous three-column row
- * had: the sidebar carried three stacked panels, CSS Grid sized the row to the
- * tallest item, and ~648px of dead space opened under the gallery. The sidebar
- * is one short card now, so no row-spanning or height-capping is needed.
+ *   LEFT (7/12)  gallery in row 1, the About / Details / Downloads tabs in
+ *                row 2. The scrolling content: arbitrarily tall, and what
+ *                sets the height the sticky column travels along.
+ *   RIGHT (5/12) title, actions, specification and the brand card, as ONE
+ *                sticky block spanning both rows, pinned below the fixed
+ *                72px header.
+ *
+ * Below both, full width: Seen in Projects and the product rails.
+ *
+ * ── WHY THREE GRID ITEMS AND NOT TWO ────────────────────────────────────────
+ * Gallery and tabs are separate items placed into column 1 explicitly, rather
+ * than nested inside one left-hand column. Nesting is tidier CSS and wrong on
+ * a phone: below `lg` the grid is a single column that renders in DOM order,
+ * so a combined left column would have put the whole description between the
+ * gallery and the product title. Keeping them separate makes the mobile order
+ * gallery -> title, actions, specification, brand -> description, which is the
+ * order the page is read in.
+ *
+ * The point of the sticky column is that what you decide on — the name, the
+ * price-request buttons, the specification, the brand — stays in view while
+ * the photographs and the description scroll past it. It is one block rather
+ * than two so the brand card cannot drift away from the specification it
+ * belongs to.
+ *
+ * It releases without any JavaScript: a sticky element travels only inside its
+ * containing block, and that is its grid area, which ends with the row. The
+ * rails below are outside the grid, so the sidebar cannot reach them. On a
+ * product whose description is short enough that the right column is the
+ * taller of the two, there is nothing to travel along and it simply never
+ * sticks — also correct.
  *
  * GALLERY: horizontal thumbnail strip below the hero, the same orientation
  * every other caller uses. A vertical side rail was tried and removed —
@@ -175,13 +197,33 @@ export async function ProductDetailView({
             column lines up under the gallery and the brand card under the
             specification, with no second set of width values to keep in sync. */}
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-start lg:gap-8">
-          {/* ── Gallery ────────────────────────────────────────────────── */}
-          <div className="min-w-0 lg:col-span-7">
+          {/* ── Gallery ─────────────────────────────────────────────────
+              Column 1, row 1. */}
+          <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:col-span-7">
             <Gallery images={detail.images} title={detail.title} />
           </div>
 
-          {/* ── Product information ────────────────────────────────────── */}
-          <div className="min-w-0 lg:col-span-5">
+          {/* ── Right column: one sticky unit ─────────────────────────────
+              Title, actions, specification and the brand card are a single
+              sticky block, so the information you decide on stays in view
+              while the gallery and the description scroll past it.
+
+              WHY IT RELEASES ON ITS OWN: a sticky element travels only within
+              its containing block, which here is its grid area. The area ends
+              where the grid row ends, so the block unpins at the bottom of the
+              row and cannot reach — let alone overlap — the full-width rails
+              that follow the grid. No scroll listener, no fixed positioning.
+
+              `lg:items-start` on the grid is load-bearing: the default
+              `stretch` would make this item as tall as the row, leaving it
+              nothing to travel along and no visible stick at all.
+
+              The max-height guard is for short viewports. Pinned at 88px, a
+              tall sidebar on a 768px-high laptop would put its last spec rows
+              permanently below the fold with no way to reach them; capping it
+              to the remaining viewport height lets it scroll internally in
+              that case, and does nothing at all when it fits. */}
+          <div className="min-w-0 lg:sticky lg:top-[88px] lg:col-start-8 lg:row-start-1 lg:col-span-5 lg:row-span-2 lg:max-h-[calc(100vh-104px)] lg:overflow-y-auto">
             <div>
               {/* Brand line. No verification checkmark: no verification flag
                   exists on any table, and brand claim_status is 'unclaimed'
@@ -284,100 +326,89 @@ export async function ProductDetailView({
                 ]}
               />
             </div>
+
+            {/* ── Brand card ──────────────────────────────────────────────
+                Inside the sticky unit, not beside it. The specification and
+                the brand that makes it are read together, so they travel
+                together; leaving the card in its own grid cell would have let
+                it scroll away from the product it describes. */}
+            <aside className="mt-8">
+              {detail.brand && (
+                <RailPanel title="Brand">
+                  <div className="flex items-center gap-3">
+                    <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded bg-stone">
+                      {detail.brand.avatarUrl && (
+                        <Image
+                          src={detail.brand.avatarUrl}
+                          alt=""
+                          fill
+                          sizes="48px"
+                          className="object-contain"
+                        />
+                      )}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate font-body text-[15px] text-ink">
+                        {detail.brand.name}
+                      </span>
+                      {detail.brand.location && (
+                        <span className="block truncate font-body text-[12px] text-muted">
+                          {detail.brand.location}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Stats, each independently real-or-omitted.
+                      FOLLOWERS IS GONE. The mockup showed "3.2k Followers"; the
+                      `follows` table holds 9 rows platform-wide and none are
+                      product-related, so the number could only ever have been
+                      decoration.
+                      BOTH FIGURES ARE BRAND-WIDE. Projects-featuring used to read
+                      detail.projects.length -- projects featuring this one
+                      PRODUCT -- beside a brand-wide product count, so a panel
+                      headed "Brand" mixed two scopes: Gillis Armchair showed
+                      12 / 1 where the brand-wide answer is 3. The product-scoped
+                      list is not lost; "Seen in Projects" lower down shows it in
+                      full. */}
+                  <dl className="mt-5 grid grid-cols-2 gap-4">
+                    {detail.brand.productCount > 0 && (
+                      <Stat label="Products" value={detail.brand.productCount} />
+                    )}
+                    {detail.brand.projectsFeaturingCount > 0 && (
+                      <Stat
+                        label="Projects featuring"
+                        value={detail.brand.projectsFeaturingCount}
+                      />
+                    )}
+                  </dl>
+
+                  {brandHref && (
+                    <Link
+                      href={brandHref}
+                      className="mt-5 inline-flex w-full items-center justify-center rounded-full border border-ink/25 px-4 py-2.5 font-body text-[13px] text-ink transition-colors hover:bg-stone/50"
+                    >
+                      View Brand Profile
+                    </Link>
+                  )}
+                </RailPanel>
+              )}
+            </aside>
           </div>
 
-          {/* ── Tabs ───────────────────────────────────────────────────────
-              Second row, columns 1-8. The About panel keeps a 68ch reading
-              measure; an eight-column track is about 800px wide, so the prose
-              now fills roughly 85% of its column instead of reading as a narrow
-              island in a full-width field. The explicit max-w-[860px] that used
-              to do that job is gone — the column is narrower than the cap, so
-              the cap never applied and was one more number to keep in sync. */}
-          <div className="min-w-0 lg:col-span-8">
+          {/* ── Tabs ────────────────────────────────────────────────────
+              Column 1, row 2 — directly under the gallery, and the reason the
+              sticky column has anything to travel along: this is the tall
+              content. A seven-column track keeps the About panel's 68ch
+              measure filling its column instead of reading as a narrow island
+              in a full-width field. */}
+          <div className="min-w-0 lg:col-start-1 lg:row-start-2 lg:col-span-7">
             <ProductDetailTabs product={detail} />
             <ProductCollaborationSection
               product_collaboration_status={detail.collaborationStatus}
               product_looking_for={detail.lookingFor}
             />
           </div>
-
-          {/* ── Brand card ─────────────────────────────────────────────────
-              One panel, beside the tabs. "More from {brand}" and the related
-              products used to stack under it here; both are now full-width
-              rails below the fold, where a product card gets a readable width
-              instead of a sidebar's worth. */}
-          {/* Spans BOTH grid rows on desktop. Previously the aside sat in a
-              single row, and CSS Grid sized that row to its tallest item — the
-              rail's three stacked panels, 1072px — while the gallery and
-              information columns held only 424px and 287px of content. The tabs
-              then began after the whole grid, leaving ~648px of dead space
-              under the gallery. Spanning the rail across both rows lets the
-              tabs start immediately after the gallery/info row while the
-              sidebar simply continues alongside them. */}
-          <aside className="min-w-0 lg:col-span-4">
-            {detail.brand && (
-              <RailPanel title="Brand">
-                <div className="flex items-center gap-3">
-                  <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded bg-stone">
-                    {detail.brand.avatarUrl && (
-                      <Image
-                        src={detail.brand.avatarUrl}
-                        alt=""
-                        fill
-                        sizes="48px"
-                        className="object-contain"
-                      />
-                    )}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate font-body text-[15px] text-ink">
-                      {detail.brand.name}
-                    </span>
-                    {detail.brand.location && (
-                      <span className="block truncate font-body text-[12px] text-muted">
-                        {detail.brand.location}
-                      </span>
-                    )}
-                  </span>
-                </div>
-
-                {/* Stats, each independently real-or-omitted.
-                    FOLLOWERS IS GONE. The mockup showed "3.2k Followers"; the
-                    `follows` table holds 9 rows platform-wide and none are
-                    product-related, so the number could only ever have been
-                    decoration.
-                    BOTH FIGURES ARE BRAND-WIDE. Projects-featuring used to read
-                    detail.projects.length -- projects featuring this one
-                    PRODUCT -- beside a brand-wide product count, so a panel
-                    headed "Brand" mixed two scopes: Gillis Armchair showed
-                    12 / 1 where the brand-wide answer is 3. The product-scoped
-                    list is not lost; "Seen in Projects" lower down shows it in
-                    full. */}
-                <dl className="mt-5 grid grid-cols-2 gap-4">
-                  {detail.brand.productCount > 0 && (
-                    <Stat label="Products" value={detail.brand.productCount} />
-                  )}
-                  {detail.brand.projectsFeaturingCount > 0 && (
-                    <Stat
-                      label="Projects featuring"
-                      value={detail.brand.projectsFeaturingCount}
-                    />
-                  )}
-                </dl>
-
-                {brandHref && (
-                  <Link
-                    href={brandHref}
-                    className="mt-5 inline-flex w-full items-center justify-center rounded-full border border-ink/25 px-4 py-2.5 font-body text-[13px] text-ink transition-colors hover:bg-stone/50"
-                  >
-                    View Brand Profile
-                  </Link>
-                )}
-              </RailPanel>
-            )}
-
-          </aside>
-
         </div>
 
         {/* ── Seen in Projects ────────────────────────────────────────── */}
