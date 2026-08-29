@@ -4,9 +4,14 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SlidersHorizontal, ChevronDown, X } from "lucide-react";
 import { ListingCardShared } from "@/components/listing/ListingCardShared";
-import { ProjectsFilterPanel } from "@/components/projects/ProjectsFilterPanel";
-import { ProjectsSearchBar } from "@/components/projects/ProjectsSearchBar";
-import { ProjectsCategoryRail } from "@/components/projects/ProjectsCategoryRail";
+import { DirectorySearchBar } from "@/components/directory/DirectorySearchBar";
+import { DirectoryCategoryRail } from "@/components/directory/DirectoryCategoryRail";
+import {
+  DirectoryFilterPanel,
+  FilterToggle,
+  RangeGroup,
+  type FilterColumn,
+} from "@/components/directory/DirectoryFilterPanel";
 import {
   EMPTY_FILTERS,
   SORTS,
@@ -179,6 +184,33 @@ export function ProjectsDirectory({
 
   const activeCount = countActiveFilters(filters);
 
+  const toggle = (key: keyof FilterState, value: string) => {
+    const cur = filters[key] as string[];
+    setFilters({
+      ...filters,
+      [key]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value],
+    });
+  };
+
+  /* Column definitions live here, not in the shared panel: which filters exist
+     is a fact about this directory's data. Category is dropped on an archive
+     route, where the URL already fixes it. */
+  const filterColumns: FilterColumn[] = (
+    [
+      { title: "Category", key: "buildingTypes" as const, values: facets.buildingTypes },
+      { title: "Location", key: "locations" as const, values: facets.locations },
+      { title: "Project Type", key: "projectTypes" as const, values: facets.projectTypes },
+      { title: "Style", key: "styles" as const, values: facets.styles },
+      { title: "Materials", key: "materials" as const, values: facets.materials },
+      { title: "Status", key: "statuses" as const, values: facets.statuses },
+    ].filter((c) => c.values.length > 0 && !(scope && c.key === "buildingTypes"))
+  ).map((c) => ({
+    title: c.title,
+    values: c.values,
+    selected: filters[c.key] as string[],
+    onToggle: (v: string) => toggle(c.key, v),
+  }));
+
   /** Active filters as individually removable chips. */
   const chips: { label: string; clear: () => void }[] = [];
   const listKeys = ["buildingTypes", "locations", "projectTypes", "styles", "materials", "statuses"] as const;
@@ -261,7 +293,12 @@ export function ProjectsDirectory({
           />
         </button>
 
-        <ProjectsSearchBar value={filters.q} onChange={setQuery} />
+        <DirectorySearchBar
+          value={filters.q}
+          onChange={setQuery}
+          placeholder="Search projects, locations, studios, products, materials…"
+          label="Search projects"
+        />
 
         <label className="relative shrink-0">
           <span className="sr-only">Sort projects</span>
@@ -284,22 +321,62 @@ export function ProjectsDirectory({
         </label>
 
         {panelOpen && (
-          <ProjectsFilterPanel
-            facets={facets}
-            hideCategory={Boolean(scope)}
-            filters={filters}
-            onChange={setFilters}
+          <DirectoryFilterPanel
+            columns={filterColumns}
+            activeCount={activeCount}
+            onClear={() => setFilters(EMPTY_FILTERS)}
             onClose={() => setPanelOpen(false)}
             triggerRef={filterBtn}
+            title="Filter projects"
+            extras={
+              <>
+                {facets.yearRange && (
+                  <RangeGroup
+                    title="Year"
+                    min={facets.yearRange.min}
+                    max={facets.yearRange.max}
+                    from={filters.yearMin}
+                    to={filters.yearMax}
+                    onFrom={(v) => setFilters({ ...filters, yearMin: v })}
+                    onTo={(v) => setFilters({ ...filters, yearMax: v })}
+                  />
+                )}
+                {facets.areaRange && (
+                  <RangeGroup
+                    title="Size (ft²)"
+                    min={facets.areaRange.min}
+                    max={facets.areaRange.max}
+                    from={filters.areaMin}
+                    to={filters.areaMax}
+                    onFrom={(v) => setFilters({ ...filters, areaMin: v })}
+                    onTo={(v) => setFilters({ ...filters, areaMax: v })}
+                  />
+                )}
+                {facets.projectsWithProducts > 0 && (
+                  <FilterToggle
+                    title="Products"
+                    label="With products specified"
+                    count={facets.projectsWithProducts}
+                    checked={filters.withProductsOnly}
+                    onChange={() =>
+                      setFilters({ ...filters, withProductsOnly: !filters.withProductsOnly })
+                    }
+                  />
+                )}
+              </>
+            }
           />
         )}
       </div>
 
       {/* ── Category rail ───────────────────────────────────────────────── */}
       <div className="mt-4">
-        <ProjectsCategoryRail
+        <DirectoryCategoryRail
           categories={facets.buildingTypes}
           total={total}
+          basePath="/projects"
+          allLabel="All Projects"
+          ariaLabel="Project categories"
           activeSlug={scope ? scope.slugPath.split("/")[0] : null}
         />
       </div>
