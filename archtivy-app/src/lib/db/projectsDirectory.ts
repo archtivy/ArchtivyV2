@@ -14,7 +14,10 @@
  *   style            3 values             -> rendered (15 projects)
  *   year        2009-2030, 50/50          -> rendered
  *   area        42/50 populated, ft²      -> rendered
- *   materials        8 values             -> rendered (7 projects)
+ *   materials        UNION of two sources -> rendered. See the note in the
+ *                    taxonomy loop: project_material_links and the
+ *                    taxonomy_nodes material domain are disjoint, and reading
+ *                    either alone under-reports the archive by roughly half.
  *   brands used      0                    -> OMITTED
  *   sustainability   0 project facets     -> OMITTED
  *   awards           no column exists     -> OMITTED
@@ -164,7 +167,10 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
     sup.from("listing_images").select("listing_id").in("listing_id", ids),
     sup
       .from("listing_taxonomy_node")
-      .select("listing_id, is_primary, taxonomy_nodes:taxonomy_node_id(domain, slug_path, label)")
+      // `slug` as well as `slug_path`: the material domain is addressed by
+      // slug everywhere else (the detail sidebar's links, the explore
+      // `materials` param), while project/style/intervention use the path.
+      .select("listing_id, is_primary, taxonomy_nodes:taxonomy_node_id(domain, slug, slug_path, label)")
       .in("listing_id", ids),
     // NOT an embedded select. project_material_links has NO foreign key
     // constraints (verified against production), and PostgREST can only embed
@@ -221,19 +227,22 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
     }
   }
 
+  // Side A of the union: the materials table, via project_material_links.
+  // Side B (the material taxonomy) is folded into the same map inside the
+  // taxonomy loop below — see the note there.
   const materialsBy = new Map<string, { slug: string; name: string }[]>();
   for (const r of matLinks) {
     const m = materialNames.get(r.material_id);
     if (!m) continue;
     const list = materialsBy.get(r.project_id) ?? [];
-    list.push(m);
+    if (!list.some((x) => x.slug === m.slug)) list.push(m);
     materialsBy.set(r.project_id, list);
   }
 
   const buildingBy = new Map<string, { root: string; label: string; slugPath: string }>();
   const stylesBy = new Map<string, string[]>();
   const interventionsBy = new Map<string, string[]>();
-  type TaxNode = { domain: string; slug_path: string; label: string };
+  type TaxNode = { domain: string; slug: string | null; slug_path: string; label: string };
   for (const r of (taxRes.data ?? []) as unknown as {
     listing_id: string;
     is_primary: boolean;
@@ -246,6 +255,39 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
       // Primary wins; otherwise first seen.
       if (r.is_primary || !buildingBy.has(r.listing_id)) {
         buildingBy.set(r.listing_id, { root, label: titleize(root), slugPath: n.slug_path });
+      }
+    } else if (n.domain === "material") {
+      /*
+       * ── THE SECOND MATERIAL SYSTEM ─────────────────────────────────────────
+       * Materials reach a project two entirely separate ways, and this facet
+       * used to read only one of them:
+       *
+       *   A  materials + project_material_links   27 project-material pairs
+       *   B  taxonomy_nodes(domain='material')
+       *      + listing_taxonomy_node              31 pairs
+       *
+       * 27 + 31 = 58, which is exactly the size of the union — the two systems
+       * do not share a single pair. Reading A alone showed 9 material slugs
+       * where 20 exist and 10 projects with materials where 20 have them.
+       * `wood` read 1 project instead of 5; `concrete-cement` (5),
+       * `gypsum-plaster` (3), `aluminum`, `brick-masonry`, `metal` and `oak`
+       * were invisible entirely.
+       *
+       * B is the source the project memory calls canonical, but neither is a
+       * superset: taxonomy alone would lose `concrete` (6 projects),
+       * `oak-wood` (4), `ash-wood` and `corten-steel`. So both, unioned.
+       *
+       * This costs no extra query — the taxonomy rows were already being
+       * fetched here for the project, style and intervention domains, and the
+       * material ones were simply falling through the loop unread.
+       */
+      const slug = (n.slug ?? n.slug_path.split("/").pop() ?? "").trim();
+      if (slug) {
+        const list = materialsBy.get(r.listing_id) ?? [];
+        if (!list.some((m) => m.slug === slug)) {
+          list.push({ slug, name: n.label });
+          materialsBy.set(r.listing_id, list);
+        }
       }
     } else if (n.domain === "style") {
       const list = stylesBy.get(r.listing_id) ?? [];
