@@ -132,6 +132,60 @@ export function productToCardModel(
 }
 
 /**
+ * A raw project `listings` row (plus resolved taxonomy and owner) → card
+ * model, deriving exactly what projectToCardModel derives from a
+ * ProjectCanonical. Same reasoning as productRowToCardModel below: the detail
+ * page's rails do not go through the canonical normalisers, and a mapper kept
+ * anywhere but beside its twin is how the card families drifted apart before.
+ */
+export function projectRowToCardModel(
+  row: {
+    id: string;
+    slug: string | null;
+    title: string | null;
+    cover: string | null;
+    location_city: string | null;
+    location_country: string | null;
+    year: number | null;
+    taxonomy_label: string | null;
+    taxonomy_slug_path: string | null;
+    owner: { displayName: string; avatarUrl?: string | null; profileId?: string | null; username?: string | null } | null;
+  },
+  counts: CardCounts = {},
+  initialSaved = false
+): ListingCardModel {
+  const city = cleanText(row.location_city);
+  const country = cleanText(row.location_country);
+  const location = city && country ? `${city}, ${country}` : city || country;
+
+  return {
+    id: row.id,
+    type: "project",
+    title: cleanText(row.title) ?? "Untitled project",
+    href: getListingUrl({
+      id: row.id,
+      type: "project",
+      slug: row.slug,
+      taxonomySlugPath: row.taxonomy_slug_path,
+    }),
+    imageUrl: row.cover,
+    categoryLabel: cleanText(row.taxonomy_label),
+    categoryHref: rootArchiveUrl("project", row.taxonomy_slug_path),
+    metaLabel: location,
+    metaHref: city ? `/explore/projects?city=${encodeURIComponent(city)}` : null,
+    authorName: cleanText(row.owner?.displayName),
+    authorHref: row.owner ? getOwnerProfileHref(row.owner) : null,
+    logoUrl: row.owner?.avatarUrl ?? null,
+    year: row.year ?? null,
+    yearHref: row.year ? `/explore/projects?year=${row.year}` : null,
+    relatedCount: counts.badge?.related ?? 0,
+    ownerCount: counts.badge?.owners ?? 0,
+    creditCount: counts.credits ?? 0,
+    initialSaved,
+  };
+}
+
+/**
  * A raw product `listings` row (plus its resolved taxonomy and owner) → card
  * model, with EXACTLY the fields productToCardModel derives from a
  * ProductCanonical.

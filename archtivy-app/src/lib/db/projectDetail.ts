@@ -67,7 +67,26 @@ export interface ProjectDetail {
   architectUsername: string | null;
   architectAvatar: string | null;
   photographer: string | null;
-  materials: string[];
+  /** Profile href for the photographer, when that credit is a real profile. */
+  photographerHref: string | null;
+  /** Split location, for the two filter destinations the explore layer supports. */
+  locationCity: string | null;
+  locationCountry: string | null;
+  /** Full taxonomy path of the building type, for the archive link. */
+  buildingTypeSlugPath: string | null;
+  /** listings.website — the project's own site. Real on 2 of 53. */
+  website: string | null;
+  /**
+   * Owner profile claim state. Drives the "Claim this Project" card: a project
+   * whose studio profile is already claimed has nothing to claim.
+   */
+  ownerClaimHref: string | null;
+  /**
+   * Name AND slug. The name is what the row prints; the slug is what
+   * /explore/projects?materials= filters on (getProjectIdsByMaterialSlugs),
+   * so without it the Materials row can be read but not navigated.
+   */
+  materials: { name: string; slug: string | null }[];
   team: DetailTeamMember[];
   products: DetailProduct[];
   documents: DetailDocument[];
@@ -97,7 +116,7 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   const { data: row } = await sup
     .from("listings")
     .select(
-      "id, slug, title, description, location, year, area_sqft, cover_image_url, owner_profile_id, project_status, project_collaboration_status, project_looking_for"
+      "id, slug, title, description, location, location_city, location_country, year, area_sqft, cover_image_url, owner_profile_id, project_status, project_collaboration_status, project_looking_for, website"
     )
     .eq("id", listingId)
     .maybeSingle();
@@ -169,23 +188,30 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   );
   const profiles = new Map<
     string,
-    { display_name: string | null; username: string | null; avatar_url: string | null }
+    {
+      display_name: string | null;
+      username: string | null;
+      avatar_url: string | null;
+      claim_status: string | null;
+    }
   >();
   if (profileIds.length > 0) {
     const { data: profs } = await sup
       .from("profiles")
-      .select("id, display_name, username, avatar_url")
+      .select("id, display_name, username, avatar_url, claim_status")
       .in("id", profileIds);
     for (const p of (profs ?? []) as {
       id: string;
       display_name: string | null;
       username: string | null;
       avatar_url: string | null;
+      claim_status: string | null;
     }[]) {
       profiles.set(p.id, {
         display_name: p.display_name,
         username: p.username,
         avatar_url: p.avatar_url,
+        claim_status: p.claim_status,
       });
     }
   }
@@ -204,7 +230,21 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
     };
   });
 
-  const photographer = team.find((t) => (t.role ?? "").toLowerCase() === "photographer")?.name ?? null;
+  /*
+   * The photographer is a TEAM MEMBER, not a free-text column, so the credit
+   * carries a profile id and often a username — which is what makes the row
+   * linkable rather than decorative.
+   */
+  const photographerMember =
+    team.find((t) => (t.role ?? "").toLowerCase() === "photographer") ?? null;
+  const photographer = photographerMember?.name ?? null;
+  const photographerHref = photographerMember
+    ? photographerMember.profileUsername
+      ? `/u/${photographerMember.profileUsername}`
+      : photographerMember.profileId
+        ? `/u/id/${photographerMember.profileId}`
+        : null
+    : null;
 
   // ── Products ──────────────────────────────────────────────────────────────
   const productIds = ((prodLinkRes.data ?? []) as { product_id: string }[]).map(
@@ -277,6 +317,7 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
     Array.isArray(v) ? v[0] ?? null : v ?? null;
 
   let buildingTypeRoot: string | null = null;
+  let buildingTypeSlugPath: string | null = null;
   let buildingTypeLabel: string | null = null;
   let styleLabel: string | null = null;
   for (const r of (taxRes.data ?? []) as unknown as {
@@ -287,6 +328,7 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
     if (!n) continue;
     if (n.domain === "project" && (r.is_primary || !buildingTypeRoot)) {
       buildingTypeRoot = n.slug_path.split("/")[0];
+      buildingTypeSlugPath = n.slug_path;
       buildingTypeLabel = n.label;
     } else if (n.domain === "style" && !styleLabel) {
       styleLabel = n.label;
@@ -297,10 +339,12 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   const materialIds = ((matLinkRes.data ?? []) as { material_id: string }[]).map(
     (r) => r.material_id
   );
-  let materials: string[] = [];
+  let materials: { name: string; slug: string | null }[] = [];
   if (materialIds.length > 0) {
-    const { data: mats } = await sup.from("materials").select("name").in("id", materialIds);
-    materials = ((mats ?? []) as { name: string }[]).map((m) => m.name).filter(Boolean);
+    const { data: mats } = await sup.from("materials").select("name, slug").in("id", materialIds);
+    materials = ((mats ?? []) as { name: string; slug: string | null }[])
+      .filter((m) => m.name)
+      .map((m) => ({ name: m.name, slug: m.slug ?? null }));
   }
 
   const ownerProf = l.owner_profile_id
@@ -409,6 +453,23 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
     architectUsername: ownerProf?.username ?? null,
     architectAvatar: ownerProf?.avatar_url ?? null,
     photographer,
+    photographerHref,
+    locationCity: (l.location_city as string | null) ?? null,
+    locationCountry: (l.location_country as string | null) ?? null,
+    buildingTypeSlugPath,
+    website: (l.website as string | null) ?? null,
+    /*
+     * A project is claimable when its studio profile still is. The claim
+     * workflow is profile-level -- there is no listing-level claim table -- so
+     * this points at the profile route rather than inventing one, and is null
+     * once the studio has been claimed, which is when the card disappears.
+     */
+    ownerClaimHref:
+      ownerProf?.claim_status === "unclaimed" && ownerProf?.username
+        ? `/u/${ownerProf.username}/claim`
+        : ownerProf?.claim_status === "unclaimed" && l.owner_profile_id
+          ? `/u/id/${String(l.owner_profile_id)}/claim`
+          : null,
     materials,
     team,
     products,

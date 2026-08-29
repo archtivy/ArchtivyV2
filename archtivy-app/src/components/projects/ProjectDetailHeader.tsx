@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, MapPin, User, Calendar, Home, Share2, MoreHorizontal, Check } from "lucide-react";
+import { MapPin, User, Calendar, Home, Share2, MoreHorizontal, Check } from "lucide-react";
 import { SaveToggle } from "@/components/home/SaveToggle";
 import { ProjectStatusBadge, CollaborationBadge } from "@/components/listing/StatusBadge";
 
@@ -23,6 +23,7 @@ export function ProjectDetailHeader({
   architectHref,
   year,
   buildingType,
+  buildingTypeHref,
   projectStatus,
   collaborationStatus,
 }: {
@@ -33,6 +34,8 @@ export function ProjectDetailHeader({
   architectHref: string | null;
   year: number | null;
   buildingType: string | null;
+  /** Archive route for the building type, when the taxonomy resolves one. */
+  buildingTypeHref?: string | null;
   /** Renders a badge only when not the ordinary "completed" state. */
   projectStatus?: string | null;
   collaborationStatus?: string | null;
@@ -61,15 +64,23 @@ export function ProjectDetailHeader({
 
   return (
     <header>
-      <Link
-        href="/projects"
-        className="inline-flex items-center gap-1.5 font-body text-[13px] text-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
-      >
-        <ArrowLeft strokeWidth={1.5} className="h-3.5 w-3.5" aria-hidden />
-        Back to Projects
-      </Link>
+      {/* Taxonomy line above the title, matching the reference. It replaces the
+          "Back to Projects" link, which duplicated the breadcrumb directly
+          above it and pointed at the same hub. This one goes somewhere the
+          breadcrumb does not repeat: the project's own category archive. */}
+      {buildingType && (
+        <p className="font-body text-[12px] uppercase tracking-[0.1em] text-muted">
+          {buildingTypeHref ? (
+            <Link href={buildingTypeHref} className="hover:text-ink">
+              {buildingType}
+            </Link>
+          ) : (
+            buildingType
+          )}
+        </p>
+      )}
 
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+      <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="font-display text-[32px] leading-[1.1] tracking-[-0.02em] text-ink sm:text-[40px]">
             {title}
