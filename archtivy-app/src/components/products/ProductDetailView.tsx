@@ -12,7 +12,8 @@ import { normaliseExternalUrl } from "@/lib/url/externalUrl";
 import { ProductStageBadge, CollaborationBadge } from "@/components/listing/StatusBadge";
 import { ProductCollaborationSection } from "@/components/listing/CollaborationSection";
 import { RequestQuoteButton } from "@/components/products/RequestQuoteButton";
-import { ProductDetailTabs } from "@/components/products/ProductDetailTabs";
+import { ProductAbout } from "@/components/products/ProductAbout";
+import { ProductDownloads } from "@/components/products/ProductDownloads";
 import { SeenInProjects } from "@/components/products/SeenInProjects";
 import { OftenSpecifiedWith } from "@/components/products/OftenSpecifiedWith";
 import { ProductRail } from "@/components/products/ProductRail";
@@ -31,9 +32,9 @@ import type { ProductCanonical } from "@/lib/canonical-models";
  *   LEFT (7/12)  gallery in row 1, the About / Details / Downloads tabs in
  *                row 2. The scrolling content: arbitrarily tall, and what
  *                sets the height the sticky column travels along.
- *   RIGHT (5/12) title, actions, specification and the brand card, as ONE
- *                sticky block spanning both rows, pinned below the fixed
- *                72px header.
+ *   RIGHT (5/12) title, actions, specification, the brand card and the
+ *                downloads, as ONE sticky block spanning both rows, pinned
+ *                below the fixed 72px header.
  *
  * Below both, full width: Seen in Projects and the product rails.
  *
@@ -86,6 +87,11 @@ import type { ProductCanonical } from "@/lib/canonical-models";
  *   "Made In"                  no such column; listings.location_country is
  *                              null on all 80 products and a brand's HQ is not
  *                              a manufacturing origin
+ *   document groupings         listing_documents has no colour, finish or
+ *                              category column. file_type is a MIME string
+ *                              with two values across all 60 product files,
+ *                              and size_bytes is null on every row, so the
+ *                              download list is flat and tagged by format
  *   "Collection"               no column, no taxonomy domain, no facet. The
  *                              `collections` table is the Inspiration
  *                              saved-query construct, not a product line
@@ -301,6 +307,16 @@ export async function ProductDetailView({
                         href: `/products/${detail.categoryRoot}`,
                       }
                     : null,
+                  /* Type and Style arrive from the retired "Details" tab.
+                     Type is the primary taxonomy node and is already nulled
+                     upstream when it IS the category root, so the two rows can
+                     never restate one node. Style is a taxonomy node too, real
+                     on 8 of 80 products. Everything else the tab printed —
+                     Category, Materials, Dimensions, Year — was already here,
+                     and its "Made in" row was removed outright: it read the
+                     brand's HQ address as a manufacturing origin. */
+                  detail.typeLabel ? { label: "Type", value: detail.typeLabel } : null,
+                  detail.styleLabel ? { label: "Style", value: detail.styleLabel } : null,
                   detail.materials.length > 0
                     ? { label: "Materials", value: detail.materials.join(", ") }
                     : null,
@@ -393,6 +409,14 @@ export async function ProductDetailView({
                   )}
                 </RailPanel>
               )}
+
+              {/* Downloads, directly under the brand card and inside the same
+                  sticky unit, so a spec sheet stays reachable while the
+                  description scrolls. Renders nothing when the product has no
+                  documents — 31 of 80. */}
+              <div className="mt-5">
+                <ProductDownloads documents={detail.documents} listingId={detail.id} />
+              </div>
             </aside>
           </div>
 
@@ -403,7 +427,7 @@ export async function ProductDetailView({
               measure filling its column instead of reading as a narrow island
               in a full-width field. */}
           <div className="min-w-0 lg:col-start-1 lg:row-start-2 lg:col-span-7">
-            <ProductDetailTabs product={detail} />
+            <ProductAbout product={detail} />
             <ProductCollaborationSection
               product_collaboration_status={detail.collaborationStatus}
               product_looking_for={detail.lookingFor}

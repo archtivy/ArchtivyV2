@@ -50,6 +50,36 @@ export interface ProductDetailDocument {
   id: string;
   name: string;
   url: string;
+  /**
+   * Short format label -- "PDF", "ZIP" -- derived from listing_documents
+   * .file_type, which holds a MIME string. Null when the column is empty.
+   *
+   * This is the ONLY real attribute the documents carry beyond a name.
+   * size_bytes is null on all 60 rows, and there is no colour, finish or
+   * document-category column, so the list is flat and labelled by format
+   * rather than sorted into folders that nothing backs.
+   */
+  format: string | null;
+}
+
+/**
+ * MIME string -> the short word people recognise. Returns null rather than
+ * echoing an unrecognised MIME type at the reader: "application/octet-stream"
+ * on a button is worse than no label.
+ */
+function documentFormat(mime: string | null | undefined): string | null {
+  if (!mime) return null;
+  const known: Record<string, string> = {
+    "application/pdf": "PDF",
+    "application/zip": "ZIP",
+    "application/x-zip-compressed": "ZIP",
+    "image/jpeg": "JPG",
+    "image/png": "PNG",
+  };
+  if (known[mime]) return known[mime];
+  const tail = mime.split("/")[1];
+  // Only echo a subtype when it is short and wordlike -- never a vendor tree.
+  return tail && /^[a-z0-9]{2,4}$/.test(tail) ? tail.toUpperCase() : null;
 }
 
 export interface ProductDetailProject {
@@ -187,7 +217,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
       .order("sort_order", { ascending: true }),
     sup
       .from("listing_documents")
-      .select("id, file_name, file_url, sort_order")
+      .select("id, file_name, file_url, file_type, sort_order")
       .eq("listing_id", listingId)
       .order("sort_order", { ascending: true }),
     sup
@@ -224,10 +254,20 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   if (cover && !images.some((i) => i.url === cover)) images.unshift({ url: cover, alt: null });
 
   const documents: ProductDetailDocument[] = (
-    (docRes.data ?? []) as { id: string; file_name: string | null; file_url: string | null }[]
+    (docRes.data ?? []) as {
+      id: string;
+      file_name: string | null;
+      file_url: string | null;
+      file_type: string | null;
+    }[]
   )
     .filter((d) => d.file_url)
-    .map((d) => ({ id: d.id, name: d.file_name ?? "Document", url: d.file_url as string }));
+    .map((d) => ({
+      id: d.id,
+      name: d.file_name ?? "Document",
+      url: d.file_url as string,
+      format: documentFormat(d.file_type),
+    }));
 
   type TaxNode = { id: string; domain: string; slug_path: string; label: string };
   let categoryRoot: string | null = null;
