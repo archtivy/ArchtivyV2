@@ -1,5 +1,5 @@
 import { ProductRail } from "@/components/products/ProductRail";
-import { getListingUrl } from "@/lib/canonical";
+import type { ListingCardModel } from "@/components/listing/ListingCardShared";
 import type { OftenSpecifiedWithItem } from "@/lib/db/oftenSpecifiedWith";
 
 /**
@@ -20,8 +20,20 @@ import type { OftenSpecifiedWithItem } from "@/lib/db/oftenSpecifiedWith";
  * that now sit below this one. Only the heading, the subtitle and the query
  * are this module's own.
  */
-export function OftenSpecifiedWith({ items }: { items: OftenSpecifiedWithItem[] }) {
+export function OftenSpecifiedWith({
+  items,
+  cards,
+}: {
+  items: OftenSpecifiedWithItem[];
+  /** Full card models, keyed by id. See lib/cards/productRailCards. */
+  cards: Map<string, ListingCardModel>;
+}) {
   if (items.length === 0) return null;
+
+  // `items` keeps the tier order the query produced; `cards` only supplies the
+  // presentation fields. A product the hydrator dropped (soft-deleted between
+  // the two reads) falls out here rather than rendering as a dead card.
+  const models = items.map((i) => cards.get(i.id)).filter(Boolean) as ListingCardModel[];
 
   const allCoOccurrence = items.every((i) => i.basis === "co_occurrence");
 
@@ -33,13 +45,7 @@ export function OftenSpecifiedWith({ items }: { items: OftenSpecifiedWithItem[] 
           ? "Specified alongside this product in real projects."
           : "From the same category."
       }
-      items={items.map((i) => ({
-        id: i.id,
-        title: i.title,
-        href: getListingUrl({ id: i.id, type: "product", slug: i.slug }),
-        cover: i.cover,
-        brand: i.brand,
-      }))}
+      items={models}
     />
   );
 }

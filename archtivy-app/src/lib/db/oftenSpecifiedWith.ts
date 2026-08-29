@@ -44,7 +44,13 @@ export interface OftenSpecifiedWithItem {
   basis: "co_occurrence" | "same_category";
 }
 
-const LIMIT = 4;
+/*
+ * Five, matching the rails' five-column grid. A four-item cap left the last
+ * column of every row empty, which reads as a missing card rather than as a
+ * deliberate row of four. Selection and tier order are untouched -- this is
+ * how many of the chosen products are shown, not which.
+ */
+const LIMIT = 5;
 
 export async function getOftenSpecifiedWith(
   productId: string

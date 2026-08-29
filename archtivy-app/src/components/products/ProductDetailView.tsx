@@ -18,6 +18,7 @@ import { SeenInProjects } from "@/components/products/SeenInProjects";
 import { OftenSpecifiedWith } from "@/components/products/OftenSpecifiedWith";
 import { ProductRail } from "@/components/products/ProductRail";
 import { getOftenSpecifiedWith } from "@/lib/db/oftenSpecifiedWith";
+import { getProductRailCards } from "@/lib/cards/productRailCards";
 import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildProductJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
@@ -115,6 +116,36 @@ export async function ProductDetailView({
   // Fetched here rather than passed in: this component already owns its own
   // data fetching, and the module is self-suppressing when it finds nothing.
   const oftenSpecifiedWith = await getOftenSpecifiedWith(product.id);
+
+  /*
+   * The related rail is deduplicated against the two rows above it before the
+   * cards are resolved, so the hydrator is never asked for a product that will
+   * not be rendered. `related` and the fallback tier of "Often specified with"
+   * are both same-category queries and return substantially the same products
+   * on a listing with no co-occurrence data.
+   */
+  const relatedItems = detail.related.filter(
+    (r) =>
+      !oftenSpecifiedWith.some((o) => o.id === r.id) &&
+      !(detail.brand?.otherProducts ?? []).some((b) => b.id === r.id)
+  );
+
+  /*
+   * ONE call for every rail on the page. The three sections render the same
+   * canonical card the products directory does — category, sub-type, brand
+   * logo chip, relationship badge — and resolving those fields per rail, or
+   * per card, would undo the batching getCardBadgeCounts exists for. Four
+   * round trips total, whatever the card count.
+   */
+  const railCards = await getProductRailCards([
+    ...oftenSpecifiedWith.map((i) => i.id),
+    ...(detail.brand?.otherProducts ?? []).map((i) => i.id),
+    ...relatedItems.map((i) => i.id),
+  ]);
+  const toModels = (ids: { id: string }[]) =>
+    ids.map((i) => railCards.get(i.id)).filter(Boolean) as NonNullable<
+      ReturnType<typeof railCards.get>
+    >[];
 
   const canonicalUrl = getAbsoluteUrl(canonicalPath);
   const brandHrefAbs = detail.brand?.username
@@ -438,30 +469,19 @@ export async function ProductDetailView({
         {/* ── Seen in Projects ────────────────────────────────────────── */}
         <SeenInProjects projects={detail.projects} />
 
-        <OftenSpecifiedWith items={oftenSpecifiedWith} />
+        <OftenSpecifiedWith items={oftenSpecifiedWith} cards={railCards} />
 
         {detail.brand && (
           <ProductRail
             title={`More from ${detail.brand.name}`}
-            items={detail.brand.otherProducts}
+            items={toModels(detail.brand.otherProducts)}
           />
         )}
 
-        {/* Last in the stack, and deduplicated against everything above it.
-            `related` is a same-category list, and so is the fallback tier of
-            "Often specified with" — on a product with no co-occurrence data
-            the two queries return substantially the same products, and the
-            page would print them twice under two headings. Filtering by id
-            leaves this row showing only what is genuinely additional; when
-            that is nothing, ProductRail renders nothing. */}
-        <ProductRail
-          title={detail.relatedReason}
-          items={detail.related.filter(
-            (r) =>
-              !oftenSpecifiedWith.some((o) => o.id === r.id) &&
-              !(detail.brand?.otherProducts ?? []).some((b) => b.id === r.id)
-          )}
-        />
+        {/* Last in the stack. Deduplicated against everything above it — see
+            relatedItems, computed with the rest of the rail data. When nothing
+            is genuinely additional, ProductRail renders nothing. */}
+        <ProductRail title={detail.relatedReason} items={toModels(relatedItems)} />
       </div>
 
       <HomeFooter />

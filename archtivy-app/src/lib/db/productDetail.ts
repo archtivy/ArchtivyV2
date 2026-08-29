@@ -486,7 +486,9 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
 
     const brandProductIds = ((brandProducts ?? []) as { id: string }[]).map((r) => r.id);
     const productCount = brandProductIds.length;
-    const siblings = brandProductIds.filter((id) => id !== listingId).slice(0, 4);
+    // Five, to fill the rail's five-column grid -- see the note on LIMIT in
+    // lib/db/oftenSpecifiedWith.ts.
+    const siblings = brandProductIds.filter((id) => id !== listingId).slice(0, 5);
 
     // Distinct live projects reached by ANY of this brand's products. Liveness
     // is enforced on the far end, exactly as the product-scoped `projects` list
@@ -556,7 +558,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
       .map((r) => r.listing_id)
       .slice(0, 12);
     const hydrated = await hydrateProducts(ids);
-    related = hydrated.slice(0, 4);
+    related = hydrated.slice(0, 5);
     if (related.length > 0) {
       relatedReason = `More ${(categoryLabel ?? categoryRoot).toLowerCase()}`;
     }

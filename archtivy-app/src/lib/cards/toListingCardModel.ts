@@ -132,6 +132,55 @@ export function productToCardModel(
 }
 
 /**
+ * A raw product `listings` row (plus its resolved taxonomy and owner) → card
+ * model, with EXACTLY the fields productToCardModel derives from a
+ * ProductCanonical.
+ *
+ * It lives here, immediately below that function, on purpose: the product
+ * detail rails do not go through the canonical normalisers, and giving them
+ * their own mapper somewhere else is precisely how the card families drifted
+ * apart before. Side by side, a change to one is visibly a change the other
+ * needs.
+ */
+export function productRowToCardModel(
+  row: {
+    id: string;
+    slug: string | null;
+    title: string | null;
+    cover: string | null;
+    product_category: string | null;
+    taxonomy_label: string | null;
+    taxonomy_slug_path: string | null;
+    owner: { displayName: string; avatarUrl?: string | null; profileId?: string | null; username?: string | null } | null;
+  },
+  counts: CardCounts = {},
+  initialSaved = false
+): ListingCardModel {
+  return {
+    id: row.id,
+    type: "product",
+    title: cleanText(row.title) ?? "Untitled product",
+    href: getListingUrl({
+      id: row.id,
+      type: "product",
+      slug: row.slug,
+      taxonomySlugPath: row.taxonomy_slug_path,
+    }),
+    imageUrl: row.cover,
+    categoryLabel: cleanText(row.taxonomy_label),
+    categoryHref: rootArchiveUrl("product", row.taxonomy_slug_path),
+    metaLabel: cleanText(row.product_category),
+    metaHref: null,
+    authorName: cleanText(row.owner?.displayName),
+    authorHref: row.owner ? getOwnerProfileHref(row.owner) : null,
+    logoUrl: row.owner?.avatarUrl ?? null,
+    relatedCount: counts.badge?.related ?? 0,
+    ownerCount: counts.badge?.owners ?? 0,
+    initialSaved,
+  };
+}
+
+/**
  * Raw `listings` row → card model.
  *
  * Used where a surface never went through the canonical normalisers — saved

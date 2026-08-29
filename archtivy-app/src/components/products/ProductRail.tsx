@@ -1,4 +1,4 @@
-import { ListingCardShared } from "@/components/listing/ListingCardShared";
+import { ListingCardShared, type ListingCardModel } from "@/components/listing/ListingCardShared";
 import { HomeSectionHeader } from "@/components/home/HomeSectionHeader";
 
 /**
@@ -20,16 +20,16 @@ import { HomeSectionHeader } from "@/components/home/HomeSectionHeader";
  * so a product page's related PRODUCTS were drawn with the project treatment —
  * cropped photographs on stone, in a catalogue context.
  *
+ * ── FULL CARD MODELS, NOT PARTIAL ONES ──────────────────────────────────────
+ * `items` are complete ListingCardModels, built by getProductRailCards from
+ * the same fields the products directory shows: category, sub-type, brand
+ * logo chip and the relationship badge. Passing a stripped model would make
+ * the one shared card draw a visibly poorer version of itself here than on
+ * /products, which reads as a second card design and is exactly what the
+ * shared card exists to prevent. Nothing about the card is overridden.
+ *
  * Renders nothing when empty, like every other conditional module on the page.
  */
-
-export interface ProductRailItem {
-  id: string;
-  title: string;
-  href: string;
-  cover: string | null;
-  brand: string | null;
-}
 
 export function ProductRail({
   title,
@@ -39,7 +39,7 @@ export function ProductRail({
   title: string;
   /** Optional line under the heading, naming the basis for the selection. */
   subtitle?: string;
-  items: ProductRailItem[];
+  items: ListingCardModel[];
 }) {
   if (items.length === 0) return null;
 
@@ -47,20 +47,19 @@ export function ProductRail({
     <section className="mt-20" aria-label={title}>
       <HomeSectionHeader title={title} />
       {subtitle && <p className="-mt-4 mb-6 font-body text-[13px] text-muted">{subtitle}</p>}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4">
+      {/* Five across on a large desktop, stepping down to four, three and two.
+          The column gap tightens with the column count rather than staying at
+          one value: five cards at a 16px gutter inside this container leaves
+          each card too narrow for its title, and the same 16px around two
+          cards on a phone is generous. The card itself is fluid — nothing here
+          overrides its width, padding or type. */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {items.map((item) => (
           <ListingCardShared
             key={item.id}
-            model={{
-              id: item.id,
-              type: "product",
-              title: item.title,
-              href: item.href,
-              imageUrl: item.cover,
-              authorName: item.brand,
-            }}
+            model={item}
             ratio="1/1"
-            sizes="(max-width: 640px) 45vw, 22vw"
+            sizes="(max-width: 640px) 45vw, (max-width: 1280px) 24vw, 18vw"
           />
         ))}
       </div>
