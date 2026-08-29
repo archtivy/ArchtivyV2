@@ -21,12 +21,27 @@ import type { Profile } from "@/lib/types/profiles";
  * The definitions live in lib/db/profileMetrics — one rule, used wherever this
  * metric appears.
  *
- * Each stat omits itself at zero rather than printing a 0. Followers is the
- * one the brief calls out, but the same rule is right for all three: a profile
- * with nothing published should not announce "0 Listings".
+ * Followers and Following are gone entirely — the stat, the nav item and the
+ * count. `follows` holds 9 rows platform-wide, so a follower number was "1" or
+ * absent on every profile: at that scale it reads as a judgement rather than a
+ * fact. The Follow BUTTON stays; being able to follow someone does not require
+ * publishing a scoreboard of who has.
+ *
+ * Each stat still omits itself at zero — a profile with nothing published
+ * should not announce "0 Listings".
+ *
+ * ── ONE PANEL, NOT FOUR CARDS ───────────────────────────────────────────────
+ * The reference draws the whole rail as a single tall card with internal
+ * dividers, anchoring the page from top to bottom. Four separate bordered
+ * boxes read as a floating profile widget beside an unrelated article.
  */
 
 const NUMBER = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+
+/** Section inside the single rail panel, separated by a hairline. */
+function RailSectionBlock({ children }: { children: React.ReactNode }) {
+  return <div className="border-t border-hairline px-5 py-5">{children}</div>;
+}
 
 export interface RailSection {
   id: string;
@@ -98,14 +113,14 @@ export function ProfileRail({
       label: metrics.connections === 1 ? "Connection" : "Connections",
       value: metrics.connections,
     },
-    ...(metrics.followers
-      ? [{ label: metrics.followers === 1 ? "Follower" : "Followers", value: metrics.followers }]
-      : []),
   ].filter((s) => s.value > 0);
 
   return (
     <aside className="lg:sticky lg:top-[92px]">
-      <div className="rounded-2xl border border-hairline bg-cream p-6">
+      {/* ONE panel. Every block below is a section of it, divided by hairlines,
+          matching the reference's single tall rail. */}
+      <div className="overflow-hidden rounded-xl border border-hairline bg-cream">
+        <div className="px-5 pb-6 pt-7">
         <span className="relative mx-auto block h-24 w-24 overflow-hidden rounded-2xl bg-stone">
           {profile.avatar_url ? (
             <Image src={profile.avatar_url} alt="" fill sizes="96px" className="object-cover" priority />
@@ -161,26 +176,31 @@ export function ProfileRail({
           </div>
         )}
 
+        </div>
+
+        {/* Two balanced columns, as specified — never three, and never a lone
+            centred number when one of the two is zero. */}
         {stats.length > 0 && (
-          <dl className="mt-6 flex items-start justify-center gap-6 border-t border-hairline pt-5">
-            {stats.map((s) => (
-              <div key={s.label} className="text-center">
-                <dd className="font-display text-[19px] leading-none text-ink">
-                  {NUMBER.format(s.value)}
-                </dd>
-                <dt className="mt-1.5 font-body text-[12px] text-muted">{s.label}</dt>
-              </div>
-            ))}
-          </dl>
+          <RailSectionBlock>
+            <dl className="grid grid-cols-2 gap-4">
+              {stats.map((s) => (
+                <div key={s.label} className="text-center">
+                  <dd className="font-display text-[20px] leading-none text-ink">
+                    {NUMBER.format(s.value)}
+                  </dd>
+                  <dt className="mt-1.5 font-body text-[12px] text-muted">{s.label}</dt>
+                </div>
+              ))}
+            </dl>
+          </RailSectionBlock>
         )}
-      </div>
 
       {/* Section nav. Built from the sections that ACTUALLY rendered, so it can
           never offer a link to a heading that is not on the page — the
           reference's fixed Overview/Projects/Products/Articles/Team/About/
           Followers list would be mostly dead on every real profile. */}
       {sections.length > 0 && (
-        <nav aria-label="Profile sections" className="mt-4 rounded-2xl border border-hairline p-2">
+        <nav aria-label="Profile sections" className="border-t border-hairline p-2">
           <ul>
             {sections.map((s) => (
               <li key={s.id}>
@@ -197,7 +217,7 @@ export function ProfileRail({
       )}
 
       {links.length > 0 && (
-        <div className="mt-4 rounded-2xl border border-hairline p-5">
+        <RailSectionBlock>
           <h2 className="mb-3 font-body text-[12px] uppercase tracking-[0.08em] text-muted">
             Connect
           </h2>
@@ -216,11 +236,11 @@ export function ProfileRail({
               </li>
             ))}
           </ul>
-        </div>
+        </RailSectionBlock>
       )}
 
       {claimHref && (
-        <div className="mt-4 rounded-2xl border border-hairline p-5">
+        <RailSectionBlock>
           <h2 className="font-body text-[14px] text-ink">
             {profile.role === "brand" ? "Are you this brand?" : "Are you this designer?"}
           </h2>
@@ -233,8 +253,9 @@ export function ProfileRail({
           >
             Claim Profile
           </Link>
-        </div>
+        </RailSectionBlock>
       )}
+      </div>
     </aside>
   );
 }

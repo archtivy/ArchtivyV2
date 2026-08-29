@@ -156,6 +156,16 @@ export function SiteShell({ children }: SiteShellProps) {
     return <>{children}</>;
   }
 
+  // Public profiles render their own HomeNav/HomeFooter, like every other
+  // redesigned public surface — /u/[username] and /u/id/[profileId].
+  //
+  // The /claim children are EXCLUDED: they render a bare form and rely on this
+  // shell for their nav and footer, so sending them down the shell-less branch
+  // would leave a claim flow floating on a blank page.
+  if (pathname?.startsWith("/u/") && !pathname.endsWith("/claim")) {
+    return <>{children}</>;
+  }
+
   // /magazine/[slug] renders its own HomeNav/HomeFooter. Unlike the two above,
   // there are no category archives under /magazine, so this prefix is
   // unambiguous — every child route is an article.

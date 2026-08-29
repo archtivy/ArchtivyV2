@@ -1,5 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
+import { HomeNav } from "@/components/home/HomeNav";
+import { HomeFooter } from "@/components/home/HomeFooter";
 // lucide-react dropped its brand glyphs, so Instagram/LinkedIn use neutral
 // icons rather than pulling in a second icon dependency for two links.
 import { ProfileTabs, type ProfileTab } from "@/components/profile/ProfileTabs";
@@ -87,7 +89,14 @@ function ProfileHeader({
       {/* Cover. No cover column exists on `profiles`, so this is the profile's
           own first cover image; when they have published nothing it falls back
           to a flat stone band rather than a broken frame. */}
-      <div className="relative h-[200px] w-full overflow-hidden rounded-2xl bg-stone sm:h-[280px]">
+      {/* ── COVER GEOMETRY, MEASURED FROM THE REFERENCE ────────────────────
+          The reference cover spans the full main column at roughly 4.3 : 1 —
+          755 x 176 in a 1024-wide render. This was a fixed 200/280px height,
+          which at a 1050px column gave about 2.4 : 1: far taller and narrower
+          than approved, and it pushed the tabs and the first row of work down
+          the page. An aspect ratio rather than a height keeps that proportion
+          at every width. */}
+      <div className="relative aspect-[43/10] w-full overflow-hidden rounded-xl bg-stone">
         {data.coverImage && (
           <Image
             src={data.coverImage}
@@ -183,7 +192,17 @@ function DesignerPanels({ profile, data }: { profile: Profile; data: ProfilePage
       )}
       {data.collaborators.length > 0 && (
         <Panel title="Collaborators">
-          <PeopleRow people={data.collaborators} compact />
+          {/* Capped at 8. This panel sits in a row beside About and
+              Specialisation, and CSS Grid sizes that row to its tallest item —
+              Desai Chia credits 11 people, which stretched the row to roughly
+              600px and left the other two panels floating in an empty field.
+              The count keeps the full number honest. */}
+          <PeopleRow people={data.collaborators.slice(0, 8)} compact />
+          {data.collaborators.length > 8 && (
+            <p className="mt-3 font-body text-[12px] text-muted">
+              +{data.collaborators.length - 8} more
+            </p>
+          )}
         </Panel>
       )}
       {/* SLOT: Awards — no `awards` table exists (PGRST205). Deferred.
@@ -292,13 +311,33 @@ export function ProfilePageView(props: ProfilePageViewProps) {
 
   return (
     <div className="min-h-screen bg-cream font-body text-ink">
-      <div className="mx-auto max-w-[1400px] px-5 pb-24 pt-6 md:px-10 lg:px-14">
+      {/* The canonical public chrome, the same pair /projects, /products and
+          both detail pages render. SiteShell and ConditionalFooter now treat
+          /u/* as shell-less so the legacy TopNav/Footer do not also mount —
+          this page was the last public surface still on them. */}
+      <HomeNav variant="solid" />
+
+      {/* ── PAGE GEOMETRY, MEASURED FROM THE REFERENCE ─────────────────────
+          Scaling the 1024-wide reference to a 1440 viewport gives: ~31px outer
+          gutters, a ~287px rail, a ~30px column gap and a ~1062px main column
+          — the composition spans essentially the whole viewport.
+
+          This was max-w-[1400px] with up to 56px of padding inside a wider
+          window, which at 1425px measured 194px of dead gutter on each side, a
+          199px rail and a 684px main column. Far narrower and more compressed
+          than approved.
+
+          A FIXED rail rather than a 12-column fraction: the reference ratio is
+          21:79, which no clean grid fraction lands on, and a fixed rail also
+          keeps the profile card a constant size as the window grows instead of
+          stretching it. */}
+      <div className="mx-auto w-full max-w-[1600px] px-4 pb-24 pt-[92px] sm:px-6 lg:px-8">
         {/* Two columns, as in the reference: a persistent identity rail and the
             content beside it. Below `lg` the rail falls into document flow
             above the content, which is the order the page is read in — the
             name before the work. */}
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start lg:gap-10">
-          <div className="min-w-0 lg:col-span-3">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start lg:gap-8">
+          <div className="min-w-0">
             <ProfileRail
               profile={profile}
               metrics={metrics}
@@ -310,7 +349,7 @@ export function ProfilePageView(props: ProfilePageViewProps) {
             />
           </div>
 
-          <div className="min-w-0 lg:col-span-9">
+          <div className="min-w-0">
             <ProfileHeader {...props} />
 
             <div className="mt-10">
@@ -337,6 +376,8 @@ export function ProfilePageView(props: ProfilePageViewProps) {
           </div>
         </div>
       </div>
+
+      <HomeFooter />
     </div>
   );
 }

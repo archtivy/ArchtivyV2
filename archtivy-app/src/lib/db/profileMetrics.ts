@@ -70,8 +70,9 @@ export const EMPTY_PROFILE_METRICS: ProfileMetrics = {
  *                         through two disjoint systems (product_material_links
  *                         and the material taxonomy), so including them means
  *                         choosing which duplicate to trust.
- *   follows               Counted separately, as Followers. An edge to a
- *                         viewer is not an edge in the archive.
+ *   follows               Not counted at all. An edge to a viewer is not an
+ *                         edge in the archive, and the Followers stat itself
+ *                         has been removed — see the note at the top.
  *
  * The rule is deterministic: same profile, same inputs, same number, wherever
  * this metric is shown.

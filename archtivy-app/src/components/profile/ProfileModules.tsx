@@ -154,7 +154,7 @@ export function ListingCard({ card }: { card: ProfileListingCard }) {
         creditCount: card.creditCount,
       }}
       ratio={card.type === "product" ? "1/1" : "4/3"}
-      sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 24vw"
+      sizes="(max-width: 640px) 45vw, (max-width: 768px) 30vw, (max-width: 1280px) 24vw, 15vw"
     />
   );
 }
@@ -162,7 +162,12 @@ export function ListingCard({ card }: { card: ProfileListingCard }) {
 export function ListingGrid({ items }: { items: ProfileListingCard[] }) {
   if (items.length === 0) return null;
   return (
-    <ul className="grid grid-cols-2 gap-x-5 gap-y-9 lg:grid-cols-4">
+    /* Five across on a wide profile, matching the reference's density — its
+       row of work runs five cards, not four. The main column is ~1056px at
+       1440, so five cards land near 195px each, the same width the products
+       directory gives them at 2xl. Denser than four, and it keeps the page
+       from running much taller than the approved composition. */
+    <ul className="grid grid-cols-2 gap-x-4 gap-y-9 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {items.map((c) => (
         <li key={c.id}>
           <ListingCard card={c} />
