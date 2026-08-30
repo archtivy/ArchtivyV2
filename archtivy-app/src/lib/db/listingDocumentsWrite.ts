@@ -33,6 +33,11 @@ export async function persistListingDocuments(
     file_url: f.url,
     file_name: f.name || (f.url ? f.url.split("/").pop() ?? "File" : "File"),
     file_type: f.mime ?? null,
+    // size_bytes was in FileToPersist and passed by all three call sites, but
+    // never made it into the INSERT — which is why the column is NULL on all
+    // 61 existing rows and why a backfill from storage metadata was needed at
+    // all. Writing it here stops the column going stale again.
+    size_bytes: typeof f.size === "number" && f.size > 0 ? f.size : null,
     storage_path: f.storage_path ?? null,
     sort_order: i,
   }));
