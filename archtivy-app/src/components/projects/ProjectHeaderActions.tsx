@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Share2, MoreHorizontal, Check } from "lucide-react";
 import { SaveToggle } from "@/components/home/SaveToggle";
+import { shareOrCopy } from "@/lib/share/shareOrCopy";
 
 /**
  * Share / Save / More, lifted out of ProjectDetailHeader unchanged.
@@ -30,22 +31,21 @@ export function ProjectHeaderActions({
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  /*
+   * Behaviour is unchanged; the try-share-then-copy dance moved into
+   * lib/share/shareOrCopy so the lightbox could use it without becoming a third
+   * hand-rolled copy. "Link copied" now shows only when a copy actually
+   * happened — previously a dismissed native share sheet fell through and
+   * copied anyway, so cancelling still claimed to have copied.
+   */
   async function share() {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    if (navigator.share) {
-      try {
-        await navigator.share({ title, url });
-        return;
-      } catch {
-        // User dismissed the sheet — fall through to copy.
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url);
+    const outcome = await shareOrCopy({
+      title,
+      url: typeof window !== "undefined" ? window.location.href : "",
+    });
+    if (outcome === "copied") {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* clipboard unavailable; nothing further to do */
     }
   }
 

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Images, Tag } from "lucide-react";
+import { ChevronLeft, ChevronRight, Expand, Images, Tag } from "lucide-react";
 
 /**
  * Generic entity hero gallery.
@@ -46,6 +46,16 @@ export interface GalleryProps {
   /** How many thumbnails to show before collapsing the rest into "+N". */
   visibleThumbs?: number;
   priority?: boolean;
+  /**
+   * Opt-in: makes the photograph itself a control that opens a larger viewer,
+   * receiving the index currently shown.
+   *
+   * OPTIONAL, and absent by default, because this component is shared with
+   * Product Detail and the Professional profile. Those surfaces render exactly
+   * what they rendered before; only a caller that passes a handler gains the
+   * click target and the expand affordance.
+   */
+  onImageClick?: (index: number) => void;
 }
 
 export function Gallery({
@@ -53,6 +63,7 @@ export function Gallery({
   title,
   visibleThumbs = 6,
   priority = true,
+  onImageClick,
 }: GalleryProps) {
   const [index, setIndex] = useState(0);
   const total = images.length;
@@ -235,6 +246,28 @@ export function Gallery({
             ].join(" ")}
           />
         ))}
+
+        {onImageClick && (
+          /* Sits at z-[5]: over the photograph, UNDER the arrows (z-10) and the
+             pins (z-20), so opening the viewer never steals a click meant for
+             navigation or a product. It is a real focusable button, which is
+             also what makes the viewer reachable by keyboard. */
+          <button
+            type="button"
+            onClick={() => onImageClick(index)}
+            aria-label={`Open image ${index + 1} of ${total} in full screen`}
+            className="absolute inset-0 z-[5] cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cream"
+          />
+        )}
+
+        {onImageClick && (
+          <span
+            className="pointer-events-none absolute left-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-ink/70 text-cream backdrop-blur-sm"
+            aria-hidden
+          >
+            <Expand strokeWidth={1.5} className="h-3.5 w-3.5" />
+          </span>
+        )}
 
         {total > 1 && (
           <>

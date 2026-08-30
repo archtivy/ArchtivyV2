@@ -6,7 +6,7 @@ import { getAbsoluteUrl } from "@/lib/canonical";
 import { getArchiveCategoryUrl } from "@/lib/archive/urls";
 import { HomeNav } from "@/components/home/HomeNav";
 import { HomeFooter } from "@/components/home/HomeFooter";
-import { Gallery } from "@/components/entity/Gallery";
+import { ProjectGalleryWithLightbox } from "@/components/projects/ProjectGalleryWithLightbox";
 import { ProjectDetailHeader } from "@/components/projects/ProjectDetailHeader";
 import { ProjectHeaderActions } from "@/components/projects/ProjectHeaderActions";
 import { ProjectDetailsPanel } from "@/components/projects/ProjectDetailsPanel";
@@ -109,6 +109,100 @@ export async function ProjectDetailView({
   );
 
   const canonicalUrl = getAbsoluteUrl(canonicalPath);
+
+  /*
+   * ── LIGHTBOX INPUTS, DERIVED FROM WHAT THIS PAGE ALREADY HAS ──────────────
+   *
+   * connectionCount is the PROJECT CARD'S definition of a connection, not a new
+   * one: distinct profile-linked credits, exactly what getCreditCounts computes
+   * from listing_team_members. Deduped by profile id for the same reason it is
+   * there — one person credited twice is one connection. Text-only credits name
+   * someone who is not on the platform, so they are not a connection to
+   * anything and are excluded, which is also the homepage metric's rule.
+   *
+   * Credits themselves are NOT filtered that way: the sidebar shows the real
+   * roles this project carries, linked where a profile exists and plain where
+   * it does not. FR House carries Architect, Lighting Designer, Landscape
+   * Architect and Photographer — nothing here forces an Architecture and
+   * Photography pair the way the reference image happens to show.
+   */
+  const connectionCount = new Set(
+    detail.team.map((m) => m.profileId).filter((id): id is string => Boolean(id))
+  ).size;
+
+  /*
+   * Credit ORDER is priority, not table order.
+   *
+   * The reference leads with Architecture and Photography, and those two are
+   * real top-level fields here — the studio that owns the listing, and
+   * detail.photographer. Taking the first five team rows instead pushed the
+   * photographer off the end of FR House, which credits three Architects, a
+   * Lighting Designer, a Landscape Architect and a Photographer in that order:
+   * the one role the reference explicitly features was the one dropped.
+   *
+   * So the studio and the photographer are pinned first, then the remaining
+   * credits fill the list in their own order. Nothing is invented and no role
+   * is renamed — a project with neither simply shows its own roles, which is
+   * why this is an ordering rule rather than a fixed Architecture/Photography
+   * pair. Deduped by name so a photographer who is also a team row appears once.
+   */
+  const seenCredit = new Set<string>();
+  const pushCredit = (
+    acc: { role: string; name: string; href: string | null; avatarUrl: string | null }[],
+    c: { role: string; name: string; href: string | null; avatarUrl: string | null }
+  ) => {
+    const key = c.name.trim().toLowerCase();
+    if (!c.name.trim() || seenCredit.has(key)) return acc;
+    seenCredit.add(key);
+    acc.push(c);
+    return acc;
+  };
+
+  const lightboxCredits: {
+    role: string;
+    name: string;
+    href: string | null;
+    avatarUrl: string | null;
+  }[] = [];
+
+  if (detail.architect) {
+    pushCredit(lightboxCredits, {
+      role: "Architecture",
+      name: detail.architect,
+      href: detail.architectUsername
+        ? `/u/${encodeURIComponent(detail.architectUsername)}`
+        : null,
+      avatarUrl: detail.architectAvatar,
+    });
+  }
+  if (detail.photographer) {
+    pushCredit(lightboxCredits, {
+      role: "Photography",
+      name: detail.photographer,
+      href: detail.photographerHref,
+      avatarUrl: null,
+    });
+  }
+  for (const m of detail.team) {
+    if (lightboxCredits.length >= 5) break;
+    pushCredit(lightboxCredits, {
+      role: m.role?.trim() || "Credit",
+      name: m.name,
+      href: m.profileUsername ? `/u/${encodeURIComponent(m.profileUsername)}` : null,
+      avatarUrl: m.avatarUrl,
+    });
+  }
+
+  const lightboxProducts = productModels.slice(0, 4).map((m) => ({
+    id: m.id,
+    title: m.title,
+    href: m.href,
+    cover: m.imageUrl,
+  }));
+
+  const locationLabel =
+    [detail.locationCity, detail.locationCountry].filter(Boolean).join(", ") ||
+    detail.location;
   const mainJsonLd = buildProjectJsonLd(project, canonicalUrl);
   const categoryHref = detail.buildingTypeSlugPath
     ? getArchiveCategoryUrl("project", detail.buildingTypeSlugPath)
@@ -177,7 +271,25 @@ export async function ProjectDetailView({
             />
 
             <div className="mt-8">
-              <Gallery images={detail.images} title={detail.title} />
+              {/* ── The gallery, and the lightbox it opens ──────────────
+                  Every value below is already resolved for this page; the
+                  lightbox adds no query. `connectionsHref` is null unless the
+                  project actually has profile-linked credits, because the
+                  block it feeds must not render an arrow with nowhere to go. */}
+              <ProjectGalleryWithLightbox
+                images={detail.images}
+                title={detail.title}
+                listingId={detail.id}
+                shareUrl={canonicalUrl}
+                productsHref="#products-used-heading"
+                connectionsHref={connectionCount > 0 ? "#project-team-heading" : null}
+                locationLabel={locationLabel}
+                year={detail.year}
+                credits={lightboxCredits}
+                products={lightboxProducts}
+                productCount={detail.products.length}
+                connectionCount={connectionCount}
+              />
             </div>
 
             <section className="mt-14" aria-labelledby="about-project-heading">
