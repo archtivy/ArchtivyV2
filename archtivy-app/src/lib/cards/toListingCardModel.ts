@@ -118,9 +118,18 @@ export function productToCardModel(
     imageUrl: product.cover,
     categoryLabel: cleanText(product.taxonomy_label) ?? cleanText(product.category),
     categoryHref: rootArchiveUrl("product", product.taxonomy_slug_path),
-    // The product's sub-type. No href: unlike a project's city there is no
-    // equivalent single-value filter route for it.
-    metaLabel: cleanText(product.product_category),
+    /*
+     * The product's sub-type — "Office chair" under "Furniture", which is how
+     * /products renders the same line.
+     *
+     * taxonomy_type_label is the leaf from the taxonomy join. product_category
+     * is the fallback and is only that: on live rows it holds a raw slug
+     * ("seating", "wood-countertops"), which is what the homepage card was
+     * printing before the canonical layer resolved real labels.
+     *
+     * No href: unlike a project's city there is no single-value filter route.
+     */
+    metaLabel: cleanText(product.taxonomy_type_label) ?? cleanText(product.product_category),
     metaHref: null,
     authorName: cleanText(product.owner?.displayName),
     authorHref: product.owner ? getOwnerProfileHref(product.owner) : null,

@@ -34,24 +34,83 @@ const supabase = () => getSupabaseServiceClient();
  * Batch-fetch primary taxonomy slug_path for a set of listing IDs.
  * Returns a Map<listingId, slug_path>.
  */
-async function getTaxonomySlugPaths(
+export interface PrimaryTaxonomy {
+  slugPath: string;
+  /** The ROOT's label — "Residential", "Furniture". What the card links. */
+  rootLabel: string | null;
+  /** The leaf's label when it differs from the root — "Apartment", "Sofa". */
+  typeLabel: string | null;
+}
+
+/**
+ * Primary taxonomy node per listing: its slug path, its ROOT's label, and its
+ * own label when the two differ.
+ *
+ * ── WHY THE ROOT LABEL AND NOT JUST THE NODE'S ──────────────────────────────
+ * This used to return the slug path alone, so ProjectCanonical.taxonomy_label
+ * and ProductCanonical.taxonomy_label were never populated and the card mapper
+ * fell back to `listings.category` / `product_category`. Those hold the LEAF,
+ * and on products they hold a raw slug — which is why a homepage product card
+ * read "seating" and "wood-countertops" where /products read "Furniture ·
+ * Office chair", and a project card read "Apartment" while linking to
+ * /projects/residential.
+ *
+ * The root label is read from taxonomy_nodes rather than title-cased from the
+ * slug, because several roots carry punctuation a slug cannot represent —
+ * "Walls, Ceilings & Facades", "Public / Civic".
+ *
+ * Two queries for any number of listings, added to a fan-out that already runs
+ * in parallel. No per-card work.
+ */
+async function getPrimaryTaxonomy(
   listingIds: string[]
-): Promise<Map<string, string>> {
+): Promise<Map<string, PrimaryTaxonomy>> {
   if (listingIds.length === 0) return new Map();
   const { data } = await supabase()
     .from("listing_taxonomy_node")
-    .select("listing_id, taxonomy_node:taxonomy_nodes(slug_path)")
+    .select("listing_id, taxonomy_node:taxonomy_nodes(slug_path, label)")
     .eq("is_primary", true)
     .in("listing_id", listingIds);
-  const map = new Map<string, string>();
+
+  type Node = { slug_path?: string; label?: string };
+  const primary = new Map<string, Node>();
   for (const row of data ?? []) {
     const r = row as Record<string, unknown>;
     const id = r.listing_id as string | undefined;
-    const node = r.taxonomy_node as { slug_path?: string } | { slug_path?: string }[] | null;
-    const slugPath = Array.isArray(node) ? node[0]?.slug_path : node?.slug_path;
-    if (id && slugPath) map.set(id, slugPath);
+    const raw = r.taxonomy_node as Node | Node[] | null;
+    const node = Array.isArray(raw) ? raw[0] : raw;
+    if (id && node?.slug_path) primary.set(id, node);
   }
-  return map;
+
+  const rootPaths = [
+    ...new Set(
+      [...primary.values()].map((n) => n.slug_path?.split("/")[0]).filter(Boolean) as string[]
+    ),
+  ];
+  const rootLabels = new Map<string, string>();
+  if (rootPaths.length > 0) {
+    const { data: roots } = await supabase()
+      .from("taxonomy_nodes")
+      .select("slug_path, label")
+      .in("slug_path", rootPaths);
+    for (const r of (roots ?? []) as { slug_path: string; label: string }[]) {
+      rootLabels.set(r.slug_path, r.label);
+    }
+  }
+
+  const out = new Map<string, PrimaryTaxonomy>();
+  for (const [id, n] of primary) {
+    const rootPath = n.slug_path!.split("/")[0];
+    const rootLabel = rootLabels.get(rootPath) ?? null;
+    out.set(id, {
+      slugPath: n.slug_path!,
+      rootLabel,
+      // When the primary node IS the root there is no parent to state, and the
+      // line is the root alone — never "Furniture · Furniture".
+      typeLabel: n.label && n.label !== rootLabel ? n.label : null,
+    });
+  }
+  return out;
 }
 
 /** Map listing_images rows to ProductImageRow shape for normalizeProduct (listing_id = product_id, image_url = src). */
@@ -840,7 +899,7 @@ export async function getProjectsCanonical(
     clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
     ownerProfileIds.length > 0 ? getProfilesByIds(ownerProfileIds) : Promise.resolve({ data: [] }),
     getMaterialsByProjectIds(ids),
-    getTaxonomySlugPaths(ids),
+    getPrimaryTaxonomy(ids),
     getCardBadgeCounts(ids, "project"),
     getCreditCounts(ids),
   ]);
@@ -878,7 +937,10 @@ export async function getProjectsCanonical(
     const profileId = (row as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id ?? null;
     const clerkId = (row.owner_clerk_user_id as string) ?? null;
     project.owner = profileId ? ownerByProfileId[profileId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
-    project.taxonomy_slug_path = taxMap.get(String(row.id)) ?? null;
+    const tax = taxMap.get(String(row.id));
+    project.taxonomy_slug_path = tax?.slugPath ?? null;
+    project.taxonomy_label = tax?.rootLabel ?? null;
+    project.taxonomy_type_label = tax?.typeLabel ?? null;
     project.cardBadge = badgeCounts[String(row.id)] ?? { related: 0, owners: 0 };
     project.cardCreditCount = creditCounts[String(row.id)] ?? 0;
     result.push(project);
@@ -904,7 +966,7 @@ export async function getProductsCanonical(
     getMaterialsByProductIds(ids),
     clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
     brandProfileIds.length > 0 ? getProfilesByIds(brandProfileIds) : Promise.resolve({ data: [] }),
-    getTaxonomySlugPaths(ids),
+    getPrimaryTaxonomy(ids),
     getCardBadgeCounts(ids, "product"),
   ]);
   const imageRows = imageResult.data ?? [];
@@ -934,7 +996,10 @@ export async function getProductsCanonical(
     const brandId = (row as RawProductRow & { brand_profile_id?: string | null }).brand_profile_id ?? null;
     const clerkId = (row as RawProductRow & { owner_clerk_user_id?: string | null }).owner_clerk_user_id ?? null;
     product.owner = brandId ? ownerByProfileId[brandId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
-    product.taxonomy_slug_path = taxMap.get(String(row.id)) ?? null;
+    const tax = taxMap.get(String(row.id));
+    product.taxonomy_slug_path = tax?.slugPath ?? null;
+    product.taxonomy_label = tax?.rootLabel ?? null;
+    product.taxonomy_type_label = tax?.typeLabel ?? null;
     product.cardBadge = badgeCounts[String(row.id)] ?? { related: 0, owners: 0 };
     return product;
   });
@@ -976,7 +1041,7 @@ export async function getProjectsCanonicalFiltered({
     clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
     ownerProfileIds.length > 0 ? getProfilesByIds(ownerProfileIds) : Promise.resolve({ data: [] }),
     getMaterialsByProjectIds(ids),
-    getTaxonomySlugPaths(ids),
+    getPrimaryTaxonomy(ids),
     getCardBadgeCounts(ids, "project"),
     getCreditCounts(ids),
   ]);
@@ -1011,7 +1076,10 @@ export async function getProjectsCanonicalFiltered({
     const profileId = (row as RawListingRow & { owner_profile_id?: string | null }).owner_profile_id ?? null;
     const clerkId = (row.owner_clerk_user_id as string) ?? null;
     project.owner = profileId ? ownerByProfileId[profileId] ?? null : (clerkId ? ownerByClerkId[clerkId] ?? null : null);
-    project.taxonomy_slug_path = taxMap.get(String(row.id)) ?? null;
+    const tax = taxMap.get(String(row.id));
+    project.taxonomy_slug_path = tax?.slugPath ?? null;
+    project.taxonomy_label = tax?.rootLabel ?? null;
+    project.taxonomy_type_label = tax?.typeLabel ?? null;
     project.cardBadge = badgeCounts[String(row.id)] ?? { related: 0, owners: 0 };
     project.cardCreditCount = creditCounts[String(row.id)] ?? 0;
     data.push(project);
@@ -1067,7 +1135,7 @@ export async function getProductsCanonicalFiltered({
     getMaterialsByProductIds(ids),
     clerkIds.length > 0 ? getProfilesByClerkIds(clerkIds) : Promise.resolve({ data: [] }),
     brandProfileIds.length > 0 ? getProfilesByIds(brandProfileIds) : Promise.resolve({ data: [] }),
-    getTaxonomySlugPaths(ids),
+    getPrimaryTaxonomy(ids),
     getCardBadgeCounts(ids, "product"),
   ]);
   const imageRows = imageResult.data ?? [];
@@ -1101,7 +1169,10 @@ export async function getProductsCanonicalFiltered({
       : clerkId
         ? ownerByClerkId[clerkId] ?? null
         : null;
-    product.taxonomy_slug_path = taxMap.get(String(row.id)) ?? null;
+    const tax = taxMap.get(String(row.id));
+    product.taxonomy_slug_path = tax?.slugPath ?? null;
+    product.taxonomy_label = tax?.rootLabel ?? null;
+    product.taxonomy_type_label = tax?.typeLabel ?? null;
     product.cardBadge = badgeCounts[String(row.id)] ?? { related: 0, owners: 0 };
     return product;
   });
@@ -1388,8 +1459,10 @@ export async function getProjectCanonicalBySlugOrId(
   }
 
   // Hydrate taxonomy_slug_path for canonical URL generation
-  const taxMap = await getTaxonomySlugPaths([id]);
-  project.taxonomy_slug_path = taxMap.get(id) ?? null;
+  const tax = (await getPrimaryTaxonomy([id])).get(id);
+  project.taxonomy_slug_path = tax?.slugPath ?? null;
+  project.taxonomy_label = tax?.rootLabel ?? null;
+  project.taxonomy_type_label = tax?.typeLabel ?? null;
 
   return project;
 }
@@ -1435,8 +1508,10 @@ export async function getProductCanonicalBySlug(
   product.connectionCount += usedCount;
 
   // Hydrate taxonomy_slug_path for canonical URL generation
-  const taxMap = await getTaxonomySlugPaths([id]);
-  product.taxonomy_slug_path = taxMap.get(id) ?? null;
+  const tax = (await getPrimaryTaxonomy([id])).get(id);
+  product.taxonomy_slug_path = tax?.slugPath ?? null;
+  product.taxonomy_label = tax?.rootLabel ?? null;
+  product.taxonomy_type_label = tax?.typeLabel ?? null;
 
   return product;
 }

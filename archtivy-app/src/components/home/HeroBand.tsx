@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { HeroSearch } from "@/components/home/HeroSearch";
-import { HeroCategoryPills } from "@/components/home/HeroCategoryPills";
 import { HeroConnectionMetric } from "@/components/home/HeroConnectionMetric";
 import { getHeroFeature } from "@/lib/db/heroFeature";
 import { getConnectionsMapped } from "@/lib/db/connectionsMetric";
@@ -20,8 +19,8 @@ import { getHomeCategories, toPopularSearches } from "@/lib/db/homeCategories";
  * ── SINGLE COLUMN ───────────────────────────────────────────────────────────
  * The statistics rail that used to occupy the right third (Projects, Designers,
  * Brands, Products, Countries, via HeroStatPanel) is deliberately gone. The
- * hero now reads top to bottom as one column: headline, subtitle, search,
- * category pills, connections count.
+ * hero now reads top to bottom as one column: headline, subtitle, search
+ * with its popular-search chips, connections count.
  *
  * HeroStatPanel and getPlatformTotals are left in place untouched — this
  * component simply stopped calling them. They are not deleted here because
@@ -105,7 +104,23 @@ export async function HeroBand() {
             <HeroSearch popularSearches={popular} />
           </div>
 
-          <HeroCategoryPills categories={categories} />
+          {/* ── THE SECOND CATEGORY ROW IS GONE ──────────────────────────
+              HeroCategoryPills rendered here, directly under the search, and
+              showed the SAME six labels linking to the SAME six archive URLs
+              as the "Popular searches:" chips inside HeroSearch. Not similar —
+              identical: both read getHomeCategories() and both applied
+              `filter(listingCount > 0).slice(0, 6)`, one via toPopularSearches
+              and one inline. Two code paths, one result, printed twice a few
+              pixels apart.
+
+              The page-level comment above <HeroBand /> already records removing
+              a duplicate category strip from the page body when this moved into
+              the hero. That fix landed one level too high: the copy inside the
+              hero survived it.
+
+              The labelled row is the one kept — "Popular searches:" says what
+              the chips are for, and an unlabelled row of the same words says
+              nothing. HeroCategoryPills is deleted rather than left unused. */}
 
           <HeroConnectionMetric connections={connections} />
 

@@ -100,8 +100,19 @@ export interface ProjectCanonical {
   taxonomy_node_id?: string | null;
   /** Taxonomy slug path (e.g. "residential"). Null if taxonomy_node_id not set. */
   taxonomy_slug_path?: string | null;
-  /** Taxonomy label (e.g. "Residential"). Falls back to category. */
+  /**
+   * ROOT taxonomy label, e.g. "Residential" — not the leaf.
+   *
+   * It must be the root because the card links this text at the root archive
+   * (rootArchiveUrl in toListingCardModel). When it was left unset the mapper
+   * fell back to `category`, which holds the LEAF ("Apartment"), so the
+   * homepage rendered a link reading "Apartment" that landed on
+   * /projects/residential — the exact label/destination mismatch that helper's
+   * own comment warns about, with the href side fixed and the label side not.
+   */
   taxonomy_label?: string | null;
+  /** Leaf label when it differs from the root, e.g. "Apartment". */
+  taxonomy_type_label?: string | null;
   /** Facet values assigned to this listing. */
   facet_values?: { facet_slug: string; value_slug: string; value_label: string }[];
   /** Lifecycle: project status (concept, design_development, etc.). */
@@ -152,8 +163,10 @@ export interface ProductCanonical {
   taxonomy_node_id?: string | null;
   /** Taxonomy slug path (e.g. "furniture/seating/dining-chair"). Null if taxonomy_node_id not set. */
   taxonomy_slug_path?: string | null;
-  /** Taxonomy label (e.g. "Dining chair"). Falls back to category. */
+  /** ROOT taxonomy label, e.g. "Furniture". See the note on ProjectCanonical. */
   taxonomy_label?: string | null;
+  /** Leaf label when it differs from the root, e.g. "Office chair". */
+  taxonomy_type_label?: string | null;
   /** Facet values assigned to this listing. */
   facet_values?: { facet_slug: string; value_slug: string; value_label: string }[];
   /** Lifecycle: product stage (concept, in_development, prototype, etc.). */

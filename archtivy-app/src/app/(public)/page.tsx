@@ -16,6 +16,7 @@ import { getHomepagePromotedListingIds } from "@/lib/promote/campaigns";
 import { getMostConnected } from "@/lib/db/mostConnected";
 import { getConnectChain } from "@/lib/db/connectShowcase";
 import { getPopularProfiles } from "@/lib/db/popularProfiles";
+import { projectToCardModel, productToCardModel } from "@/lib/cards/toListingCardModel";
 import { getListingUrl } from "@/lib/canonical";
 import { getBaseUrl } from "@/lib/canonical";
 import { isMaintenanceMode } from "@/lib/maintenance";
@@ -144,33 +145,33 @@ export default async function Home() {
   const sortedProjects = sortPromoted(projects);
   const sortedProducts = sortPromoted(products);
 
+  /*
+   * ── THE SHOWCASES GET THE CANONICAL MODEL, VIA THE CANONICAL MAPPER ───────
+   * This used to flatten each listing into a bespoke five-field shape — title,
+   * subtitle, meta, location, imageUrl — which the Showcase then turned back
+   * into a ListingCardModel. Everything with no slot in that shape was thrown
+   * away here, one layer above the card: the category href, the studio logo,
+   * the year and its filter link, the credit count, and the relationship badge.
+   * Projects lost their taxonomy line outright, because only the PRODUCT branch
+   * ever set `meta`.
+   *
+   * projectToCardModel / productToCardModel are the mappers /projects,
+   * /products, the archives and the rails already go through, so the homepage
+   * now draws the identical card by construction rather than by matching it.
+   *
+   * ── AND IT COSTS NOTHING EXTRA ────────────────────────────────────────────
+   * No new query, and no N+1: getProjectsCanonical / getProductsCanonical
+   * already attach `cardBadge` and `cardCreditCount` during their own batched
+   * fan-out (explore.ts), and the mappers read them off the object. The data
+   * for the badges was being fetched and discarded the whole time.
+   */
   const projectItems: ShowcaseItem[] = sortedProjects.map((p) => ({
-    id: p.id,
-    href: getListingUrl({
-      id: p.id,
-      slug: p.slug,
-      type: "project",
-      taxonomySlugPath: p.taxonomy_slug_path ?? null,
-    }),
-    title: p.title,
-    subtitle: p.owner?.displayName ?? null,
-    location: p.location_text,
-    imageUrl: p.cover,
+    model: projectToCardModel(p),
     group: rootOf(p.taxonomy_slug_path),
   }));
 
   const productItems: ShowcaseItem[] = sortedProducts.map((p) => ({
-    id: p.id,
-    href: getListingUrl({
-      id: p.id,
-      slug: p.slug,
-      type: "product",
-      taxonomySlugPath: p.taxonomy_slug_path ?? null,
-    }),
-    title: p.title,
-    subtitle: p.owner?.displayName ?? null,
-    meta: p.taxonomy_label ?? p.category ?? null,
-    imageUrl: p.cover,
+    model: productToCardModel(p),
     group: rootOf(p.taxonomy_slug_path),
   }));
 
@@ -255,6 +256,10 @@ export default async function Home() {
             items={productItems}
             filters={PRODUCT_PILLS}
             ratio="1/1"
+            /* Five across on large desktop, deliberately denser than the
+               projects showcase above and than /products' own grid. Solved
+               entirely in the grid container — see GRIDS in Showcase. */
+            maxColumns={5}
           />
         </div>
 
