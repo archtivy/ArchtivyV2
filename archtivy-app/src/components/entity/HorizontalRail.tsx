@@ -23,19 +23,50 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
  *
  * The arrows hide when there is nothing to scroll to, so a rail that fits
  * entirely on screen shows no controls at all and reads as a plain row.
+ *
+ * ── THE THREE OPTIONS ALL DEFAULT TO WHAT IT ALREADY DID ────────────────────
+ * gapClassName, arrowPlacement and pageDots were added for the homepage brand
+ * and designer rails. Every default reproduces the previous behaviour exactly,
+ * so the existing consumer (ProjectTeam) renders byte-identically and did not
+ * need touching. They are presentational knobs on a shared primitive, which is
+ * the alternative to a second rail implementation.
  */
 export function HorizontalRail({
   children,
   ariaLabel,
   className = "",
+  gapClassName = "gap-4",
+  arrowPlacement = "edge",
+  pageDots = false,
 }: {
   children: React.ReactNode;
   ariaLabel: string;
   className?: string;
+  /** Track gap. "gap-0" lets items carry their own dividers instead. */
+  gapClassName?: string;
+  /**
+   * "edge"    — arrows tucked just outside the track, overlapping it slightly.
+   * "outside" — pushed clear of the content, into the page gutter. Only from
+   *   `lg`, because below that the homepage gutter is 16px and there is
+   *   nowhere for a 36px control to go without overhanging the viewport.
+   */
+  arrowPlacement?: "edge" | "outside";
+  /**
+   * Centred page indicators beneath the track.
+   *
+   * DERIVED FROM REAL SCROLL GEOMETRY, never decorative: the count is
+   * ceil(scrollWidth / clientWidth) and the active dot is the page actually in
+   * view, so a rail that scrolls in two screens shows two dots — not the four
+   * a mockup happened to draw. They are buttons, and each one scrolls to its
+   * page. When everything fits, there is one page and nothing renders.
+   */
+  pageDots?: boolean;
 }) {
   const ref = useRef<HTMLUListElement>(null);
   const [atStart, setAtStart] = useState(true);
   const [atEnd, setAtEnd] = useState(true);
+  const [pages, setPages] = useState(1);
+  const [page, setPage] = useState(0);
 
   const measure = useCallback(() => {
     const el = ref.current;
@@ -44,6 +75,11 @@ export function HorizontalRail({
     // arrow on and off at the extremes.
     setAtStart(el.scrollLeft <= 1);
     setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 1);
+    const w = el.clientWidth;
+    if (w > 0) {
+      setPages(Math.max(1, Math.ceil(el.scrollWidth / w)));
+      setPage(Math.round(el.scrollLeft / w));
+    }
   }, []);
 
   useEffect(() => {
@@ -57,16 +93,24 @@ export function HorizontalRail({
 
   // Scroll by most of a viewport rather than a fixed card width: the children
   // size themselves, so the rail must not assume how wide one of them is.
-  const page = (dir: 1 | -1) => {
+  const nudge = (dir: 1 | -1) => {
     const el = ref.current;
     if (!el) return;
     el.scrollBy({ left: dir * Math.round(el.clientWidth * 0.85), behavior: "smooth" });
+  };
+
+  const goToPage = (i: number) => {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
   };
 
   const arrow =
     "flex h-9 w-9 items-center justify-center rounded-full border border-hairline bg-cream text-ink transition-colors hover:border-ink/30 disabled:cursor-default disabled:opacity-0";
 
   const hasOverflow = !(atStart && atEnd);
+  const left = arrowPlacement === "outside" ? "-left-3 lg:-left-14" : "-left-3";
+  const right = arrowPlacement === "outside" ? "-right-3 lg:-right-14" : "-right-3";
 
   return (
     <div className={`relative ${className}`}>
@@ -74,7 +118,7 @@ export function HorizontalRail({
         ref={ref}
         onScroll={measure}
         aria-label={ariaLabel}
-        className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className={`flex snap-x snap-mandatory ${gapClassName} overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
       >
         {children}
       </ul>
@@ -83,23 +127,44 @@ export function HorizontalRail({
         <>
           <button
             type="button"
-            onClick={() => page(-1)}
+            onClick={() => nudge(-1)}
             disabled={atStart}
             aria-label="Scroll left"
-            className={`${arrow} absolute -left-3 top-1/2 z-10 -translate-y-1/2 shadow-[0_2px_8px_rgba(22,22,22,0.08)]`}
+            className={`${arrow} absolute ${left} top-1/2 z-10 -translate-y-1/2 shadow-[0_2px_8px_rgba(22,22,22,0.08)]`}
           >
             <ChevronLeft strokeWidth={1.5} className="h-4 w-4" />
           </button>
           <button
             type="button"
-            onClick={() => page(1)}
+            onClick={() => nudge(1)}
             disabled={atEnd}
             aria-label="Scroll right"
-            className={`${arrow} absolute -right-3 top-1/2 z-10 -translate-y-1/2 shadow-[0_2px_8px_rgba(22,22,22,0.08)]`}
+            className={`${arrow} absolute ${right} top-1/2 z-10 -translate-y-1/2 shadow-[0_2px_8px_rgba(22,22,22,0.08)]`}
           >
             <ChevronRight strokeWidth={1.5} className="h-4 w-4" />
           </button>
         </>
+      )}
+
+      {pageDots && pages > 1 && (
+        <div className="mt-6 flex items-center justify-center gap-2">
+          {Array.from({ length: pages }, (_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => goToPage(i)}
+              aria-label={`Go to page ${i + 1} of ${pages}`}
+              aria-current={i === page ? "true" : undefined}
+              /* One dot per REAL page always — the width shrinks past five so
+                 a narrow viewport (390px paginates into seven) stays tidy
+                 without dropping or merging pages, which would make the
+                 indicator lie about how far the rail goes. */
+              className={`h-[3px] rounded-full transition-all ${
+                pages > 5 ? "w-4" : "w-7"
+              } ${i === page ? "bg-ink" : "bg-hairline hover:bg-ink/30"}`}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
