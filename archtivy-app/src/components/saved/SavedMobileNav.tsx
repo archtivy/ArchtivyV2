@@ -9,7 +9,7 @@ import type { SavedBoard } from "@/lib/db/savedLibrary";
 /**
  * The rail as a sheet, below `lg`.
  *
- * Below 1024 a 264px permanent rail would leave a 1024-wide tablet about 700px
+ * Below 1024 a 280px permanent rail would leave a 1024-wide tablet about 680px
  * for the grid and a phone essentially nothing, so the same SavedSidebar moves
  * into a drawer rather than being reimplemented as a second, narrower nav. It
  * carries everything the desktop rail does — type navigation with counts,
@@ -22,10 +22,12 @@ export function SavedMobileNav({
   params,
   boards,
   counts,
+  profile,
 }: {
   params: SavedParams;
   boards: SavedBoard[];
-  counts: { all: number; project: number; product: number };
+  counts: { all: number; project: number; product: number; recent: number };
+  profile: { displayName: string; href: string | null; avatarUrl: string | null } | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -63,7 +65,12 @@ export function SavedMobileNav({
                 <X strokeWidth={1.5} className="h-4 w-4" />
               </button>
             </div>
-            <SavedSidebar params={params} boards={boards} counts={counts} />
+            <SavedSidebar
+              params={params}
+              boards={boards}
+              counts={counts}
+              profile={profile}
+            />
           </div>
         </div>
       )}

@@ -61,6 +61,13 @@ export interface SavedBoard {
   id: string;
   name: string;
   itemCount: number;
+  /**
+   * The board's own cover if it has one, otherwise the newest saved item's
+   * image. DERIVED, never invented: `folders.cover_image_url` is NULL on every
+   * board on the platform, so a strict reading would leave the rail and the
+   * sidebar showing five grey rectangles. Falling back to the board's own
+   * newest contents shows what is actually in it, which is what a cover is for.
+   */
   coverUrl: string | null;
   sortOrder: number;
   /** Sharing state, so the board header can open the existing share modal. */
@@ -71,7 +78,12 @@ export interface SavedBoard {
 export interface SavedLibrary {
   items: SavedItem[];
   boards: SavedBoard[];
-  counts: { all: number; project: number; product: number };
+  /**
+   * Whole-library totals. `recent` is the rail's "Recently added" — saves
+   * inside RECENT_WINDOW_DAYS, counted from resolved items like every other
+   * number here.
+   */
+  counts: { all: number; project: number; product: number; recent: number };
   /** True when the folders tables are absent, so the page can say so. */
   setupRequired: boolean;
 }
@@ -79,9 +91,12 @@ export interface SavedLibrary {
 export const EMPTY_SAVED_LIBRARY: SavedLibrary = {
   items: [],
   boards: [],
-  counts: { all: 0, project: 0, product: 0 },
+  counts: { all: 0, project: 0, product: 0, recent: 0 },
   setupRequired: false,
 };
+
+/** Mirrors WINDOW_DAYS.recent in lib/saved/params. */
+const RECENT_WINDOW_DAYS = 30;
 
 function isTableMissing(message: string): boolean {
   const m = message.toLowerCase();
@@ -162,6 +177,10 @@ export async function getSavedLibrary(clerkUserId: string): Promise<SavedLibrary
       getProductRailCards(productIds),
     ]);
 
+    const recentCutoff = new Date(
+      Date.now() - RECENT_WINDOW_DAYS * 86_400_000
+    ).toISOString();
+
     const items: SavedItem[] = [];
     for (const e of entries) {
       const model =
@@ -199,11 +218,34 @@ export async function getSavedLibrary(clerkUserId: string): Promise<SavedLibrary
       for (const b of it.boardIds) liveByFolder.set(b, (liveByFolder.get(b) ?? 0) + 1);
     }
 
+    /*
+     * Board covers, derived from the board's own newest RESOLVED item.
+     *
+     * `folders.cover_image_url` is NULL on all five boards on the platform —
+     * nothing writes it, and there is no UI to set one. The reference draws a
+     * photograph on every board card, so the choice was a rail of grey
+     * placeholders or a cover taken from what the board actually holds. The
+     * second is real data about that board; the first is the truth about an
+     * unused column, told in the least useful place.
+     *
+     * Newest rather than first, so adding to a board refreshes its cover, and
+     * resolved-only, so a board never advertises itself with a deleted listing.
+     * An explicit cover_image_url still wins if one is ever set.
+     */
+    const newestFirst = [...items].sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+    const derivedCover = new Map<string, string>();
+    for (const it of newestFirst) {
+      if (!it.model.imageUrl) continue;
+      for (const b of it.boardIds) {
+        if (!derivedCover.has(b)) derivedCover.set(b, it.model.imageUrl);
+      }
+    }
+
     const boards: SavedBoard[] = folders.map((f) => ({
       id: f.id,
       name: f.name,
       itemCount: liveByFolder.get(f.id) ?? 0,
-      coverUrl: f.cover_image_url?.trim() || null,
+      coverUrl: f.cover_image_url?.trim() || derivedCover.get(f.id) || null,
       sortOrder: f.sort_order ?? 0,
       isPublic: f.is_public ?? false,
       shareSlug: f.share_slug ?? null,
@@ -216,6 +258,7 @@ export async function getSavedLibrary(clerkUserId: string): Promise<SavedLibrary
         all: items.length,
         project: items.filter((i) => i.entityType === "project").length,
         product: items.filter((i) => i.entityType === "product").length,
+        recent: items.filter((i) => i.savedAt >= recentCutoff).length,
       },
       setupRequired: false,
     };

@@ -19,25 +19,25 @@ import type { SavedItem } from "@/lib/db/savedLibrary";
  * to make a grid tidy.
  *
  * ── COLUMN COUNTS COME FROM THE MAIN COLUMN, NOT THE VIEWPORT ───────────────
- * The page is max-w-[1600px] with px-4 / sm:px-6 / lg:px-8, and the 264px rail
+ * The page is max-w-[1600px] with px-4 / sm:px-6 / lg:px-8, and the 280px rail
  * plus its 40px gutter only exists from `lg` — below that it is a drawer and
- * the grid gets the whole page. Computed against that, with gap-x-4:
+ * the grid gets the whole page. Measured against that, with gap-x-4:
  *
  *   vw     main   cols   card
  *    390    358     2     171
  *    768    720     3     229
- *   1024    656     3     208     <- rail appears here, so main DROPS
- *   1280    912     4     216
- *   1440   1072     4     256
- *   1536   1168     5     221
- *   1600   1232     5     234     <- container caps, so this is the widest
+ *   1024    640     3     203     <- rail appears here, so main DROPS 320px
+ *   1280    896     4     212
+ *   1440   1056     4     252
+ *   1536   1152     5     218
+ *   1600   1216     5     230     <- container caps, so this is the widest
  *
- * FIVE ACROSS STARTS AT 1536, NOT 1440. The brief asks for five on large
- * desktop "if canonical card minimum width permits", and at 1440 it does not:
- * five would be 201px against the 256px four gives. The rail costs the grid
- * 304px that a directory page does not spend, which is the whole reason this
- * lands a breakpoint later than /products does. The card is never shrunk to
- * hold a column count.
+ * FIVE ACROSS STARTS AT 1536, NOT 1440. The brief asks for five at 1600 and
+ * 1536 "if healthy" and four at 1440 — and at 1440 five would be 198px against
+ * the 252px four gives, which is exactly the ~200px squeeze the brief says not
+ * to force. The rail costs the grid 320px a directory page does not spend,
+ * which is why this lands a breakpoint later than /products does. The card is
+ * never shrunk to hold a column count.
  */
 export function SavedGrid({ items }: { items: SavedItem[] }) {
   return (

@@ -2,40 +2,64 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Bookmark, Building2, Package } from "lucide-react";
+import { ArrowRight, Bookmark, Clock, LayoutGrid, Package } from "lucide-react";
 import { NewBoardButton } from "@/components/saved/NewBoardButton";
-import { savedHref, type SavedParams, type SavedType } from "@/lib/saved/params";
+import {
+  savedHref,
+  savedViewHref,
+  isSavedView,
+  type SavedParams,
+  type SavedType,
+  type SavedWindow,
+} from "@/lib/saved/params";
 import type { SavedBoard } from "@/lib/db/savedLibrary";
 
 /**
- * The Saved workspace rail: library navigation, then boards.
+ * The Saved workspace rail: who you are, then the library, then your boards.
  *
  * ── WHAT THE REFERENCE HAS THAT THIS DOES NOT ───────────────────────────────
- * The Files mockup's rail carries All Files / Recently added / Collections /
- * Trash, then a tall file-type checkbox group (PDF, CAD, Image, Other), then
- * Source / Brand / Designer / Project / Download date accordions. Almost none
- * of that has a counterpart here and none of it is copied:
+ * The mockup's rail is All saved / Projects / Products / Recently added, then
+ * COLLECTIONS. Three of those four map exactly. The fourth does not:
  *
- *   PDF / CAD / Image   saves are listings, not documents
- *   Trash               no soft-delete on folder_items; unsaving is a DELETE
- *   Recently added      the default sort already is newest-first
- *   Designers / Brands  NOT SAVEABLE. entity_type is "project" | "product"
- *                       everywhere in savedFolders.ts and no profile surface
- *                       renders a save control, so those two rows would be
- *                       permanently dead. Omitted rather than shown at zero.
+ *   Collections   renamed to BOARDS, because `collections` is already a live,
+ *                 unrelated feature — the cron-refreshed, publicly indexable
+ *                 Inspiration collections. Two different things under one word
+ *                 in one product is worse than not matching a mockup's copy,
+ *                 and every existing surface already says board:
+ *                 SaveToBoardPopover, BoardPickerPanel, BoardShareModal.
  *
- * ── AND NO SECOND TYPE FILTER ───────────────────────────────────────────────
- * The reference repeats file type as both nav and a checkbox group. Type is
- * this rail's primary navigation, so there is no giant checkbox section
- * underneath saying the same thing twice. Boards are the only other axis, and
- * they are navigation too. That leaves the rail shorter than the Files one,
- * which is the right outcome rather than a missing one.
+ *   Designers /   NOT SAVEABLE. entity_type is "project" | "product" across
+ *   Brands        savedFolders.ts, and no profile surface renders a save
+ *                 control, so those rows would be permanently dead. The mockup
+ *                 does not show them either; noted because the earlier draft
+ *                 of this brief asked about them.
+ *
+ * ── NO "VIEW ALL BOARDS" LINK ───────────────────────────────────────────────
+ * The brief asks for one "if the existing route supports it". No boards index
+ * route exists — /me/saved/folder/[folderId] is a single board, and it now
+ * redirects into this workspace. Every board the user has is already listed
+ * here in full and again in the preview rail, so the link would point at a
+ * page showing the same three rows the reader is looking at. Omitted rather
+ * than pointed at a placeholder.
+ *
+ * ── THE RAIL NAVIGATES; THE TOOLBAR FILTERS ─────────────────────────────────
+ * These four rows are PLACES, so each resets the board and the date window
+ * (savedViewHref). Otherwise "Projects" clicked from inside a board would
+ * quietly stay in that board while the count beside it read library-wide — the
+ * count/grid mismatch this page has already been burned by once. Narrowing
+ * within a view is what the toolbar's Type / Board / Date saved pills are for.
  */
 
-const TYPE_ROWS: { value: SavedType; label: string; Icon: typeof Bookmark }[] = [
-  { value: "all", label: "All Saved", Icon: Bookmark },
-  { value: "project", label: "Projects", Icon: Building2 },
-  { value: "product", label: "Products", Icon: Package },
+const VIEWS: {
+  label: string;
+  Icon: typeof Bookmark;
+  view: { type?: SavedType; window?: SavedWindow };
+  countKey: "all" | "project" | "product" | "recent";
+}[] = [
+  { label: "All saved", Icon: Bookmark, view: {}, countKey: "all" },
+  { label: "Projects", Icon: LayoutGrid, view: { type: "project" }, countKey: "project" },
+  { label: "Products", Icon: Package, view: { type: "product" }, countKey: "product" },
+  { label: "Recently added", Icon: Clock, view: { window: "recent" }, countKey: "recent" },
 ];
 
 function RowShell({
@@ -50,11 +74,12 @@ function RowShell({
   return (
     <Link
       href={href}
+      scroll={false}
       aria-current={active ? "page" : undefined}
       className={[
         "flex items-center gap-3 rounded-lg px-3 py-2.5 font-body text-[14px] transition-colors",
-        // The reference's selected state is a soft neutral fill, not an accent
-        // bar and not a brand colour.
+        // The reference's selected state: a soft neutral fill, a restrained
+        // radius, a black icon and a stronger label. No accent, no left bar.
         active ? "bg-stone/70 font-medium text-ink" : "text-ink hover:bg-stone/40",
       ].join(" ")}
     >
@@ -67,93 +92,120 @@ export function SavedSidebar({
   params,
   boards,
   counts,
+  profile,
 }: {
   params: SavedParams;
   boards: SavedBoard[];
-  counts: { all: number; project: number; product: number };
+  counts: { all: number; project: number; product: number; recent: number };
+  /** The signed-in user. Null only if their profile row is missing. */
+  profile: { displayName: string; href: string | null; avatarUrl: string | null } | null;
 }) {
   return (
-    <nav aria-label="Saved library" className="flex flex-col gap-8">
-      <div>
-        <p className="mb-2 px-3 font-body text-[11px] font-medium uppercase tracking-[0.1em] text-muted">
-          Saved
-        </p>
-        <ul className="space-y-0.5">
-          {TYPE_ROWS.map(({ value, label, Icon }) => {
-            // Type is a filter WITHIN the current board, not a jump back to the
-            // whole library — switching to Products inside "LA" keeps you in LA.
-            const active = params.type === value;
-            return (
-              <li key={value}>
-                <RowShell href={savedHref({ ...params, type: value })} active={active}>
-                  <Icon strokeWidth={1.5} className="h-4 w-4 shrink-0 text-muted" aria-hidden />
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
-                  <span className="shrink-0 font-body text-[13px] text-muted">
-                    {counts[value === "all" ? "all" : value]}
-                  </span>
-                </RowShell>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-
-      <div className="border-t border-hairline pt-6">
-        <div className="mb-2 flex items-center justify-between gap-2 px-3">
-          <p className="font-body text-[11px] font-medium uppercase tracking-[0.1em] text-muted">
-            Boards
-          </p>
-          {/*
-           * "Boards", not "Collections".
-           *
-           * The mockup says Collections, but `collections` is already a live,
-           * unrelated feature — the cron-refreshed, publicly indexable
-           * Inspiration collections. Two different things under one word in one
-           * product is worse than not matching the mockup's copy, and every
-           * existing surface already says board: SaveToBoardPopover,
-           * BoardPickerPanel, BoardShareModal, "Save to board".
-           */}
-        </div>
-
-        <div className="px-3 pb-2">
-          <NewBoardButton />
-        </div>
-
-        {boards.length > 0 ? (
-          <ul className="space-y-0.5">
-            <li>
-              <RowShell
-                href={savedHref({ ...params, board: null })}
-                active={params.board === null}
+    <div className="flex flex-col gap-7">
+      {profile && (
+        <div className="flex items-center gap-3 px-3">
+          <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-ink text-cream">
+            {profile.avatarUrl ? (
+              <Image
+                src={profile.avatarUrl}
+                alt=""
+                fill
+                sizes="40px"
+                className="object-cover"
+              />
+            ) : (
+              // Real initial from the real display name — not a stock face.
+              <span className="flex h-full w-full items-center justify-center font-body text-[15px]">
+                {profile.displayName.trim().charAt(0).toUpperCase() || "?"}
+              </span>
+            )}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate font-body text-[14px] font-medium text-ink">
+              {profile.displayName}
+            </span>
+            {profile.href && (
+              <Link
+                href={profile.href}
+                className="mt-0.5 inline-flex items-center gap-1 font-body text-[12px] text-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
               >
-                <span className="h-7 w-7 shrink-0 rounded-md bg-stone" aria-hidden />
-                <span className="min-w-0 flex-1 truncate">All boards</span>
-                <span className="shrink-0 font-body text-[13px] text-muted">{boards.length}</span>
-              </RowShell>
-            </li>
-            {boards.map((b) => (
-              <li key={b.id}>
-                <RowShell
-                  href={savedHref({ ...params, board: b.id })}
-                  active={params.board === b.id}
-                >
-                  <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-md bg-stone">
-                    {b.coverUrl && (
-                      <Image src={b.coverUrl} alt="" fill sizes="28px" className="object-cover" />
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                  <span className="shrink-0 font-body text-[13px] text-muted">{b.itemCount}</span>
-                </RowShell>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="px-3 font-body text-[13px] leading-[20px] text-muted">
-            Boards group saved work by theme. Create one to start.
+                View profile
+                <ArrowRight strokeWidth={1.5} className="h-3 w-3" aria-hidden />
+              </Link>
+            )}
+          </span>
+        </div>
+      )}
+
+      <nav aria-label="Saved library" className="flex flex-col gap-7">
+        <div>
+          <p className="mb-2 px-3 font-body text-[11px] font-medium uppercase tracking-[0.1em] text-muted">
+            Saved
           </p>
-        )}
-      </div>
-    </nav>
+          <ul className="space-y-0.5">
+            {VIEWS.map(({ label, Icon, view, countKey }) => {
+              const active = isSavedView(params, view);
+              return (
+                <li key={label}>
+                  <RowShell href={savedViewHref(params, view)} active={active}>
+                    <Icon
+                      strokeWidth={1.5}
+                      className={`h-4 w-4 shrink-0 ${active ? "text-ink" : "text-muted"}`}
+                      aria-hidden
+                    />
+                    <span className="min-w-0 flex-1 truncate">{label}</span>
+                    <span className="shrink-0 font-body text-[13px] text-muted">
+                      {counts[countKey]}
+                    </span>
+                  </RowShell>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className="border-t border-hairline pt-6">
+          <div className="mb-2 flex items-center justify-between gap-2 px-3">
+            <p className="font-body text-[11px] font-medium uppercase tracking-[0.1em] text-muted">
+              Boards
+            </p>
+            <NewBoardButton variant="inline" />
+          </div>
+
+          {boards.length > 0 ? (
+            <ul className="space-y-0.5">
+              {boards.map((b) => (
+                <li key={b.id}>
+                  <RowShell
+                    href={savedHref({ ...params, board: b.id })}
+                    active={params.board === b.id}
+                  >
+                    <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-md bg-stone">
+                      {b.coverUrl && (
+                        <Image
+                          src={b.coverUrl}
+                          alt=""
+                          fill
+                          sizes="28px"
+                          className="object-cover"
+                        />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                    <span className="shrink-0 font-body text-[13px] text-muted">
+                      {b.itemCount}
+                    </span>
+                  </RowShell>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-3 font-body text-[13px] leading-[20px] text-muted">
+              Boards group saved work by theme. Create one to start.
+            </p>
+          )}
+        </div>
+      </nav>
+    </div>
   );
 }

@@ -3,48 +3,59 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, X, ChevronDown } from "lucide-react";
+import { Search, ChevronDown } from "lucide-react";
 import {
   savedHref,
   hasActiveFilters,
   SAVED_SORTS,
   SAVED_TYPES,
+  SAVED_WINDOWS,
   type SavedParams,
   type SavedSort,
   type SavedType,
+  type SavedWindow,
 } from "@/lib/saved/params";
+import type { SavedBoard } from "@/lib/db/savedLibrary";
 
 /**
- * Search, sort and the active-filter chips.
+ * The toolbar: search, three filters, Clear all, and sort on the right.
  *
- * ── URL-BACKED, DEBOUNCED, AND NOT A SECOND SOURCE OF TRUTH ─────────────────
+ * ── SAVED FILTERS, NOT FILE FILTERS ─────────────────────────────────────────
+ * The reference's row is File type / Source / Brand / Project / Date. Four of
+ * those five describe a DOCUMENT and have no column on a saved listing. They
+ * are not translated into lookalikes; the row carries the three axes a save
+ * actually records:
+ *
+ *   Type         entity_type on folder_items — project or product
+ *   Board        which of the user's folders hold it
+ *   Date saved   folder_items.created_at, a real timestamp on every row
+ *
+ * ── URL-BACKED, DEBOUNCED, NOT A SECOND SOURCE OF TRUTH ─────────────────────
  * The input is seeded from the URL and pushes back to it 300ms after typing
- * stops. The server does the filtering, so refresh and back/forward restore
- * the exact result set and a filtered library is a shareable link.
+ * stops. The server does the filtering, so refresh and back/forward restore the
+ * exact result set and a filtered library is a shareable link. The local
+ * `value` exists only so typing is not one round trip per keystroke; it
+ * re-syncs whenever the URL changes underneath it (Clear all, the rail, the
+ * browser back button), which is what stops the two drifting.
  *
- * The local `value` exists only so typing is not one round trip per keystroke;
- * it re-syncs whenever the URL changes underneath it (a chip dismissed, Clear
- * all, the browser back button), which is what stops the two drifting.
- *
- * ── NO VIEW TOGGLE ──────────────────────────────────────────────────────────
- * The reference has grid/list. Saved is a mixed grid of canonical project and
- * product cards, and a list view of it would need a genuinely different mixed
- * -entity row — thumbnail, type, studio or brand, saved date, boards — which is
- * real architecture, not a CSS switch. A dead toggle is worse than no toggle,
- * so there is none until that row exists.
+ * ── NO GRID/LIST TOGGLE ─────────────────────────────────────────────────────
+ * The reference has one. Saved is a mixed grid of canonical project and product
+ * cards, and a list view would need a genuinely different mixed-entity row —
+ * thumbnail, type, studio or brand, saved date, boards — which is real
+ * architecture, not a CSS switch. The brief is explicit that a dead control is
+ * worse than an absent one, so there is none until that row exists.
  */
 export function SavedControls({
   params,
-  boardName,
+  boards,
 }: {
   params: SavedParams;
-  boardName: string | null;
+  boards: SavedBoard[];
 }) {
   const router = useRouter();
   const [value, setValue] = useState(params.q);
   const seeded = useRef(params.q);
 
-  // Re-seed when the URL's q changes from anywhere that is not this input.
   useEffect(() => {
     if (params.q !== seeded.current) {
       seeded.current = params.q;
@@ -65,101 +76,95 @@ export function SavedControls({
 
   const go = (next: SavedParams) => router.push(savedHref(next), { scroll: false });
 
-  const typeLabel = SAVED_TYPES.find((t) => t.value === params.type)?.label ?? "All types";
-  const sortLabel = SAVED_SORTS.find((s) => s.value === params.sort)?.label ?? "Newest saved";
-  const showChips = hasActiveFilters(params);
+  const boardOptions = [
+    { value: "", label: "All boards" },
+    ...boards.map((b) => ({ value: b.id, label: b.name })),
+  ];
+  const boardLabel =
+    boards.find((b) => b.id === params.board)?.name ?? "All boards";
+  const sortLabel = SAVED_SORTS.find((s) => s.value === params.sort)?.label ?? "Newest added";
 
   return (
-    <div>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="relative flex-1">
-          <Search
-            strokeWidth={1.5}
-            className="pointer-events-none absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-            aria-hidden
-          />
-          <label htmlFor="saved-search" className="sr-only">
-            Search your saved library
-          </label>
-          <input
-            id="saved-search"
-            type="search"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Search saved projects, products..."
-            className="h-12 w-full rounded-xl border border-hairline bg-cream pl-12 pr-4 font-body text-[14px] text-ink placeholder:text-muted focus:border-ink/30 focus:outline-none"
-          />
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          <SelectPill
-            label={`Sort by: ${sortLabel}`}
-            value={params.sort}
-            options={SAVED_SORTS}
-            onChange={(v) => go({ ...params, sort: v as SavedSort })}
-            srLabel="Sort saved items"
-          />
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <SelectPill
-          label={typeLabel}
-          value={params.type}
-          options={SAVED_TYPES}
-          onChange={(v) => go({ ...params, type: v as SavedType })}
-          srLabel="Filter by type"
+    <div className="flex flex-wrap items-center gap-2">
+      {/* First and widest, as the reference has it. Capped so it does not eat
+          the whole row on a 1600px main column, where the pills would then
+          float alone at the far right. */}
+      <div className="relative min-w-[200px] flex-1 lg:max-w-[380px]">
+        <Search
+          strokeWidth={1.5}
+          className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+          aria-hidden
         />
-
-        {/* Active filters as removable chips, exactly as the reference shows.
-            The board is NOT a chip: it is navigation, and dismissing it here
-            would silently move you out of the board you opened. */}
-        {params.q && (
-          <Chip label={`"${params.q}"`} onClear={() => go({ ...params, q: "" })} />
-        )}
-        {params.type !== "all" && (
-          <Chip
-            label={SAVED_TYPES.find((t) => t.value === params.type)!.label}
-            onClear={() => go({ ...params, type: "all" })}
-          />
-        )}
-        {params.sort !== "newest" && (
-          <Chip label={sortLabel} onClear={() => go({ ...params, sort: "newest" })} />
-        )}
-
-        {showChips && (
-          <Link
-            href={savedHref({ q: "", type: "all", sort: "newest", board: params.board })}
-            scroll={false}
-            className="ml-1 font-body text-[13px] text-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
-          >
-            Clear all
-          </Link>
-        )}
-
-        {boardName && (
-          <span className="ml-auto font-body text-[13px] text-muted">
-            in <span className="text-ink">{boardName}</span>
-          </span>
-        )}
+        <label htmlFor="saved-search" className="sr-only">
+          Search your saved library
+        </label>
+        <input
+          id="saved-search"
+          type="search"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Search saved projects, products..."
+          className="h-10 w-full rounded-full border border-hairline bg-cream pl-11 pr-4 font-body text-[13px] text-ink placeholder:text-muted focus:border-ink/30 focus:outline-none"
+        />
       </div>
-    </div>
-  );
-}
 
-function Chip({ label, onClear }: { label: string; onClear: () => void }) {
-  return (
-    <span className="inline-flex h-9 items-center gap-2 rounded-full border border-hairline bg-cream px-3.5 font-body text-[13px] text-ink">
-      {label}
-      <button
-        type="button"
-        onClick={onClear}
-        aria-label={`Remove filter ${label}`}
-        className="text-muted transition-colors hover:text-ink"
-      >
-        <X strokeWidth={1.5} className="h-3.5 w-3.5" />
-      </button>
-    </span>
+      <SelectPill
+        label={SAVED_TYPES.find((t) => t.value === params.type)!.label}
+        value={params.type}
+        options={SAVED_TYPES}
+        onChange={(v) => go({ ...params, type: v as SavedType })}
+        srLabel="Filter by type"
+      />
+
+      {/* Only when the user has boards — an "All boards" select over nothing
+          is a control that cannot change anything. */}
+      {boards.length > 0 && (
+        <SelectPill
+          label={boardLabel}
+          value={params.board ?? ""}
+          options={boardOptions}
+          onChange={(v) => go({ ...params, board: v || null })}
+          srLabel="Filter by board"
+        />
+      )}
+
+      <SelectPill
+        label={SAVED_WINDOWS.find((w) => w.value === params.window)!.label}
+        value={params.window}
+        options={SAVED_WINDOWS}
+        onChange={(v) => go({ ...params, window: v as SavedWindow })}
+        srLabel="Filter by date saved"
+      />
+
+      {/* Only when something is actually on. */}
+      {hasActiveFilters(params) && (
+        <Link
+          href={savedHref({
+            q: "",
+            type: "all",
+            sort: "newest",
+            window: "all",
+            // The board is navigation, so Clear all must not move you out of
+            // the board you opened.
+            board: params.board,
+          })}
+          scroll={false}
+          className="px-1 font-body text-[13px] text-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
+        >
+          Clear all
+        </Link>
+      )}
+
+      <span className="ml-auto">
+        <SelectPill
+          label={sortLabel}
+          value={params.sort}
+          options={SAVED_SORTS}
+          onChange={(v) => go({ ...params, sort: v as SavedSort })}
+          srLabel="Sort saved items"
+        />
+      </span>
+    </div>
   );
 }
 
@@ -178,8 +183,8 @@ function SelectPill({
   srLabel: string;
 }) {
   return (
-    <span className="relative inline-flex h-9 items-center gap-2 rounded-full border border-hairline bg-cream pl-3.5 pr-8 font-body text-[13px] text-ink">
-      {label}
+    <span className="relative inline-flex h-10 max-w-[180px] items-center rounded-full border border-hairline bg-cream pl-4 pr-8 font-body text-[13px] text-ink">
+      <span className="truncate">{label}</span>
       <ChevronDown
         strokeWidth={1.5}
         className="pointer-events-none absolute right-3 h-3.5 w-3.5 text-muted"

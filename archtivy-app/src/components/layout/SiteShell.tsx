@@ -51,6 +51,13 @@ const EDITORIAL_ROUTES = new Set([
   "/me/listings",
   "/me/profile",
   "/me/files",
+  // /me/saved was missing and had BOTH symptoms described above: TopNav plus
+  // its own fixed HomeNav painted over it, and Container capping the workspace
+  // at 1040px so the 280px rail left ~656px for a five-column grid. Measured in
+  // a headless browser at 1600px before the fix: aside at x=312, main column
+  // 656px, cards 118px wide. It is the sibling of /me/files and belongs here
+  // for the same reason.
+  "/me/saved",
 ]);
 
 // Routes that show TopNav but skip PageContainer (full-width content).

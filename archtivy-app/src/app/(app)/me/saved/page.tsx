@@ -3,12 +3,21 @@ import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { HomeNav } from "@/components/home/HomeNav";
+import { getDefaultProfileForClerkUserId } from "@/lib/db/profiles";
 import { SavedSidebar } from "@/components/saved/SavedSidebar";
 import { SavedMobileNav } from "@/components/saved/SavedMobileNav";
+import { SavedBoardsRow } from "@/components/saved/SavedBoardsRow";
 import { SavedControls } from "@/components/saved/SavedControls";
 import { SavedGrid } from "@/components/saved/SavedGrid";
 import { getSavedLibrary } from "@/lib/db/savedLibrary";
-import { parseSavedParams, savedHref, hasActiveFilters } from "@/lib/saved/params";
+import {
+  parseSavedParams,
+  savedHref,
+  hasActiveFilters,
+  WINDOW_DAYS,
+  DEFAULT_SAVED_PARAMS,
+  type SavedParams,
+} from "@/lib/saved/params";
 import { BoardShareButton } from "@/components/saved/BoardShareButton";
 import { BTN_PILL_SECONDARY } from "@/components/ui/publicButton";
 
@@ -23,26 +32,35 @@ export const dynamic = "force-dynamic";
 /**
  * /me/saved — the saved workspace.
  *
- * ── SIBLING OF FILES, NOT A COPY OF IT ──────────────────────────────────────
- * Same shell language as the Files reference: a persistent left rail, a wide
- * neutral main column, one large search field, compact pill controls, hairline
- * dividers, no shadows and no accent colour. The CONTENT model is deliberately
- * different — Files is documents and belongs in a table; Saved is design work
- * and belongs in a grid of canonical cards. Nothing file-specific was carried
- * across: no PDF/CAD/Image filters, no Trash, no size or format columns.
+ * ── THE MOCKUP'S LAYOUT, THIS PLATFORM'S DATA ───────────────────────────────
+ * Composition follows the approved reference closely: a 280px persistent rail
+ * with a profile block on top, a hairline divider, a wide neutral main column,
+ * the heading with its count pill, the boards preview row, a compact toolbar,
+ * then a dense grid. What the reference's CONTENT implies is another matter —
+ * every label and every number here comes from the live schema:
+ *
+ *   Collections -> BOARDS   `collections` is the unrelated public Inspiration
+ *                           system. Renaming Saved's folders to match a mockup
+ *                           would put two different features under one word.
+ *   248 / 120 / 96 / 28     mock counts. The real library resolves to 6.
+ *   File type / Source /    document facets. A save records entity_type, its
+ *   Brand / Project         boards and a timestamp, and nothing else.
+ *   PROJECT / PRODUCT       not part of ListingCardShared. Adding them here
+ *   image labels            would fork the canonical card for one surface.
+ *   Grid / List toggle      only the grid exists; see SavedControls.
+ *   Designer saving         entity_type is "project" | "product" only.
  *
  * ── FILTERING RUNS ON THE SERVER ────────────────────────────────────────────
- * q, type, sort and board are read from the URL here and applied before render,
- * so the first paint is already the filtered library and back/forward restore
- * it exactly. The client components own input handling only; none of them holds
- * a second copy of the result set.
+ * q, type, window, board and sort are read from the URL here and applied before
+ * render, so the first paint is already the filtered library and back/forward
+ * restore it exactly. The client components own input handling only; none of
+ * them holds a second copy of the result set.
  *
  * ── PAGINATION IS ABSENT ON PURPOSE ─────────────────────────────────────────
- * The Files mockup shows "1 2 3 … 7". The largest library on the platform is 10
- * items and the biggest board is 5, so paging controls would render a single
- * dead page number on every account. The grid renders the whole library, which
- * at this scale is also the fastest thing to do. When libraries grow past a
- * screenful, the load-more the directories already use is the pattern to adopt.
+ * The reference shows "1 2 3 … 7". The largest library on the platform is 6
+ * items and the biggest board is 3, so paging controls would render a single
+ * dead page number on every account. When libraries outgrow a screenful, the
+ * load-more the directories already use is the pattern to adopt.
  */
 export default async function SavedPage({
   searchParams,
@@ -53,7 +71,19 @@ export default async function SavedPage({
   if (!userId) redirect("/sign-in?redirect_url=/me/saved");
 
   const params = parseSavedParams(await searchParams);
-  const library = await getSavedLibrary(userId);
+  const [library, profileResult] = await Promise.all([
+    getSavedLibrary(userId),
+    getDefaultProfileForClerkUserId(userId),
+  ]);
+
+  const p = profileResult.data;
+  const profile = p
+    ? {
+        displayName: p.display_name?.trim() || p.username || "Your profile",
+        href: p.username ? `/u/${encodeURIComponent(p.username)}` : null,
+        avatarUrl: p.avatar_url?.trim() || null,
+      }
+    : null;
 
   const board = params.board
     ? library.boards.find((b) => b.id === params.board) ?? null
@@ -66,13 +96,19 @@ export default async function SavedPage({
   if (activeBoardId) items = items.filter((i) => i.boardIds.includes(activeBoardId));
   if (params.type !== "all") items = items.filter((i) => i.entityType === params.type);
 
+  const days = WINDOW_DAYS[params.window];
+  if (days) {
+    const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
+    items = items.filter((i) => i.savedAt >= cutoff);
+  }
+
   if (params.q) {
     // Searches the LIBRARY, never the catalogue: only fields already on the
     // card model, and only within what this user has saved.
     const needle = params.q.toLowerCase();
     items = items.filter((i) => {
       const m = i.model;
-      return [m.title, m.authorName, m.categoryLabel, m.metaLabel]
+      return [m.title, m.authorName, m.brandName, m.categoryLabel, m.metaLabel]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(needle));
     });
@@ -84,19 +120,40 @@ export default async function SavedPage({
     return b.savedAt.localeCompare(a.savedAt);
   });
 
-  // Counts beside the rail reflect the BOARD you are in, so "Projects 3" inside
-  // a board means three in that board — not three across the whole library.
-  const scoped = activeBoardId
-    ? library.items.filter((i) => i.boardIds.includes(activeBoardId))
-    : library.items;
-  const counts = {
-    all: scoped.length,
-    project: scoped.filter((i) => i.entityType === "project").length,
-    product: scoped.filter((i) => i.entityType === "product").length,
-  };
+  /*
+   * Rail counts are WHOLE-LIBRARY, always.
+   *
+   * The rail is navigation — each of its four rows resets the board — so a
+   * count beside "Projects" describes where that row takes you. Scoping them to
+   * the open board instead would print "Projects 3" next to a link that leads
+   * to a view of all of them, which is the count/grid mismatch this page has
+   * already been burned by once (a board once read "LA 5" over three cards).
+   * A board's own count sits on its own row, where it belongs.
+   */
+  const counts = library.counts;
 
-  const title = board ? board.name : "All Saved";
-  const total = counts.all;
+  /*
+   * The heading names the VIEW you are in, and the pill counts what is on
+   * screen under it.
+   *
+   * Both halves matter. Naming only the library meant clicking "Projects" in
+   * the rail highlighted that row, filtered the grid to three cards, and left
+   * the heading reading "All saved · 6 items" above them — a title and a number
+   * that described neither the row you clicked nor the grid you got. And
+   * counting the view's total rather than the rendered rows would put "3 items"
+   * over a two-card search result. Counting `items` is the only figure that
+   * cannot drift from the grid, because it IS the grid.
+   */
+  const title = board
+    ? board.name
+    : params.type === "project" && params.window === "all"
+      ? "Projects"
+      : params.type === "product" && params.window === "all"
+        ? "Products"
+        : params.window === "recent" && params.type === "all"
+          ? "Recently added"
+          : "All saved";
+  const total = items.length;
 
   return (
     <div className="min-h-screen bg-cream font-body text-ink">
@@ -105,24 +162,32 @@ export default async function SavedPage({
       <HomeNav variant="solid" />
 
       <div className="mx-auto flex w-full max-w-[1600px] gap-10 px-4 pb-24 pt-[92px] sm:px-6 lg:px-8">
-        <aside className="hidden w-[264px] shrink-0 lg:block">
+        {/* ~280px, per the reference. The hairline is the divider between the
+            two columns; the workspace is full-width, never a centred container. */}
+        <aside className="hidden w-[280px] shrink-0 lg:block">
           <div className="sticky top-[92px] border-r border-hairline pr-6">
-            <SavedSidebar params={params} boards={library.boards} counts={counts} />
+            <SavedSidebar
+              params={params}
+              boards={library.boards}
+              counts={counts}
+              profile={profile}
+            />
           </div>
         </aside>
 
         <main className="min-w-0 flex-1">
           <header className="mb-8">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="font-display text-[32px] leading-[40px] tracking-[-0.01em] text-ink">
+              <h1 className="font-display text-[30px] leading-[38px] tracking-[-0.01em] text-ink">
                 {title}
               </h1>
-              {total > 0 && (
-                <span className="rounded-full bg-stone/70 px-3 py-1 font-body text-[13px] text-ink">
-                  {total} saved
-                </span>
-              )}
+              <span className="rounded-full bg-stone/70 px-3 py-1 font-body text-[13px] text-ink">
+                {total} item{total === 1 ? "" : "s"}
+              </span>
               <span className="ml-auto flex items-center gap-2">
+                {/* Sharing lives beside the board it changes, and nowhere else
+                    — see SavedBoardsRow on why the preview tiles only DISPLAY
+                    public state rather than offering the control. */}
                 {board && (
                   <BoardShareButton
                     folder={{
@@ -141,13 +206,20 @@ export default async function SavedPage({
                   params={params}
                   boards={library.boards}
                   counts={counts}
+                  profile={profile}
                 />
               </span>
             </div>
-            <p className="mt-3 max-w-[62ch] font-body text-[15px] leading-[24px] text-muted">
+            <p className="mt-3 max-w-[62ch] font-body text-[14px] leading-[22px] text-muted">
               {board
                 ? "Projects and products you've saved to this board."
-                : "Projects and products you've saved across Archtivy."}
+                : title === "Projects"
+                  ? "Projects you've saved across Archtivy."
+                  : title === "Products"
+                    ? "Products you've saved across Archtivy."
+                    : title === "Recently added"
+                      ? "Saved in the last 30 days."
+                      : "Everything you've saved from projects and products."}
             </p>
           </header>
 
@@ -157,7 +229,16 @@ export default async function SavedPage({
             </p>
           ) : (
             <>
-              <SavedControls params={params} boardName={board?.name ?? null} />
+              {/* Boards preview, then the toolbar, then the grid — the
+                  reference's order. There is deliberately no second "Recently
+                  added" carousel above the grid: that view is a rail
+                  destination, not a duplicate strip. */}
+              {library.boards.length > 0 && (
+                <SavedBoardsRow boards={library.boards} params={params} />
+              )}
+
+              <SavedControls params={params} boards={library.boards} />
+
               <div className="mt-8">
                 {items.length > 0 ? (
                   <SavedGrid items={items} />
@@ -166,7 +247,7 @@ export default async function SavedPage({
                     params={params}
                     boardName={board?.name ?? null}
                     libraryEmpty={library.items.length === 0}
-                    boardEmpty={Boolean(activeBoardId) && scoped.length === 0}
+                    boardEmpty={Boolean(activeBoardId) && (board?.itemCount ?? 0) === 0}
                   />
                 )}
               </div>
@@ -192,11 +273,13 @@ function SavedEmpty({
   libraryEmpty,
   boardEmpty,
 }: {
-  params: ReturnType<typeof parseSavedParams>;
+  params: SavedParams;
   boardName: string | null;
   libraryEmpty: boolean;
   boardEmpty: boolean;
 }) {
+  const cleared: SavedParams = { ...DEFAULT_SAVED_PARAMS, board: params.board };
+
   if (libraryEmpty) {
     return (
       <div className="py-16 text-center">
@@ -239,16 +322,18 @@ function SavedEmpty({
     );
   }
 
-  const noun = params.type === "project" ? "projects" : "products";
+  const noun =
+    params.type === "project" ? "projects" : params.type === "product" ? "products" : "items";
   return (
     <div className="py-16 text-center">
       <p className="font-body text-[15px] text-ink">
         No saved {noun}
-        {boardName ? ` in ${boardName}` : ""}.
+        {boardName ? ` in ${boardName}` : ""}
+        {params.window !== "all" ? " in this period" : ""}.
       </p>
       {hasActiveFilters(params) && (
         <Link
-          href={savedHref({ q: "", type: "all", sort: "newest", board: params.board })}
+          href={savedHref(cleared)}
           scroll={false}
           className="mt-4 inline-block font-body text-[14px] text-muted underline underline-offset-4 hover:text-ink"
         >
