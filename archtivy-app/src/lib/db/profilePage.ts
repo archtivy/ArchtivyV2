@@ -33,6 +33,9 @@
 
 import { getCardBadgeCounts, getCreditCounts } from "@/lib/db/cardBadgeCounts";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { documentFormat } from "@/lib/documents/format";
+import { getArchiveCategoryUrl, } from "@/lib/archive/urls";
+import { getListingUrl } from "@/lib/canonical";
 
 const supa = () => getSupabaseServiceClient();
 
@@ -95,7 +98,11 @@ export interface ProfileDocument {
   id: string;
   listingId: string;
   fileName: string;
+  /** The listing the file hangs off — there is no profile-level document store. */
   listingTitle: string;
+  listingHref: string | null;
+  /** "PDF" / "ZIP", from file_type. Null when the MIME string is unrecognised. */
+  format: string | null;
 }
 
 export interface ProfilePageData {
@@ -114,7 +121,20 @@ export interface ProfilePageData {
   styleTags: string[];
   /** Designer: distinct cities across their projects. */
   locations: string[];
-  /** Brand: downloadable documents across their catalogue. */
+  /**
+   * Downloadable files across every listing this profile owns.
+   *
+   * ── THERE IS NO PROFILE-LEVEL DOCUMENT STORE ──────────────────────────
+   * Checked before building: the only document table in the schema is
+   * `listing_documents`, keyed on listing_id. `profiles` has no documents
+   * column and no join table. So a profile's "files" are exactly the files
+   * on its own approved listings — real uploads, not an invented system.
+   *
+   * This used to load for BRANDS ONLY, and only from product listings, which
+   * silently hid the one designer on the platform who has attached a document
+   * to a project (Contacto Atlantico). It now runs for every role across
+   * projects and products alike.
+   */
   documents: ProfileDocument[];
   /**
    * Hero cover. `profiles` has NO cover/banner column, so this is derived from
@@ -223,10 +243,17 @@ async function getProfilesByIds(ids: string[]): Promise<Map<string, ProfileMiniP
   return map;
 }
 
+interface CategoryInfo {
+  rootLabel: string | null;
+  typeLabel: string;
+  /** First segment of the primary node's slug_path — the archive route. */
+  rootPath: string | null;
+}
+
 function toCard(
   r: ListingRow,
   byline: string | null,
-  category: { rootLabel: string | null; typeLabel: string } | null = null,
+  category: CategoryInfo | null = null,
   extras: {
     badge?: { related: number; owners: number };
     credits?: number;
@@ -257,10 +284,25 @@ function toCard(
     badge: extras.badge ?? { related: 0, owners: 0 },
     creditCount: extras.credits ?? 0,
     ownerAvatar: extras.ownerAvatar ?? null,
-    // Root of the taxonomy path — a link whose text says "Residential" must
-    // not land on a narrower archive.
-    categoryHref: r.taxonomy_slug_path
-      ? `/${r.type === "product" ? "products" : "projects"}/${r.taxonomy_slug_path.split("/")[0]}`
+    /*
+     * Root of the taxonomy path — a link whose text says "Residential" must
+     * not land on a narrower archive.
+     *
+     * ── THIS WAS DEAD ON EVERY PROFILE CARD ──────────────────────────────
+     * It read `r.taxonomy_slug_path`, and `listings` HAS NO SUCH COLUMN
+     * (42703 when selected directly). LISTING_COLS therefore never fetched
+     * it, the field was `undefined` on every row, and categoryHref was null
+     * on all 128 listings — so the taxonomy label rendered as plain text on a
+     * profile while the same card links it on /projects. The path comes from
+     * the taxonomy join that getCategoryLabels already runs, which is where
+     * the canonical layer gets it too.
+     *
+     * taxonomySlugPath above is deliberately left alone: it feeds
+     * getListingUrl, and changing it would silently repoint every card on
+     * this page at a different detail URL than the one it uses today.
+     */
+    categoryHref: category?.rootPath
+      ? getArchiveCategoryUrl(r.type === "product" ? "product" : "project", category.rootPath)
       : null,
   };
 }
@@ -279,8 +321,8 @@ function toCard(
  */
 async function getCategoryLabels(
   listingIds: string[]
-): Promise<Map<string, { rootLabel: string | null; typeLabel: string }>> {
-  const out = new Map<string, { rootLabel: string | null; typeLabel: string }>();
+): Promise<Map<string, CategoryInfo>> {
+  const out = new Map<string, CategoryInfo>();
   if (listingIds.length === 0) return out;
   const { data } = await supa()
     .from("listing_taxonomy_node")
@@ -326,9 +368,54 @@ async function getCategoryLabels(
       // line is the root alone — never "Furniture · Furniture".
       rootLabel: rootLabel && rootLabel !== n.label ? rootLabel : null,
       typeLabel: n.label,
+      rootPath: root,
     });
   }
   return out;
+}
+
+/**
+ * Every downloadable file on a profile's own approved listings.
+ *
+ * ── INSPECTED BEFORE BUILDING ───────────────────────────────────────────────
+ * `listing_documents` is the ONLY document table in the schema — there is no
+ * profile_documents, no join table, and no documents column on `profiles`. So
+ * "the profile's files" can only mean the files on the listings it owns, and
+ * that is what this returns. Nothing is invented.
+ *
+ * The metadata is likewise only what is stored. Measured across all 61 rows:
+ *   file_type      61/61   -> rendered, as "PDF" / "ZIP"
+ *   storage_path   61/61   -> used by the download route, never shown
+ *   mime_type       0/61   -> absent
+ *   size_bytes      0/61   -> absent, so NO size is displayed on any file
+ * There is no colour, finish, or document-category column either, which is why
+ * the list is flat and grouped by nothing. The same finding drove the product
+ * page's Downloads list.
+ */
+async function getProfileDocuments(owned: ListingRow[]): Promise<ProfileDocument[]> {
+  if (owned.length === 0) return [];
+  const { data } = await supa()
+    .from("listing_documents")
+    .select("id, listing_id, file_name, file_type, sort_order")
+    .in("listing_id", owned.map((l) => l.id))
+    .order("sort_order", { ascending: true });
+
+  const byId = new Map(owned.map((l) => [l.id, l]));
+  return ((data ?? []) as {
+    id: string; listing_id: string; file_name: string | null; file_type: string | null;
+  }[]).map((d) => {
+    const l = byId.get(d.listing_id);
+    return {
+      id: d.id,
+      listingId: d.listing_id,
+      fileName: d.file_name ?? "Document",
+      listingTitle: l?.title ?? "Untitled",
+      // The file is only meaningful next to the thing it documents, so the
+      // listing name is a link back to it rather than decoration.
+      listingHref: l ? getListingUrl({ id: l.id, type: l.type === "product" ? "product" : "project", slug: l.slug }) : null,
+      format: documentFormat(d.file_type),
+    };
+  });
 }
 
 export async function getProfilePageData(
@@ -353,13 +440,17 @@ export async function getProfilePageData(
    * two queries regardless of grid size, and getCreditCounts one. Resolving
    * these per card is the fan-out those helpers exist to prevent.
    */
-  const [ownCategories, projectBadges, productBadges, projectCredits, ownerRow] =
+  const [ownCategories, projectBadges, productBadges, projectCredits, ownerRow, documents] =
     await Promise.all([
       getCategoryLabels(owned.map((l) => l.id)),
       getCardBadgeCounts(projectRows.map((r) => r.id), "project"),
       getCardBadgeCounts(productRows.map((r) => r.id), "product"),
       getCreditCounts(projectRows.map((r) => r.id)),
       supa().from("profiles").select("avatar_url").eq("id", profileId).maybeSingle(),
+      // Joins the existing fan-out rather than adding a round trip. Runs for
+      // every role now, not just brands, and across projects as well as
+      // products — see getProfileDocuments.
+      getProfileDocuments(owned),
     ]);
 
   // Every listing here is owned by the profile being viewed, so the card's logo
@@ -388,7 +479,9 @@ export async function getProfilePageData(
     productRows.find((r) => r.cover_image_url)?.cover_image_url ??
     null;
 
-  const data: ProfilePageData = { ...EMPTY_PROFILE_PAGE_DATA, projects, products, coverImage };
+  const data: ProfilePageData = {
+    ...EMPTY_PROFILE_PAGE_DATA, projects, products, coverImage, documents,
+  };
 
   if (role === "brand") {
     // Aggregate "Seen in Projects" across the whole catalogue, plus who owns
@@ -412,21 +505,6 @@ export async function getProfilePageData(
       ownerIds.map((id) => [id, owners.get(id)]).filter((e): e is [string, ProfileMiniProfile] => !!e[1])
     ).values()];
 
-    if (productRows.length > 0) {
-      const { data: docs } = await supa()
-        .from("listing_documents")
-        .select("id, listing_id, file_name")
-        .in("listing_id", productRows.map((p) => p.id))
-        .order("sort_order", { ascending: true });
-      const titleById = new Map(productRows.map((p) => [p.id, p.title ?? "Untitled"]));
-      data.documents = ((docs ?? []) as { id: string; listing_id: string; file_name: string | null }[])
-        .map((d) => ({
-          id: d.id,
-          listingId: d.listing_id,
-          fileName: d.file_name ?? "Document",
-          listingTitle: titleById.get(d.listing_id) ?? "Untitled",
-        }));
-    }
     return data;
   }
 

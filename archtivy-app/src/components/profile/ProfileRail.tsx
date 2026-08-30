@@ -5,6 +5,8 @@ import { FollowButton } from "@/components/follow/FollowButton";
 import { ProfileContactButton } from "@/components/profile/ProfileContactButton";
 import { initialsOf } from "@/components/home/EntityCard";
 import { normaliseInstagramHandle } from "@/lib/publish/instagram";
+import { ProfileViewNav, type ProfileViewItem } from "@/components/profile/ProfileViews";
+import { BTN_PILL_SECONDARY } from "@/components/ui/publicButton";
 import type { ProfileMetrics } from "@/lib/db/profileMetrics";
 import type { Profile } from "@/lib/types/profiles";
 
@@ -30,6 +32,14 @@ import type { Profile } from "@/lib/types/profiles";
  * Each stat still omits itself at zero — a profile with nothing published
  * should not announce "0 Listings".
  *
+ * ── THE ACTIONS ARE THE PLATFORM'S BUTTONS NOW ──────────────────────────────
+ * Follow and Message were the last controls on any public page still drawn in
+ * the pre-editorial system — zinc borders, a hard-coded #002abf focus ring,
+ * dark: variants, and two different heights and corner radii sitting side by
+ * side. They now use the shared public pill tokens, so Follow is the same
+ * solid ink button as Save on a project and Message the same outlined pill as
+ * Share beside it. See components/ui/publicButton.
+ *
  * ── ONE PANEL, NOT FOUR CARDS ───────────────────────────────────────────────
  * The reference draws the whole rail as a single tall card with internal
  * dividers, anchoring the page from top to bottom. Four separate bordered
@@ -43,15 +53,10 @@ function RailSectionBlock({ children }: { children: React.ReactNode }) {
   return <div className="border-t border-hairline px-5 py-5">{children}</div>;
 }
 
-export interface RailSection {
-  id: string;
-  label: string;
-}
-
 export function ProfileRail({
   profile,
   metrics,
-  sections,
+  views,
   isOwner,
   initialFollowing,
   contactListing,
@@ -59,8 +64,8 @@ export function ProfileRail({
 }: {
   profile: Profile;
   metrics: ProfileMetrics;
-  /** Anchors to sections that actually rendered. Never a fixed list. */
-  sections: RailSection[];
+  /** The views that actually have content. Never a fixed list. */
+  views: ProfileViewItem[];
   isOwner: boolean;
   initialFollowing: boolean;
   contactListing: { id: string; type: "project" | "product"; title: string } | null;
@@ -195,26 +200,14 @@ export function ProfileRail({
           </RailSectionBlock>
         )}
 
-      {/* Section nav. Built from the sections that ACTUALLY rendered, so it can
-          never offer a link to a heading that is not on the page — the
-          reference's fixed Overview/Projects/Products/Articles/Team/About/
-          Followers list would be mostly dead on every real profile. */}
-      {sections.length > 0 && (
-        <nav aria-label="Profile sections" className="border-t border-hairline p-2">
-          <ul>
-            {sections.map((s) => (
-              <li key={s.id}>
-                <a
-                  href={`#${s.id}`}
-                  className="block rounded-lg px-4 py-2.5 font-body text-[14px] text-ink transition-colors hover:bg-stone/50"
-                >
-                  {s.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      )}
+      {/* The profile navigator. Built from the views that ACTUALLY have
+          content, so it can never offer a destination with nothing in it —
+          the reference's fixed Overview/Projects/Products/Articles/Team/
+          About/Followers list would be mostly dead on every real profile.
+
+          These used to be `#anchor` links that scrolled down to a row of
+          bottom panels. They are real view switches now; see ProfileViews. */}
+      <ProfileViewNav views={views} />
 
       {links.length > 0 && (
         <RailSectionBlock>
@@ -249,7 +242,7 @@ export function ProfileRail({
           </p>
           <Link
             href={claimHref}
-            className="mt-4 inline-flex rounded-full border border-ink/25 px-4 py-2 font-body text-[13px] text-ink transition-colors hover:bg-stone/50"
+            className={`${BTN_PILL_SECONDARY} mt-4`}
           >
             Claim Profile
           </Link>

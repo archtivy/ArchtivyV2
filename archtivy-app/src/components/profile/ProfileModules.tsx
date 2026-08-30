@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Download, FileText } from "lucide-react";
 import { initialsOf } from "@/components/home/EntityCard";
 import { ListingCardShared } from "@/components/listing/ListingCardShared";
 import { getListingUrl } from "@/lib/canonical";
@@ -154,7 +155,13 @@ export function ListingCard({ card }: { card: ProfileListingCard }) {
         creditCount: card.creditCount,
       }}
       ratio={card.type === "product" ? "1/1" : "4/3"}
-      sizes="(max-width: 640px) 45vw, (max-width: 768px) 30vw, (max-width: 1280px) 24vw, 15vw"
+      /* Mirrors the grid above step for step — see the table there. Each value
+         is the widest the card gets inside that band, rounded up. */
+      sizes={
+        "(max-width: 767px) 45vw, (max-width: 1023px) 30vw, " +
+        "(max-width: 1279px) 35vw, (max-width: 1399px) 25vw, " +
+        "(max-width: 1600px) 20vw, 292px"
+      }
     />
   );
 }
@@ -162,12 +169,34 @@ export function ListingCard({ card }: { card: ProfileListingCard }) {
 export function ListingGrid({ items }: { items: ProfileListingCard[] }) {
   if (items.length === 0) return null;
   return (
-    /* Five across on a wide profile, matching the reference's density — its
-       row of work runs five cards, not four. The main column is ~1056px at
-       1440, so five cards land near 195px each, the same width the products
-       directory gives them at 2xl. Denser than four, and it keeps the page
-       from running much taller than the approved composition. */
-    <ul className="grid grid-cols-2 gap-x-4 gap-y-9 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+    /*
+     * FOUR across on large desktop — and the count at every OTHER width is
+     * derived from the column the cards actually sit in, not from the
+     * viewport.
+     *
+     * That distinction matters here in a way it does not on a directory page,
+     * because the 288px rail enters the layout at `lg` and takes its width out
+     * of the grid. Main column, measured:
+     *
+     *     390    358   (rail above, full width)   2 cols -> 171px
+     *     768    720   (rail above, full width)   3 cols -> 229px
+     *    1024    640   (rail beside)              2 cols -> 296px
+     *    1280    896   (rail beside)              3 cols -> 283px
+     *    1400   1016                              4 cols -> 242px
+     *    1440   1056   <- the approved reference   4 cols -> 252px
+     *    1600+  1216   (page capped at 1600)      4 cols -> 292px
+     *
+     * A first cut ran four across from `lg`, which put four cards in a 640px
+     * column at 148px each — exactly the "shrink the cards to fit five"
+     * failure, one column further along. The count now steps DOWN when the
+     * rail appears and back up as the column earns it, so no card is ever
+     * under ~170px on mobile or ~240px on desktop.
+     *
+     * 1400 is a custom stop rather than Tailwind's 2xl (1536): the approved
+     * reference viewport is 1440, and at 2xl a 1440 window would show three.
+     * ListingCardShared is untouched — only the track count changes.
+     */
+    <ul className="grid grid-cols-2 gap-x-4 gap-y-9 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 min-[1400px]:grid-cols-4">
       {items.map((c) => (
         <li key={c.id}>
           <ListingCard card={c} />
@@ -273,22 +302,52 @@ export function TagRow({ tags }: { tags: string[] }) {
   );
 }
 
-/* ── Documents ───────────────────────────────────────────────────────────── */
+/* ── Files ───────────────────────────────────────────────────────────────── */
 
-export function DocumentList({ documents }: { documents: ProfileDocument[] }) {
+/**
+ * The Files view's document list.
+ *
+ * ── ONLY WHAT IS STORED ─────────────────────────────────────────────────────
+ * Name, format, and the listing the file belongs to. NO size: `size_bytes` is
+ * NULL on all 61 rows in listing_documents, so a size column would be blank or
+ * fabricated on every file on the platform. No categories either — there is no
+ * colour, finish or document-type column to group by, which is the same
+ * finding that kept the product page's Downloads list flat.
+ *
+ * ── AND ONLY THROUGH THE SAFE RESOLVER ──────────────────────────────────────
+ * Every href comes from documentDownloadHref, which points at
+ * /api/documents/download and mints a signed URL per request. The raw
+ * listing_documents.file_url is a /object/public/ address on a PRIVATE bucket:
+ * linking it directly returns "Bucket not found" and, if the bucket were ever
+ * opened to fix that, would expose every document with no auth and no record.
+ * A row whose href cannot be built renders disabled rather than dead.
+ */
+export function ProfileFileList({ documents }: { documents: ProfileDocument[] }) {
   if (documents.length === 0) return null;
   return (
-    <ul className="space-y-2.5">
+    <ul className="divide-y divide-hairline border-y border-hairline">
       {documents.map((d) => {
-        // Same rule as the product page: never link to listing_documents.file_url,
-        // which is a /object/public/ address on a private bucket.
         const href = documentDownloadHref({ id: d.id, listing_id: d.listingId });
-        const label = (
+        const body = (
           <>
-            <span className="min-w-0 flex-1 truncate font-body text-[13px] text-ink">
-              {d.fileName}
+            <FileText
+              strokeWidth={1.5}
+              className="h-4 w-4 shrink-0 text-muted"
+              aria-hidden
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-body text-[14px] text-ink">
+                {d.fileName}
+              </span>
+              <span className="mt-0.5 block truncate font-body text-[12px] text-muted">
+                {d.listingTitle}
+              </span>
             </span>
-            <span className="shrink-0 font-body text-[12px] text-muted">{d.listingTitle}</span>
+            {d.format && (
+              <span className="shrink-0 rounded-full border border-hairline px-2.5 py-0.5 font-body text-[11px] uppercase tracking-[0.06em] text-muted">
+                {d.format}
+              </span>
+            )}
           </>
         );
         return (
@@ -298,13 +357,21 @@ export function DocumentList({ documents }: { documents: ProfileDocument[] }) {
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 transition-opacity hover:opacity-70"
+                className="group flex items-center gap-3 py-3.5 transition-colors hover:bg-stone/30"
               >
-                {label}
+                {body}
+                <Download
+                  strokeWidth={1.5}
+                  className="h-4 w-4 shrink-0 text-muted transition-colors group-hover:text-ink"
+                  aria-hidden
+                />
               </a>
             ) : (
-              <span className="flex items-center gap-3 opacity-60" title="This file is unavailable">
-                {label}
+              <span
+                className="flex items-center gap-3 py-3.5 opacity-60"
+                title="This file is unavailable"
+              >
+                {body}
               </span>
             )}
           </li>

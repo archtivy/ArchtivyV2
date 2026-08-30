@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toggleFollow } from "@/app/actions/follows";
+import { BTN_PILL_PRIMARY, BTN_PILL_MUTED } from "@/components/ui/publicButton";
 import type { FollowTargetType } from "@/lib/db/follows";
 
 interface FollowButtonProps {
@@ -11,6 +12,25 @@ interface FollowButtonProps {
   className?: string;
 }
 
+/**
+ * Follow / Following / Unfollow.
+ *
+ * ── STYLING ONLY; THE BEHAVIOUR IS UNTOUCHED ────────────────────────────────
+ * Same optimistic toggle, same server action, same hover-to-Unfollow label.
+ * What changed is the paint: this was drawn in the pre-editorial system —
+ * `border-zinc-200 bg-white text-zinc-700`, a hard-coded `#002abf` focus ring
+ * and a full set of `dark:` variants — on a page that has no dark mode and no
+ * zinc anywhere else. Beside a cream page in `ink` and `hairline` it read as a
+ * control borrowed from another product.
+ *
+ * It now uses the public pill tokens, so it is the same height, radius, type
+ * and focus treatment as Share on a project, Request quote on a product and
+ * every button in the directory filter panel.
+ *
+ * Follow is the PRIMARY action on a profile, so it is solid. Following is not
+ * a second call to action — it is a state — so it drops to the muted outline
+ * and only firms up on hover, where it also becomes Unfollow.
+ */
 export function FollowButton({
   targetType,
   targetId,
@@ -30,17 +50,7 @@ export function FollowButton({
     });
   };
 
-  const label = following
-    ? hovering
-      ? "Unfollow"
-      : "Following"
-    : "Follow";
-
-  const stateClasses = following
-    ? hovering
-      ? "border-zinc-300 text-zinc-500 dark:border-zinc-600 dark:text-zinc-400"
-      : "border-[#002abf] text-[#002abf] dark:border-[#5b7cff] dark:text-[#5b7cff]"
-    : "border-zinc-200 bg-white text-zinc-700 hover:border-[#002abf] hover:text-[#002abf] dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:border-[#5b7cff] dark:hover:text-[#5b7cff]";
+  const label = following ? (hovering ? "Unfollow" : "Following") : "Follow";
 
   return (
     <button
@@ -49,7 +59,7 @@ export function FollowButton({
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
       disabled={isPending}
-      className={`inline-flex items-center justify-center rounded-full h-9 border px-4 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 disabled:opacity-50 ${stateClasses} ${className ?? ""}`}
+      className={`${following ? BTN_PILL_MUTED : BTN_PILL_PRIMARY} ${className ?? ""}`}
     >
       {label}
     </button>

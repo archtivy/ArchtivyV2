@@ -1,11 +1,17 @@
 /**
- * The three numbers under a profile's name: Listings · Connections · Followers.
+ * The two numbers under a profile's name: Listings · Connections.
  *
  * The reference mockup shows Projects / Followers / Following — generic social
  * metrics. Following is a fact about the viewer's habits, not about the
- * profile's value, and "Projects" undercounts a brand to zero. These three say
+ * profile's value, and "Projects" undercounts a brand to zero. These two say
  * what a profile is worth inside a connected archive: how much it has
- * published, how much of the graph it touches, and how many people track it.
+ * published, and how much of the graph it touches.
+ *
+ * ── FOLLOWERS IS GONE FROM THE DATA LAYER TOO ───────────────────────────────
+ * The rail stopped rendering a follower count, but this module kept computing
+ * one: a `followers` field on the type and a count query against `follows` in
+ * the fan-out, whose result nothing read. A removed metric that still costs a
+ * round trip is a metric waiting to be re-rendered by accident. Both are gone.
  */
 
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
@@ -15,14 +21,11 @@ export interface ProfileMetrics {
   listings: number;
   /** Distinct deduplicated graph edges. See the rule below. */
   connections: number;
-  /** Real rows in `follows`. Null when zero, so the stat is omitted. */
-  followers: number | null;
 }
 
 export const EMPTY_PROFILE_METRICS: ProfileMetrics = {
   listings: 0,
   connections: 0,
-  followers: null,
 };
 
 /**
@@ -100,7 +103,7 @@ export async function getProfileMetrics(profileId: string): Promise<ProfileMetri
 
     const edges = new Set<string>();
 
-    const [byProject, byProduct, creditsOnMine, creditsOfMine, followerRes] =
+    const [byProject, byProduct, creditsOnMine, creditsOfMine] =
       await Promise.all([
         ownedProjectIds.length
           ? sup
@@ -125,10 +128,6 @@ export async function getProfileMetrics(profileId: string): Promise<ProfileMetri
           .from("listing_team_members")
           .select("listing_id, profile_id")
           .eq("profile_id", profileId),
-        sup
-          .from("follows")
-          .select("id", { count: "exact", head: true })
-          .eq("target_id", profileId),
       ]);
 
     for (const res of [byProject, byProduct]) {
@@ -143,14 +142,9 @@ export async function getProfileMetrics(profileId: string): Promise<ProfileMetri
       }
     }
 
-    const followers = followerRes.count ?? 0;
-
     return {
       listings: ownedIds.length,
       connections: edges.size,
-      // Zero followers renders no stat at all rather than a "0 Followers" that
-      // reads as a judgement. `follows` holds 9 rows platform-wide.
-      followers: followers > 0 ? followers : null,
     };
   } catch (err) {
     console.error("[profileMetrics] failed:", err);

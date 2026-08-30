@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ContactLeadModal } from "@/components/listing/ContactLeadModal";
+import { BTN_PILL_SECONDARY } from "@/components/ui/publicButton";
 
 export interface ProfileContactButtonProps {
   listingId: string;
@@ -10,9 +11,16 @@ export interface ProfileContactButtonProps {
   className?: string;
 }
 
-const ctaClass =
-  "inline-flex items-center gap-2 rounded border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:focus:ring-offset-zinc-950";
-
+/**
+ * Message — the secondary action beside Follow.
+ *
+ * Behaviour unchanged: still opens ContactLeadModal seeded with the profile's
+ * first listing, because leads are recorded against a listing rather than a
+ * profile. Only the class string moved, from the legacy `rounded border
+ * border-zinc-200 bg-white ... dark:` set to the public secondary pill, so it
+ * matches Follow's height and radius instead of sitting a few pixels short of
+ * it with a 4px corner against a 999px one.
+ */
 export function ProfileContactButton({
   listingId,
   listingType,
@@ -26,7 +34,7 @@ export function ProfileContactButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={ctaClass + " " + className}
+        className={`${BTN_PILL_SECONDARY} ${className}`}
         aria-label="Contact via Archtivy"
       >
         Message

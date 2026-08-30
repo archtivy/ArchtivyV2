@@ -45,6 +45,7 @@ import { unstable_cache } from "next/cache";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getHotspotsForListing, type ImageHotspot } from "@/lib/db/imageHotspots";
+import { documentFormat } from "@/lib/documents/format";
 
 export interface ProductDetailDocument {
   id: string;
@@ -60,26 +61,6 @@ export interface ProductDetailDocument {
    * rather than sorted into folders that nothing backs.
    */
   format: string | null;
-}
-
-/**
- * MIME string -> the short word people recognise. Returns null rather than
- * echoing an unrecognised MIME type at the reader: "application/octet-stream"
- * on a button is worse than no label.
- */
-function documentFormat(mime: string | null | undefined): string | null {
-  if (!mime) return null;
-  const known: Record<string, string> = {
-    "application/pdf": "PDF",
-    "application/zip": "ZIP",
-    "application/x-zip-compressed": "ZIP",
-    "image/jpeg": "JPG",
-    "image/png": "PNG",
-  };
-  if (known[mime]) return known[mime];
-  const tail = mime.split("/")[1];
-  // Only echo a subtype when it is short and wordlike -- never a vendor tree.
-  return tail && /^[a-z0-9]{2,4}$/.test(tail) ? tail.toUpperCase() : null;
 }
 
 export interface ProductDetailProject {
