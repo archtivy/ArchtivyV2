@@ -5,7 +5,7 @@ import { getProductDetail } from "@/lib/db/productDetail";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { HomeNav } from "@/components/home/HomeNav";
 import { HomeFooter } from "@/components/home/HomeFooter";
-import { Gallery } from "@/components/entity/Gallery";
+import { ProductGalleryWithLightbox } from "@/components/products/ProductGalleryWithLightbox";
 import { RailPanel } from "@/components/entity/RelationshipRail";
 import { SaveToggle } from "@/components/home/SaveToggle";
 import { normaliseExternalUrl } from "@/lib/url/externalUrl";
@@ -237,7 +237,55 @@ export async function ProductDetailView({
           {/* ── Gallery ─────────────────────────────────────────────────
               Column 1, row 1. */}
           <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:col-span-7">
-            <Gallery images={detail.images} title={detail.title} />
+            {/* ── The gallery, and the lightbox it opens ────────────────
+                Every value is already resolved for this page; the lightbox
+                adds no query. Each sidebar row is self-omitting, so a product
+                with no materials, dimensions or designer simply renders a
+                shorter card — see ProductLightbox for the measured coverage
+                behind that decision. */}
+            <ProductGalleryWithLightbox
+              images={detail.images}
+              title={detail.title}
+              listingId={detail.id}
+              shareUrl={canonicalUrl}
+              brandName={detail.brand?.name ?? null}
+              brandHref={brandHref}
+              brandAvatarUrl={detail.brand?.avatarUrl ?? null}
+              brandLocation={detail.brand?.location ?? null}
+              year={detail.year}
+              categoryLabel={detail.categoryLabel}
+              categoryHref={
+                detail.categoryLabel && detail.categoryRoot
+                  ? `/products/${detail.categoryRoot}`
+                  : null
+              }
+              designers={detail.designers.map((d) => ({
+                name: d.name,
+                // 37 of 38 credited profiles are unclaimed stubs with no /u/
+                // route, so the row links only where one actually resolves.
+                href: d.username ? `/u/${encodeURIComponent(d.username)}` : null,
+              }))}
+              materials={detail.materials}
+              dimensions={detail.dimensions}
+              colors={detail.colorOptions}
+              projectCount={detail.projects.length}
+              projects={detail.projects.map((pr) => ({
+                id: pr.id,
+                title: pr.title,
+                href: pr.href,
+                cover: pr.cover,
+              }))}
+              projectsHref={detail.projects.length > 0 ? "#seen-in-projects" : null}
+              brandProducts={(detail.brand?.otherProducts ?? []).map((pr) => ({
+                id: pr.id,
+                title: pr.title,
+                href: pr.href,
+                cover: pr.cover,
+              }))}
+              brandProductsHref={
+                (detail.brand?.otherProducts?.length ?? 0) > 0 ? "#more-from-brand" : null
+              }
+            />
           </div>
 
           {/* ── Right column: one sticky unit ─────────────────────────────
@@ -473,6 +521,7 @@ export async function ProductDetailView({
 
         {detail.brand && (
           <ProductRail
+            id="more-from-brand"
             title={`More from ${detail.brand.name}`}
             items={toModels(detail.brand.otherProducts)}
           />

@@ -32,10 +32,13 @@ import { HomeSectionHeader } from "@/components/home/HomeSectionHeader";
  */
 
 export function ProductRail({
+  id,
   title,
   subtitle,
   items,
 }: {
+  /** Optional anchor, so a link elsewhere can land on this rail. */
+  id?: string;
   title: string;
   /** Optional line under the heading, naming the basis for the selection. */
   subtitle?: string;
@@ -44,7 +47,7 @@ export function ProductRail({
   if (items.length === 0) return null;
 
   return (
-    <section className="mt-20" aria-label={title}>
+    <section id={id} className="mt-20" aria-label={title}>
       <HomeSectionHeader title={title} />
       {subtitle && <p className="-mt-4 mb-6 font-body text-[13px] text-muted">{subtitle}</p>}
       {/* Five across on a large desktop, stepping down to four, three and two.
