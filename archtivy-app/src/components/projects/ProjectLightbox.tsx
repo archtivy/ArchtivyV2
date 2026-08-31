@@ -418,6 +418,7 @@ export function ProjectLightbox({
                       onToggle={() =>
                         setOpenHotspot((cur) => (cur === h.id ? null : h.id))
                       }
+                      onClose={() => setOpenHotspot(null)}
                     />
                   ))}
                 </div>
@@ -836,69 +837,102 @@ function LightboxHotspot({
   hotspot,
   open,
   onToggle,
+  onClose,
 }: {
   hotspot: NonNullable<GalleryImage["hotspots"]>[number];
   open: boolean;
   onToggle: () => void;
+  onClose: () => void;
 }) {
   const flip = hotspot.xPercent > 62;
+  const cardId = `lightbox-hotspot-${hotspot.id}`;
 
   return (
+    /*
+     * ── THE ANCHOR IS A FIXED 44px BOX, AND THE CARD LEAVES THE FLOW ────────
+     * This used to be a flex ROW holding the button and the card as siblings,
+     * with -translate-x-1/2 on the row. Closed, the row was 44px wide and the
+     * translate put the dot on the coordinate. Opened, the row became button +
+     * card — about 232px — and the same -50% translate then shifted the whole
+     * row, DOT INCLUDED, sideways. Measured: hovering a pin moved its own dot
+     * 89.5px, out from under the cursor that had just opened it.
+     *
+     * So the anchor is now a constant 44x44 regardless of state, and the card
+     * is positioned absolutely against it. Layout cannot change when the card
+     * appears, so the dot cannot move.
+     *
+     * onMouseLeave sits on THIS element rather than the button, because the
+     * card is a descendant of it: mouseleave does not fire when the pointer
+     * moves onto a descendant, so travelling dot -> card keeps it open and the
+     * link stays clickable, while leaving the pair entirely closes it. Without
+     * any leave handler at all — the previous state — a hover-opened card
+     * stayed open forever, and the dot had moved away so it could not even be
+     * re-hovered to dismiss.
+     */
     <span
-      className="pointer-events-auto absolute z-30"
+      className="pointer-events-auto absolute z-30 block h-11 w-11 -translate-x-1/2 -translate-y-1/2"
       style={{ left: `${hotspot.xPercent}%`, top: `${hotspot.yPercent}%` }}
+      onMouseLeave={onClose}
     >
-      <span
-        className={[
-          "relative flex -translate-x-1/2 -translate-y-1/2 items-center gap-0",
-          flip ? "flex-row-reverse" : "flex-row",
-        ].join(" ")}
+      <button
+        type="button"
+        onClick={onToggle}
+        onMouseEnter={() => {
+          if (!open) onToggle();
+        }}
+        aria-expanded={open}
+        aria-controls={cardId}
+        aria-label={`Product in this photo: ${hotspot.productTitle}${
+          hotspot.brandName ? ` by ${hotspot.brandName}` : ""
+        }`}
+        className="absolute inset-0 flex items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
       >
-        <button
-          type="button"
-          onClick={onToggle}
-          onMouseEnter={() => {
-            if (!open) onToggle();
-          }}
-          aria-expanded={open}
-          aria-label={`Product in this photo: ${hotspot.productTitle}${
-            hotspot.brandName ? ` by ${hotspot.brandName}` : ""
-          }`}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        <span
+          className={[
+            "flex h-[22px] w-[22px] items-center justify-center rounded-full",
+            "border border-white/70 bg-black/45 text-white backdrop-blur-sm",
+            "transition-transform duration-150 motion-reduce:transition-none",
+            open ? "scale-110" : "hover:scale-105",
+          ].join(" ")}
+          aria-hidden
         >
-          <span
-            className={[
-              "flex h-[22px] w-[22px] items-center justify-center rounded-full",
-              "border border-white/70 bg-black/45 text-white backdrop-blur-sm",
-              "transition-transform duration-150 motion-reduce:transition-none",
-              open ? "scale-110" : "hover:scale-105",
-            ].join(" ")}
-            aria-hidden
-          >
-            <span className="text-[13px] leading-none">+</span>
-          </span>
-        </button>
+          <span className="text-[13px] leading-none">+</span>
+        </span>
+      </button>
 
-        {open && (
-          <Link
-            href={hotspot.productHref}
-            className={[
-              "block max-w-[190px] rounded-lg bg-black/80 px-3 py-2 backdrop-blur-sm",
-              "transition-colors hover:bg-black/90",
-              flip ? "mr-[-2px]" : "ml-[-2px]",
-            ].join(" ")}
-          >
-            <span className="block truncate font-body text-[13px] leading-[18px] text-white">
-              {hotspot.productTitle}
+      {open && (
+        <Link
+          id={cardId}
+          href={hotspot.productHref}
+          /* w-max so it sizes to its text rather than stretching the anchor,
+             capped so a long product name still wraps instead of running off
+             the photograph. Flipped to the inside for pins near the right
+             edge, same rule as before. */
+          className={[
+            "absolute top-1/2 w-max max-w-[190px] -translate-y-1/2",
+            "rounded-lg bg-black/80 px-3 py-2 backdrop-blur-sm",
+            "transition-colors hover:bg-black/90",
+            /* NEGATIVE margin, so the card OVERLAPS the anchor box by 4px
+               rather than sitting 4px clear of it. mouseleave does not fire
+               when the pointer moves onto a descendant, but a gap is neither
+               the anchor nor the card — the pointer crossing it counted as
+               leaving, and the card closed before it could be clicked. With
+               the two touching there is nothing in between to fall through.
+               The visible dot is 22px inside a 44px box, so this still leaves
+               ~7px of clear space between the dot and the card. */
+            flip ? "right-full -mr-1" : "left-full -ml-1",
+          ].join(" ")}
+        >
+          <span className="block truncate font-body text-[13px] leading-[18px] text-white">
+            {hotspot.productTitle}
+          </span>
+          {hotspot.brandName && (
+            <span className="block truncate font-body text-[12px] leading-[16px] text-white/55">
+              {hotspot.brandName}
             </span>
-            {hotspot.brandName && (
-              <span className="block truncate font-body text-[12px] leading-[16px] text-white/55">
-                {hotspot.brandName}
-              </span>
-            )}
-          </Link>
-        )}
-      </span>
+          )}
+        </Link>
+      )}
     </span>
   );
 }
