@@ -641,7 +641,27 @@ function LightboxHotspot({
      * re-hovered to dismiss.
      */
     <span
-      className="pointer-events-auto absolute z-30 block h-11 w-11 -translate-x-1/2 -translate-y-1/2"
+      className={[
+        "pointer-events-auto absolute block h-11 w-11 -translate-x-1/2 -translate-y-1/2",
+        /*
+         * ── THE OPEN PIN RISES ABOVE ITS SIBLINGS ─────────────────────────
+         * Every pin used to be a flat z-30, and the card is a child of its
+         * pin, so it inherits that level. Equal z-index means PAINT ORDER IS
+         * DOM ORDER — a pin later in the array drew its dot straight over an
+         * earlier pin's open card. Measured on Istanbul House Design, whose
+         * two right-hand pins sit 21% apart: no clash at 1600 where the image
+         * is wide, but at 1280, 1024 and 768 the card runs under the next
+         * pin's marker every time.
+         *
+         * Raising only the OPEN pin fixes it for any arrangement, because at
+         * most one card is open at a time — no pair-wise collision logic
+         * needed, and none is worth the complexity at this pin density.
+         *
+         * 35, not 40: the sub-xl details sheet is z-40, and a pin must never
+         * be able to paint over it.
+         */
+        open ? "z-[35]" : "z-30",
+      ].join(" ")}
       style={{ left: `${hotspot.xPercent}%`, top: `${hotspot.yPercent}%` }}
       onMouseLeave={onClose}
     >
