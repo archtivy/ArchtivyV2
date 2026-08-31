@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { SaveToggle } from "@/components/home/SaveToggle";
+import { paintedImageRect, pinOffsetInBox } from "@/lib/gallery/imageFit";
 import { shareOrCopy } from "@/lib/share/shareOrCopy";
 import type { GalleryImage } from "@/components/entity/Gallery";
 
@@ -121,6 +122,17 @@ export function ProjectLightbox({
   const restoreFocusTo = useRef<HTMLElement | null>(null);
   const pushedHistory = useRef(false);
   const filmstripRef = useRef<HTMLUListElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+
+  /*
+   * The painted photograph's rectangle, which is what pins are positioned
+   * against — NOT the stage. See lib/gallery/imageFit. Both inputs are
+   * measured rather than assumed: the natural size arrives with the decoded
+   * image, the stage size from a ResizeObserver, so the pins stay correct
+   * through window resizes and orientation changes as well as slide changes.
+   */
+  const [stageBox, setStageBox] = useState({ width: 0, height: 0 });
+  const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
 
   const go = useCallback(
     (delta: number) => {
@@ -243,6 +255,21 @@ export function ProjectLightbox({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, openHotspot, sheetOpen, go, requestClose]);
 
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!open || !el) return;
+    const measure = () =>
+      setStageBox({ width: el.clientWidth, height: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open]);
+
+  // A new slide has its own dimensions; keeping the old ones would place the
+  // next image's pins using the previous image's aspect ratio for a frame.
+  useEffect(() => setNaturalSize({ width: 0, height: 0 }), [index]);
+
   // Keep the active thumbnail in view as navigation moves past the fold.
   useEffect(() => {
     if (!open) return;
@@ -255,6 +282,7 @@ export function ProjectLightbox({
 
   const current = images[index];
   const hotspots = current?.hotspots ?? [];
+  const photoRect = paintedImageRect(naturalSize, stageBox, "contain");
 
   const onTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0]?.clientX ?? null;
@@ -325,6 +353,7 @@ export function ProjectLightbox({
           {/* ── Image stage ───────────────────────────────────────────── */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div
+              ref={stageRef}
               className="relative min-h-0 flex-1"
               onTouchStart={onTouchStart}
               onTouchEnd={onTouchEnd}
@@ -338,6 +367,9 @@ export function ProjectLightbox({
                 fill
                 sizes="(max-width: 1279px) 100vw, 72vw"
                 priority
+                onLoadingComplete={(el) =>
+                  setNaturalSize({ width: el.naturalWidth, height: el.naturalHeight })
+                }
                 className="object-contain"
               />
 
@@ -362,17 +394,34 @@ export function ProjectLightbox({
                 </>
               )}
 
-              {/* Real pins only — see the header note. */}
-              {hotspots.map((h) => (
-                <LightboxHotspot
-                  key={h.id}
-                  hotspot={h}
-                  open={openHotspot === h.id}
-                  onToggle={() =>
-                    setOpenHotspot((cur) => (cur === h.id ? null : h.id))
-                  }
-                />
-              ))}
+              {/* Real pins only — see the header note.
+                  They live in a layer laid exactly over the PAINTED image, not
+                  over the stage, so a percentage means the same point on the
+                  photograph here as it does anywhere else. Rendered only once
+                  the rectangle is known, so nothing flashes at the wrong spot
+                  and then jumps. */}
+              {photoRect && (
+                <div
+                  className="pointer-events-none absolute"
+                  style={{
+                    left: photoRect.x,
+                    top: photoRect.y,
+                    width: photoRect.width,
+                    height: photoRect.height,
+                  }}
+                >
+                  {hotspots.map((h) => (
+                    <LightboxHotspot
+                      key={h.id}
+                      hotspot={h}
+                      open={openHotspot === h.id}
+                      onToggle={() =>
+                        setOpenHotspot((cur) => (cur === h.id ? null : h.id))
+                      }
+                    />
+                  ))}
+                </div>
+              )}
 
               {/* Bottom-left credit line, over the image, as the reference has
                   it. Each part is omitted when the field is absent rather than
@@ -693,7 +742,7 @@ function SidebarBody({
                   {connectionCount} connection{connectionCount === 1 ? "" : "s"}
                 </span>
                 <span className="block font-body text-[12px] text-white/45">
-                  Discover the people behind this project
+                  Products and people linked to this project
                 </span>
               </span>
               <ArrowRight
@@ -709,7 +758,18 @@ function SidebarBody({
       {/* Save is the EXISTING SaveToggle over folder_items — no second
           lightbox-local saved state to fall out of sync with the card behind. */}
       <div className="mt-4 flex items-center justify-end gap-2">
-        <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.10] bg-white/[0.035] text-white">
+        {/*
+         * ── WHY THE CHILD SELECTOR ────────────────────────────────────────
+         * SaveToggle's `card` variant positions ITSELF with `absolute right-3
+         * top-3`, because everywhere else it overlays the corner of a
+         * photograph. Dropped into a 44px circle that offset pushed the 32px
+         * button to x0/y12 — visibly low and left of the two buttons beside
+         * it, and clipped at the bottom. The variant is right for its normal
+         * callers, so this neutralises the offset locally instead of changing
+         * a component five other surfaces render. The wrapper stays `relative`
+         * so the board popover still anchors to it.
+         */}
+        <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.10] bg-white/[0.035] text-white [&>span]:!static [&>span]:!inset-auto">
           <SaveToggle
             listingId={listingId}
             entityType="project"
@@ -785,7 +845,7 @@ function LightboxHotspot({
 
   return (
     <span
-      className="absolute z-30"
+      className="pointer-events-auto absolute z-30"
       style={{ left: `${hotspot.xPercent}%`, top: `${hotspot.yPercent}%` }}
     >
       <span

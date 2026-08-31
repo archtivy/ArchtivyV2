@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
+import { paintedImageRect } from "@/lib/gallery/imageFit";
 import { ChevronLeft, ChevronRight, Expand, Images, Tag } from "lucide-react";
 
 /**
@@ -68,6 +69,21 @@ export function Gallery({
   const [index, setIndex] = useState(0);
   const total = images.length;
   const touchStartX = useRef<number | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+
+  /*
+   * Pins are positioned against the PAINTED photograph, not this box.
+   *
+   * The box is aspect-[16/10] with object-cover, so an image of any other
+   * ratio is scaled up and cropped — and a percentage of the box is then not
+   * the same point as a percentage of the image. The error here is small (a
+   * 1056x685 photo lands pins ~4px high) which is exactly why it survived,
+   * but it is the same mistake that put lightbox pins 107px out, and the two
+   * surfaces can only agree if they resolve the coordinate identically.
+   * See lib/gallery/imageFit.
+   */
+  const [stageBox, setStageBox] = useState({ width: 0, height: 0 });
+  const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
 
   /**
    * Which hotspot's card is open. One at a time, and OPEN-ON-INTENT rather than
@@ -121,6 +137,18 @@ export function Gallery({
     if (index >= total && total > 0) setIndex(0);
   }, [index, total]);
 
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const measure = () => setStageBox({ width: el.clientWidth, height: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => setNaturalSize({ width: 0, height: 0 }), [index]);
+
   // Changing slide must not leave a card open over a different photo.
   useEffect(() => {
     setOpenHotspot(null);
@@ -154,6 +182,7 @@ export function Gallery({
    * false signal, and it would leak the existence of unconfirmed guesses.
    * The owner's PinEditor already badges every pin including pending.
    */
+  const photoRect = paintedImageRect(naturalSize, stageBox, "cover");
   const pinnedImageCount = images.filter((i) => (i.hotspots?.length ?? 0) > 0).length;
   const hiddenPinned = images
     .slice(visibleThumbs)
@@ -221,6 +250,7 @@ export function Gallery({
   return (
     <div>
       <div
+        ref={stageRef}
         role="group"
         aria-roledescription="carousel"
         aria-label={`${title} — image ${index + 1} of ${total}`}
@@ -239,6 +269,10 @@ export function Gallery({
             sizes="(max-width: 1024px) 100vw, 66vw"
             priority={priority && i === 0}
             aria-hidden={i !== index}
+            onLoadingComplete={(el) => {
+              if (i === index)
+                setNaturalSize({ width: el.naturalWidth, height: el.naturalHeight });
+            }}
             className={[
               "object-cover transition-opacity duration-300 ease-out",
               "motion-reduce:transition-none",
@@ -317,15 +351,27 @@ export function Gallery({
             Rendered only for the current slide. Each is a real <button> with
             aria-expanded, so it is tabbable, operable by Enter/Space, and
             announced as a disclosure — not a div that only responds to hover. */}
-        {hotspots.map((h) => (
-          <Hotspot
-            key={h.id}
-            hotspot={h}
-            open={openHotspot === h.id}
-            onToggle={() => setOpenHotspot((cur) => (cur === h.id ? null : h.id))}
-            onClose={() => setOpenHotspot(null)}
-          />
-        ))}
+        {photoRect && (
+          <div
+            className="pointer-events-none absolute"
+            style={{
+              left: photoRect.x,
+              top: photoRect.y,
+              width: photoRect.width,
+              height: photoRect.height,
+            }}
+          >
+            {hotspots.map((h) => (
+              <Hotspot
+                key={h.id}
+                hotspot={h}
+                open={openHotspot === h.id}
+                onToggle={() => setOpenHotspot((cur) => (cur === h.id ? null : h.id))}
+                onClose={() => setOpenHotspot(null)}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/*
@@ -391,7 +437,7 @@ function Hotspot({
 
   return (
     <span
-      className="absolute z-20"
+      className="pointer-events-auto absolute z-20"
       style={{ left: `${hotspot.xPercent}%`, top: `${hotspot.yPercent}%` }}
       onMouseLeave={onClose}
     >

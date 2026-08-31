@@ -126,38 +126,6 @@ export async function ProjectDetailView({
    * Architect and Photographer — nothing here forces an Architecture and
    * Photography pair the way the reference image happens to show.
    */
-  const connectionCount = new Set(
-    detail.team.map((m) => m.profileId).filter((id): id is string => Boolean(id))
-  ).size;
-
-  /*
-   * Credit ORDER is priority, not table order.
-   *
-   * The reference leads with Architecture and Photography, and those two are
-   * real top-level fields here — the studio that owns the listing, and
-   * detail.photographer. Taking the first five team rows instead pushed the
-   * photographer off the end of FR House, which credits three Architects, a
-   * Lighting Designer, a Landscape Architect and a Photographer in that order:
-   * the one role the reference explicitly features was the one dropped.
-   *
-   * So the studio and the photographer are pinned first, then the remaining
-   * credits fill the list in their own order. Nothing is invented and no role
-   * is renamed — a project with neither simply shows its own roles, which is
-   * why this is an ordering rule rather than a fixed Architecture/Photography
-   * pair. Deduped by name so a photographer who is also a team row appears once.
-   */
-  const seenCredit = new Set<string>();
-  const pushCredit = (
-    acc: { role: string; name: string; href: string | null; avatarUrl: string | null }[],
-    c: { role: string; name: string; href: string | null; avatarUrl: string | null }
-  ) => {
-    const key = c.name.trim().toLowerCase();
-    if (!c.name.trim() || seenCredit.has(key)) return acc;
-    seenCredit.add(key);
-    acc.push(c);
-    return acc;
-  };
-
   const lightboxCredits: {
     role: string;
     name: string;
@@ -166,7 +134,7 @@ export async function ProjectDetailView({
   }[] = [];
 
   if (detail.architect) {
-    pushCredit(lightboxCredits, {
+    lightboxCredits.push({
       role: "Architecture",
       name: detail.architect,
       href: detail.architectUsername
@@ -176,22 +144,69 @@ export async function ProjectDetailView({
     });
   }
   if (detail.photographer) {
-    pushCredit(lightboxCredits, {
+    lightboxCredits.push({
       role: "Photography",
       name: detail.photographer,
       href: detail.photographerHref,
+      // No avatar column for the photographer; the initials fallback in
+      // Avatar() covers it, same pattern as every other credit surface.
       avatarUrl: null,
     });
   }
-  for (const m of detail.team) {
-    if (lightboxCredits.length >= 5) break;
-    pushCredit(lightboxCredits, {
-      role: m.role?.trim() || "Credit",
-      name: m.name,
-      href: m.profileUsername ? `/u/${encodeURIComponent(m.profileUsername)}` : null,
-      avatarUrl: m.avatarUrl,
-    });
-  }
+
+  /*
+   * ── PRODUCTS: project_product_links, not product_tags ─────────────────────
+   * Two candidate sources, and they differ: Istanbul House Design has 5 linked
+   * products but only 4 publicly pinned, FR House 3 linked and 1 pinned. Links
+   * is the superset — every public pin on a project is guaranteed to have a
+   * link behind it (the invariant productTagLinks.ts enforces) — and it is
+   * what "Explore all products used" navigates to. Counting pins instead would
+   * promise 4 and then show 5 on arrival, and would report zero for the many
+   * projects whose owner has linked products but never pinned any.
+   *
+   * productModels is used rather than detail.products.length because it is the
+   * resolved, live set the destination section actually renders.
+   */
+  const productCount = productModels.length;
+
+  /*
+   * ── CONNECTIONS: the platform's own definition, scoped to one project ─────
+   * lib/db/connectionsMetric.ts defines a connection as a discovered
+   * relationship between two DISTINCT entities, over three terms:
+   *   A project <-> product   project_product_links, both ends live
+   *   B product <-> product   public tags whose parent is a product gallery
+   *   C listing <-> person    credits carrying a real profile_id
+   * Term B is structurally zero for a project. So A + C here, deduped.
+   *
+   * What is deliberately NOT counted, following that same file: ownership —
+   * the studio behind the project and the brands behind its products. Every
+   * listing has an owner by definition, so counting those is counting rows,
+   * not mapped relationships. Sibling projects by the same studio are excluded
+   * for the same reason: they share an owner, which is not an edge between
+   * this project and them.
+   *
+   * Live values: FR House 3 + 6 = 9. Istanbul House Design 5 + 0 = 5.
+   */
+  const creditConnections = new Set(
+    detail.team.map((m) => m.profileId).filter((id): id is string => Boolean(id))
+  ).size;
+  const connectionCount = productCount + creditConnections;
+
+  /*
+   * The arrow goes where the connections ACTUALLY are.
+   *
+   * Anchoring unconditionally at the team heading was a dead link on any
+   * project whose connections are all products: ProjectTeam renders null on an
+   * empty team, so #project-team-heading does not exist on Istanbul House
+   * Design at all — 5 connections pointing at nothing. People first when there
+   * are people, products otherwise, and no block at all when there is neither.
+   */
+  const connectionsHref =
+    creditConnections > 0
+      ? "#project-team-heading"
+      : productCount > 0
+        ? "#products-used-heading"
+        : null;
 
   const lightboxProducts = productModels.slice(0, 4).map((m) => ({
     id: m.id,
@@ -282,12 +297,12 @@ export async function ProjectDetailView({
                 listingId={detail.id}
                 shareUrl={canonicalUrl}
                 productsHref="#products-used-heading"
-                connectionsHref={connectionCount > 0 ? "#project-team-heading" : null}
+                connectionsHref={connectionsHref}
                 locationLabel={locationLabel}
                 year={detail.year}
                 credits={lightboxCredits}
                 products={lightboxProducts}
-                productCount={detail.products.length}
+                productCount={productCount}
                 connectionCount={connectionCount}
               />
             </div>
