@@ -122,16 +122,16 @@ export function SearchableFilterPanel({
           onClick={() => toggle(opt.value)}
           className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] transition ${
             active
-              ? "bg-zinc-50 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
-              : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800/60"
+              ? "bg-stone/40 text-ink"
+              : "text-ink/80 hover:bg-stone/25"
           }`}
         >
           {multi && (
             <span
               className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center border text-[8px] ${
                 active
-                  ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                  : "border-zinc-300 dark:border-zinc-600"
+                  ? "border-ink bg-ink text-cream"
+                  : "border-hairline"
               }`}
               style={{ borderRadius: 2 }}
             >
@@ -143,7 +143,7 @@ export function SearchableFilterPanel({
             </span>
           )}
           {!multi && active && (
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-900 dark:bg-zinc-100" />
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink" />
           )}
           <span className="truncate">{opt.label}</span>
         </button>
@@ -156,13 +156,13 @@ export function SearchableFilterPanel({
       <div className="fixed inset-0" style={{ zIndex: Z_BACKDROP }} aria-hidden onClick={() => setOpen(false)} />
       <div
         ref={panelRef}
-        className={`${panelWidth} border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900`}
+        className={`${panelWidth} border border-hairline bg-cream`}
         style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: Z_PANEL, borderRadius: 4, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}
       >
         {/* Search input */}
         <div className="px-3.5 pt-3 pb-2">
-          <div className="flex items-center gap-2 border-b border-zinc-100 pb-2 dark:border-zinc-800">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-zinc-300 dark:text-zinc-600" aria-hidden>
+          <div className="flex items-center gap-2 border-b border-hairline pb-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-muted" aria-hidden>
               <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             <input
@@ -171,7 +171,7 @@ export function SearchableFilterPanel({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={placeholder}
-              className="min-w-0 flex-1 bg-transparent text-[13px] text-zinc-900 placeholder-zinc-400 outline-none dark:text-zinc-100 dark:placeholder-zinc-500"
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-ink placeholder-muted outline-none"
             />
           </div>
         </div>
@@ -179,16 +179,16 @@ export function SearchableFilterPanel({
         {/* Popular section */}
         {showPopular && (
           <div className="px-1 pb-1">
-            <p className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Popular</p>
+            <p className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-muted">Popular</p>
             <ul>{popularOptions.map(renderOption)}</ul>
-            <div className="mx-3.5 mt-1 border-t border-zinc-100 dark:border-zinc-800" />
+            <div className="mx-3.5 mt-1 border-t border-hairline" />
           </div>
         )}
 
         {/* All options */}
         <ul className="max-h-60 overflow-auto px-1 pb-2">
           {filtered.length === 0 ? (
-            <li className="px-3.5 py-3 text-xs text-zinc-400 dark:text-zinc-500">No results</li>
+            <li className="px-3.5 py-3 text-xs text-muted">No results</li>
           ) : (
             filtered.map(renderOption)
           )}
@@ -196,17 +196,17 @@ export function SearchableFilterPanel({
 
         {/* Selected tags footer */}
         {multi && selected.length > 0 && (
-          <div className="flex flex-wrap gap-1 border-t border-zinc-100 px-3.5 py-2.5 dark:border-zinc-800">
+          <div className="flex flex-wrap gap-1 border-t border-hairline px-3.5 py-2.5">
             {selected.map((v) => {
               const opt = options.find((o) => o.value === v);
               return (
                 <span
                   key={v}
-                  className="inline-flex items-center gap-1 border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                  className="inline-flex items-center gap-1 rounded-full border border-hairline bg-stone/40 px-2 py-0.5 text-[11px] text-ink"
                   style={{ borderRadius: 2 }}
                 >
                   {opt?.label ?? v}
-                  <button type="button" onClick={() => toggle(v)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200" aria-label={`Remove ${opt?.label}`}>
+                  <button type="button" onClick={() => toggle(v)} className="text-muted hover:text-ink" aria-label={`Remove ${opt?.label}`}>
                     <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
                       <path d="M3 3l6 6M9 3l-6 6" />
                     </svg>

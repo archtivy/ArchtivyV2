@@ -2,15 +2,12 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { SlidersHorizontal, ChevronDown, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { ListingCardShared } from "@/components/listing/ListingCardShared";
-import { DirectorySearchBar } from "@/components/directory/DirectorySearchBar";
-import { DirectoryCategoryRail } from "@/components/directory/DirectoryCategoryRail";
-import {
-  DirectoryFilterPanel,
-  FilterToggle,
-  type FilterColumn,
-} from "@/components/directory/DirectoryFilterPanel";
+import { DirectoryFilterBar } from "@/components/directory/DirectoryFilterBar";
+import { CategoryCascadeFilter } from "@/components/directory/CategoryCascadeFilter";
+import { SearchableFilterPanel } from "@/components/explore/filters/SearchableFilterPanel";
+import type { CategoryTreeNode } from "@/lib/directory/categoryTree";
 import {
   EMPTY_PRODUCT_FILTERS,
   PRODUCT_SORTS,
@@ -25,8 +22,14 @@ import {
 import type { DirectoryProduct, ProductFacets } from "@/lib/db/productsDirectory";
 
 /**
- * Products directory — the sibling of ProjectsDirectory, sharing its control
- * bar, filter panel, category rail and search field rather than restating them.
+ * Products directory — the sibling of ProjectsDirectory, sharing its filter
+ * bar, cascading category pill and facet pills rather than restating them.
+ *
+ * ── ITS FACETS ARE ITS OWN ──────────────────────────────────────────────────
+ * Brand, Colour, Finish and Sustainability exist here and nowhere else;
+ * Location, Project Type, Style, Status, Year and Size are project facts and
+ * are absent. The two directories share a SHELL, not a facet set — there is no
+ * forced parity where the data does not support it.
  *
  * ── URL IS THE STATE, AND THE SERVER READS IT ───────────────────────────────
  * Query, filters, sort and tab round-trip through the query string via
@@ -53,10 +56,13 @@ export function ProductsDirectory({
   total,
   state,
   scope,
+  categoryTree,
 }: {
   products: DirectoryProduct[];
   facets: ProductFacets;
   total: number;
+  /** Roots + their children, for the cascading Category pill. */
+  categoryTree: CategoryTreeNode[];
   /** Parsed from the request URL on the server. */
   state: ProductDirectoryState;
   /** Set on a category archive, where the URL already fixes the category. */
@@ -149,25 +155,6 @@ export function ProductsDirectory({
     });
   };
 
-  const columns: FilterColumn[] = (
-    [
-      { title: "Category", key: "categories" as const, values: facets.categories },
-      { title: "Brand", key: "brands" as const, values: facets.brands },
-      { title: "Materials", key: "materials" as const, values: facets.materials },
-      { title: "Colour", key: "colors" as const, values: facets.colors },
-      { title: "Finish", key: "finishes" as const, values: facets.finishes },
-      { title: "Sustainability", key: "sustainability" as const, values: facets.sustainability },
-    ]
-      // A facet with no values renders no column, and Category is dropped on an
-      // archive route where the URL already fixes it.
-      .filter((c) => c.values.length > 0 && !(scope && c.key === "categories"))
-  ).map((c) => ({
-    title: c.title,
-    values: c.values,
-    selected: filters[c.key] as string[],
-    onToggle: (v: string) => toggle(c.key, v),
-  }));
-
   /** Active filters as individually removable chips. */
   const chips: { label: string; clear: () => void }[] = [];
   const listKeys = [
@@ -197,97 +184,94 @@ export function ProductsDirectory({
 
   return (
     <div>
-      {/* ── Control bar ─────────────────────────────────────────────────── */}
-      <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <button
-          ref={filterBtn}
-          type="button"
-          onClick={() => setPanelOpen((v) => !v)}
-          aria-expanded={panelOpen}
-          aria-haspopup="dialog"
-          className={[
-            "inline-flex shrink-0 items-center gap-2 rounded-full border px-5 py-3 font-body text-[14px] transition-colors",
-            activeCount > 0 || panelOpen
-              ? "border-ink/40 text-ink"
-              : "border-hairline text-ink hover:border-ink/30",
-          ].join(" ")}
-        >
-          <SlidersHorizontal strokeWidth={1.5} className="h-4 w-4" aria-hidden />
-          Filter
-          {activeCount > 0 && (
-            <span className="font-body text-[13px] text-muted">· {activeCount}</span>
-          )}
-          <ChevronDown
-            strokeWidth={1.5}
-            className={`h-4 w-4 text-muted transition-transform ${panelOpen ? "rotate-180" : ""}`}
-            aria-hidden
-          />
-        </button>
+      <DirectoryFilterBar
+        // Null on an archive: ArchiveHeader above already owns that page h1.
+        heading={scope ? null : "Products"}
+        title="Products"
+        countLabel={`${NUMBER.format(results.length)} ${results.length === 1 ? "product" : "products"} found`}
+        q={filters.q}
+        onQueryChange={setQuery}
+        searchPlaceholder="Search products, brands, materials, finishes…"
+        searchLabel="Search products"
+        sortOptions={PRODUCT_SORTS}
+        sort={sort}
+        onSortChange={(v) => write({ sort: v as ProductSortKey }, "push")}
+        chips={chips}
+        onClearAll={() => setFilters(EMPTY_PRODUCT_FILTERS)}
+        pills={
+          <>
+            <CategoryCascadeFilter
+              tree={categoryTree}
+              basePath="/products"
+              allLabel="All Categories"
+              activeSlugPath={scope?.slugPath ?? null}
+            />
 
-        {/* No camera button: there is no product image-search endpoint in this
-            codebase, so it could only open a picker that leads nowhere. */}
-        <DirectorySearchBar
-          value={filters.q}
-          onChange={setQuery}
-          placeholder="Search products, brands, materials, categories…"
-          label="Search products"
-        />
-
-        <label className="relative shrink-0">
-          <span className="sr-only">Sort products</span>
-          <select
-            value={sort}
-            onChange={(e) => write({ sort: e.target.value as ProductSortKey }, "push")}
-            className="appearance-none rounded-full border border-hairline bg-cream py-3 pl-5 pr-11 font-body text-[14px] text-ink focus:border-ink/40 focus:outline-none"
-          >
-            {PRODUCT_SORTS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            strokeWidth={1.5}
-            className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-            aria-hidden
-          />
-        </label>
-
-        {panelOpen && (
-          <DirectoryFilterPanel
-            columns={columns}
-            activeCount={activeCount}
-            onClear={() => setFilters(EMPTY_PRODUCT_FILTERS)}
-            onClose={() => setPanelOpen(false)}
-            triggerRef={filterBtn}
-            title="Filter products"
-            extras={
-              facets.categories.length > 0 ? (
-                <FilterToggle
-                  title="Projects"
-                  label="Used in projects"
-                  checked={filters.usedInProjectsOnly}
-                  onChange={() =>
-                    setFilters({ ...filters, usedInProjectsOnly: !filters.usedInProjectsOnly })
-                  }
-                />
-              ) : null
-            }
-          />
-        )}
-      </div>
-
-      {/* ── Category rail ───────────────────────────────────────────────── */}
-      <div className="mt-4">
-        <DirectoryCategoryRail
-          categories={facets.categories}
-          total={total}
-          basePath="/products"
-          allLabel="All Products"
-          ariaLabel="Product categories"
-          activeSlug={scope ? scope.slugPath.split("/")[0] : null}
-        />
-      </div>
+            {facets.brands.length > 0 && (
+              <SearchableFilterPanel
+                label="Brand"
+                options={facets.brands.map((f) => ({ value: f.value, label: f.label }))}
+                selected={filters.brands}
+                onChange={(v) => setFilters({ ...filters, brands: v })}
+                placeholder="Search brand…"
+              />
+            )}
+            {facets.materials.length > 0 && (
+              <SearchableFilterPanel
+                label="Material"
+                options={facets.materials.map((f) => ({ value: f.value, label: f.label }))}
+                selected={filters.materials}
+                onChange={(v) => setFilters({ ...filters, materials: v })}
+                placeholder="Search material…"
+              />
+            )}
+            {facets.colors.length > 0 && (
+              <SearchableFilterPanel
+                label="Colour"
+                options={facets.colors.map((f) => ({ value: f.value, label: f.label }))}
+                selected={filters.colors}
+                onChange={(v) => setFilters({ ...filters, colors: v })}
+                placeholder="Search colour…"
+              />
+            )}
+            {facets.finishes.length > 0 && (
+              <SearchableFilterPanel
+                label="Finish"
+                options={facets.finishes.map((f) => ({ value: f.value, label: f.label }))}
+                selected={filters.finishes}
+                onChange={(v) => setFilters({ ...filters, finishes: v })}
+                placeholder="Search finish…"
+              />
+            )}
+            {facets.sustainability.length > 0 && (
+              <SearchableFilterPanel
+                label="Sustainability"
+                options={facets.sustainability.map((f) => ({ value: f.value, label: f.label }))}
+                selected={filters.sustainability}
+                onChange={(v) => setFilters({ ...filters, sustainability: v })}
+                placeholder="Search sustainability…"
+              />
+            )}
+            {facets.categories.length > 0 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setFilters({ ...filters, usedInProjectsOnly: !filters.usedInProjectsOnly })
+                }
+                aria-pressed={filters.usedInProjectsOnly}
+                className={[
+                  "inline-flex h-10 shrink-0 items-center rounded-full border px-4 font-body text-[14px] transition-colors",
+                  filters.usedInProjectsOnly
+                    ? "border-ink bg-ink text-cream"
+                    : "border-hairline text-ink hover:border-ink/30",
+                ].join(" ")}
+              >
+                Used in projects
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* ── Results header + tabs ───────────────────────────────────────── */}
       <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-hairline">

@@ -8,6 +8,7 @@ import { ArchiveHeader } from "./ArchiveHeader";
 import { ArchiveBreadcrumb } from "./ArchiveBreadcrumb";
 import { SubcategoryLinks, type SubcategoryLinkItem } from "./SubcategoryLinks";
 import { ProductsDirectory } from "@/components/products/ProductsDirectory";
+import { getDirectoryCategoryTree } from "@/lib/directory/categoryTree";
 import type { ProductsDirectoryData } from "@/lib/db/productsDirectory";
 import type { ProductDirectoryState } from "@/lib/products/directoryParams";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -24,7 +25,7 @@ interface ProductCategoryArchiveProps {
   state: ProductDirectoryState;
 }
 
-export function ProductCategoryArchive({
+export async function ProductCategoryArchive({
   node,
   ancestors,
   childNodes,
@@ -32,6 +33,13 @@ export function ProductCategoryArchive({
   directory,
   state,
 }: ProductCategoryArchiveProps) {
+  // Fetched here rather than threaded through every archive route: this is a
+  // server component and the tree is the same one /products builds.
+  const categoryTree = await getDirectoryCategoryTree(
+    "product",
+    directory.facets.categories.map((f) => f.value)
+  );
+
   const isSubcategory = node.depth > 0;
   const title = node.seo_title || `${node.label} Products`;
   const intro = node.intro_text || node.description;
@@ -92,6 +100,7 @@ export function ProductCategoryArchive({
               paginate a set that is already fully present. */}
           <div className="mt-8">
             <ProductsDirectory
+              categoryTree={categoryTree}
               products={directory.products}
               facets={directory.facets}
               total={directory.total}

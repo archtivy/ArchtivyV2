@@ -2,16 +2,13 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { SlidersHorizontal, ChevronDown, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { ListingCardShared } from "@/components/listing/ListingCardShared";
-import { DirectorySearchBar } from "@/components/directory/DirectorySearchBar";
-import { DirectoryCategoryRail } from "@/components/directory/DirectoryCategoryRail";
-import {
-  DirectoryFilterPanel,
-  FilterToggle,
-  RangeGroup,
-  type FilterColumn,
-} from "@/components/directory/DirectoryFilterPanel";
+import { DirectoryFilterBar } from "@/components/directory/DirectoryFilterBar";
+import { CategoryCascadeFilter } from "@/components/directory/CategoryCascadeFilter";
+import { SearchableFilterPanel } from "@/components/explore/filters/SearchableFilterPanel";
+import { RangeFilterPanel } from "@/components/explore/filters/RangeFilterPanel";
+import type { CategoryTreeNode } from "@/lib/directory/categoryTree";
 import {
   EMPTY_FILTERS,
   SORTS,
@@ -62,10 +59,13 @@ export function ProjectsDirectory({
   total,
   state,
   scope,
+  categoryTree,
 }: {
   projects: DirectoryProject[];
   facets: DirectoryFacets;
   total: number;
+  /** Roots + their children, for the cascading Category pill. */
+  categoryTree: CategoryTreeNode[];
   /** Parsed from the request URL on the server. See the note above. */
   state: DirectoryState;
   /**
@@ -78,9 +78,6 @@ export function ProjectsDirectory({
   scope?: { slugPath: string; label: string; basePath: string } | null;
 }) {
   const router = useRouter();
-  const filterBtn = useRef<HTMLButtonElement>(null);
-
-  const [panelOpen, setPanelOpen] = useState(false);
   const [shown, setShown] = useState(PAGE);
 
   const { filters, sort, tab } = state;
@@ -195,22 +192,6 @@ export function ProjectsDirectory({
   /* Column definitions live here, not in the shared panel: which filters exist
      is a fact about this directory's data. Category is dropped on an archive
      route, where the URL already fixes it. */
-  const filterColumns: FilterColumn[] = (
-    [
-      { title: "Category", key: "buildingTypes" as const, values: facets.buildingTypes },
-      { title: "Location", key: "locations" as const, values: facets.locations },
-      { title: "Project Type", key: "projectTypes" as const, values: facets.projectTypes },
-      { title: "Style", key: "styles" as const, values: facets.styles },
-      { title: "Materials", key: "materials" as const, values: facets.materials },
-      { title: "Status", key: "statuses" as const, values: facets.statuses },
-    ].filter((c) => c.values.length > 0 && !(scope && c.key === "buildingTypes"))
-  ).map((c) => ({
-    title: c.title,
-    values: c.values,
-    selected: filters[c.key] as string[],
-    onToggle: (v: string) => toggle(c.key, v),
-  }));
-
   /** Active filters as individually removable chips. */
   const chips: { label: string; clear: () => void }[] = [];
   const listKeys = ["buildingTypes", "locations", "projectTypes", "styles", "materials", "statuses"] as const;
@@ -266,120 +247,134 @@ export function ProjectsDirectory({
 
   return (
     <div>
-      {/* ── Control bar ─────────────────────────────────────────────────── */}
-      <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <button
-          ref={filterBtn}
-          type="button"
-          onClick={() => setPanelOpen((v) => !v)}
-          aria-expanded={panelOpen}
-          aria-haspopup="dialog"
-          className={[
-            "inline-flex shrink-0 items-center gap-2 rounded-full border px-5 py-3 font-body text-[14px] transition-colors",
-            activeCount > 0 || panelOpen
-              ? "border-ink/40 text-ink"
-              : "border-hairline text-ink hover:border-ink/30",
-          ].join(" ")}
-        >
-          <SlidersHorizontal strokeWidth={1.5} className="h-4 w-4" aria-hidden />
-          Filter
-          {activeCount > 0 && (
-            <span className="font-body text-[13px] text-muted">· {activeCount}</span>
-          )}
-          <ChevronDown
-            strokeWidth={1.5}
-            className={`h-4 w-4 text-muted transition-transform ${panelOpen ? "rotate-180" : ""}`}
-            aria-hidden
-          />
-        </button>
+      <DirectoryFilterBar
+        // Null on an archive: ArchiveHeader above already owns that page h1.
+        heading={scope ? null : "Projects"}
+        title="Projects"
+        countLabel={`${NUMBER.format(results.length)} ${results.length === 1 ? "project" : "projects"} found`}
+        q={filters.q}
+        onQueryChange={setQuery}
+        searchPlaceholder="Search projects, locations, studios, products, materials…"
+        searchLabel="Search projects"
+        sortOptions={SORTS}
+        sort={sort}
+        onSortChange={(v) => write({ sort: v as SortKey }, "push")}
+        chips={chips}
+        onClearAll={() => setFilters(EMPTY_FILTERS)}
+        pills={
+          <>
+            {/* Category is the only pill that NAVIGATES: it routes to the
+                canonical archive, which is the only thing that can express a
+                subcategory. On an archive route the URL already fixes the
+                path, so the pill shows it as active rather than disappearing. */}
+            <CategoryCascadeFilter
+              tree={categoryTree}
+              basePath="/projects"
+              allLabel="All Categories"
+              activeSlugPath={scope?.slugPath ?? null}
+            />
 
-        <DirectorySearchBar
-          value={filters.q}
-          onChange={setQuery}
-          placeholder="Search projects, locations, studios, products, materials…"
-          label="Search projects"
-        />
-
-        <label className="relative shrink-0">
-          <span className="sr-only">Sort projects</span>
-          <select
-            value={sort}
-            onChange={(e) => write({ sort: e.target.value as SortKey }, "push")}
-            className="appearance-none rounded-full border border-hairline bg-cream py-3 pl-5 pr-11 font-body text-[14px] text-ink focus:border-ink/40 focus:outline-none"
-          >
-            {SORTS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            strokeWidth={1.5}
-            className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-            aria-hidden
-          />
-        </label>
-
-        {panelOpen && (
-          <DirectoryFilterPanel
-            columns={filterColumns}
-            activeCount={activeCount}
-            onClear={() => setFilters(EMPTY_FILTERS)}
-            onClose={() => setPanelOpen(false)}
-            triggerRef={filterBtn}
-            title="Filter projects"
-            extras={
-              <>
-                {facets.yearRange && (
-                  <RangeGroup
-                    title="Year"
-                    min={facets.yearRange.min}
-                    max={facets.yearRange.max}
-                    from={filters.yearMin}
-                    to={filters.yearMax}
-                    onFrom={(v) => setFilters({ ...filters, yearMin: v })}
-                    onTo={(v) => setFilters({ ...filters, yearMax: v })}
-                  />
-                )}
-                {facets.areaRange && (
-                  <RangeGroup
-                    title="Size (ft²)"
-                    min={facets.areaRange.min}
-                    max={facets.areaRange.max}
-                    from={filters.areaMin}
-                    to={filters.areaMax}
-                    onFrom={(v) => setFilters({ ...filters, areaMin: v })}
-                    onTo={(v) => setFilters({ ...filters, areaMax: v })}
-                  />
-                )}
-                {facets.projectsWithProducts > 0 && (
-                  <FilterToggle
-                    title="Products"
-                    label="With products specified"
-                    count={facets.projectsWithProducts}
-                    checked={filters.withProductsOnly}
-                    onChange={() =>
-                      setFilters({ ...filters, withProductsOnly: !filters.withProductsOnly })
-                    }
-                  />
-                )}
-              </>
-            }
-          />
-        )}
-      </div>
-
-      {/* ── Category rail ───────────────────────────────────────────────── */}
-      <div className="mt-4">
-        <DirectoryCategoryRail
-          categories={facets.buildingTypes}
-          total={total}
-          basePath="/projects"
-          allLabel="All Projects"
-          ariaLabel="Project categories"
-          activeSlug={scope ? scope.slugPath.split("/")[0] : null}
-        />
-      </div>
+            {facets.locations.length > 0 && (
+              <SearchableFilterPanel
+                label="Location"
+                options={facets.locations.map((f) => ({ value: f.value, label: f.label }))}
+                selected={filters.locations}
+                onChange={(v) => setFilters({ ...filters, locations: v })}
+                placeholder="Search locations…"
+              />
+            )}
+            {facets.projectTypes.length > 0 && (
+              <SearchableFilterPanel
+                label="Project Type"
+                options={facets.projectTypes.map((f) => ({ value: f.value, label: f.label }))}
+                selected={filters.projectTypes}
+                onChange={(v) => setFilters({ ...filters, projectTypes: v })}
+                placeholder="Search types…"
+              />
+            )}
+            {facets.styles.length > 0 && (
+              <SearchableFilterPanel
+                label="Style"
+                options={facets.styles.map((f) => ({ value: f.value, label: f.label }))}
+                selected={filters.styles}
+                onChange={(v) => setFilters({ ...filters, styles: v })}
+                placeholder="Search styles…"
+              />
+            )}
+            {facets.materials.length > 0 && (
+              <SearchableFilterPanel
+                label="Material"
+                options={facets.materials.map((f) => ({ value: f.value, label: f.label }))}
+                selected={filters.materials}
+                onChange={(v) => setFilters({ ...filters, materials: v })}
+                placeholder="Search materials…"
+              />
+            )}
+            {facets.statuses.length > 0 && (
+              <SearchableFilterPanel
+                label="Status"
+                options={facets.statuses.map((f) => ({ value: f.value, label: f.label }))}
+                selected={filters.statuses}
+                onChange={(v) => setFilters({ ...filters, statuses: v })}
+                placeholder="Search statuses…"
+              />
+            )}
+            {/* Year and Size are ranges, not lists — and each appears only
+                when the archive actually carries the values. */}
+            {facets.yearRange && (
+              <RangeFilterPanel
+                label="Year"
+                minLabel="From"
+                maxLabel="To"
+                minValue={filters.yearMin != null ? String(filters.yearMin) : ""}
+                maxValue={filters.yearMax != null ? String(filters.yearMax) : ""}
+                onChange={(min, max) =>
+                  setFilters({
+                    ...filters,
+                    yearMin: min ? Number(min) : null,
+                    yearMax: max ? Number(max) : null,
+                  })
+                }
+                placeholder={[String(facets.yearRange.min), String(facets.yearRange.max)]}
+              />
+            )}
+            {facets.areaRange && (
+              <RangeFilterPanel
+                label="Size (ft²)"
+                minLabel="From"
+                maxLabel="To"
+                minValue={filters.areaMin != null ? String(filters.areaMin) : ""}
+                maxValue={filters.areaMax != null ? String(filters.areaMax) : ""}
+                onChange={(min, max) =>
+                  setFilters({
+                    ...filters,
+                    areaMin: min ? Number(min) : null,
+                    areaMax: max ? Number(max) : null,
+                  })
+                }
+                placeholder={[String(facets.areaRange.min), String(facets.areaRange.max)]}
+              />
+            )}
+            {facets.projectsWithProducts > 0 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setFilters({ ...filters, withProductsOnly: !filters.withProductsOnly })
+                }
+                aria-pressed={filters.withProductsOnly}
+                className={[
+                  "inline-flex h-10 shrink-0 items-center rounded-full border px-4 font-body text-[14px] transition-colors",
+                  filters.withProductsOnly
+                    ? "border-ink bg-ink text-cream"
+                    : "border-hairline text-ink hover:border-ink/30",
+                ].join(" ")}
+              >
+                With products
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* ── Results header + tabs ───────────────────────────────────────── */}
       <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-hairline pb-0">

@@ -3,6 +3,7 @@ export const revalidate = 3600;
 import type { Metadata } from "next";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { getProductsDirectory } from "@/lib/db/productsDirectory";
+import { getDirectoryCategoryTree } from "@/lib/directory/categoryTree";
 import { parseProductDirectoryState } from "@/lib/products/directoryParams";
 import { isSearchResultUrl, toSearchParams } from "@/lib/discovery/indexation";
 import { HomeNav } from "@/components/home/HomeNav";
@@ -72,6 +73,10 @@ export default async function ProductsIndexPage({
 }) {
   const sp = await searchParams;
   const { products, facets, total } = await getProductsDirectory();
+  const categoryTree = await getDirectoryCategoryTree(
+    "product",
+    facets.categories.map((f) => f.value)
+  );
 
   /* Parsed on the SERVER, so /products?q=chair renders its results in the HTML
      rather than after hydration. */
@@ -95,17 +100,12 @@ export default async function ProductsIndexPage({
       <HomeNav variant="solid" />
 
       <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
-        {/* ── NO HERO BAND ───────────────────────────────────────────────
-            Removed for the same reason as the projects one: the control bar is
-            the page's entry point, and a stats-and-photograph band above it
-            pushed the first product most of a viewport down. The h1 stays,
-            because the band carried this page's only one. */}
-        <h1 className="font-display text-[28px] leading-none tracking-tight text-ink sm:text-[32px]">
-          Products
-        </h1>
-
-        <div className="mt-8">
+        {/* The h1 and the result count live in DirectoryFilterBar now, on one
+            line as in the reference. The page deliberately renders no heading
+            of its own — two h1s would be a document-outline regression. */}
+        <div>
           <ProductsDirectory
+            categoryTree={categoryTree}
             products={products}
             facets={facets}
             total={total}

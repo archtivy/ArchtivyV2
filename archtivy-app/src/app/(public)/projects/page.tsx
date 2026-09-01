@@ -3,6 +3,7 @@ export const revalidate = 3600;
 import type { Metadata } from "next";
 import { getAbsoluteUrl } from "@/lib/canonical";
 import { getProjectsDirectory } from "@/lib/db/projectsDirectory";
+import { getDirectoryCategoryTree } from "@/lib/directory/categoryTree";
 import { parseDirectoryState, isSearchResultUrl } from "@/lib/projects/directoryParams";
 import { HomeNav } from "@/components/home/HomeNav";
 import { HomeFooter } from "@/components/home/HomeFooter";
@@ -90,6 +91,12 @@ export default async function ProjectsIndexPage({
 }) {
   const sp = await searchParams;
   const { projects, facets, total } = await getProjectsDirectory();
+  // Roots restricted to those that actually carry projects — the same facet
+  // the pill's "All Categories" list is measured against.
+  const categoryTree = await getDirectoryCategoryTree(
+    "project",
+    facets.buildingTypes.map((f) => f.value)
+  );
 
   /*
    * Parsed on the SERVER and handed down, so /projects?q=house renders its
@@ -124,24 +131,15 @@ export default async function ProjectsIndexPage({
       <HomeNav variant="solid" />
 
       <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
-        {/* ── NO HERO BAND ───────────────────────────────────────────────
-            The stats-and-photograph band that used to open this page is gone;
-            the control bar is the first thing under the nav now.
-
-            A plain h1 stays. The band carried the page's ONLY h1, so removing
-            it outright would have left /projects with no heading at all — a
-            document-outline and SEO regression, not a layout simplification.
-            This is the heading, not a hero: no image, no stat panel, no second
-            search field. */}
-        <h1 className="font-display text-[28px] leading-none tracking-tight text-ink sm:text-[32px]">
-          Projects
-        </h1>
-
-        <div className="mt-8">
+        {/* The h1 and the result count live in DirectoryFilterBar now, on one
+            line as in the reference. The page deliberately renders no heading
+            of its own — two h1s would be a document-outline regression. */}
+        <div>
           <ProjectsDirectory
             projects={projects}
             facets={facets}
             total={total}
+            categoryTree={categoryTree}
             state={state}
           />
         </div>

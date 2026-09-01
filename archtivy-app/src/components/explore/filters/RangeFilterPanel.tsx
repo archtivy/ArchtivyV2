@@ -95,47 +95,47 @@ export function RangeFilterPanel({
       <div className="fixed inset-0" style={{ zIndex: Z - 1 }} aria-hidden onClick={() => setOpen(false)} />
       <div
         ref={panelRef}
-        className="w-56 border border-zinc-200 bg-white p-3.5 dark:border-zinc-700 dark:bg-zinc-900"
+        className="w-56 border border-hairline bg-cream p-3.5"
         style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: Z, borderRadius: 4, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}
       >
         <div className="flex gap-2">
           <div className="flex-1">
-            <label className="mb-1 block text-[11px] font-medium text-zinc-400 dark:text-zinc-500">{minLabel}</label>
+            <label className="mb-1 block text-[11px] font-medium text-muted">{minLabel}</label>
             <input
               type="text"
               inputMode="numeric"
               value={localMin}
               onChange={(e) => setLocalMin(e.target.value.replace(/[^\d]/g, ""))}
               placeholder={placeholder[0]}
-              className="w-full border border-zinc-200 bg-white px-2.5 py-1.5 text-[13px] text-zinc-900 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-500"
+              className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 font-body text-[13px] text-ink placeholder:text-muted focus:border-ink/40 focus:outline-none"
               style={{ borderRadius: 3 }}
             />
           </div>
-          <div className="flex items-end pb-2 text-zinc-300 dark:text-zinc-600">
+          <div className="flex items-end pb-2 text-muted">
             <span className="text-xs">–</span>
           </div>
           <div className="flex-1">
-            <label className="mb-1 block text-[11px] font-medium text-zinc-400 dark:text-zinc-500">{maxLabel}</label>
+            <label className="mb-1 block text-[11px] font-medium text-muted">{maxLabel}</label>
             <input
               type="text"
               inputMode="numeric"
               value={localMax}
               onChange={(e) => setLocalMax(e.target.value.replace(/[^\d]/g, ""))}
               placeholder={placeholder[1]}
-              className="w-full border border-zinc-200 bg-white px-2.5 py-1.5 text-[13px] text-zinc-900 placeholder:text-zinc-300 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-500"
+              className="w-full rounded-md border border-hairline bg-white px-2.5 py-1.5 font-body text-[13px] text-ink placeholder:text-muted focus:border-ink/40 focus:outline-none"
               style={{ borderRadius: 3 }}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); apply(); } }}
             />
           </div>
         </div>
         <div className="mt-3 flex items-center justify-between">
-          <button type="button" onClick={clear} className="text-[11px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300">
+          <button type="button" onClick={clear} className="font-body text-[11px] text-muted hover:text-ink">
             Clear
           </button>
           <button
             type="button"
             onClick={apply}
-            className="border border-zinc-900 bg-zinc-900 px-3 py-1 text-[11px] font-medium text-white transition hover:bg-zinc-800 dark:border-zinc-200 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="rounded-full border border-ink bg-ink px-3 py-1 font-body text-[11px] text-cream transition hover:bg-ink/90"
             style={{ borderRadius: 3 }}
           >
             Apply
