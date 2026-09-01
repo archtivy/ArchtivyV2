@@ -8,17 +8,16 @@ import { getDefaultProfileForClerkUserId } from "@/lib/db/profiles";
  * ── WHY A REDIRECT AND NOT A PAGE ───────────────────────────────────────────
  * This was a deliberate placeholder ("Profile editing is being rebuilt…") that
  * existed only so the account menu's "Edit Profile" item had a target that was
- * not a 404. The editor it was waiting for is now a drawer over the profile
- * itself, which is where editing belongs: the owner sees the page they are
- * changing while they change it.
+ * not a 404. Editing now happens ON the profile: the owner turns the page
+ * itself into edit mode and changes each field where it is published.
  *
  * The route is KEPT rather than deleted because it is linked from
  * HeaderProfileMenu, TopNavAuth and the workspace Settings page, and may be
- * bookmarked. ?edit=1 is read client-side by ProfileOwnerControls, which opens
- * the drawer and then strips the param.
+ * bookmarked. ?edit=1 is read client-side by ProfileEditProvider, which enters
+ * edit mode and then strips the param.
  *
  * Falls back to /u/id/[profileId] for the 158 of 199 profiles with no
- * username — that route renders the same page and the same drawer.
+ * username — that route renders the same page and the same edit mode.
  */
 export default async function EditProfilePage() {
   const { userId } = await auth();

@@ -20,6 +20,9 @@ import {
 } from "@/components/profile/ProfileModules";
 import type { ProfileMetrics } from "@/lib/db/profileMetrics";
 import type { ProfilePageData } from "@/lib/db/profilePage";
+import { ProfileEditProvider } from "@/components/profile/edit/ProfileEditContext";
+import { EditableText } from "@/components/profile/edit/EditableText";
+import { ProfileIntro } from "@/components/profile/edit/ProfileIntro";
 import type { Profile } from "@/lib/types/profiles";
 
 /**
@@ -75,7 +78,15 @@ function prettyUrl(url: string | null | undefined): string | null {
   return raw.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/+$/, "") || null;
 }
 
-function ProfileCover({ profile, data }: { profile: Profile; data: ProfilePageData }) {
+function ProfileCover({
+  profile,
+  data,
+  isOwner,
+}: {
+  profile: Profile;
+  data: ProfilePageData;
+  isOwner: boolean;
+}) {
   return (
     <header>
       {/* Cover. No cover column exists on `profiles`, so this is the profile's
@@ -116,13 +127,10 @@ function ProfileCover({ profile, data }: { profile: Profile; data: ProfilePageDa
        * The full text stays in the DOM for screen readers and for SEO; only
        * the visual height is capped, and About shows it unclamped.
        */}
-      {profile.bio && (
-        <ProfileStatement>
-          <p className="mt-7 line-clamp-3 max-w-[68ch] font-body text-[17px] leading-[30px] text-ink">
-            {profile.bio}
-          </p>
-        </ProfileStatement>
-      )}
+      {/* In edit mode the statement renders even when bio is empty, so a
+          profile with no introduction still has somewhere to write one.
+          Publicly it is unchanged: no bio, no band. */}
+      <ProfileIntro bio={profile.bio} isOwner={isOwner} />
 
       {/* SLOT: Promote / Featured CTA. Blocked on Stripe — intentionally not
           rendered rather than shown as a button that cannot complete. */}
@@ -140,7 +148,15 @@ function ProfileCover({ profile, data }: { profile: Profile; data: ProfilePageDa
  * it sits beside "Builds in" and means something different. No field is
  * invented: each row is dropped when its column is null.
  */
-function AboutView({ profile, data }: { profile: Profile; data: ProfilePageData }) {
+function AboutView({
+  profile,
+  data,
+  isOwner,
+}: {
+  profile: Profile;
+  data: ProfilePageData;
+  isOwner: boolean;
+}) {
   const basedIn = [profile.location_city, profile.location_country].filter(Boolean).join(", ");
   const website = prettyUrl(profile.website);
 
@@ -160,11 +176,19 @@ function AboutView({ profile, data }: { profile: Profile; data: ProfilePageData 
 
   return (
     <div className="max-w-[72ch]">
-      {profile.bio && (
+      {(profile.bio || isOwner) && (
         <Section title="Profile">
-          <p className="whitespace-pre-line font-body text-[15px] leading-[26px] text-ink">
-            {profile.bio}
-          </p>
+          <EditableText
+            field="bio"
+            multiline
+            rows={10}
+            inputClassName="whitespace-pre-line font-body text-[15px] leading-[26px] text-ink"
+            placeholder="What your studio does, and what it is known for."
+          >
+            <p className="whitespace-pre-line font-body text-[15px] leading-[26px] text-ink">
+              {profile.bio}
+            </p>
+          </EditableText>
         </Section>
       )}
       <Section title="Details">
@@ -305,7 +329,7 @@ export function ProfilePageView(props: ProfilePageViewProps) {
       ? `/u/${encodeURIComponent(profile.username)}/claim`
       : null;
 
-  return (
+  const page = (
     <div className="min-h-screen bg-cream font-body text-ink">
       {/* The canonical public chrome, the same pair /projects, /products and
           both detail pages render. SiteShell and ConditionalFooter treat /u/*
@@ -341,7 +365,7 @@ export function ProfilePageView(props: ProfilePageViewProps) {
             </div>
 
             <div className="min-w-0">
-              <ProfileCover profile={profile} data={data} />
+              <ProfileCover profile={profile} data={data} isOwner={isOwner} />
 
               <div className="mt-10">
                 {/* The empty state is not a VIEW — it is a statement about the
@@ -370,7 +394,7 @@ export function ProfilePageView(props: ProfilePageViewProps) {
                       <CollaboratorsView data={data} />
                     </ProfileView>
                     <ProfileView viewKey="about">
-                      <AboutView profile={profile} data={data} />
+                      <AboutView profile={profile} data={data} isOwner={isOwner} />
                     </ProfileView>
                     <ProfileView viewKey="files">
                       <ProfileFileList documents={data.documents} />
@@ -386,4 +410,10 @@ export function ProfilePageView(props: ProfilePageViewProps) {
       <HomeFooter />
     </div>
   );
+
+  /* The provider is mounted ONLY for the owner. That is what keeps edit-mode
+     markup — pencils, camera chip, Edit links, Save/Cancel — out of a public
+     visitor's HTML entirely rather than hidden with CSS: with no context,
+     every editable component returns its published children untouched. */
+  return isOwner ? <ProfileEditProvider profile={profile}>{page}</ProfileEditProvider> : page;
 }

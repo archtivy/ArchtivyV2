@@ -3,7 +3,14 @@ import Image from "next/image";
 import { AtSign, BadgeCheck, Globe, Link2, MapPin } from "lucide-react";
 import { FollowButton } from "@/components/follow/FollowButton";
 import { ProfileContactButton } from "@/components/profile/ProfileContactButton";
-import { ProfileOwnerControls } from "@/components/profile/ProfileOwnerControls";
+import {
+  ProfileOwnerActions,
+  AvatarEditBadge,
+  EditableLocation,
+  EditLinksControl,
+  ConnectBlock,
+} from "@/components/profile/edit/ProfileOwnerActions";
+import { EditableText } from "@/components/profile/edit/EditableText";
 import { initialsOf } from "@/components/home/EntityCard";
 import { normaliseInstagramHandle } from "@/lib/publish/instagram";
 import { ProfileViewNav, type ProfileViewItem } from "@/components/profile/ProfileViews";
@@ -144,10 +151,18 @@ export function ProfileRail({
               {initialsOf(displayName)}
             </span>
           )}
+          <AvatarEditBadge />
         </span>
 
         <h1 className="mt-5 flex items-center justify-center gap-1.5 text-center font-display text-[22px] leading-[1.15] tracking-[-0.01em] text-ink">
-          <span className="min-w-0">{displayName}</span>
+          <EditableText
+            field="display_name"
+            align="center"
+            inputClassName="font-display text-[22px] leading-[1.15] tracking-[-0.01em] text-ink"
+            placeholder="Studio or brand name"
+          >
+            <span className="min-w-0">{displayName}</span>
+          </EditableText>
           {isVerified && (
             <BadgeCheck
               strokeWidth={1.5}
@@ -158,12 +173,16 @@ export function ProfileRail({
         </h1>
 
         <p className="mt-1.5 text-center font-body text-[13px] text-muted">{roleLabel}</p>
-        {location && (
-          <p className="mt-1 flex items-center justify-center gap-1 text-center font-body text-[13px] text-muted">
-            <MapPin strokeWidth={1.5} className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            {location}
-          </p>
-        )}
+        <p className="mt-1 flex items-center justify-center gap-1 text-center font-body text-[13px] text-muted">
+          <EditableLocation>
+            {location && (
+              <span className="inline-flex items-center gap-1">
+                <MapPin strokeWidth={1.5} className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {location}
+              </span>
+            )}
+          </EditableLocation>
+        </p>
 
         {!isOwner ? (
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
@@ -185,7 +204,7 @@ export function ProfileRail({
              for everyone else — same position, same weight, nothing moves. It
              used to be a Link to /me/profile, which was a placeholder page;
              that route now redirects back here and opens this drawer. */
-          <ProfileOwnerControls profile={profile} />
+          <ProfileOwnerActions />
         )}
 
         </div>
@@ -216,11 +235,16 @@ export function ProfileRail({
           bottom panels. They are real view switches now; see ProfileViews. */}
       <ProfileViewNav views={views} />
 
-      {links.length > 0 && (
-        <RailSectionBlock>
-          <h2 className="mb-3 font-body text-[12px] uppercase tracking-[0.08em] text-muted">
-            Connect
-          </h2>
+      {/* In edit mode the block renders even with zero populated links, so the
+          owner has somewhere to add the first one. Publicly it is unchanged:
+          no links, no section. */}
+      <ConnectBlock hasLinks={links.length > 0}>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="font-body text-[12px] uppercase tracking-[0.08em] text-muted">
+              Connect
+            </h2>
+            <EditLinksControl />
+          </div>
           <ul className="space-y-2.5">
             {links.map(({ key, href, Icon, label }) => (
               <li key={key}>
@@ -236,8 +260,7 @@ export function ProfileRail({
               </li>
             ))}
           </ul>
-        </RailSectionBlock>
-      )}
+      </ConnectBlock>
 
       {claimHref && (
         <RailSectionBlock>
