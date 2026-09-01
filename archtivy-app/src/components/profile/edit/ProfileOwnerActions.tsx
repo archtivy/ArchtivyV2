@@ -5,6 +5,7 @@ import { useClerk } from "@clerk/nextjs";
 import { Camera, Link2, Pencil } from "lucide-react";
 import { ProfileLocationPicker, type ProfileLocationValue } from "@/components/location/ProfileLocationPicker";
 import { useProfileEdit } from "./ProfileEditContext";
+import { AnchoredPopover } from "./AnchoredPopover";
 
 /**
  * The owner's mode switch, in the slot Follow/Message occupy for everyone else.
@@ -97,25 +98,11 @@ export function AvatarEditBadge() {
 export function EditableLocation({ children }: { children: React.ReactNode }) {
   const ctx = useProfileEdit();
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLSpanElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!ctx?.editing) setOpen(false);
   }, [ctx?.editing]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   if (!ctx || !ctx.editing) return <>{children}</>;
 
@@ -131,9 +118,10 @@ export function EditableLocation({ children }: { children: React.ReactNode }) {
     : null;
 
   return (
-    <span ref={wrapRef} className="relative inline-flex items-center justify-center gap-1.5">
+    <span className="inline-flex items-center justify-center gap-1.5">
       <span className="min-w-0">{children}</span>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Edit location"
@@ -143,8 +131,13 @@ export function EditableLocation({ children }: { children: React.ReactNode }) {
         <Pencil strokeWidth={1.5} className="h-3.5 w-3.5" aria-hidden />
       </button>
 
-      {open && (
-        <span className="absolute left-1/2 top-full z-40 mt-2 block w-[260px] -translate-x-1/2 rounded-lg border border-hairline bg-cream p-3 text-left shadow-lg">
+      <AnchoredPopover
+        open={open}
+        anchorRef={triggerRef}
+        onClose={() => setOpen(false)}
+        width={260}
+        align="center"
+      >
           <ProfileLocationPicker
             value={value}
             label="Location"
@@ -160,8 +153,7 @@ export function EditableLocation({ children }: { children: React.ReactNode }) {
               })
             }
           />
-        </span>
-      )}
+      </AnchoredPopover>
     </span>
   );
 }
@@ -173,46 +165,34 @@ export function EditableLocation({ children }: { children: React.ReactNode }) {
  * logical section, and editing them one pencil at a time would mean four
  * separate inline inputs in a list that renders only the populated ones.
  *
- * ── ONLY THE FOUR THE SCHEMA HOLDS ──────────────────────────────────────────
- * X/Twitter and Pinterest are absent because `profiles` has no column for
- * either. Adding them would need a migration; they are reported rather than
- * drawn as inputs that discard what you type.
+ * All six the schema holds. X/Twitter and Pinterest joined the other four in
+ * migration 20260831100000; each renders publicly only when it has a value, so
+ * the two new ones cost nothing on the 200 profiles that have neither.
  */
 const LINK_FIELDS = [
   { key: "website", label: "Website", placeholder: "https://" },
   { key: "instagram", label: "Instagram", placeholder: "@handle" },
   { key: "linkedin", label: "LinkedIn", placeholder: "URL or handle" },
   { key: "behance", label: "Behance", placeholder: "URL or handle" },
+  { key: "twitter_url", label: "X / Twitter", placeholder: "URL or @handle" },
+  { key: "pinterest_url", label: "Pinterest", placeholder: "URL or handle" },
 ] as const;
 
 export function EditLinksControl() {
   const ctx = useProfileEdit();
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!ctx?.editing) setOpen(false);
   }, [ctx?.editing]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   if (!ctx?.editing) return null;
 
   return (
-    <div ref={wrapRef} className="relative">
+    <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
@@ -222,8 +202,7 @@ export function EditLinksControl() {
         Edit links
       </button>
 
-      {open && (
-        <div className="absolute left-0 top-full z-40 mt-2 w-[248px] rounded-lg border border-hairline bg-cream p-3 shadow-lg">
+      <AnchoredPopover open={open} anchorRef={triggerRef} onClose={() => setOpen(false)} width={248}>
           {LINK_FIELDS.map(({ key, label, placeholder }) => (
             <label key={key} className="mb-2.5 block last:mb-0">
               <span className="mb-1 block font-body text-[11px] text-muted">{label}</span>
@@ -239,8 +218,7 @@ export function EditLinksControl() {
           <p className="mt-2.5 font-body text-[11px] leading-[15px] text-muted">
             Each link appears under Connect once it has a value.
           </p>
-        </div>
-      )}
+      </AnchoredPopover>
     </div>
   );
 }

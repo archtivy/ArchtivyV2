@@ -25,7 +25,13 @@ export interface Profile {
   linkedin: string | null;
   /** Real column on `profiles`, absent from this type until 2026-08-31. */
   behance: string | null;
+  twitter_url: string | null;
+  pinterest_url: string | null;
   avatar_url: string | null;
+  /** Owner-set cover. NULL falls back to the first published listing's cover. */
+  cover_image_url: string | null;
+  /** Short intro under the cover. NULL falls back to `bio`. Max 300 chars. */
+  short_bio: string | null;
   designer_discipline: string | null;
   brand_type: string | null;
   reader_type: string | null;
@@ -82,7 +88,11 @@ export type ProfileUpdateInput = Partial<
     | "instagram"
     | "linkedin"
     | "behance"
+    | "twitter_url"
+    | "pinterest_url"
     | "avatar_url"
+    | "cover_image_url"
+    | "short_bio"
     | "designer_discipline"
     | "brand_type"
     | "reader_type"

@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
+import { uploadProfileCover } from "@/lib/storage/avatars";
 import {
   getProfileForOwnershipCheck,
   ownsProfile,
@@ -84,6 +85,13 @@ export async function updateProfileAction(
     instagram: (formData.get("instagram") as string)?.trim() || null,
     linkedin: (formData.get("linkedin") as string)?.trim() || null,
     behance: (formData.get("behance") as string)?.trim() || null,
+    twitter_url: (formData.get("twitter_url") as string)?.trim() || null,
+    pinterest_url: (formData.get("pinterest_url") as string)?.trim() || null,
+    cover_image_url: (formData.get("cover_image_url") as string)?.trim() || null,
+    // Trimmed rather than rejected, matching how `username` is sanitised a few
+    // lines above. 300 is the limit the textarea enforces; this is the guard
+    // for anything that reaches the action another way.
+    short_bio: (formData.get("short_bio") as string)?.trim().slice(0, 300) || null,
     designer_discipline: existing.role === "designer" ? designerDiscipline : null,
     brand_type: existing.role === "brand" ? brandType : null,
     reader_type: existing.role === "reader" ? readerType : null,
@@ -123,4 +131,45 @@ export async function updateProfileActionForm(
     return { error: "Missing profile." };
   }
   return updateProfileAction(profileId, _prev, formData);
+}
+
+/**
+ * Upload a cover for a profile the caller owns, and return its public URL.
+ *
+ * ── OWNERSHIP IS CHECKED HERE TOO ───────────────────────────────────────────
+ * This writes to storage, which updateProfileAction does not cover, so it
+ * repeats the same check with the same `ownsProfile` rule rather than trusting
+ * that the UI only offers the control to owners. Without it, any signed-in user
+ * could write objects under another profile's storage prefix.
+ *
+ * It only UPLOADS. The URL goes into the edit draft and is persisted by the
+ * normal save, so an upload followed by Cancel leaves the profile unchanged.
+ *
+ * Removing a cover nulls the column and deliberately does NOT delete the
+ * object: the draft is cancellable, and deleting on click would break the
+ * rendered cover of an owner who then cancels. The file sits at a fixed path
+ * and is overwritten by the next upload, so orphans are bounded to one per
+ * profile.
+ */
+export async function uploadProfileCoverAction(
+  formData: FormData
+): Promise<{ url: string } | { error: string }> {
+  const { userId } = await auth();
+  if (!userId) return { error: "Sign in to update this profile." };
+
+  const profileId = (formData.get("_profileId") as string)?.trim();
+  const file = formData.get("file");
+  if (!profileId) return { error: "Missing profile." };
+  if (!(file instanceof File) || file.size === 0) return { error: "Choose an image." };
+
+  const existing = (await getProfileForOwnershipCheck(profileId)).data;
+  if (!existing || !ownsProfile(userId, existing)) {
+    return { error: "Not allowed to update this profile." };
+  }
+
+  const result = await uploadProfileCover(profileId, file);
+  if (result.error !== null || result.data === null) {
+    return { error: result.error ?? "Upload failed." };
+  }
+  return { url: result.data };
 }

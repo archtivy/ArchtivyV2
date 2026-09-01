@@ -23,6 +23,7 @@ import type { ProfilePageData } from "@/lib/db/profilePage";
 import { ProfileEditProvider } from "@/components/profile/edit/ProfileEditContext";
 import { EditableText } from "@/components/profile/edit/EditableText";
 import { ProfileIntro } from "@/components/profile/edit/ProfileIntro";
+import { ProfileCoverImage } from "@/components/profile/edit/ProfileCoverImage";
 import type { Profile } from "@/lib/types/profiles";
 
 /**
@@ -89,26 +90,20 @@ function ProfileCover({
 }) {
   return (
     <header>
-      {/* Cover. No cover column exists on `profiles`, so this is the profile's
-          own first cover image; when they have published nothing it falls back
-          to a flat stone band rather than a broken frame.
+      {/* Cover. `profiles.cover_image_url` if the owner set one, otherwise the
+          profile's own first published cover image, otherwise a flat stone band
+          rather than a broken frame. See ProfileCoverImage.
 
           ── COVER GEOMETRY, MEASURED FROM THE REFERENCE ────────────────────
           The reference cover spans the full main column at roughly 4.3 : 1 —
           755 x 176 in a 1024-wide render. An aspect ratio rather than a fixed
           height keeps that proportion at every width. */}
-      <div className="relative aspect-[43/10] w-full overflow-hidden rounded-xl bg-stone">
-        {data.coverImage && (
-          <Image
-            src={data.coverImage}
-            alt=""
-            fill
-            sizes="100vw"
-            className="object-cover"
-            priority
-          />
-        )}
-      </div>
+      <ProfileCoverImage
+        profileId={profile.id}
+        savedCover={profile.cover_image_url}
+        derivedCover={data.coverImage}
+        isOwner={isOwner}
+      />
 
       {/*
        * The statement, and nothing beside it.
@@ -130,7 +125,7 @@ function ProfileCover({
       {/* In edit mode the statement renders even when bio is empty, so a
           profile with no introduction still has somewhere to write one.
           Publicly it is unchanged: no bio, no band. */}
-      <ProfileIntro bio={profile.bio} isOwner={isOwner} />
+      <ProfileIntro shortBio={profile.short_bio} bio={profile.bio} isOwner={isOwner} />
 
       {/* SLOT: Promote / Featured CTA. Blocked on Stripe — intentionally not
           rendered rather than shown as a button that cannot complete. */}

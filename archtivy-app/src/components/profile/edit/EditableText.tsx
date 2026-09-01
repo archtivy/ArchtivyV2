@@ -31,6 +31,7 @@ export function EditableText({
   maxLength,
   rows = 5,
   displayClassName = "",
+  seed,
 }: {
   field: keyof ProfileDraft;
   children: React.ReactNode;
@@ -46,6 +47,13 @@ export function EditableText({
    * editing, and not to the public render, which owns its own markup.
    */
   displayClassName?: string;
+  /**
+   * DISPLAY-ONLY fallback shown when this field is empty. Never copied into the
+   * draft: the intro falls back to `bio` for display, but typing must start
+   * from an empty short_bio so About is not silently duplicated into it. The
+   * open input shows the placeholder, not this.
+   */
+  seed?: string;
 }) {
   const ctx = useProfileEdit();
   const [open, setOpen] = useState(false);
@@ -111,7 +119,7 @@ export function EditableText({
       ].join(" ")}
     >
       <span className={`min-w-0 ${inputClassName} ${displayClassName}`}>
-        {value || <span className="text-muted">{placeholder ?? "Add…"}</span>}
+        {value || seed || <span className="text-muted">{placeholder ?? "Add…"}</span>}
       </span>
       <button
         type="button"

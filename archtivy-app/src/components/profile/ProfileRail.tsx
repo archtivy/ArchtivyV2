@@ -118,14 +118,21 @@ export function ProfileRail({
       Icon: Link2,
       label: "LinkedIn",
     },
-    // behance is a real column that nothing could previously write, so it was
-    // never rendered. It is editable in the drawer now, so CONNECT lists it —
-    // on the same "only when it has a value" rule as the other three.
-    (profile as { behance?: string | null }).behance && {
-      key: "be",
-      href: (profile as { behance?: string | null }).behance as string,
+    // The three columns nothing could write before this pass. Each obeys the
+    // same rule as the originals: rendered only when it has a value, so a
+    // profile that uses none of them shows exactly the section it always did.
+    profile.behance && { key: "be", href: profile.behance, Icon: Link2, label: "Behance" },
+    profile.twitter_url && {
+      key: "tw",
+      href: profile.twitter_url,
       Icon: Link2,
-      label: "Behance",
+      label: "X / Twitter",
+    },
+    profile.pinterest_url && {
+      key: "pin",
+      href: profile.pinterest_url,
+      Icon: Link2,
+      label: "Pinterest",
     },
   ].filter(Boolean) as { key: string; href: string; Icon: typeof Globe; label: string }[];
 

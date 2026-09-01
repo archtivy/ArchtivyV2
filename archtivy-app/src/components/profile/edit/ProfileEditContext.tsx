@@ -31,11 +31,18 @@ import type { Profile } from "@/lib/types/profiles";
 
 export interface ProfileDraft {
   display_name: string;
+  /** Full About content. */
   bio: string;
+  /** Short intro under the cover. Independent of `bio` — see ProfileIntro. */
+  short_bio: string;
+  /** "" means "no owner-set cover", which falls back to the derived one. */
+  cover_image_url: string;
   website: string;
   instagram: string;
   linkedin: string;
   behance: string;
+  twitter_url: string;
+  pinterest_url: string;
   location_place_name: string;
   location_city: string;
   location_country: string;
@@ -69,10 +76,14 @@ function draftOf(p: Profile): ProfileDraft {
   return {
     display_name: p.display_name ?? "",
     bio: p.bio ?? "",
+    short_bio: p.short_bio ?? "",
+    cover_image_url: p.cover_image_url ?? "",
     website: p.website ?? "",
     instagram: p.instagram ?? "",
     linkedin: p.linkedin ?? "",
-    behance: (p as { behance?: string | null }).behance ?? "",
+    behance: p.behance ?? "",
+    twitter_url: p.twitter_url ?? "",
+    pinterest_url: p.pinterest_url ?? "",
     location_place_name:
       p.location_place_name ?? [p.location_city, p.location_country].filter(Boolean).join(", "),
     location_city: p.location_city ?? "",
