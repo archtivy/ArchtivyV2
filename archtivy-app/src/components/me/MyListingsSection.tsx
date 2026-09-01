@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Bookmark, ChevronDown, Eye, Plus } from "lucide-react";
@@ -52,6 +52,34 @@ export function MyListingsSection({
   const [tab, setTab] = useState<TabKey>(tabs[0]?.key ?? "project");
   const active = tabs.find((t) => t.key === tab) ?? tabs[0] ?? null;
   const railRef = useRef<HTMLUListElement>(null);
+
+  /*
+   * ── THE ARROWS APPEAR ONLY WHEN THERE IS SOMEWHERE TO GO ──────────────────
+   * They used to render whenever the tab held more than one card, which is not
+   * the same question. Measured at 1600px with four cards: scrollWidth 1278 ===
+   * clientWidth 1278 — the rail did not overflow, and both arrows were live
+   * controls that did nothing when clicked.
+   *
+   * Overflow depends on viewport width and on the active tab's card count, so
+   * it is measured rather than predicted: a ResizeObserver on the rail catches
+   * window resizes and the sidebar drawer, and `active.key` re-runs it when the
+   * tab changes the number of cards.
+   */
+  const [overflows, setOverflows] = useState(false);
+  const measure = useCallback(() => {
+    const el = railRef.current;
+    if (!el) return;
+    setOverflows(el.scrollWidth > el.clientWidth + 1);
+  }, []);
+
+  useEffect(() => {
+    const el = railRef.current;
+    if (!el) return;
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [measure, active?.key]);
 
   const scrollBy = (dir: 1 | -1) => {
     const el = railRef.current;
@@ -109,7 +137,7 @@ export function MyListingsSection({
             ))}
           </ul>
 
-          {active.items.length > 1 && (
+          {overflows && (
             <div className="flex items-center justify-center gap-2 pb-5">
               <RailArrow label="Scroll left" onClick={() => scrollBy(-1)}>
                 <ArrowLeft strokeWidth={1.5} className="h-4 w-4" aria-hidden />

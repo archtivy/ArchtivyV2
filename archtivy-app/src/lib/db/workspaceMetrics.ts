@@ -1,5 +1,6 @@
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { getUserListingStats } from "@/lib/db/userStats";
+import { countProfileFollowers } from "@/lib/db/profileMetrics";
 
 /**
  * The four headline numbers on the /me workspace dashboard.
@@ -47,7 +48,7 @@ export async function getWorkspaceMetrics(
 ): Promise<WorkspaceMetric[]> {
   const [stats, followers] = await Promise.all([
     getUserListingStats(clerkUserId, profileId),
-    countFollowers(profileId),
+    countProfileFollowers(profileId),
   ]);
 
   return [
@@ -76,30 +77,6 @@ export async function getWorkspaceMetrics(
       note: "People following this profile",
     },
   ];
-}
-
-/**
- * Followers of THIS profile.
- *
- * `follows` is (follower_profile_id, target_type, target_id); target_id is the
- * profile being followed, so this is a direct count and needs no dedupe — the
- * table carries a uniqueness constraint per (follower, target).
- *
- * Deliberately NOT filtered by target_type: a profile is followed as either
- * "designer" or "brand" depending on its role at the time of the follow, and
- * filtering on today's role would drop followers gained before a role change.
- */
-async function countFollowers(profileId: string): Promise<number> {
-  if (!profileId) return 0;
-  const { count, error } = await getSupabaseServiceClient()
-    .from("follows")
-    .select("id", { count: "exact", head: true })
-    .eq("target_id", profileId);
-  if (error) {
-    console.error(`[workspaceMetrics] follower count failed: ${error.message}`);
-    return 0;
-  }
-  return count ?? 0;
 }
 
 /**

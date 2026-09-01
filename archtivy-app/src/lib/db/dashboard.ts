@@ -1,6 +1,7 @@
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { computeListingCompleteness, type ListingCompleteness } from "@/lib/publish/listingCompleteness";
 import { getLiveSaveCountsByListingIds } from "@/lib/db/userStats";
+import { countProfileFollowers } from "@/lib/db/profileMetrics";
 
 /**
  * Dashboard data for /me/dashboard.
@@ -344,16 +345,6 @@ async function loadFeed(profileId: string): Promise<FeedItem[]> {
     .slice(0, 8);
 }
 
-async function loadFollowerCount(profileId: string): Promise<number> {
-  const supabase = getSupabaseServiceClient();
-  const { count, error } = await supabase
-    .from("follows")
-    .select("id", { count: "exact", head: true })
-    .eq("target_id", profileId);
-  if (error) return 0;
-  return count ?? 0;
-}
-
 /** Shared assembly; the two role entry points differ only in their stats. */
 async function buildDashboard(
   profileId: string,
@@ -368,7 +359,7 @@ async function buildDashboard(
   const [inputs, feed, followerCount, saveCounts] = await Promise.all([
     loadDraftCompletenessInputs(draftIds),
     loadFeed(profileId),
-    loadFollowerCount(profileId),
+    countProfileFollowers(profileId),
     getLiveSaveCountsByListingIds(listingIds),
   ]);
 

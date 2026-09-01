@@ -151,3 +151,36 @@ export async function getProfileMetrics(profileId: string): Promise<ProfileMetri
     return EMPTY_PROFILE_METRICS;
   }
 }
+
+/**
+ * Followers of a profile — the ONE definition.
+ *
+ * ── WHY IT LIVES HERE AND NOT IN ProfileMetrics ─────────────────────────────
+ * The public rail deliberately stopped rendering a follower count (see the
+ * note at the top of this file), so `followers` is not a field on
+ * ProfileMetrics and must not come back as one. But the signed-in workspace
+ * DOES show the owner their own follower number, which is a different question
+ * from "what is this profile worth in the archive" — so it is a separate
+ * exported function rather than a resurrected field.
+ *
+ * It exists because the count was written twice, byte-identically, in
+ * lib/db/dashboard (loadFollowerCount) and lib/db/workspaceMetrics
+ * (countFollowers). Two copies of one query is how the two surfaces eventually
+ * disagree; both now call this.
+ *
+ * `target_type` is deliberately NOT filtered: a profile is followed as either
+ * "designer" or "brand" depending on its role at the time, and filtering on
+ * today's role would drop followers gained before a role change.
+ */
+export async function countProfileFollowers(profileId: string): Promise<number> {
+  if (!profileId) return 0;
+  const { count, error } = await getSupabaseServiceClient()
+    .from("follows")
+    .select("id", { count: "exact", head: true })
+    .eq("target_id", profileId);
+  if (error) {
+    console.error(`[profileMetrics] follower count failed: ${error.message}`);
+    return 0;
+  }
+  return count ?? 0;
+}
