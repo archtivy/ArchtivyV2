@@ -3,7 +3,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
-import { getProfileByClerkId, updateProfile, isUsernameTaken } from "@/lib/db/profiles";
+import {
+  getProfileForOwnershipCheck,
+  ownsProfile,
+  updateProfile,
+  isUsernameTaken,
+} from "@/lib/db/profiles";
 import type { ProfileUpdateInput } from "@/lib/types/profiles";
 
 export type ProfileActionResult = { error?: string } | { ok: true };
@@ -18,9 +23,15 @@ export async function updateProfileAction(
     return { error: "Sign in to update profile." };
   }
 
-  const existingResult = await getProfileByClerkId(userId);
+  /*
+   * Ownership is enforced HERE, server-side, on the row being written — never
+   * inferred from the caller's own profile and never trusted from the client.
+   * `ownsProfile` is the same rule loadProfilePage uses to show the editor, so
+   * the control and the mutation behind it cannot drift apart.
+   */
+  const existingResult = await getProfileForOwnershipCheck(profileId);
   const existing = existingResult.data;
-  if (!existing || existing.id !== profileId) {
+  if (!existing || !ownsProfile(userId, existing)) {
     return { error: "Not allowed to update this profile." };
   }
 
@@ -72,6 +83,7 @@ export async function updateProfileAction(
     website: (formData.get("website") as string)?.trim() || null,
     instagram: (formData.get("instagram") as string)?.trim() || null,
     linkedin: (formData.get("linkedin") as string)?.trim() || null,
+    behance: (formData.get("behance") as string)?.trim() || null,
     designer_discipline: existing.role === "designer" ? designerDiscipline : null,
     brand_type: existing.role === "brand" ? brandType : null,
     reader_type: existing.role === "reader" ? readerType : null,

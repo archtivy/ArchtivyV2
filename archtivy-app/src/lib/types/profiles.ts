@@ -23,6 +23,8 @@ export interface Profile {
   website: string | null;
   instagram: string | null;
   linkedin: string | null;
+  /** Real column on `profiles`, absent from this type until 2026-08-31. */
+  behance: string | null;
   avatar_url: string | null;
   designer_discipline: string | null;
   brand_type: string | null;
@@ -79,6 +81,7 @@ export type ProfileUpdateInput = Partial<
     | "website"
     | "instagram"
     | "linkedin"
+    | "behance"
     | "avatar_url"
     | "designer_discipline"
     | "brand_type"

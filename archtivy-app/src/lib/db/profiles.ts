@@ -42,6 +42,55 @@ export async function getProfileByClerkId(
 }
 
 /**
+ * The profile a mutation is about to write to, fetched BY ID for an ownership
+ * check — not by the caller's clerk id.
+ *
+ * ── WHY BY ID ───────────────────────────────────────────────────────────────
+ * updateProfileAction used to resolve the signed-in user's OWN profile via
+ * getProfileByClerkId and then compare ids. That silently encoded a narrower
+ * rule than the page's: lib/profile/loadProfilePage grants ownership on
+ * `clerk_user_id === userId || owner_user_id === userId`, so a user who owns a
+ * profile through owner_user_id saw the Edit control and was refused by the
+ * action behind it. Harmless only because owner_user_id is populated on 0 of
+ * 200 live rows — a latent divergence, not a working design.
+ *
+ * Service role: the check must see owner_user_id on a row the anon key may not
+ * return, and it reads only the three fields the decision needs.
+ */
+export async function getProfileForOwnershipCheck(
+  id: string
+): Promise<DbResult<Pick<Profile, "id" | "clerk_user_id" | "role"> & { owner_user_id: string | null } | null>> {
+  const supabaseService = getSupabaseServiceClient();
+  const { data, error } = await supabaseService
+    .from(TABLE)
+    .select("id, clerk_user_id, owner_user_id, role")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) return { data: null, error: error.message };
+  return {
+    data: (data as (Pick<Profile, "id" | "clerk_user_id" | "role"> & { owner_user_id: string | null }) | null) ?? null,
+    error: null,
+  };
+}
+
+/**
+ * The single definition of "this signed-in user controls this profile".
+ *
+ * Used by loadProfilePage to decide whether to render the editor, and by
+ * updateProfileAction to decide whether to accept the write. One rule, so the
+ * button and the action can never disagree again.
+ */
+export function ownsProfile(
+  userId: string | null | undefined,
+  profile: { clerk_user_id?: string | null; owner_user_id?: string | null } | null | undefined
+): boolean {
+  if (!userId || !profile) return false;
+  return userId === profile.clerk_user_id || userId === profile.owner_user_id;
+}
+
+/**
  * Get the default (visible) profile for the current user for /me and header "Profile" link.
  * Prefers owned non-hidden profiles with is_primary=true, else newest; fallback to signup profile (clerk_user_id) if non-hidden.
  */
