@@ -54,7 +54,7 @@ function getSearchType(pathname: string): "projects" | "products" {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function HeaderSearch() {
+export function HeaderSearch({ forceInline = false }: { forceInline?: boolean } = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -66,7 +66,17 @@ export function HeaderSearch() {
   const popoverRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const mode = getHeaderMode(pathname);
+  /*
+   * `forceInline` lets a host ask for the visible pill on a route the
+   * classifier would otherwise send to the compact icon — the /me workspace
+   * top bar, whose reference shows a persistent search field.
+   *
+   * A prop rather than another entry in getHeaderMode(): the classifier is
+   * about the PUBLIC surface's discovery pages, and adding /me to it would put
+   * the workspace's layout decision inside a list nobody reading the shell
+   * would think to check. Default false, so no existing call site changes.
+   */
+  const mode = forceInline ? "inline" : getHeaderMode(pathname);
   const placeholder = getPlaceholder(pathname);
   const searchType = getSearchType(pathname);
 

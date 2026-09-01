@@ -89,8 +89,8 @@ export function MeWorkspaceShell({
           </button>
 
           <div className="hidden min-w-0 flex-1 justify-center md:flex">
-            <div className="w-full max-w-[520px]">
-              <HeaderSearch />
+            <div className="flex w-full max-w-[520px] [&_form]:max-w-none">
+              <HeaderSearch forceInline />
             </div>
           </div>
           <div className="flex-1 md:hidden" />

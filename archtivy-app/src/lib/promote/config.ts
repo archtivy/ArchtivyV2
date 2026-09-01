@@ -22,7 +22,9 @@ export function getPrice(placement: PlacementType, duration: DurationDays): numb
 export function getDailyRate(placement: PlacementType): string {
   const cents = DAILY_RATE_CENTS[placement] ?? 0;
   const dollars = cents / 100;
-  return dollars % 1 === 0 ? `$${dollars}` : `$${dollars.toFixed(1)}`;
+  // toFixed(2), not (1): the map spotlight rate is 150 cents and rendered as
+  // "$1.5", which reads as a truncated number rather than a price.
+  return dollars % 1 === 0 ? `$${dollars}` : `$${dollars.toFixed(2)}`;
 }
 
 export function formatCents(cents: number): string {
