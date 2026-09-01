@@ -256,6 +256,11 @@ export default async function Home() {
             items={productItems}
             filters={PRODUCT_PILLS}
             ratio="1/1"
+            /* Exactly five, in one row on desktop, with no Load more — "View
+               all products" in the header is the way to the rest. */
+            pageSize={5}
+            loadMore={false}
+            typeBadge
             /* Five across on large desktop, deliberately denser than the
                projects showcase above and than /products' own grid. Solved
                entirely in the grid container — see GRIDS in Showcase. */

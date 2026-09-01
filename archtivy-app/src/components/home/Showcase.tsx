@@ -57,6 +57,14 @@ export interface ShowcaseProps {
   ratio?: "4/3" | "1/1";
   /** How many cards to show before "load more". */
   pageSize?: number;
+  /** Prints PROJECT / PRODUCT on each card. See ListingCardShared. */
+  typeBadge?: boolean;
+  /**
+   * False caps the section at `pageSize` with no "Load more" — the section
+   * shows exactly that many and the "View all" link in the header is the way
+   * to the rest.
+   */
+  loadMore?: boolean;
   /**
    * Cards per row at the widest desktop step. The products showcase runs
    * denser than the projects one by design.
@@ -84,20 +92,22 @@ export interface ShowcaseProps {
  *     4      -       -     254     284      294
  *     5      -       -     198     222      230
  *
- * Five columns is therefore introduced at 1400 rather than at Tailwind's 2xl
- * (1536): at 2xl a 1440 window — the reference width — would still show four,
- * and at xl (1280) five would squeeze a product card to 198px. The card is
- * never altered to make a count fit; the count changes to suit the card.
+ * Five columns was introduced at 1400 so a card never fell below ~222px. The
+ * homepage products showcase now ships exactly five items and must read as ONE
+ * row on desktop, so the 5-column step moves to xl (1280), where a card is
+ * 198px — measured, not guessed. That is the narrowest step in the table and
+ * it is a deliberate trade for the single row; between 1280 and 1400 a product
+ * tile is tighter than it was. The card itself is unchanged.
  */
 const GRIDS: Record<4 | 5, string> = {
   4: "grid-cols-2 md:grid-cols-3 xl:grid-cols-4",
-  5: "grid-cols-2 md:grid-cols-3 xl:grid-cols-4 min-[1400px]:grid-cols-5",
+  5: "grid-cols-2 md:grid-cols-3 xl:grid-cols-5",
 };
 
 /** Mirrors GRIDS step for step, so the browser never fetches the wrong size. */
 const SIZES: Record<4 | 5, string> = {
   4: "(max-width: 767px) 45vw, (max-width: 1279px) 28vw, (max-width: 1439px) 20vw, 294px",
-  5: "(max-width: 767px) 45vw, (max-width: 1279px) 28vw, (max-width: 1399px) 20vw, (max-width: 1439px) 17vw, 230px",
+  5: "(max-width: 767px) 45vw, (max-width: 1279px) 28vw, (max-width: 1439px) 17vw, 230px",
 };
 
 export function Showcase({
@@ -109,6 +119,8 @@ export function Showcase({
   ratio = "4/3",
   pageSize = 8,
   maxColumns = 4,
+  typeBadge = false,
+  loadMore = true,
 }: ShowcaseProps) {
   const [active, setActive] = useState<string | null>(null);
   const [visible, setVisible] = useState(pageSize);
@@ -119,7 +131,7 @@ export function Showcase({
   );
 
   const shown = filtered.slice(0, visible);
-  const hasMore = filtered.length > visible;
+  const hasMore = loadMore && filtered.length > visible;
 
   if (items.length === 0) return null;
 
@@ -186,6 +198,7 @@ export function Showcase({
               model={it.model}
               ratio={ratio}
               sizes={SIZES[maxColumns]}
+              typeBadge={typeBadge}
             />
           ))}
         </div>

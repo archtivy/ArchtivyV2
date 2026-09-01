@@ -121,11 +121,23 @@ export function ListingCardShared({
   ratio = "4/3",
   priority = false,
   sizes = "(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 30vw",
+  typeBadge = false,
 }: {
   model: ListingCardModel;
   ratio?: "4/3" | "1/1";
   priority?: boolean;
   sizes?: string;
+  /**
+   * Prints PROJECT / PRODUCT in the image's top-left corner.
+   *
+   * Off by default and opted into per surface, NOT added to every card: on
+   * /projects and /products the page already says which entity you are looking
+   * at, and a tag repeating it on ninety cards is noise. It earns its place on
+   * a mixed homepage, where the two showcases sit one above the other.
+   *
+   * Top-LEFT specifically — SaveToggle occupies the top-right of this same box.
+   */
+  typeBadge?: boolean;
 }) {
   const credits = model.creditCount ?? 0;
   const metaParts = [model.categoryLabel, model.metaLabel].filter(Boolean) as string[];
@@ -188,6 +200,12 @@ export function ListingCardShared({
             <span className="absolute inset-0" aria-hidden />
           )}
         </Link>
+
+        {typeBadge && (
+          <span className="pointer-events-none absolute left-2.5 top-2.5 z-10 rounded bg-ink/65 px-2 py-1 font-body text-[10px] uppercase leading-none tracking-[0.1em] text-cream backdrop-blur-sm">
+            {model.type}
+          </span>
+        )}
 
         <BadgeOverlay model={model} />
 

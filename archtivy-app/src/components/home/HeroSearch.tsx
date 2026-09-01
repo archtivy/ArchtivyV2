@@ -57,14 +57,29 @@ export function HeroSearch({ popularSearches }: HeroSearchProps) {
       </form>
 
       {popularSearches.length > 0 && (
-        <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="font-body text-[13px] text-cream/60">Popular searches:</span>
-          <ul className="flex flex-wrap gap-2">
+        /* ── ONE ROW, EQUAL CHIPS ──────────────────────────────────────────
+           Was `flex-wrap` on both the row and the list with `py-1` chips: the
+           chips took their height from the text metrics rather than a fixed
+           box, and a label that did not fit dropped to a second line under the
+           label, so the row read as ragged rather than as a set.
+
+           Now: a fixed 28px box with the text centred in it, `flex-nowrap`, and
+           horizontal scroll when the row runs out of width — the same treatment
+           the Showcase filter pills already use, rather than a new one. */
+        <div className="mt-5 flex items-center gap-x-3">
+          <span className="shrink-0 font-body text-[13px] text-cream/60">
+            Popular searches:
+          </span>
+          {/* The right edge fades so an overflowing row reads as "scrollable"
+              rather than as a chip sliced in half. It masks the ul's own right
+              edge, so when the chips fit the fade falls on empty space and
+              nothing is dimmed. */}
+          <ul className="flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 [mask-image:linear-gradient(to_right,black_calc(100%-28px),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {popularSearches.map((p) => (
-              <li key={p.href}>
+              <li key={p.href} className="shrink-0">
                 <Link
                   href={p.href}
-                  className="inline-flex rounded-full border border-cream/35 px-3 py-1 font-body text-[12px] text-cream/90 transition-colors hover:bg-cream/10"
+                  className="inline-flex h-7 items-center whitespace-nowrap rounded-full border border-cream/35 px-3 font-body text-[12px] leading-none text-cream/90 transition-colors hover:bg-cream/10"
                 >
                   {p.label}
                 </Link>
