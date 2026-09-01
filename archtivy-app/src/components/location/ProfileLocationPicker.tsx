@@ -97,6 +97,24 @@ export function ProfileLocationPicker({
   }, [value?.place_name]);
 
   useEffect(() => {
+    /*
+     * Nothing to search for when the text IS the already-chosen place.
+     *
+     * `query` initialises from value.place_name, which tripped this effect on
+     * mount: the picker geocoded the location the profile already had and
+     * opened its suggestion list over the rest of the form, unprompted, on
+     * every profile that has a location.
+     *
+     * Written as a comparison rather than a "first run" ref on purpose — React
+     * runs effects twice in development, so a ref that clears itself on the
+     * first pass is already spent by the second and the fetch fires anyway.
+     * This condition is idempotent: it holds until the user actually edits the
+     * text, and stops holding the moment they do.
+     */
+    if (value?.place_name && query.trim() === value.place_name.trim()) {
+      setOpen(false);
+      return;
+    }
     if (suppressNextFetchRef.current) return;
     if (!query.trim()) {
       setSuggestions([]);
@@ -108,7 +126,7 @@ export function ProfileLocationPicker({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, fetchSuggestions]);
+  }, [query, fetchSuggestions, value?.place_name]);
 
   const selectPlace = useCallback(
     (feature: MapboxFeature) => {

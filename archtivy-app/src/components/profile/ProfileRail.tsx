@@ -3,6 +3,7 @@ import Image from "next/image";
 import { AtSign, BadgeCheck, Globe, Link2, MapPin } from "lucide-react";
 import { FollowButton } from "@/components/follow/FollowButton";
 import { ProfileContactButton } from "@/components/profile/ProfileContactButton";
+import { ProfileOwnerControls } from "@/components/profile/ProfileOwnerControls";
 import { initialsOf } from "@/components/home/EntityCard";
 import { normaliseInstagramHandle } from "@/lib/publish/instagram";
 import { ProfileViewNav, type ProfileViewItem } from "@/components/profile/ProfileViews";
@@ -110,6 +111,15 @@ export function ProfileRail({
       Icon: Link2,
       label: "LinkedIn",
     },
+    // behance is a real column that nothing could previously write, so it was
+    // never rendered. It is editable in the drawer now, so CONNECT lists it —
+    // on the same "only when it has a value" rule as the other three.
+    (profile as { behance?: string | null }).behance && {
+      key: "be",
+      href: (profile as { behance?: string | null }).behance as string,
+      Icon: Link2,
+      label: "Behance",
+    },
   ].filter(Boolean) as { key: string; href: string; Icon: typeof Globe; label: string }[];
 
   const stats = [
@@ -171,14 +181,11 @@ export function ProfileRail({
             )}
           </div>
         ) : (
-          <div className="mt-5 text-center">
-            <Link
-              href="/me/profile"
-              className="font-body text-[13px] text-muted underline-offset-4 hover:text-ink hover:underline"
-            >
-              Edit profile
-            </Link>
-          </div>
+          /* The owner gets the editor in the same slot Follow/Message occupy
+             for everyone else — same position, same weight, nothing moves. It
+             used to be a Link to /me/profile, which was a placeholder page;
+             that route now redirects back here and opens this drawer. */
+          <ProfileOwnerControls profile={profile} />
         )}
 
         </div>
