@@ -58,6 +58,16 @@ const EDITORIAL_ROUTES = new Set([
   // 656px, cards 118px wide. It is the sibling of /me/files and belongs here
   // for the same reason.
   "/me/saved",
+
+  // ── THE /me WORKSPACE ─────────────────────────────────────────────────────
+  // These five now render inside MeWorkspaceShell's sidebar + top bar, mounted
+  // once by (app)/me/layout.tsx. /me/dashboard and /me/listings were already
+  // here; /me/settings was NOT, so it carried TopNav plus PageContainer's
+  // 1040px cap — the same pair of symptoms /me/saved had. /me/messages and
+  // /me/tools are new and would have inherited that default.
+  "/me/settings",
+  "/me/messages",
+  "/me/tools",
 ]);
 
 // Routes that show TopNav but skip PageContainer (full-width content).

@@ -1,5 +1,6 @@
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { computeListingCompleteness, type ListingCompleteness } from "@/lib/publish/listingCompleteness";
+import { getLiveSaveCountsByListingIds } from "@/lib/db/userStats";
 
 /**
  * Dashboard data for /me/dashboard.
@@ -76,6 +77,14 @@ export interface DashboardListing {
   status: string;
   coverImageUrl: string | null;
   views: number;
+  /** Live count from folder_items — see lib/db/userStats. */
+  saves: number;
+  /**
+   * The one line under the title on a card: "Residential · Los Angeles" for a
+   * project, "Vibia · Pendant Lights" for a product. Null when the listing
+   * carries neither — never a placeholder.
+   */
+  subtitle: string | null;
   createdAt: string;
   /** Only computed for drafts — it is what the draft card shows. */
   completeness: ListingCompleteness | null;
@@ -171,7 +180,7 @@ async function loadOwnedListings(profileId: string) {
   const { data, error } = await supabase
     .from("listings")
     .select(
-      "id, type, title, slug, status, cover_image_url, views_count, created_at, description, meta_description, location_city, location_country"
+      "id, type, title, slug, status, cover_image_url, views_count, created_at, description, meta_description, location_city, location_country, category, product_type"
     )
     .eq("owner_profile_id", profileId)
     .is("deleted_at", null)
@@ -231,16 +240,39 @@ async function loadDraftCompletenessInputs(draftIds: string[]) {
 
 function toDashboardListing(
   row: Record<string, unknown>,
-  completeness: ListingCompleteness | null
+  completeness: ListingCompleteness | null,
+  saves: number
 ): DashboardListing {
+  const kind = isProjectType(row.type);
+  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "") || null;
+
+  /*
+   * A project is placed, a product is classified — so the same slot carries
+   * category + city for one and category + type for the other. Both halves are
+   * optional and the separator only appears between two present values, so a
+   * listing with just a city reads "Los Angeles" rather than "· Los Angeles".
+   *
+   * location_city is null on 46 of 53 projects, which is why country is the
+   * fallback rather than being appended to it.
+   */
+  const subtitle = (
+    kind === "project"
+      ? [str(row.category), str(row.location_city) ?? str(row.location_country)]
+      : [str(row.category), str(row.product_type)]
+  )
+    .filter(Boolean)
+    .join(" · ") || null;
+
   return {
     id: String(row.id),
-    type: isProjectType(row.type),
+    type: kind,
     title: (row.title as string | null)?.trim() || "Untitled",
     slug: (row.slug as string | null) ?? null,
     status: String(row.status ?? "APPROVED"),
     coverImageUrl: (row.cover_image_url as string | null) ?? null,
     views: typeof row.views_count === "number" ? row.views_count : 0,
+    saves,
+    subtitle,
     createdAt: String(row.created_at ?? ""),
     completeness,
   };
@@ -333,15 +365,17 @@ async function buildDashboard(
   const draftRows = rows.filter((r) => String(r.status) === "DRAFT");
   const draftIds = draftRows.map((r) => String(r.id));
 
-  const [inputs, feed, followerCount] = await Promise.all([
+  const [inputs, feed, followerCount, saveCounts] = await Promise.all([
     loadDraftCompletenessInputs(draftIds),
     loadFeed(profileId),
     loadFollowerCount(profileId),
+    getLiveSaveCountsByListingIds(listingIds),
   ]);
 
   const all: DashboardListing[] = rows.map((row) => {
     const id = String(row.id);
-    if (String(row.status) !== "DRAFT") return toDashboardListing(row, null);
+    const saves = saveCounts[id] ?? 0;
+    if (String(row.status) !== "DRAFT") return toDashboardListing(row, null, saves);
     const kind = isProjectType(row.type);
     const completeness = computeListingCompleteness(kind, {
       title: (row.title as string | null) ?? "",
@@ -356,7 +390,7 @@ async function buildDashboard(
       city: (row.location_city as string | null) ?? "",
       country: (row.location_country as string | null) ?? "",
     });
-    return toDashboardListing(row, completeness);
+    return toDashboardListing(row, completeness, saves);
   });
 
   const drafts = all.filter((l) => l.status === "DRAFT");

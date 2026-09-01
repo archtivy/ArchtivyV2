@@ -106,8 +106,8 @@ export async function POST(request: Request) {
       placement_type: placementType,
       duration_days: String(durationDays),
     },
-    success_url: `${baseUrl}/me/promote?success=true`,
-    cancel_url: `${baseUrl}/me/promote?cancelled=true`,
+    success_url: `${baseUrl}/me/tools?success=true`,
+    cancel_url: `${baseUrl}/me/tools?cancelled=true`,
   });
 
   // Create pending campaign row

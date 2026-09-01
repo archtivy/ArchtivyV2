@@ -3,13 +3,14 @@
  *
  * Rules enforced here:
  *  - Only APPROVED + non-deleted listings count.
- *  - Saves are counted live from `listing_saves`, not the denormalized column.
- *  - Connections counted once per pair (each row = one connection).
+ *  - Saves are counted live from `folder_items`, the platform's one save table.
+ *  - Connections are delegated to getProfileMetrics, the one connection rule.
  *  - Service-role client bypasses RLS for accurate, trustworthy aggregation.
  *  - No client-side (browser) aggregation — runs only in Server Components.
  */
 
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { getProfileMetrics } from "@/lib/db/profileMetrics";
 
 export interface UserListingStats {
   totalListings: number;
@@ -24,8 +25,8 @@ export interface UserListingStats {
  * SQL approach:
  *   total_listings   — server-side count of deduplicated IDs after two indexed lookups.
  *   total_views      — SUM of views_count column (fetched as a single narrow column, summed server-side).
- *   total_saves      — COUNT(*) from listing_saves WHERE listing_id IN (...) — pure SQL COUNT via Supabase head query.
- *   total_connections — COUNT(*) from connections WHERE (requester_id = ? OR addressee_id = ?) AND status = 'ACCEPTED'.
+ *   total_saves      — COUNT(*) from folder_items WHERE entity_id IN (...) — pure SQL COUNT via Supabase head query.
+ *   total_connections — getProfileMetrics(profileId).connections.
  */
 export async function getUserListingStats(
   clerkUserId: string,
@@ -68,40 +69,42 @@ export async function getUserListingStats(
 
   const totalListings = listingIds.length;
 
-  // ── 2. Live save count — SQL COUNT via head query ─────────────────────────
-  // No rows are returned; Supabase sends COUNT(*) as the response header.
-  // REPOINTED 2026-08-08: was `saved_listings`, which has never existed, so this
-  // count was silently 0 for every profile. The real table is `listing_saves`.
-  // See DATA_INTEGRITY_LOG.md item 6.
+  // ── 2. Live save count ────────────────────────────────────────────────────
+  // THIRD repoint of this one metric: `saved_listings` (never existed) →
+  // `listing_saves` (exists, 0 rows, written by nothing) → folder_items, which
+  // is what every SaveToggle on the platform actually writes. Both earlier
+  // targets returned 0 for every profile, which is why neither was noticed.
+  // getLiveSaveCountsByListingIds below reads the same table for the same
+  // reason; that is the single definition of a save.
   let totalSaves = 0;
   if (listingIds.length > 0) {
     const { count, error } = await supa
-      .from("listing_saves")
+      .from("folder_items")
       .select("*", { count: "exact", head: true })
-      .in("listing_id", listingIds);
+      .in("entity_id", listingIds);
     if (error) console.error(`[userStats] save count failed: ${error.code ?? "?"} ${error.message}`);
     totalSaves = count ?? 0;
   }
 
-  // ── 3. Connection count — SQL COUNT, no double-counting ──────────────────
-  // Each connections row represents one bilateral connection.
-  // We count rows where the user is either party AND status is ACCEPTED.
-  const { count: connectionsCount } = await supa
-    .from("connections")
-    .select("*", { count: "exact", head: true })
-    .or(`requester_id.eq.${profileId},addressee_id.eq.${profileId}`)
-    .eq("status", "ACCEPTED");
+  // ── 3. Connection count ───────────────────────────────────────────────────
+  // Delegated to getProfileMetrics, the platform's one definition of a
+  // connection (distinct project_product_links + profile-linked credit edges).
+  // This used to COUNT the `connections` table, which holds ONE row database-
+  // wide and is explicitly rejected as a source of truth in profileMetrics —
+  // so the public profile and this dashboard reported different numbers for
+  // the same word.
+  const { connections } = await getProfileMetrics(profileId);
 
   return {
     totalListings,
     totalViews,
     totalSaves,
-    totalConnections: connectionsCount ?? 0,
+    totalConnections: connections,
   };
 }
 
 /**
- * Fetch live per-listing save counts from the `listing_saves` table.
+ * Fetch live per-listing save counts from `folder_items`.
  * Returns listing_id → count map. Runs server-side only.
  *
  * Fetches only the `listing_id` column, then counts occurrences — a single
@@ -116,10 +119,25 @@ export async function getLiveSaveCountsByListingIds(
 ): Promise<Record<string, number>> {
   if (listingIds.length === 0) return {};
 
+  /*
+   * ── SAVES COME FROM folder_items ────────────────────────────────────────
+   * This read `listing_saves`, which holds 0 rows and is written by nothing.
+   * The live save mechanism is folder_items — every SaveToggle on the platform
+   * writes one row there, keyed (entity_type, entity_id). So this function
+   * returned {} for every listing and /me/listings showed "0 saves" beside
+   * work that had genuinely been saved.
+   *
+   * folder_items.entity_id is the listing id and entity_type is
+   * project | product, so a listing-id filter alone is unambiguous.
+   *
+   * Counted per ROW, not per distinct user: two people saving the same listing
+   * is two saves, and one person filing it into two boards is two rows. That
+   * matches what folder_items means and what the Saved workspace shows.
+   */
   const { data, error } = await getSupabaseServiceClient()
-    .from("listing_saves")
-    .select("listing_id")
-    .in("listing_id", listingIds);
+    .from("folder_items")
+    .select("entity_id")
+    .in("entity_id", listingIds);
 
   if (error) {
     console.error(`[userStats] live save counts failed: ${error.code ?? "?"} ${error.message}`);
@@ -128,8 +146,8 @@ export async function getLiveSaveCountsByListingIds(
 
   const counts: Record<string, number> = {};
   for (const row of data ?? []) {
-    const r = row as { listing_id: string };
-    counts[r.listing_id] = (counts[r.listing_id] ?? 0) + 1;
+    const r = row as { entity_id: string };
+    counts[r.entity_id] = (counts[r.entity_id] ?? 0) + 1;
   }
   return counts;
 }

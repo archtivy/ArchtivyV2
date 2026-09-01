@@ -16,10 +16,11 @@ import { SaveToggle } from "@/components/home/SaveToggle";
  * handled by mapping to ListingCardModel at the call site, so the card itself
  * has ONE input and no branching on provenance.
  *
- * Not replaced, deliberately: DashboardListingCard (owner-facing, draft-aware,
- * points at the wizard rather than a public page), EntityCard's profile and
- * article usages (different entity types), and InspirationCard (renders
- * materials, which have no listing behind them at all).
+ * Not replaced, deliberately: the /me workspace's own owner-facing cards
+ * (draft-aware, carrying management stats and an actions menu, and pointing at
+ * the wizard rather than a public page), EntityCard's profile and article
+ * usages (different entity types), and InspirationCard (renders materials,
+ * which have no listing behind them at all).
  *
  * ── THE BADGE IS ABSENT, NOT EMPTY ──────────────────────────────────────────
  * "Used N products from M brands" / "Used in N projects by M studios" renders

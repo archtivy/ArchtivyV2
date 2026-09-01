@@ -1,56 +1,29 @@
-import type { Metadata } from "next";
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { getProfileByClerkId } from "@/lib/db/profiles";
-import { getOwnedListingsForClerkUser } from "@/lib/db/listings";
-import { getUserCampaigns } from "@/lib/promote/campaigns";
-import { isFeatureListingEnabled } from "@/lib/db/siteSettings";
-import { PromoteDashboard } from "./PromoteDashboard";
 
-export const metadata: Metadata = {
-  title: "Feature Your Listing | Archtivy",
-  robots: { index: false, follow: false },
-};
-
-export default async function PromotePage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-
-  // Feature gate: block access when disabled
-  const enabled = await isFeatureListingEnabled();
-  if (!enabled) {
-    return (
-      <div className="mx-auto max-w-md px-4 py-20 text-center">
-        <h1 className="font-serif text-2xl font-normal text-zinc-900 dark:text-zinc-100">
-          Coming Soon
-        </h1>
-        <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-          The Feature Listing option is not available yet. Check back soon.
-        </p>
-      </div>
-    );
+/**
+ * /me/promote → /me/tools.
+ *
+ * The promotion surface is called "Listing Tools" in the workspace sidebar and
+ * lives at /me/tools. This route is kept as a permanent alias rather than
+ * deleted: it is linked from the account menu in TopNavAuth, referenced in two
+ * dashboard comments, and — most importantly — was the Stripe success/cancel
+ * return URL for any checkout session created before this change. A session
+ * already in flight must still land somewhere real when the user pays.
+ *
+ * The query string is preserved so ?success=true / ?cancelled=true reach the
+ * new page and still render their banner.
+ */
+export default async function PromoteRedirectPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string") qs.set(key, value);
+    else if (Array.isArray(value) && value[0] != null) qs.set(key, value[0]);
   }
-
-  const profileRes = await getProfileByClerkId(userId);
-  const profile = profileRes.data;
-  const profileId = profile?.id ?? null;
-
-  const [listingsRes, campaigns] = await Promise.all([
-    getOwnedListingsForClerkUser(userId, profileId),
-    getUserCampaigns(userId),
-  ]);
-
-  const listings = (listingsRes.data ?? []).map((l) => ({
-    id: l.id,
-    title: l.title ?? "Untitled",
-    type: l.type as "project" | "product",
-    cover_image_url: l.cover_image_url ?? null,
-  }));
-
-  return (
-    <PromoteDashboard
-      listings={listings}
-      campaigns={campaigns}
-    />
-  );
+  const suffix = qs.toString();
+  redirect(suffix ? `/me/tools?${suffix}` : "/me/tools");
 }
