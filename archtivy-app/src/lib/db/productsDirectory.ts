@@ -26,6 +26,7 @@ import { unstable_cache } from "next/cache";
 import { getCardBadgeCounts } from "@/lib/db/cardBadgeCounts";
 import { toOwner, type OwnerProfileRow } from "@/lib/db/toOwner";
 import { getOwnerProfileHref } from "@/lib/cardUtils";
+import { getListingUrl } from "@/lib/canonical";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { FacetValue } from "@/components/directory/FilterPrimitives";
@@ -321,7 +322,18 @@ async function fetchProductsDirectory(): Promise<ProductsDirectoryData> {
       id,
       slug,
       title: String(l.title ?? "Untitled"),
-      href: `/products/${slug ?? id}`,
+      /* The canonical URL, not one that 308s to it — see the long note on the
+         same line in projectsDirectory.ts. `cat.slugPath` is the primary node
+         in the PRODUCT domain, the same rule getListingTaxonomyPath applies,
+         and getListingUrl is the same builder the detail route uses. With no
+         product-domain node it returns the flat `/products/{slug}`, which is
+         also what the route renders for such a listing. */
+      href: getListingUrl({
+        id,
+        type: "product",
+        slug,
+        taxonomySlugPath: cat?.slugPath ?? null,
+      }),
       cover: (l.cover_image_url as string | null) ?? null,
       imageCount: imageCounts.get(id) ?? 0,
       brand: brand?.name ?? null,

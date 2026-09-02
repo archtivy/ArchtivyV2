@@ -27,6 +27,7 @@ import { unstable_cache } from "next/cache";
 import { getCardBadgeCounts, getCreditCounts } from "@/lib/db/cardBadgeCounts";
 import { toOwner, type OwnerProfileRow } from "@/lib/db/toOwner";
 import { getOwnerProfileHref } from "@/lib/cardUtils";
+import { getListingUrl } from "@/lib/canonical";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 
@@ -324,9 +325,37 @@ async function fetchProjectsDirectory(): Promise<ProjectsDirectoryData> {
       id,
       slug,
       title: String(l.title ?? "Untitled"),
-      // Taxonomy-aware URL is resolved by the caller via getListingUrl; the
-      // simple form is enough here because the archive route 308s to canonical.
-      href: `/projects/${slug ?? id}`,
+      /*
+       * ── THE CANONICAL URL, NOT A URL THAT REDIRECTS TO IT ─────────────────
+       * This was `/projects/${slug ?? id}` with a comment saying the flat form
+       * "is enough here because the archive route 308s to canonical". It was
+       * enough to arrive, but every single card on /projects and on every
+       * category archive was a link into a redirect: measured,
+       * /projects/casa-libertad returns 308 to
+       * /projects/residential/single-family-house/casa-libertad, which is also
+       * the URL the sitemap submits. So the crawler was told one URL and the
+       * navigation used another that bounced to it.
+       *
+       * getListingUrl is the SAME builder the detail route's
+       * resolveCanonicalPath calls, so the href a card emits and the target the
+       * route would redirect to are now produced by one function and cannot
+       * disagree.
+       *
+       * `building.slugPath` is the primary node in the PROJECT domain, which is
+       * the rule getListingTaxonomyPath applies. Verified against all 133
+       * approved listings: zero disagreements between the two.
+       *
+       * FALLBACK: with no project-domain node, slugPath is null and
+       * getListingUrl returns the flat `/projects/{slug}`. That is not a
+       * degraded case — a listing with no taxonomy has no nested URL, the route
+       * resolves nothing and renders it flat with no redirect at all.
+       */
+      href: getListingUrl({
+        id,
+        type: "project",
+        slug,
+        taxonomySlugPath: building?.slugPath ?? null,
+      }),
       cover: (l.cover_image_url as string | null) ?? null,
       imageCount: imageCounts.get(id) ?? 0,
       // City when we have one, else country alone — never the raw free-text

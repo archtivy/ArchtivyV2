@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Search, X } from "lucide-react";
 
 /**
@@ -16,6 +17,29 @@ import { ChevronDown, Search, X } from "lucide-react";
  * was split. `heading` is null there and the bar shows the count alone, which
  * is also the honest reading: the archive header has already said what the page
  * is, and repeating the category name under it says nothing new.
+ *
+ * ── THE SEARCH BOX TYPES LOCALLY AND SYNCS ON A DEBOUNCE ────────────────────
+ * `q` arrives from the server: the page parses searchParams, hands down the
+ * parsed state, and the input rendered `value={q}` directly. So every
+ * keystroke had to complete a router.replace and a server round-trip before it
+ * could appear, and React re-rendered the controlled input back to the STALE
+ * prop in the meantime — which discarded the characters typed during the trip.
+ * Measured identically on /projects and on a category archive: typing "house"
+ * at speed left `?q=e` in the URL and a single "e" in the box. Four of five
+ * characters lost.
+ *
+ * The input is now driven by local `draft` state, so typing is instant and
+ * nothing can overwrite it mid-word. The URL is written 250ms after the last
+ * keystroke, which keeps every guarantee the URL-as-state design depends on:
+ * the address bar is shareable, a fresh request to it renders the same results
+ * server-side, and the crawler still sees a real result set in the HTML.
+ *
+ * `pushedRef` is what separates OUR echo from a change that came from
+ * somewhere else. When the prop settles to the value we just wrote, the two
+ * match and the draft is left alone; when it differs — Back/Forward, "Clear
+ * all", removing a chip — it is an outside edit and the draft is reset to it.
+ * Without that distinction the effect would either fight the user's typing or
+ * ignore the Back button.
  *
  * ── PILLS ARE PASSED IN, NOT DEFINED HERE ───────────────────────────────────
  * Projects and products do not have the same facets and are not forced to: the
@@ -56,6 +80,47 @@ export function DirectoryFilterBar({
   chips: { label: string; clear: () => void }[];
   onClearAll: () => void;
 }) {
+  const [draft, setDraft] = useState(q);
+
+  /*
+   * The last value THIS component wrote to the URL. See the note above: it is
+   * the only way to tell our own echo from an outside change.
+   */
+  const pushedRef = useRef(q);
+
+  /*
+   * onQueryChange is rebuilt on every parent render (it closes over the current
+   * filters), so depending on it directly would restart the debounce timer
+   * whenever the parent re-rendered — including on the server response to the
+   * previous keystroke. Held in a ref, the timer below depends on `draft`
+   * alone while still calling the newest callback.
+   */
+  const onQueryChangeRef = useRef(onQueryChange);
+  onQueryChangeRef.current = onQueryChange;
+
+  useEffect(() => {
+    if (q === pushedRef.current) return;
+    // Came from outside — Back/Forward, "Clear all", a removed chip.
+    pushedRef.current = q;
+    setDraft(q);
+  }, [q]);
+
+  useEffect(() => {
+    if (draft === pushedRef.current) return;
+    const t = setTimeout(() => {
+      pushedRef.current = draft;
+      onQueryChangeRef.current(draft);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [draft]);
+
+  /* Clearing is a deliberate act, not typing: it applies immediately. */
+  const clearQuery = useCallback(() => {
+    pushedRef.current = "";
+    setDraft("");
+    onQueryChangeRef.current("");
+  }, []);
+
   return (
     <div>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -76,16 +141,16 @@ export function DirectoryFilterBar({
           />
           <input
             type="search"
-            value={q}
-            onChange={(e) => onQueryChange(e.target.value)}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
             placeholder={searchPlaceholder}
             aria-label={searchLabel}
             className="h-12 w-full rounded-full border border-hairline bg-cream pl-12 pr-11 font-body text-[14px] text-ink placeholder:text-muted focus:border-ink/40 focus:outline-none"
           />
-          {q && (
+          {draft && (
             <button
               type="button"
-              onClick={() => onQueryChange("")}
+              onClick={clearQuery}
               aria-label="Clear search"
               className="absolute right-4 top-1/2 -translate-y-1/2 rounded p-1 text-muted transition-colors hover:text-ink"
             >
