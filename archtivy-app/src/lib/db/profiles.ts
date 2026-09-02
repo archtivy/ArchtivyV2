@@ -390,11 +390,22 @@ export async function upsertProfileFromOnboarding(
 }
 
 /**
- * Set profile claim_status (e.g. to 'pending' when first claim submitted). Service role.
+ * Set profiles.claim_status. Service role.
+ *
+ * ── ONLY TWO VALUES EXIST ───────────────────────────────────────────────────
+ * The union used to include "pending", and the doc-comment recommended it
+ * "when first claim submitted". No such value is storable:
+ * profiles_claim_status_check is CHECK (claim_status IN ('unclaimed',
+ * 'claimed')). The one caller that passed it therefore failed silently on
+ * every claim submission until it was removed; narrowing the type here is what
+ * stops the next caller repeating it.
+ *
+ * A pending claim lives in profile_claim_requests.status, which is where it
+ * belongs — a fact about a request, not about who owns a profile.
  */
 export async function setProfileClaimStatus(
   profileId: string,
-  claimStatus: "unclaimed" | "pending" | "claimed"
+  claimStatus: "unclaimed" | "claimed"
 ): Promise<DbResult<void>> {
   const supabaseService = getSupabaseServiceClient();
   const { error } = await supabaseService

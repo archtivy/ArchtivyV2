@@ -9,19 +9,20 @@ import { ClaimProfileModal } from "./ClaimProfileModal";
 /**
  * The rail's claim control and the dialog behind it.
  *
- * ── STATES, UNCHANGED FROM WHAT THE DATA ALREADY SAID ───────────────────────
- * `claim_status` on the profile is the authority, exactly as before:
+ * ── TWO SOURCES, BECAUSE THERE ARE TWO FACTS ────────────────────────────────
+ *   profiles.claim_status          -> is this profile owned?  unclaimed | claimed
+ *   profile_claim_requests.status  -> has THIS viewer asked?   pending | …
  *
- *   unclaimed  -> "Claim Profile", opens the dialog
- *   pending    -> "Claim pending", inert
- *   claimed    -> nothing; the caller passes no claim block at all
+ * which resolve to:
  *
- * The pending state is the only visible change. Submitting a claim sets the
- * profile to `pending`, and the rail block used to vanish outright at that
- * point — so the claimant's own successful submission made the section
- * disappear, which reads as a failure. It now says what actually happened.
- * "Pending" is a property of the PROFILE, not of the viewer, so it is honest
- * for every visitor: a claim really is open on it.
+ *   claimed                        -> nothing; the caller passes no block
+ *   unclaimed + viewer has pending -> "Claim pending", inert
+ *   unclaimed                      -> "Claim Profile", opens the dialog
+ *
+ * The pending state is the only visible change, and it is per VIEWER — "your
+ * claim is with our team", not "someone has claimed this", which is a weaker
+ * statement about another person that no visitor needs. It is resolved
+ * server-side in loadProfilePageProps.
  *
  * An owner never sees this: the caller does not render it for them.
  *

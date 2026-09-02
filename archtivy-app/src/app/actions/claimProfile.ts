@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { createClaimRequest, getPendingRequestByProfileAndUser } from "@/lib/db/profileClaimRequests";
-import { setProfileClaimStatus } from "@/lib/db/profiles";
 
 const toText = (v: unknown) => (v == null ? "" : String(v).trim());
 
@@ -43,7 +42,22 @@ export async function submitClaimRequest(
   });
   if (!insert.data) return { ok: false, error: insert.error ?? "Failed to create request." };
 
-  await setProfileClaimStatus(profileId, "pending");
+  /*
+   * ── NO PROFILE STATUS WRITE HERE ──────────────────────────────────────────
+   * This used to call setProfileClaimStatus(profileId, "pending"), and that
+   * call could never succeed: profiles_claim_status_check permits 'unclaimed'
+   * and 'claimed' only, so every submission since the feature shipped raised a
+   * 23514 that was discarded along with the result. The De Sede profile is the
+   * evidence — a pending claim row from 2026-09-02 sitting next to
+   * claim_status 'unclaimed'.
+   *
+   * It is removed rather than made to work. "Pending" is a property of a
+   * REQUEST, not of a profile's ownership: profile_claim_requests.status
+   * already records it, per requester, and a mirrored flag on the profile
+   * would be a second copy of the same fact that could disagree with the
+   * first. The pending CTA reads the requests table — see the note in
+   * loadProfilePage.ts.
+   */
 
   revalidatePath("/u/[username]", "page");
   revalidatePath("/u/[username]/claim", "page");

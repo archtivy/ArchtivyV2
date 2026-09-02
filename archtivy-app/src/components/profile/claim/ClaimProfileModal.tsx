@@ -169,7 +169,7 @@ export function ClaimProfileModal({
   if (!open || !mounted) return null;
 
   const FIELD =
-    "mt-1.5 h-11 w-full rounded-xl border border-hairline bg-white px-3.5 font-body text-[14px] text-ink " +
+    "mt-1.5 h-11 w-full rounded-lg border border-hairline bg-white px-3.5 font-body text-[14px] text-ink " +
     "placeholder:text-muted/70 outline-none transition-colors focus:border-ink/40 disabled:opacity-60";
   const LABEL = "font-body text-[13px] text-ink";
 
@@ -193,7 +193,7 @@ export function ClaimProfileModal({
           "relative flex max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden bg-cream text-left shadow-xl",
           // 540px sits inside the 500–580 band; the panel is near-full-width
           // below sm, with p-4 on the wrapper keeping it off the screen edges.
-          "rounded-2xl border border-hairline sm:max-w-[540px]",
+          "rounded-xl border border-hairline sm:max-w-[540px]",
         ].join(" ")}
       >
         <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 pb-4 pt-5">
@@ -243,7 +243,7 @@ export function ClaimProfileModal({
               {error && (
                 <p
                   role="alert"
-                  className="mt-4 rounded-xl border border-red-200 bg-red-50/70 px-3.5 py-2.5 font-body text-[13px] text-red-700"
+                  className="mt-4 rounded-lg border border-red-200 bg-red-50/70 px-3.5 py-2.5 font-body text-[13px] text-red-700"
                 >
                   {error}
                 </p>
@@ -307,7 +307,7 @@ export function ClaimProfileModal({
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     disabled={submitting}
-                    className="mt-1.5 w-full resize-y rounded-xl border border-hairline bg-white px-3.5 py-2.5 font-body text-[14px] leading-[21px] text-ink placeholder:text-muted/70 outline-none transition-colors focus:border-ink/40 disabled:opacity-60"
+                    className="mt-1.5 w-full resize-y rounded-lg border border-hairline bg-white px-3.5 py-2.5 font-body text-[14px] leading-[21px] text-ink placeholder:text-muted/70 outline-none transition-colors focus:border-ink/40 disabled:opacity-60"
                   />
                   <p className="mt-1.5 font-body text-[12px] leading-[18px] text-muted">
                     Briefly explain your connection to this profile or include anything that may
