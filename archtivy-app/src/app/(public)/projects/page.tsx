@@ -5,8 +5,7 @@ import { getAbsoluteUrl } from "@/lib/canonical";
 import { getProjectsDirectory } from "@/lib/db/projectsDirectory";
 import { getDirectoryCategoryTree } from "@/lib/directory/categoryTree";
 import { parseDirectoryState, isSearchResultUrl } from "@/lib/projects/directoryParams";
-import { HomeNav } from "@/components/home/HomeNav";
-import { HomeFooter } from "@/components/home/HomeFooter";
+import { DirectoryPageShell } from "@/components/directory/DirectoryPageShell";
 import { ProjectsDirectory } from "@/components/projects/ProjectsDirectory";
 import { RequestProjectBand } from "@/components/projects/RequestProjectBand";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -125,29 +124,22 @@ export default async function ProjectsIndexPage({
   ]);
 
   return (
-    <div className="min-h-screen bg-cream font-body text-ink">
+    /* The same shell every category archive renders. Before it existed this
+       page and /projects/commercial/showroom drew different headers, different
+       footers and a 1440px vs 1040px column — see DirectoryPageShell. */
+    <DirectoryPageShell>
       <JsonLd schemas={[collectionJsonLd, breadcrumbJsonLd]} />
-      {/* solid: there is no dark hero behind the bar on this page. */}
-      <HomeNav variant="solid" />
-
-      <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
-        {/* The h1 and the result count live in DirectoryFilterBar now, on one
-            line as in the reference. The page deliberately renders no heading
-            of its own — two h1s would be a document-outline regression. */}
-        <div>
-          <ProjectsDirectory
-            projects={projects}
-            facets={facets}
-            total={total}
-            categoryTree={categoryTree}
-            state={state}
-          />
-        </div>
-
-        <RequestProjectBand />
-      </div>
-
-      <HomeFooter />
-    </div>
+      {/* The h1 and the result count live in DirectoryFilterBar now, on one
+          line as in the reference. The page deliberately renders no heading of
+          its own — two h1s would be a document-outline regression. */}
+      <ProjectsDirectory
+        projects={projects}
+        facets={facets}
+        total={total}
+        categoryTree={categoryTree}
+        state={state}
+      />
+      <RequestProjectBand />
+    </DirectoryPageShell>
   );
 }

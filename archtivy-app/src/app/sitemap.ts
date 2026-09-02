@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { getBaseUrl } from "@/lib/canonical";
 import { getArchiveCategoryUrl } from "@/lib/archive/urls";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { getNodeListingCountsWithDescendants } from "@/lib/taxonomy/taxonomyDb";
 
 /**
  * Dynamic sitemap: static pages + all approved projects/products + all public profiles.
@@ -88,9 +89,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .eq("is_hidden", false)
       .order("updated_at", { ascending: false })
       .limit(5000),
+    /*
+     * ── .in("domain", …) IS LOAD-BEARING, NOT A TIDY-UP ──────────────────────
+     * This selected EVERY active taxonomy node — 1110 rows across 11 domains —
+     * and PostgREST caps a response at 1000. The rows come back ordered by
+     * domain, so the tail was silently dropped, and the tail is `project`:
+     * discipline+intervention_type+material+mood+organization_type = 241,
+     * +product = 884, +professional_role = 911, +project = 1028. The cut at
+     * 1000 landed 28 rows into `project`, so 28 project categories — including
+     * commercial/mixed-use, hospitality/cafe, hospitality/convention-center and
+     * landscape-urban/garden, all of which have live projects in them — have
+     * been missing from the sitemap. Measured: 937 URLs before this fix, of
+     * which 732 were taxonomy pages rather than the expected 760.
+     *
+     * Only these two domains are ever used below, and 760 rows is inside the
+     * cap. Nothing else here needs the other nine.
+     */
     supabase
       .from("taxonomy_nodes")
-      .select("domain, slug_path, updated_at")
+      .select("id, domain, slug_path, updated_at")
+      .in("domain", ["project", "product"])
       .eq("is_active", true)
       .order("domain")
       .order("depth", { ascending: true })
@@ -143,7 +161,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const projectRows = (projectsRes.data ?? []) as { id: string; slug: string | null; updated_at: string | null }[];
   const productRows = (productsRes.data ?? []) as { id: string; slug: string | null; updated_at: string | null }[];
   const profileRows = (profilesRes.data ?? []) as { id: string; username: string | null; updated_at: string | null }[];
-  const taxonomyRows = (taxonomyRes.data ?? []) as { domain: string; slug_path: string; updated_at: string | null }[];
+  const taxonomyRows = (taxonomyRes.data ?? []) as { id: string; domain: string; slug_path: string; updated_at: string | null }[];
 
   // Build a map of listing_id → primary taxonomy slug_path
   const taxMappingRaw = taxMappingRes.data ?? [];
@@ -196,9 +214,54 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     }));
 
-  // Archive taxonomy URLs — canonical archive pages (not explore)
+  /*
+   * Archive taxonomy URLs — the canonical /projects/{path} and
+   * /products/{path} category pages.
+   *
+   * ── ONLY CATEGORIES THAT HAVE SOMETHING IN THEM ───────────────────────────
+   * This used to submit every active project/product node: 760 URLs. Measured
+   * against the live database, only 83 of those have a single approved listing
+   * behind them, counting descendants — so 677 of the URLs in the sitemap were
+   * pages whose entire content was the empty state. That is a thin-content
+   * signal we were volunteering, on a submitted sitemap, at nine times the
+   * volume of the real pages.
+   *
+   * The taxonomy itself is not touched and neither are the URLs: every one of
+   * those 677 pages still exists, still renders, still carries its canonical
+   * and is still reachable from the Category dropdown and its parent's
+   * subcategory links. They are simply not SUBMITTED as pages worth indexing
+   * until they hold something. A category that gains its first listing
+   * re-enters on the next revalidation, with no migration and no redirect.
+   *
+   * The count rolls DESCENDANTS up, so /products/furniture qualifies on the
+   * strength of the 35 products in its subcategories even though nothing is
+   * filed directly against the root — which matches what the page shows, since
+   * the directory scopes by slug_path prefix.
+   */
+  const nodeIdBySlug = new Map<string, string>();
+  for (const t of taxonomyRows) {
+    if (t.domain === "project" || t.domain === "product") {
+      nodeIdBySlug.set(`${t.domain}:${t.slug_path}`, t.id);
+    }
+  }
+  const [projectNodeCounts, productNodeCounts] = await Promise.all([
+    getNodeListingCountsWithDescendants("project"),
+    getNodeListingCountsWithDescendants("product"),
+  ]);
+  const countFor = (domain: "project" | "product", slugPath: string): number => {
+    const counts = (domain === "project" ? projectNodeCounts.data : productNodeCounts.data) ?? {};
+    const id = nodeIdBySlug.get(`${domain}:${slugPath}`);
+    // A count query that FAILED must not silently empty the sitemap of every
+    // category page, so an absent counts map falls back to including the node.
+    if (domain === "project" ? projectNodeCounts.error : productNodeCounts.error) return 1;
+    if (!id) return 0;
+    return counts[id] ?? 0;
+  };
+
   const taxonomyUrls: MetadataRoute.Sitemap = taxonomyRows
     .filter((t) => t.domain === "project" || t.domain === "product")
+    .filter((t) => countFor(t.domain as "project" | "product", t.slug_path) > 0)
+    .slice(0, MAX)
     .map((t) => {
       return {
         url: `${base}${getArchiveCategoryUrl(t.domain as "project" | "product", t.slug_path)}`,
