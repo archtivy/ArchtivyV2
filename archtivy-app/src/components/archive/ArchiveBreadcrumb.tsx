@@ -12,28 +12,37 @@ interface ArchiveBreadcrumbProps {
 }
 
 /**
- * Simple breadcrumb trail for archive pages.
- * Home / Projects / Residential / Houses
+ * Crawlable breadcrumb trail: Home / Projects / Commercial / Showroom.
+ *
+ * Real <Link>s to real taxonomy ancestors — the same paths the BreadcrumbList
+ * JSON-LD emits, so the markup and the structured data cannot disagree.
+ *
+ * Styling is copied from the breadcrumb ProjectDetailView and ProductDetailView
+ * already render — 12px, muted, px-2 separators, ink for the current node —
+ * rather than invented here, so arriving at a category from a listing does not
+ * change how the trail looks. The old zinc/#374151 palette was the last piece
+ * of legacy styling on this page.
  */
 export function ArchiveBreadcrumb({ segments, current }: ArchiveBreadcrumbProps) {
   return (
-    <nav
-      className="mb-6 flex flex-wrap items-center gap-1.5 text-sm text-[#374151]"
-      aria-label="Breadcrumb"
-    >
-      <Link href="/" className="hover:text-zinc-900 transition-colors">
+    <nav aria-label="Breadcrumb" className="mb-6 font-body text-[12px] text-muted">
+      <Link href="/" className="hover:text-ink">
         Home
       </Link>
       {segments.map((seg) => (
-        <span key={seg.href} className="contents">
-          <span aria-hidden className="text-zinc-300">/</span>
-          <Link href={seg.href} className="hover:text-zinc-900 transition-colors">
+        <span key={seg.href}>
+          <span className="px-2" aria-hidden>
+            /
+          </span>
+          <Link href={seg.href} className="hover:text-ink">
             {seg.label}
           </Link>
         </span>
       ))}
-      <span aria-hidden className="text-zinc-300">/</span>
-      <span className="text-zinc-900 font-medium">{current}</span>
+      <span className="px-2" aria-hidden>
+        /
+      </span>
+      <span className="text-ink">{current}</span>
     </nav>
   );
 }

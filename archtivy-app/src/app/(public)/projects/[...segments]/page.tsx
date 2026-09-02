@@ -12,6 +12,7 @@ import { getProfileByClerkId } from "@/lib/db/profiles";
 import { canManageListing } from "@/lib/auth/listingOwnership";
 import { getListingUrl } from "@/lib/canonical";
 import { fetchProjectArchive } from "@/lib/archive/fetchArchiveData";
+import { archiveIntro } from "@/lib/archive/copy";
 import { getProjectsDirectory } from "@/lib/db/projectsDirectory";
 import { parseDirectoryState, isSearchResultUrl } from "@/lib/projects/directoryParams";
 import { ProjectCategoryArchive } from "@/components/archive/ProjectCategoryArchive";
@@ -126,7 +127,7 @@ export async function generateMetadata({
       const { node } = archiveData;
       return {
         title: node.seo_title || `${node.label} Projects | Archtivy`,
-        description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} architecture projects on Archtivy.`,
+        description: archiveIntro("project", node),
         alternates: { canonical: `/projects/${node.slug_path}` },
         robots: searchRobots,
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
@@ -141,7 +142,7 @@ export async function generateMetadata({
       const { node } = archiveData;
       return {
         title: node.seo_title || `${node.label} Projects | Archtivy`,
-        description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} architecture projects on Archtivy.`,
+        description: archiveIntro("project", node),
         alternates: { canonical: `/projects/${node.slug_path}` },
         robots: searchRobots,
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
@@ -197,7 +198,7 @@ export default async function ProjectSegmentsPage({
         node={fullArchive.node}
         ancestors={fullArchive.ancestors}
         childNodes={fullArchive.childNodes}
-        total={fullArchive.total}
+        siblingNodes={fullArchive.siblingNodes}
         directory={directory}
         state={state}
       />

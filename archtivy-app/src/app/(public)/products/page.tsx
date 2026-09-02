@@ -6,8 +6,7 @@ import { getProductsDirectory } from "@/lib/db/productsDirectory";
 import { getDirectoryCategoryTree } from "@/lib/directory/categoryTree";
 import { parseProductDirectoryState } from "@/lib/products/directoryParams";
 import { isSearchResultUrl, toSearchParams } from "@/lib/discovery/indexation";
-import { HomeNav } from "@/components/home/HomeNav";
-import { HomeFooter } from "@/components/home/HomeFooter";
+import { DirectoryPageShell } from "@/components/directory/DirectoryPageShell";
 import { ProductsDirectory } from "@/components/products/ProductsDirectory";
 import { ProductsTrustStrip } from "@/components/products/ProductsTrustStrip";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -94,33 +93,27 @@ export default async function ProductsIndexPage({
   ]);
 
   return (
-    <div className="min-h-screen bg-cream font-body text-ink">
+    /* The same shell every category archive renders — see DirectoryPageShell. */
+    <DirectoryPageShell>
       <JsonLd schemas={[collectionJsonLd, breadcrumbJsonLd]} />
-      {/* solid: no dark hero behind the bar on this page. */}
-      <HomeNav variant="solid" />
-
-      <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
-        {/* The h1 and the result count live in DirectoryFilterBar now, on one
-            line as in the reference. The page deliberately renders no heading
-            of its own — two h1s would be a document-outline regression. */}
-        <div>
-          <ProductsDirectory
-            categoryTree={categoryTree}
-            products={products}
-            facets={facets}
-            total={total}
-            state={state}
-          />
-        </div>
-
-        <ProductsTrustStrip
-          withDocuments={facets.withDocuments}
-          total={total}
-          brandsWithWebsite={facets.brandsWithWebsite}
-        />
-      </div>
-
-      <HomeFooter />
-    </div>
+      {/* The h1 and the result count live in DirectoryFilterBar now, on one
+          line as in the reference. The page deliberately renders no heading of
+          its own — two h1s would be a document-outline regression. */}
+      <ProductsDirectory
+        categoryTree={categoryTree}
+        products={products}
+        facets={facets}
+        total={total}
+        state={state}
+      />
+      {/* Stays on the UNSCOPED directory: its numbers are platform-wide, so a
+          category page cannot show them without implying they describe that
+          category. See the note in ProductCategoryArchive. */}
+      <ProductsTrustStrip
+        withDocuments={facets.withDocuments}
+        total={total}
+        brandsWithWebsite={facets.brandsWithWebsite}
+      />
+    </DirectoryPageShell>
   );
 }

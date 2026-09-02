@@ -12,6 +12,7 @@ import { getProfileByClerkId } from "@/lib/db/profiles";
 import { canManageListing } from "@/lib/auth/listingOwnership";
 import { getListingUrl } from "@/lib/canonical";
 import { fetchProductArchive } from "@/lib/archive/fetchArchiveData";
+import { archiveIntro } from "@/lib/archive/copy";
 import { getProductsDirectory } from "@/lib/db/productsDirectory";
 import { parseProductDirectoryState } from "@/lib/products/directoryParams";
 import { isSearchResultUrl, toSearchParams } from "@/lib/discovery/indexation";
@@ -143,7 +144,7 @@ export async function generateMetadata({
       const { node } = archiveData;
       return {
         title: node.seo_title || `${node.label} Products | Archtivy`,
-        description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} products on Archtivy.`,
+        description: archiveIntro("product", node),
         alternates: { canonical: `/products/${node.slug_path}` },
         robots: searchRobots,
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
@@ -158,7 +159,7 @@ export async function generateMetadata({
       const { node } = archiveData;
       return {
         title: node.seo_title || `${node.label} Products | Archtivy`,
-        description: node.meta_description || node.description || `Browse ${node.label.toLowerCase()} products on Archtivy.`,
+        description: archiveIntro("product", node),
         alternates: { canonical: `/products/${node.slug_path}` },
         robots: searchRobots,
         ...(node.featured_image ? { openGraph: { images: [node.featured_image] } } : {}),
@@ -207,7 +208,7 @@ export default async function ProductSegmentsPage({
         node={fullArchive.node}
         ancestors={fullArchive.ancestors}
         childNodes={fullArchive.childNodes}
-        total={fullArchive.total}
+        siblingNodes={fullArchive.siblingNodes}
         directory={directory}
         state={parseProductDirectoryState(toSearchParams(sp))}
       />

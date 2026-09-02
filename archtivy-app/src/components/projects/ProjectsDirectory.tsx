@@ -439,7 +439,14 @@ export function ProjectsDirectory({
         <p className="mt-12 font-body text-[14px] text-muted">
           {filters.q
             ? `No projects match “${filters.q}”${activeCount > 0 ? " with these filters" : ""}.`
-            : "No projects match these filters."}
+            : activeCount === 0 && scope
+              /* A category with nothing in it yet is not a failed filter, and
+                 saying "no projects match these filters" when the visitor has set
+                 none reads as a broken page. 677 of the 760 live taxonomy nodes
+                 are currently empty, so this is the common case on an archive,
+                 not an edge one. */
+              ? `No projects in ${scope.label} yet.`
+              : "No projects match these filters."}
         </p>
       ) : (
         <div className="mt-8 grid grid-cols-2 gap-x-3 gap-y-9 sm:gap-x-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

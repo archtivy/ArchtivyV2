@@ -1,12 +1,15 @@
 import { getAbsoluteUrl } from "@/lib/canonical";
-import { getArchiveHubUrl, getArchiveCategoryUrl, buildArchiveBreadcrumbSegments } from "@/lib/archive/urls";
+import {
+  getArchiveHubUrl,
+  getArchiveCategoryUrl,
+  buildArchiveBreadcrumbSegments,
+} from "@/lib/archive/urls";
 import type { TaxonomyNode } from "@/lib/taxonomy/taxonomyDb";
-import { Container } from "@/components/layout/Container";
-import { TopNav } from "@/components/layout/TopNav";
-import { Footer } from "@/components/layout/Footer";
+import { DirectoryPageShell } from "@/components/directory/DirectoryPageShell";
 import { ArchiveHeader } from "./ArchiveHeader";
 import { ArchiveBreadcrumb } from "./ArchiveBreadcrumb";
 import { SubcategoryLinks, type SubcategoryLinkItem } from "./SubcategoryLinks";
+import { archiveIntro } from "@/lib/archive/copy";
 import { ProjectsDirectory } from "@/components/projects/ProjectsDirectory";
 import { getDirectoryCategoryTree } from "@/lib/directory/categoryTree";
 import type { ProjectsDirectoryData } from "@/lib/db/projectsDirectory";
@@ -18,7 +21,8 @@ interface ProjectCategoryArchiveProps {
   node: TaxonomyNode;
   ancestors: TaxonomyNode[];
   childNodes: SubcategoryLinkItem[];
-  total: number;
+  /** Peers under the same parent that have listings. Empty on a root node. */
+  siblingNodes: SubcategoryLinkItem[];
   /** Every live project plus its facets — the same payload /projects uses. */
   directory: ProjectsDirectoryData;
   /** Directory state parsed from the request URL on the server. */
@@ -26,27 +30,35 @@ interface ProjectCategoryArchiveProps {
 }
 
 /**
- * ── ONE RESULTS UI, NOT THREE ───────────────────────────────────────────────
- * The grid and pagination that used to sit here are gone. This page, /projects
- * and /explore/projects each rendered project results differently, so the same
- * archive looked like a different product depending on how you arrived. The
- * results body is now ProjectsDirectory — the same filter bar, category pill,
- * facet pills, tabs, canonical cards and Load more — scoped to this node.
+ * A project category archive: /projects/commercial/showroom.
  *
- * Everything that made this page an ARCHIVE stays: the SEO title and intro
- * from the taxonomy node, the breadcrumb, the subcategory links, the
- * CollectionPage and BreadcrumbList JSON-LD, and the canonical URL. Only the
- * way results are drawn changed.
+ * ── IT IS /projects, SCOPED ─────────────────────────────────────────────────
+ * The chrome is DirectoryPageShell — the same HomeNav, the same 1440px column,
+ * the same HomeFooter that /projects renders. The results body is
+ * ProjectsDirectory — the same filter bar, category pill, facet pills, tabs,
+ * canonical card and Load more — with `scope` set to this node's slug_path.
+ * There is no category-specific results UI, no category-specific card, and no
+ * category-specific container; a reader arriving here from /projects should
+ * notice the heading changed and nothing else.
  *
- * ArchivePagination goes with the grid. The directory ships every live project
- * to the client and reveals them with Load more, so a page-2 URL would now
- * paginate a set that is already fully present. Nothing is unreachable.
+ * What makes it an ARCHIVE rather than the directory is everything above and
+ * below the results: the taxonomy title and intro, the crawlable breadcrumb,
+ * the subcategory links, the related peers, the CollectionPage and
+ * BreadcrumbList JSON-LD, and the self-referencing canonical.
+ *
+ * ── WHY THE SHELL IS MOUNTED HERE AND NOT IN SiteShell ──────────────────────
+ * /projects/* is shell-less in SiteShell and ConditionalFooter, because that
+ * catch-all serves both archives and project detail pages and a client
+ * component cannot tell which resolved. Only this server branch knows, so the
+ * branch supplies its own chrome. It previously supplied the LEGACY TopNav,
+ * Container and Footer — which is the entire reason category pages looked like
+ * a different product. Same mechanism, correct chrome.
  */
 export async function ProjectCategoryArchive({
   node,
   ancestors,
   childNodes,
-  total,
+  siblingNodes,
   directory,
   state,
 }: ProjectCategoryArchiveProps) {
@@ -59,7 +71,16 @@ export async function ProjectCategoryArchive({
 
   const isSubcategory = node.depth > 0;
   const title = node.seo_title || `${node.label} Projects`;
+  const description = archiveIntro("project", node);
+  // Only real, authored copy is shown ABOVE the results. The generated sentence
+  // is honest but says nothing a visitor cannot see, so it earns its place in
+  // the meta description and not in the page.
   const intro = node.intro_text || node.description;
+
+  // Children that lead somewhere. Of the 103 live project subcategories only 15
+  // have an approved listing behind them, so listing them all would mostly be
+  // links to empty archives.
+  const populatedChildren = childNodes.filter((c) => (c.listing_count ?? 0) > 0);
 
   const breadcrumbSegments = buildArchiveBreadcrumbSegments("project", ancestors, node.id);
 
@@ -67,10 +88,7 @@ export async function ProjectCategoryArchive({
   const canonicalUrl = getAbsoluteUrl(archivePath);
   const collectionJsonLd = buildCollectionPageJsonLd({
     name: title,
-    description:
-      node.meta_description ||
-      node.description ||
-      `Browse ${node.label.toLowerCase()} architecture projects on Archtivy.`,
+    description,
     url: canonicalUrl,
   });
   const breadcrumbItems = [
@@ -78,49 +96,47 @@ export async function ProjectCategoryArchive({
     { name: "Projects", url: getAbsoluteUrl(getArchiveHubUrl("project")) },
     ...ancestors
       .filter((a) => a.id !== node.id)
-      .map((a) => ({ name: a.label, url: getAbsoluteUrl(getArchiveCategoryUrl("project", a.slug_path)) })),
+      .map((a) => ({
+        name: a.label,
+        url: getAbsoluteUrl(getArchiveCategoryUrl("project", a.slug_path)),
+      })),
     { name: node.label, url: canonicalUrl },
   ];
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
 
-  /*
-   * Renders its own TopNav and Footer.
-   *
-   * SiteShell and ConditionalFooter treat everything under /projects/* as
-   * shell-less, because that catch-all serves BOTH category archives and
-   * project detail pages and a client component cannot tell them apart — only
-   * this server branch knows. Re-adding the shell here keeps archive pages
-   * pixel-identical to how they rendered before, while the detail branch is
-   * free to use the cream editorial palette.
-   */
   return (
-    <>
-      <TopNav />
-      <main>
-        <Container className="py-8 sm:py-12">
-          <JsonLd schemas={[collectionJsonLd, breadcrumbJsonLd]} />
-          <ArchiveBreadcrumb segments={breadcrumbSegments} current={node.label} />
-          <ArchiveHeader title={title} intro={intro} count={total} />
-          {!isSubcategory && childNodes.length > 0 && (
-            <SubcategoryLinks baseSegment="projects" items={childNodes} />
-          )}
-          <div className="mt-8">
-            <ProjectsDirectory
-              categoryTree={categoryTree}
-              projects={directory.projects}
-              facets={directory.facets}
-              total={directory.total}
-              state={state}
-              scope={{
-                slugPath: node.slug_path,
-                label: node.label,
-                basePath: archivePath,
-              }}
-            />
-          </div>
-        </Container>
-      </main>
-      <Footer />
-    </>
+    <DirectoryPageShell>
+      <JsonLd schemas={[collectionJsonLd, breadcrumbJsonLd]} />
+      <ArchiveBreadcrumb segments={breadcrumbSegments} current={node.label} />
+      <ArchiveHeader title={title} intro={intro} />
+
+      {!isSubcategory && populatedChildren.length > 0 && (
+        <SubcategoryLinks baseSegment="projects" items={populatedChildren} />
+      )}
+
+      <ProjectsDirectory
+        categoryTree={categoryTree}
+        projects={directory.projects}
+        facets={directory.facets}
+        total={directory.total}
+        state={state}
+        scope={{
+          slugPath: node.slug_path,
+          label: node.label,
+          basePath: archivePath,
+        }}
+      />
+
+      {/* AFTER the results, so the grid stays the page's primary content. */}
+      {isSubcategory && siblingNodes.length > 0 && (
+        <div className="mt-16">
+          <SubcategoryLinks
+            baseSegment="projects"
+            items={siblingNodes}
+            heading="Related categories"
+          />
+        </div>
+      )}
+    </DirectoryPageShell>
   );
 }

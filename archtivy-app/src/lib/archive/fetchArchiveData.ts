@@ -26,6 +26,16 @@ export interface ArchiveData<T> {
   node: TaxonomyNode;
   ancestors: TaxonomyNode[];
   childNodes: SubcategoryLinkItem[];
+  /**
+   * Peer categories under the same parent, already filtered to those that have
+   * at least one approved listing behind them and with this node removed.
+   *
+   * Empty on a root node, which has no peers worth listing — its siblings are
+   * the whole top level of the taxonomy, and that is what the Category pill in
+   * the filter bar is for. Populated on a subcategory, where "other things in
+   * Commercial" is a genuine next step.
+   */
+  siblingNodes: SubcategoryLinkItem[];
   listings: T[];
   total: number;
   page: number;
@@ -61,12 +71,38 @@ export async function fetchProjectArchive(
         getNodeListingCountsWithDescendants("project"),
       ]);
 
+      const counts = countsRes.data ?? {};
+
       const childNodes: SubcategoryLinkItem[] = (childrenRes.data ?? []).map((c) => ({
         label: c.label,
         slug_path: c.slug_path,
         description: c.description,
-        listing_count: (countsRes.data ?? {})[c.id] ?? 0,
+        listing_count: counts[c.id] ?? 0,
       }));
+
+      /*
+       * Peers, for the related-categories block under the results.
+       *
+       * Fetched here rather than in the component because the rolled-up counts
+       * are already in hand: the filter below is what keeps this from becoming
+       * a wall of links to empty pages. Only 15 of the 103 live project
+       * subcategories and 29 of the 505 product ones have any approved listing
+       * behind them, so an unfiltered sibling list would be mostly dead ends.
+       *
+       * One extra query, and only for a node that has a parent.
+       */
+      const siblingsRes = node.parent_id
+        ? await getChildNodes(node.parent_id)
+        : { data: [], error: null };
+      const siblingNodes: SubcategoryLinkItem[] = (siblingsRes.data ?? [])
+        .filter((s) => s.id !== node.id)
+        .map((s) => ({
+          label: s.label,
+          slug_path: s.slug_path,
+          description: s.description,
+          listing_count: counts[s.id] ?? 0,
+        }))
+        .filter((s) => (s.listing_count ?? 0) > 0);
 
       const total = listingsRes.total;
       const totalPages = Math.max(1, Math.ceil(total / ARCHIVE_PAGE_SIZE));
@@ -75,6 +111,7 @@ export async function fetchProjectArchive(
         node,
         ancestors: ancestorsRes.data ?? [],
         childNodes,
+        siblingNodes,
         listings: listingsRes.data,
         total,
         page: safePage,
@@ -115,12 +152,38 @@ export async function fetchProductArchive(
         getNodeListingCountsWithDescendants("product"),
       ]);
 
+      const counts = countsRes.data ?? {};
+
       const childNodes: SubcategoryLinkItem[] = (childrenRes.data ?? []).map((c) => ({
         label: c.label,
         slug_path: c.slug_path,
         description: c.description,
-        listing_count: (countsRes.data ?? {})[c.id] ?? 0,
+        listing_count: counts[c.id] ?? 0,
       }));
+
+      /*
+       * Peers, for the related-categories block under the results.
+       *
+       * Fetched here rather than in the component because the rolled-up counts
+       * are already in hand: the filter below is what keeps this from becoming
+       * a wall of links to empty pages. Only 15 of the 103 live project
+       * subcategories and 29 of the 505 product ones have any approved listing
+       * behind them, so an unfiltered sibling list would be mostly dead ends.
+       *
+       * One extra query, and only for a node that has a parent.
+       */
+      const siblingsRes = node.parent_id
+        ? await getChildNodes(node.parent_id)
+        : { data: [], error: null };
+      const siblingNodes: SubcategoryLinkItem[] = (siblingsRes.data ?? [])
+        .filter((s) => s.id !== node.id)
+        .map((s) => ({
+          label: s.label,
+          slug_path: s.slug_path,
+          description: s.description,
+          listing_count: counts[s.id] ?? 0,
+        }))
+        .filter((s) => (s.listing_count ?? 0) > 0);
 
       const total = listingsRes.total;
       const totalPages = Math.max(1, Math.ceil(total / ARCHIVE_PAGE_SIZE));
@@ -129,6 +192,7 @@ export async function fetchProductArchive(
         node,
         ancestors: ancestorsRes.data ?? [],
         childNodes,
+        siblingNodes,
         listings: listingsRes.data,
         total,
         page: safePage,
