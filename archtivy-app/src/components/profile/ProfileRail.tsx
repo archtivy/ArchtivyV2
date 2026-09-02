@@ -14,6 +14,7 @@ import { EditableText } from "@/components/profile/edit/EditableText";
 import { initialsOf } from "@/components/home/EntityCard";
 import { normaliseInstagramHandle } from "@/lib/publish/instagram";
 import { ProfileViewNav, type ProfileViewItem } from "@/components/profile/ProfileViews";
+import { ClaimProfileCta } from "@/components/profile/claim/ClaimProfileCta";
 import { BTN_PILL_SECONDARY } from "@/components/ui/publicButton";
 import type { ProfileMetrics } from "@/lib/db/profileMetrics";
 import type { Profile } from "@/lib/types/profiles";
@@ -68,7 +69,7 @@ export function ProfileRail({
   isOwner,
   initialFollowing,
   contactListing,
-  claimHref,
+  claim,
 }: {
   profile: Profile;
   metrics: ProfileMetrics;
@@ -77,8 +78,18 @@ export function ProfileRail({
   isOwner: boolean;
   initialFollowing: boolean;
   contactListing: { id: string; type: "project" | "product"; title: string } | null;
-  /** Null when the profile is already claimed or has no claim route. */
-  claimHref: string | null;
+  /**
+   * Null when the profile is already claimed, when there is no username to
+   * return to after sign-in, or when the viewer is the owner. The rail only
+   * decides where the block sits; ClaimProfileCta decides what it says.
+   */
+  claim: {
+    profileId: string;
+    profileName: string;
+    profileKind: string;
+    state: "unclaimed" | "pending";
+    signedOutHref: string;
+  } | null;
 }) {
   const displayName = profile.display_name ?? profile.username ?? "Profile";
 
@@ -269,20 +280,26 @@ export function ProfileRail({
           </ul>
       </ConnectBlock>
 
-      {claimHref && (
+      {claim && (
         <RailSectionBlock>
           <h2 className="font-body text-[14px] text-ink">
             {profile.role === "brand" ? "Are you this brand?" : "Are you this designer?"}
           </h2>
           <p className="mt-2 font-body text-[13px] leading-[20px] text-muted">
-            Claim your profile to update your information and gain more visibility.
+            {claim.state === "pending"
+              ? "A claim on this profile is with our team for review."
+              : "Claim your profile to update your information and gain more visibility."}
           </p>
-          <Link
-            href={claimHref}
-            className={`${BTN_PILL_SECONDARY} mt-4`}
-          >
-            Claim Profile
-          </Link>
+          {/* Opens a dialog on this page rather than navigating to a separate
+              claim page. The page still exists and still works — it is the
+              only route that can handle a tokenised instant-claim link. */}
+          <ClaimProfileCta
+            profileId={claim.profileId}
+            profileName={claim.profileName}
+            profileKind={claim.profileKind}
+            state={claim.state}
+            signedOutHref={claim.signedOutHref}
+          />
         </RailSectionBlock>
       )}
       </div>

@@ -3,6 +3,7 @@ import { getProfileByClerkId } from "@/lib/db/profiles";
 import { isFollowing } from "@/lib/db/follows";
 import { getProfilePageData } from "@/lib/db/profilePage";
 import { getProfileMetrics } from "@/lib/db/profileMetrics";
+import { getPendingRequestByProfileAndUser } from "@/lib/db/profileClaimRequests";
 import type { ProfilePageViewProps } from "@/components/profile/ProfilePageView";
 import type { Profile } from "@/lib/types/profiles";
 
@@ -24,7 +25,7 @@ export async function loadProfilePageProps(
     userId && (userId === profile.clerk_user_id || userId === ownerClerkId)
   );
 
-  const [data, metrics, initialFollowing] = await Promise.all([
+  const [data, metrics, initialFollowing, viewerHasPendingClaim] = await Promise.all([
     getProfilePageData(profile.id, profile.role),
     getProfileMetrics(profile.id),
     (async () => {
@@ -38,6 +39,25 @@ export async function loadProfilePageProps(
         profile.id
       );
     })(),
+    /*
+     * ── "CLAIM PENDING" COMES FROM THE CLAIMS TABLE, NOT FROM THE PROFILE ────
+     * The obvious source is profiles.claim_status = 'pending', and it can
+     * never be true: profiles_claim_status_check permits only 'unclaimed' and
+     * 'claimed'. submitClaimRequest calls setProfileClaimStatus(id,'pending')
+     * anyway and discards the result, so that write has always failed with a
+     * 23514 and no one noticed. Live proof: the De Sede profile has a pending
+     * claim row from 2026-09-02 and claim_status 'unclaimed'.
+     *
+     * A pending claim is a fact about profile_claim_requests, so it is read
+     * from there. Per-VIEWER, because "you have a claim in review" is true for
+     * one person and "someone has claimed this" is a different, weaker
+     * statement we have no reason to broadcast.
+     */
+    (async () => {
+      if (!userId || isOwner) return false;
+      const pending = await getPendingRequestByProfileAndUser(profile.id, userId);
+      return Boolean(pending.data);
+    })(),
   ]);
 
   // Seeds the contact dialog, which is written against a listing rather than a
@@ -50,6 +70,7 @@ export async function loadProfilePageProps(
     metrics,
     isOwner,
     initialFollowing,
+    viewerHasPendingClaim,
     contactListing: first
       ? { id: first.id, type: first.type, title: first.title }
       : null,

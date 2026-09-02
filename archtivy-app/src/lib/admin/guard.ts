@@ -24,3 +24,25 @@ export async function requireAdmin(): Promise<void> {
     redirect("/");
   }
 }
+
+/**
+ * Admin check for SERVER ACTIONS.
+ *
+ * requireAdmin() above redirects, which is right for a page render and wrong
+ * inside an action: the caller wants an error it can show, not a navigation.
+ *
+ * ── WHY THIS EXISTS ─────────────────────────────────────────────────────────
+ * The (admin) layout calls requireAdmin(), so no non-admin can LOAD an admin
+ * page. That says nothing about who can INVOKE the server actions those pages
+ * import — a server action is an endpoint, reachable by anyone who can post to
+ * it, and approveClaim/rejectClaim were checking only that a userId existed.
+ * Any signed-in account could therefore approve a profile claim to itself.
+ * The layout guard was doing all the work and could never have covered this.
+ */
+export async function isAdminUser(): Promise<boolean> {
+  const { userId, sessionClaims } = await auth();
+  if (!userId) return false;
+  const publicMeta = sessionClaims?.publicMetadata as { isAdmin?: boolean } | undefined;
+  const meta = sessionClaims?.metadata as { role?: string } | undefined;
+  return publicMeta?.isAdmin === true || meta?.role === "admin";
+}

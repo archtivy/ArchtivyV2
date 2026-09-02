@@ -11,8 +11,17 @@ export function ClaimProfileForm({ profileId }: { profileId: string }) {
 
   async function handleSubmit(formData: FormData) {
     startTransition(async () => {
-      const id = (formData.get("profile_id") as string) ?? profileId;
-      const res = await submitClaimRequest(id, formData);
+      /*
+       * The profile id comes from the PROP, not from the form.
+       *
+       * This read `formData.get("profile_id")` and preferred it over the prop,
+       * so which profile got claimed was decided by a hidden input any visitor
+       * could edit. The action re-checks that the target exists and is
+       * unclaimed, so the blast radius was small — but it let a claim be filed
+       * against a profile other than the one on screen, which is the shape of
+       * bug §9 is about. The hidden input is gone with it.
+       */
+      const res = await submitClaimRequest(profileId, formData);
       setState(res);
     });
   }
@@ -35,7 +44,6 @@ export function ClaimProfileForm({ profileId }: { profileId: string }) {
       }}
       className="space-y-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
     >
-      <input type="hidden" name="profile_id" value={profileId} />
       <div>
         <label htmlFor="requester_name" className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
           Your name *

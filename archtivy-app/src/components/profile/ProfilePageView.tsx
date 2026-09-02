@@ -68,6 +68,12 @@ export interface ProfilePageViewProps {
   initialFollowing: boolean;
   /** Listing used to seed the contact dialog, when one exists. */
   contactListing: { id: string; type: "project" | "product"; title: string } | null;
+  /**
+   * A signed-in non-owner already has a pending claim on this profile.
+   * Resolved from profile_claim_requests, not from profiles.claim_status —
+   * see the note in loadProfilePage.ts for why that column cannot say it.
+   */
+  viewerHasPendingClaim?: boolean;
 }
 
 /* ── Identity ────────────────────────────────────────────────────────────── */
@@ -244,7 +250,15 @@ function CollaboratorsView({ data }: { data: ProfilePageData }) {
 /* ── Page ────────────────────────────────────────────────────────────────── */
 
 export function ProfilePageView(props: ProfilePageViewProps) {
-  const { profile, data, metrics, isOwner, initialFollowing, contactListing } = props;
+  const {
+    profile,
+    data,
+    metrics,
+    isOwner,
+    initialFollowing,
+    contactListing,
+    viewerHasPendingClaim = false,
+  } = props;
   const displayName = profile.display_name ?? profile.username ?? "Profile";
   const isBrand = profile.role === "brand";
   const hasWork = data.projects.length > 0 || data.products.length > 0;
@@ -317,11 +331,50 @@ export function ProfilePageView(props: ProfilePageViewProps) {
       : []),
   ];
 
-  /* Claimable only while unclaimed. A claimed profile has nothing to claim,
-     and the route would be a dead end. */
-  const claimHref =
-    (profile as { claim_status?: string }).claim_status === "unclaimed" && profile.username
-      ? `/u/${encodeURIComponent(profile.username)}/claim`
+  /*
+   * ── THE CLAIM BLOCK ───────────────────────────────────────────────────────
+   * Offered only while the profile is unclaimed or has a claim under review,
+   * and never to the owner. A claimed profile has nothing to claim.
+   *
+   * `pending` is new here: it used to fall through to null, so the block
+   * vanished the moment anyone submitted a claim — including for the person
+   * who had just submitted it. It now renders as an inert "Claim pending"
+   * rather than disappearing.
+   *
+   * The href is only a SIGN-IN return path. Claiming happens in a dialog on
+   * this page now; ?claim=1 reopens it after the round trip.
+   */
+  const rawClaimStatus = (profile as { claim_status?: string }).claim_status;
+  const claimState: "unclaimed" | "pending" | null =
+    rawClaimStatus === "claimed"
+      ? null
+      : viewerHasPendingClaim
+        ? "pending"
+        : rawClaimStatus === "unclaimed"
+          ? "unclaimed"
+          : null;
+  const claimProfilePath = profile.username
+    ? `/u/${encodeURIComponent(profile.username)}`
+    : `/u/id/${profile.id}`;
+  const claim =
+    claimState && !isOwner
+      ? {
+          profileId: profile.id,
+          profileName: (profile.display_name ?? profile.username ?? "this profile").trim(),
+          profileKind: [
+            profile.role === "brand" ? "Brand profile" : "Designer profile",
+            [
+              (profile as { location_city?: string | null }).location_city?.trim(),
+              (profile as { location_country?: string | null }).location_country?.trim(),
+            ]
+              .filter(Boolean)
+              .join(", "),
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          state: claimState,
+          signedOutHref: `${claimProfilePath}?claim=1`,
+        }
       : null;
 
   const page = (
@@ -355,7 +408,7 @@ export function ProfilePageView(props: ProfilePageViewProps) {
                 isOwner={isOwner}
                 initialFollowing={initialFollowing}
                 contactListing={contactListing}
-                claimHref={claimHref}
+                claim={claim}
               />
             </div>
 
