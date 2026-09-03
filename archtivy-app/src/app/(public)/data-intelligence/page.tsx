@@ -5,157 +5,113 @@ import {
 } from "@/components/marketing/MarketingPage";
 
 export const metadata = {
-  title: "Data & Intelligence | Archtivy",
+  title: "Connections and Accuracy | Archtivy",
   description:
-    "How Archtivy structures architectural data into actionable intelligence for professionals and brands.",
+    "How Archtivy establishes the connections between architecture projects, design studios, products and brands — what counts as a credit, what counts as a suggestion, and why gaps are left visible.",
 };
 
-export default function DataIntelligencePage() {
+/**
+ * Connections and accuracy.
+ *
+ * ── WHAT THIS REPLACES ──────────────────────────────────────────────────────
+ * "Structured data turns into intelligence at scale", promising "specification
+ * frequency by product, region, and typology", "professional network mapping
+ * and collaboration history" and "brand footprint analysis across markets and
+ * firm types". None of it exists, and none of it could be produced honestly
+ * from the data on the platform today. It was an analytics product described
+ * in advance of itself.
+ *
+ * The page keeps its route and takes the one subject in this territory that is
+ * both true and worth a page: how a connection gets established, what we will
+ * and will not infer, and why an empty section is preferable to a filled-in
+ * guess. That is the argument the rest of the platform depends on, and it does
+ * not overlap /how-it-works, which describes the reader's path.
+ */
+export default function ConnectionsPage() {
   return (
     <MarketingPage
-      label="Data & Intelligence"
-      headline="Structured data turns into intelligence at scale."
-      subheadline="Every project submitted to Archtivy generates structured data. Every product tag, every team credit, every location attribute compounds into a queryable record of global architectural production."
+      label="Connections"
+      headline="A connection is either established or it is absent."
+      subheadline="Archtivy is only as useful as its connections are trustworthy. So it matters a great deal where each one comes from, and it matters that the difference is visible."
     >
-      {/* What gets structured */}
-      <MarketingSection heading="What gets structured">
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <MarketingSection heading="Where connections come from">
+        <ul className="divide-y divide-hairline border-y border-hairline">
           {[
-            {
-              title: "Projects",
-              items: [
-                "Type and typology",
-                "Location and year",
-                "Team credits by role",
-                "Products specified",
-                "Materials used",
-              ],
-            },
-            {
-              title: "Products",
-              items: [
-                "Category and type",
-                "Brand and manufacturer",
-                "Specification frequency",
-                "Project contexts",
-                "Specifying regions",
-              ],
-            },
-            {
-              title: "Professionals",
-              items: [
-                "Firm type and role",
-                "Project history",
-                "Specification patterns",
-                "Geographic range",
-                "Collaboration network",
-              ],
-            },
-            {
-              title: "Brands",
-              items: [
-                "Product portfolio",
-                "Specification footprint",
-                "Regional performance",
-                "Specifying firms",
-                "Typology distribution",
-              ],
-            },
-          ].map(({ title, items }) => (
-            <div
-              key={title}
-              className="space-y-4 rounded-2xl border border-hairline bg-white p-5"
-            >
-              <h3 className="text-sm font-semibold text-ink">
-                {title}
-              </h3>
-              <ul className="space-y-2">
-                {items.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-center gap-2 text-xs text-muted"
-                  >
-                    <span className="h-1 w-1 shrink-0 rounded-full bg-stone" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            [
+              "Stated by the people who made the work",
+              "A studio publishes a project and credits the collaborators and the products in it. A brand publishes a product with its category and materials. These are the strongest connections on the platform, because someone with first-hand knowledge asserted them.",
+            ],
+            [
+              "Derived from shared attributes",
+              "A material, a category, a city. If two projects both specify the same stone, that relationship follows from the records themselves and needs no interpretation.",
+            ],
+            [
+              "Suggested by resemblance",
+              "In a project photograph, we can surface products that look like what is in the room. This is a suggestion about appearance and nothing more. It is never labelled as a specification, and it never appears where a credited product would.",
+            ],
+          ].map(([title, body]) => (
+            <li key={title} className="grid gap-2 py-6 sm:grid-cols-[16rem_1fr] sm:gap-8">
+              <h3 className="font-body text-[15px] text-ink">{title}</h3>
+              <p className="max-w-[58ch] font-body text-[15px] leading-[25px] text-muted">
+                {body}
+              </p>
+            </li>
           ))}
-        </div>
+        </ul>
       </MarketingSection>
 
-      {/* Intelligence outputs */}
-      <MarketingSection heading="Intelligence outputs">
-        <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-muted">
+      <MarketingSection heading="What we will not do">
+        <div className="grid gap-12 lg:grid-cols-2 lg:items-start">
+          <div className="max-w-[54ch] space-y-6 font-body text-[16px] leading-[27px] text-muted">
             <p>
-              The structured data within Archtivy becomes actionable at two
-              levels: individual and aggregate. At the individual level, a
-              professional can view their full specification history, a brand
-              can track where their products appear, and a project page surfaces
-              its complete credit record.
+              We do not infer a specification. If a chair in a photograph
+              closely resembles a product in the catalogue, that is not
+              evidence the chair is that product, and presenting it as one
+              would corrupt every genuine credit around it.
             </p>
             <p>
-              At the aggregate level, patterns emerge that were previously
-              invisible. Specification trends by region, product adoption by
-              typology, professional network mapping — these are the outputs
-              of a structured intelligence system operating at scale.
+              We do not fill empty fields with plausible values. A project with
+              no credited products shows no credited products.
             </p>
           </div>
-          <div className="space-y-3">
-            {[
-              "Specification frequency by product, region, and typology",
-              "Professional network mapping and collaboration history",
-              "Brand footprint analysis across markets and firm types",
-              "Emerging specification trends by category",
-              "Cross-referencing of materials, products, and project contexts",
-            ].map((item) => (
-              <div
-                key={item}
-                className="flex items-start gap-4 rounded-2xl border border-hairline bg-white px-5 py-3.5"
-              >
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-archtivy-primary" />
-                <span className="text-sm text-muted">
-                  {item}
-                </span>
-              </div>
-            ))}
+          <div className="max-w-[54ch] space-y-6 font-body text-[16px] leading-[27px] text-muted">
+            <p>
+              We do not publish counts or coverage figures we cannot stand
+              behind. Where the network is thin, the interface shows less
+              rather than implying more.
+            </p>
+            <p>
+              None of this is caution for its own sake. A discovery platform
+              whose connections cannot be trusted is a worse tool than the
+              scattered pages it set out to replace.
+            </p>
           </div>
         </div>
       </MarketingSection>
 
-      {/* Coming soon */}
-      <MarketingSection heading="Intelligence features">
-        <div className="rounded-2xl border border-hairline bg-stone/25 px-6 py-5">
-          <p className="text-sm font-medium text-ink">
-            Advanced intelligence features are in development.
+      <MarketingSection heading="Why gaps stay visible">
+        <div className="max-w-[62ch] space-y-6 font-body text-[16px] leading-[27px] text-muted">
+          <p>
+            Most projects on the internet credit their photographer and not
+            their furniture. That is the inheritance Archtivy is working
+            against, and it means many projects here have connections that are
+            incomplete.
           </p>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-            Query dashboards, trend reports, and professional network
-            visualisation are planned for a future release. The data is being
-            collected now. The intelligence layer follows at scale.
-          </p>
-          <p className="mt-4 text-sm text-muted">
-            For early access or research partnerships, contact{" "}
-            <a
-              href="mailto:info@archtivy.com"
-              className="text-archtivy-primary hover:underline dark:text-[#4d6fff]"
-            >
-              info@archtivy.com
-            </a>
-            .
+          <p>
+            Leaving those gaps legible is deliberate. It shows a reader what is
+            known and what is not, and it shows a studio or a brand exactly
+            where their own work would make the network more useful.
           </p>
         </div>
       </MarketingSection>
 
       <MarketingCTA
-        heading="Add to the record."
-        body="Every project submitted improves the intelligence available to everyone on the platform."
-        primaryLabel="Submit a Project"
+        heading="Credit what is in your work."
+        body="The connections that make discovery useful come from the people who made the projects."
+        primaryLabel="Add a project"
         primaryHref="/add/project"
-        secondaryLabel="Explore the Platform"
-        secondaryHref="/explore/projects"
+        secondaryLabel="How it works"
+        secondaryHref="/how-it-works"
       />
     </MarketingPage>
   );

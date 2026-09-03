@@ -65,11 +65,11 @@ export default function PressKitPage() {
             </div>
           ))}
         </div>
-        <p className="mt-6 text-xs text-muted">
+        <p className="mt-6 max-w-[68ch] text-xs text-muted">
           Asset files are being prepared. Contact{" "}
           <a
             href="mailto:info@archtivy.com"
-            className="text-[#002abf] hover:underline dark:text-[#4d6fff]"
+            className="text-archtivy-primary hover:underline"
           >
             info@archtivy.com
           </a>{" "}
@@ -81,33 +81,43 @@ export default function PressKitPage() {
       <MarketingSection heading="Brand colors">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            // Jet Black is the brand primary. This entry previously published
-            // #002ABF, which is not the brand colour and is not in the token
-            // set either — the swatch and the hex are corrected together so the
-            // square always renders exactly the value printed beside it.
+            /*
+             * ── THESE WERE NOT THE BRAND COLOURS ──────────────────────────
+             * A press kit is what a journalist or a partner reproduces the
+             * brand from, so publishing the wrong values here propagates them
+             * outward. Every entry was wrong: #002ABF as the accent (the
+             * accent is #173DED — #002ABF has never been in the token set),
+             * #0B0B0B as primary, and zinc-900 / zinc-500 / #FAFAFA for text
+             * and ground, none of which appear anywhere in the product.
+             *
+             * These now read from tailwind.config: cream #F3F2EE, ink #161616,
+             * muted #6B6B68, hairline #E4E1D9, archtivy.primary #173DED. The
+             * swatch class and the printed hex are set from the same value so
+             * the square can never disagree with the label beside it.
+             */
             {
-              name: "Primary",
-              hex: "#0B0B0B",
-              use: "CTAs, links, interactive elements",
-              swatch: "bg-[#0B0B0B]",
+              name: "Ink",
+              hex: "#161616",
+              use: "Headlines, body text, the wordmark, primary buttons",
+              swatch: "bg-[#161616]",
             },
             {
-              name: "Foreground",
-              hex: "#18181B",
-              use: "Headlines, primary text",
-              swatch: "bg-zinc-900",
+              name: "Cream",
+              hex: "#F3F2EE",
+              use: "Page background",
+              swatch: "bg-[#F3F2EE] border border-hairline",
             },
             {
-              name: "Muted text",
-              hex: "#71717A",
-              use: "Body copy, descriptions",
-              swatch: "bg-zinc-500",
+              name: "Muted",
+              hex: "#6B6B68",
+              use: "Captions, metadata, secondary text",
+              swatch: "bg-[#6B6B68]",
             },
             {
-              name: "Background",
-              hex: "#FAFAFA",
-              use: "Page backgrounds, footer",
-              swatch: "bg-zinc-50 border border-zinc-200",
+              name: "Accent",
+              hex: "#173DED",
+              use: "Links, active states, focus rings",
+              swatch: "bg-[#173DED]",
             },
           ].map(({ name, hex, use, swatch }) => (
             <div
@@ -145,7 +155,7 @@ export default function PressKitPage() {
               ].map((item) => (
                 <li
                   key={item}
-                  className="flex items-start gap-3 text-sm leading-relaxed text-muted"
+                  className="flex max-w-[68ch] items-start gap-3 text-sm leading-relaxed text-muted"
                 >
                   <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-stone" />
                   {item}
@@ -166,7 +176,7 @@ export default function PressKitPage() {
               ].map((item) => (
                 <li
                   key={item}
-                  className="flex items-start gap-3 text-sm leading-relaxed text-muted"
+                  className="flex max-w-[68ch] items-start gap-3 text-sm leading-relaxed text-muted"
                 >
                   <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-stone" />
                   {item}
@@ -179,12 +189,12 @@ export default function PressKitPage() {
 
       {/* Contact */}
       <MarketingSection>
-        <p className="text-sm leading-relaxed text-muted">
+        <p className="max-w-[68ch] text-sm leading-relaxed text-muted">
           For asset requests, high-resolution files, or questions about brand
           usage, contact{" "}
           <a
             href="mailto:info@archtivy.com"
-            className="font-medium text-[#002abf] hover:underline dark:text-[#4d6fff]"
+            className="font-medium text-archtivy-primary hover:underline"
           >
             info@archtivy.com
           </a>

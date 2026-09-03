@@ -5,157 +5,189 @@ import {
 } from "@/components/marketing/MarketingPage";
 
 export const metadata = {
-  title: "Vision | Archtivy",
+  title: "Why Archtivy — Connected Discovery for Architecture and Design",
   description:
-    "Why architecture data is fragmented and why structured intelligence changes the industry.",
+    "Architecture online is fragmented: projects on one site, products in catalogues, designers in portfolios, brands elsewhere. Archtivy connects projects, designers, products and brands so discovery can follow the relationships that made the work.",
 };
 
+/**
+ * Why Archtivy — the positioning page.
+ *
+ * ── WHAT THIS REPLACES ──────────────────────────────────────────────────────
+ * The previous version argued that architecture is an industry with a data
+ * problem, and that Archtivy is the infrastructure that fixes it: "structured
+ * credits", "market intelligence from real data", "a brand can query its
+ * specification footprint across 90 countries", "an industry worth trillions
+ * in annual output". That is a data-platform pitch, aimed at procurement, and
+ * it described a product that does not exist — the numbers were aspirational
+ * and the tone was closer to a market-research vendor than to architecture.
+ *
+ * The page now argues the thing that is actually true and actually built:
+ * architecture is made through relationships, those relationships are
+ * scattered across the web, and Archtivy puts them back together so a reader
+ * can follow one.
+ */
 export default function VisionPage() {
   return (
     <MarketingPage
-      label="Vision"
-      headline="Architecture data is fragmented. That fragmentation has a cost."
-      subheadline="Every completed project carries embedded knowledge — the products specified, the teams credited, the decisions made. This information has always existed. What it has never had is structure."
+      label="Why Archtivy"
+      headline="Architecture, finally connected."
+      subheadline="A building is the product of relationships — between the people who designed it, the products specified inside it, and the brands that made them. Online, those relationships come apart. Archtivy puts them back together."
     >
-      {/* Fragmentation problem */}
-      <MarketingSection heading="The fragmentation problem">
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-muted">
+      {/* The problem, stated plainly rather than as a market thesis. */}
+      <MarketingSection heading="Everything is somewhere. Nothing is together.">
+        <div className="grid gap-12 lg:grid-cols-[1fr_0.9fr] lg:items-start">
+          <div className="max-w-[62ch] space-y-6 font-body text-[16px] leading-[27px] text-muted">
             <p>
-              The current information infrastructure of architecture was built
-              for media reach, not structural accuracy. It rewards editorial
-              attention over completeness. It captures the award-winning and the
-              photographed, not the systemic record of how the built environment
-              is actually produced.
+              Look for a building you admire and you will find the photographs
+              on an architecture site. The studio behind it keeps a portfolio
+              somewhere else. The chair in the third image sits in a
+              manufacturer&apos;s catalogue, under a name the article never
+              mentioned. The brand that makes it has its own website, arranged
+              by product family rather than by the rooms its work ends up in.
             </p>
             <p>
-              A product brand cannot reliably know which architecture firms
-              specify their products, in which countries, across which project
-              types. A designer cannot demonstrate their specification history
-              without manually assembling a portfolio. A researcher cannot query
-              architectural production by material, region, or typology without
-              pulling from dozens of incompatible sources.
+              Every one of those pages is well made. None of them knows about
+              the others. So the reader does the joining by hand — a search, a
+              reverse image lookup, a guess — and most of the time gives up
+              before the answer arrives.
             </p>
             <p>
-              This is not a minor inconvenience. It is a structural failure in
-              how an industry worth trillions in annual output manages its own
-              knowledge.
+              This is not a shortage of information. Architecture is documented
+              more thoroughly than almost any other discipline. What is missing
+              is the connective tissue: a way to move from the thing you are
+              looking at to the things that made it.
             </p>
           </div>
 
-          <ul className="space-y-4">
+          {/* Restrained: four plain statements, hairline-separated. No cards,
+              no icons — the sentences are the content. */}
+          <ul className="divide-y divide-hairline border-y border-hairline">
             {[
-              {
-                n: "01",
-                text: "Project credits are scattered across PDFs, press releases, and disconnected firm websites with no canonical record.",
-              },
-              {
-                n: "02",
-                text: "Product specification data lives inside manufacturer sales systems, inaccessible to market intelligence.",
-              },
-              {
-                n: "03",
-                text: "Professional histories are rebuilt from scratch for every award submission, tender document, and client pitch.",
-              },
-              {
-                n: "04",
-                text: "There is no shared database connecting the products used in a building to the professionals who specified them.",
-              },
-            ].map(({ n, text }) => (
-              <li
-                key={n}
-                className="flex gap-5 rounded-2xl border border-hairline bg-white p-5"
-              >
-                <span className="shrink-0 font-mono text-xs text-muted/70">
-                  {n}
-                </span>
-                <p className="text-sm leading-relaxed text-muted">
-                  {text}
-                </p>
+              "A project names its photographer but rarely its furniture.",
+              "A product page shows a studio backdrop, never the room it was specified into.",
+              "A studio's portfolio ends at its own work, with no route onward.",
+              "Inspiration collects on social platforms, stripped of every credit.",
+            ].map((text) => (
+              <li key={text} className="py-5 font-body text-[15px] leading-[24px] text-muted">
+                {text}
               </li>
             ))}
           </ul>
         </div>
       </MarketingSection>
 
-      {/* Structured credits */}
-      <MarketingSection heading="What structured credits enable">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            {
-              title: "Verifiable professional history",
-              body: "When credits are attributed at the project level — by role, firm, and contribution — a professional accumulates a verifiable record that persists independent of any publication cycle or platform.",
-            },
-            {
-              title: "Product-to-project traceability",
-              body: "Each product tagged in a project creates a permanent link between the specification context and the brand. Over time, a product accumulates a traceable record of where it has been specified and by whom.",
-            },
-            {
-              title: "Market intelligence from real data",
-              body: "Aggregate specification records reveal patterns that were previously invisible: which markets favour which products, which typologies drive specification volume, which firms lead in specific material categories.",
-            },
-            {
-              title: "Discoverable work that compounds",
-              body: "A project with structured credits is findable by product, by material, by location, by typology. Every new connection makes the record more complete and more useful.",
-            },
-            {
-              title: "Cross-industry network effects",
-              body: "Each new designer project that tags a product increases the value of that product's intelligence record. Each new brand increases the prestige of being specified. The value compounds with scale.",
-            },
-            {
-              title: "Long-term professional permanence",
-              body: "A firm's website changes. Media features become inaccessible. Archtivy is built to persist — your professional record does not depend on any external publication cycle.",
-            },
-          ].map(({ title, body }) => (
-            <div key={title} className="space-y-3">
-              <h3 className="text-sm font-semibold tracking-tight text-ink">
-                {title}
-              </h3>
-              <p className="text-sm leading-relaxed text-muted">
-                {body}
-              </p>
-            </div>
-          ))}
+      {/* The graph, which is the actual product. */}
+      <MarketingSection heading="In the real world, these things belong together.">
+        <div className="max-w-[62ch] space-y-6 font-body text-[16px] leading-[27px] text-muted">
+          <p>
+            A project has a designer. A space contains products. Products come
+            from brands. Materials shape projects. The same lamp turns up in a
+            house in Lisbon and a café in Riyadh. The same studio works with
+            one brand across a decade.
+          </p>
+          <p>
+            None of that is a new idea — it is simply how the work happens.
+            Archtivy&apos;s only claim is that discovery should follow the same
+            shape.
+          </p>
+        </div>
+
+        {/* The graph as type, not as a diagram. Reads on a phone, needs no
+            illustration, and states the model exactly. */}
+        <p className="mt-10 max-w-[46ch] font-display text-[22px] leading-[1.5] tracking-tight text-ink sm:text-[26px]">
+          Projects <span className="text-muted">↔</span> Designers{" "}
+          <span className="text-muted">↔</span> Products{" "}
+          <span className="text-muted">↔</span> Brands
+        </p>
+        <p className="mt-4 max-w-[52ch] font-body text-[15px] leading-[24px] text-muted">
+          Held together by the materials, locations and specifications that
+          recur across them.
+        </p>
+      </MarketingSection>
+
+      {/* The experience, described as a path rather than a feature set. */}
+      <MarketingSection heading="Begin anywhere.">
+        <div className="grid gap-12 lg:grid-cols-2 lg:items-start">
+          <div className="max-w-[54ch] space-y-6 font-body text-[16px] leading-[27px] text-muted">
+            <p>
+              There is no correct entry point. Arrive at a project and you can
+              reach the studio, then the products inside it, then the brands
+              behind those, then another project entirely. Arrive at a product
+              and you can see the spaces it has been specified into, and who
+              chose it.
+            </p>
+            <p>
+              Follow the studios and brands whose decisions interest you. Keep
+              what matters on a board. Discovery becomes more relevant as you
+              use it, without ever asking you to fill in a profile of your
+              tastes.
+            </p>
+          </div>
+
+          <ol className="space-y-0 divide-y divide-hairline border-y border-hairline">
+            {[
+              ["Project", "The building, its drawings and its credits."],
+              ["Designer", "The studio, and the rest of what they have built."],
+              ["Product", "What is actually in the room."],
+              ["Brand", "Who makes it, and where else it lives."],
+              ["Onward", "Another project. The path does not end."],
+            ].map(([step, note], i) => (
+              <li key={step} className="flex gap-5 py-5">
+                <span className="w-5 shrink-0 pt-[3px] font-body text-[12px] tabular-nums text-muted/70">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span>
+                  <span className="block font-body text-[15px] text-ink">{step}</span>
+                  <span className="mt-1 block font-body text-[14px] leading-[22px] text-muted">
+                    {note}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ol>
         </div>
       </MarketingSection>
 
-      {/* Infrastructure layer */}
-      <MarketingSection heading="The infrastructure layer">
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-muted">
+      {/* What we are, said without overreach. */}
+      <MarketingSection heading="A discovery layer, not a destination.">
+        <div className="grid gap-12 lg:grid-cols-2 lg:items-start">
+          <div className="max-w-[54ch] space-y-6 font-body text-[16px] leading-[27px] text-muted">
             <p>
-              Archtivy&apos;s role is not editorial. We do not curate what is
-              important or select which projects deserve attention. We provide
-              infrastructure for the industry to record itself — accurately,
-              permanently, and at scale.
+              Archtivy is not a directory, a portfolio host or a catalogue,
+              though it contains something of each. It is the layer that sits
+              between them — the set of connections that lets one lead to the
+              next.
             </p>
             <p>
-              A platform that achieves canonical status for architectural
-              specification becomes the primary reference for professional
-              credibility, product intelligence, and research globally. That
-              infrastructure does not yet exist. Archtivy is building it.
+              We do not decide which architecture matters. Studios and brands
+              present their own work; the connections between them are what we
+              build and maintain.
             </p>
           </div>
-          <div className="space-y-5 text-sm leading-relaxed text-muted">
+          <div className="max-w-[54ch] space-y-6 font-body text-[16px] leading-[27px] text-muted">
             <p>
-              We are building toward a future in which every built project has a
-              permanent, verifiable record. In which a designer&apos;s professional
-              history is as structured as a financial record. In which a brand
-              can query its specification footprint across 90 countries. In
-              which architectural intelligence is no longer fragmented by
-              default.
+              This is early. The graph is dense in places and thin in others,
+              and it grows as studios and brands add their work and credit what
+              is in it. Where a connection has not been established yet, we
+              would rather show nothing than guess.
+            </p>
+            <p>
+              The ambition is straightforward and long-term: that anyone
+              looking at a building can find their way to everything that made
+              it.
             </p>
           </div>
         </div>
       </MarketingSection>
 
       <MarketingCTA
-        heading="Be part of the record."
-        body="Submit your projects and products. Every entry contributes to a more complete picture of global architectural production."
-        primaryLabel="Submit Your Work"
-        primaryHref="/add/project"
-        secondaryLabel="Explore Products"
-        secondaryHref="/explore/products"
+        heading="Start with a project."
+        body="Follow it to the studio, the products inside it, and the brands behind those."
+        primaryLabel="Explore projects"
+        primaryHref="/projects"
+        secondaryLabel="Browse products"
+        secondaryHref="/products"
       />
     </MarketingPage>
   );

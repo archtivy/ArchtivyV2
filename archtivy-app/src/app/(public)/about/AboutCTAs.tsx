@@ -13,7 +13,7 @@ export function AboutCTAs({ userId, role }: AboutCTAsProps) {
   return (
     <>
       <ShareCTA userId={userId} role={role} />
-      <Button as="link" href="/explore/projects" variant="secondary">
+      <Button as="link" href="/projects" variant="secondary">
         Explore projects
       </Button>
     </>

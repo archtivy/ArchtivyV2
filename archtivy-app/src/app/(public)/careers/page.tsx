@@ -4,23 +4,23 @@ import {
 } from "@/components/marketing/MarketingPage";
 
 export const metadata = {
-  title: "Careers | Archtivy",
+  title: "Careers at Archtivy",
   description:
-    "Work at Archtivy. We are building the intelligence infrastructure for global architecture.",
+    "Work at Archtivy. A small, senior team connecting architecture projects, design studios, products and brands so that discovery can follow the relationships behind the work.",
 };
 
 const PRINCIPLES = [
   {
     title: "Structural thinking",
-    body: "We design systems before we design surfaces. Every decision — product, engineering, content — is evaluated for its structural effect on the platform.",
+    body: "We design the relationships before the screens. What can be connected, and how honestly, decides what the interface is allowed to claim.",
   },
   {
     title: "Precision over volume",
-    body: "We do not optimise for speed at the expense of accuracy. The record we are building must be correct. We move deliberately.",
+    body: "A connection that is wrong is worse than one that is missing. Where we cannot establish a relationship honestly, we show nothing — and we would rather ship less than guess.",
   },
   {
     title: "Long-term orientation",
-    body: "We are building infrastructure that should outlast any individual feature or funding cycle. Decisions are evaluated over years, not quarters.",
+    body: "The connections between projects, products and studios should still be useful in ten years. Decisions get evaluated over that horizon, not over a quarter.",
   },
   {
     title: "Small and senior",
@@ -32,18 +32,18 @@ export default function CareersPage() {
   return (
     <MarketingPage
       label="Careers"
-      headline="Building the permanent record of global architecture."
-      subheadline="Archtivy is an early-stage team working on a difficult, structural problem. If you want to work on something that matters to a specific industry in a lasting way, read on."
+      headline="A small team, connecting a fragmented discipline."
+      subheadline="Architecture is documented well and joined up badly. Archtivy exists to connect projects to the studios, products and brands behind them. It is early, the problem is specific, and the work is more careful than fast."
     >
       {/* Culture principles */}
       <MarketingSection heading="How we work">
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="grid gap-10 sm:grid-cols-2">
           {PRINCIPLES.map(({ title, body }) => (
             <div key={title} className="space-y-2">
-              <h3 className="text-sm font-semibold tracking-tight text-ink">
+              <h3 className="font-body text-[15px] text-ink">
                 {title}
               </h3>
-              <p className="text-sm leading-relaxed text-muted">
+              <p className="max-w-[52ch] font-body text-[15px] leading-[25px] text-muted">
                 {body}
               </p>
             </div>
@@ -76,9 +76,9 @@ export default function CareersPage() {
               description of your background.
             </p>
             <p>
-              We are particularly interested in people with direct experience
-              in architectural practice, construction technology, data systems,
-              or B2B product growth.
+              We are particularly interested in people who have worked inside
+              architectural or interior practice, and in engineers who care
+              about data being correct rather than merely present.
             </p>
           </div>
           <div className="rounded-2xl border border-hairline bg-white p-6">
@@ -87,7 +87,7 @@ export default function CareersPage() {
             </p>
             <a
               href="mailto:info@archtivy.com"
-              className="mt-3 block text-base font-medium text-archtivy-primary hover:underline dark:text-[#4d6fff]"
+              className="mt-3 block font-body text-[16px] text-archtivy-primary hover:underline"
             >
               info@archtivy.com
             </a>

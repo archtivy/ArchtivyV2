@@ -35,8 +35,8 @@ export default function ContactPage() {
   return (
     <MarketingPage
       label="Contact"
-      headline="Direct lines. No requests that disappear."
-      subheadline="We review every message and respond within two business days. Use the category that best describes your inquiry."
+      headline="Talk to us."
+      subheadline="A small team reads everything that arrives here. Pick the line closest to your question and we will reply."
     >
       {/* Direct lines */}
       <MarketingSection heading="Direct contact">
@@ -54,7 +54,7 @@ export default function ContactPage() {
               </p>
               <a
                 href={`mailto:${email}`}
-                className="block text-sm font-medium text-archtivy-primary hover:underline dark:text-[#4d6fff]"
+                className="block text-sm font-medium text-archtivy-primary hover:underline"
               >
                 {email}
               </a>

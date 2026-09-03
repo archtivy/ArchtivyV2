@@ -46,8 +46,8 @@ export default function ApiDocsPage() {
   return (
     <MarketingPage
       label="API Documentation"
-      headline="Programmatic access to the architecture intelligence record."
-      subheadline="The Archtivy API provides structured access to project, product, and professional data. Documentation is in active development ahead of public release."
+      headline="Programmatic access to the Archtivy graph."
+      subheadline="Structured access to projects, products, studios and brands, and the connections between them. The API is not open yet — this documents the intended shape ahead of release."
     >
       {/* Status notice */}
       <MarketingSection>
@@ -55,13 +55,13 @@ export default function ApiDocsPage() {
           <p className="text-sm font-medium text-ink">
             API access is not yet publicly available.
           </p>
-          <p className="mt-2 text-sm leading-relaxed text-muted">
+          <p className="mt-2 max-w-[68ch] text-sm leading-relaxed text-muted">
             We are building toward a versioned, rate-limited REST API. Early
             access is available for qualified research institutions and brand
             intelligence partners. Contact{" "}
             <a
               href="mailto:info@archtivy.com"
-              className="text-archtivy-primary hover:underline dark:text-[#4d6fff]"
+              className="text-archtivy-primary hover:underline"
             >
               info@archtivy.com
             </a>{" "}
@@ -73,7 +73,7 @@ export default function ApiDocsPage() {
       {/* Authentication */}
       <MarketingSection heading="Authentication">
         <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-4 text-sm leading-relaxed text-muted">
+          <div className="max-w-[68ch] space-y-4 text-sm leading-relaxed text-muted">
             <p>
               The Archtivy API uses bearer token authentication. All requests
               must include a valid API key in the{" "}
@@ -88,7 +88,7 @@ export default function ApiDocsPage() {
               early access period.
             </p>
           </div>
-          <div className="rounded-2xl border border-hairline bg-zinc-900 p-5">
+          <div className="rounded-2xl border border-hairline bg-ink p-5">
             <pre className="overflow-x-auto font-mono text-xs text-muted/70">
               {`Authorization: Bearer arch_live_xxxxxxxxxxxxx
 
@@ -103,7 +103,10 @@ Accept: application/json`}
       {/* Endpoints */}
       <MarketingSection heading="Endpoints overview">
         <div className="overflow-hidden rounded-2xl border border-hairline">
-          <div className="grid grid-cols-[80px_1fr_1fr_100px] border-b border-hairline bg-stone/25 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted 0">
+          {/* Column headings are for the table layout only, so they are
+              hidden once the rows stack. `text-muted 0` here was a stray
+              fragment left by an earlier edit — "0" is not a class. */}
+          <div className="hidden border-b border-hairline bg-stone/25 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted sm:grid sm:grid-cols-[80px_1fr_1fr_100px]">
             <span>Method</span>
             <span>Path</span>
             <span>Description</span>
@@ -112,9 +115,13 @@ Accept: application/json`}
           {ENDPOINTS.map(({ method, path, description, status }) => (
             <div
               key={path}
-              className="grid grid-cols-[80px_1fr_1fr_100px] items-start border-b border-hairline px-5 py-4 last:border-0 /50"
+              /* Four fixed columns needed 80px + 100px plus two content
+                 columns, which overflowed a 390px viewport by up to 55px —
+                 measured, and not inside a scroll container. The row stacks
+                 below sm instead. ("/50" was another stray fragment.) */
+              className="grid items-start gap-1 border-b border-hairline px-5 py-4 last:border-0 sm:grid-cols-[80px_1fr_1fr_100px] sm:gap-0"
             >
-              <span className="font-mono text-xs font-semibold text-archtivy-primary dark:text-[#4d6fff]">
+              <span className="font-mono text-xs font-semibold text-archtivy-primary">
                 {method}
               </span>
               <span className="font-mono text-xs text-muted">
@@ -123,7 +130,7 @@ Accept: application/json`}
               <span className="text-xs leading-relaxed text-muted">
                 {description}
               </span>
-              <span className="text-right text-[10px] text-muted">
+              <span className="text-[10px] text-muted sm:text-right">
                 {status}
               </span>
             </div>
@@ -158,7 +165,7 @@ Accept: application/json`}
               <p className="text-sm font-semibold text-ink">
                 {tier}
               </p>
-              <p className="font-mono text-xs text-archtivy-primary dark:text-[#4d6fff]">
+              <p className="font-mono text-xs text-archtivy-primary">
                 {requests}
               </p>
               <p className="text-xs leading-relaxed text-muted">
@@ -171,12 +178,12 @@ Accept: application/json`}
 
       {/* Contact */}
       <MarketingSection>
-        <p className="text-sm leading-relaxed text-muted">
+        <p className="max-w-[68ch] text-sm leading-relaxed text-muted">
           For early API access, technical questions, or partnership
           discussions, contact{" "}
           <a
             href="mailto:info@archtivy.com"
-            className="font-medium text-archtivy-primary hover:underline dark:text-[#4d6fff]"
+            className="font-medium text-archtivy-primary hover:underline"
           >
             info@archtivy.com
           </a>

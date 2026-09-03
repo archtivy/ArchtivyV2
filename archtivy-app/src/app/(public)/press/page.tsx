@@ -7,7 +7,7 @@ import {
 export const metadata = {
   title: "Press | Archtivy",
   description:
-    "Press resources, key facts, and media contact for Archtivy — the global architecture intelligence platform.",
+    "Press resources, key facts and media contact for Archtivy — a connected discovery platform for architecture and design, linking projects, studios, products and brands.",
 };
 
 const KEY_FACTS = [
@@ -21,19 +21,24 @@ const KEY_FACTS = [
   },
   {
     label: "Category",
-    value: "Architecture intelligence / PropTech",
+    value: "Architecture and design discovery",
   },
   {
-    label: "Platform type",
-    value: "Structured professional record and product traceability",
+    label: "What it does",
+    value: "Connects projects, studios, products and brands",
   },
   {
-    label: "Users",
-    value: "Architects, interior designers, product brands",
+    label: "Who uses it",
+    value: "Architects, interior designers, design studios, design brands",
   },
+  /*
+   * "Geographic reach: Global" was removed rather than restated. It was a
+   * claim about scale, and at this stage a reach figure invites a follow-up
+   * question the platform cannot yet answer honestly.
+   */
   {
-    label: "Geographic reach",
-    value: "Global",
+    label: "Stage",
+    value: "Early — the network grows as studios and brands add their work",
   },
 ];
 
@@ -41,33 +46,33 @@ export default function PressPage() {
   return (
     <MarketingPage
       label="Press"
-      headline="Archtivy in the record."
-      subheadline="Archtivy is a global architecture intelligence platform connecting projects, products, and professionals through structured credits and permanent visibility."
+      headline="Press and media."
+      subheadline="Archtivy is a connected discovery platform for architecture and design. It links architecture projects to the studios that designed them, the products specified inside them, and the brands that make those products."
     >
       {/* Boilerplate */}
       <MarketingSection heading="About Archtivy">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
           <div className="space-y-5 text-sm leading-relaxed text-muted">
             <p>
-              Archtivy is building the structured record of global architecture
-              — an intelligence infrastructure that connects every project to
-              the products within it, every credit to the professional who
-              earned it, and every specification to the brand that made it
-              possible.
+              Archtivy is a connected discovery platform for architecture and
+              design. Architecture online is fragmented — projects sit on one
+              site, products in catalogues, studios in portfolios, brands
+              elsewhere. Archtivy connects them, so a reader can move from a
+              project to the studio that designed it, to the products specified
+              inside it, to the brands behind those, and onward.
             </p>
             <p>
-              Architecture firms and independent designers use Archtivy to
-              establish structured professional records. Product brands use it
-              to understand where, how, and by whom their products are specified
-              globally. The platform is built on the premise that the full
-              record of architecture holds intelligence the industry has never
-              been able to access — until now.
+              Architects and design studios use Archtivy to present projects in
+              the context of what is actually in them and to credit the people
+              and products involved. Design brands use it so their furniture,
+              lighting and building products are found inside the spaces they
+              were specified into rather than only in a catalogue.
             </p>
             <p>
-              Archtivy is not a portfolio platform, a directory, or a media
-              outlet. It is infrastructure for the architectural industry —
-              designed to persist, compound, and become the canonical reference
-              for professional credibility and product intelligence worldwide.
+              Archtivy is not a portfolio host, a product catalogue or a media
+              outlet, though it touches each. It is the discovery layer between
+              them: the connections that let one lead to the next. It is early,
+              and the network grows as studios and brands add their work.
             </p>
           </div>
 
@@ -102,7 +107,7 @@ export default function PressPage() {
             </p>
             <a
               href="mailto:info@archtivy.com"
-              className="mt-4 block text-sm font-medium text-archtivy-primary hover:underline dark:text-[#4d6fff]"
+              className="mt-4 block text-sm font-medium text-archtivy-primary hover:underline"
             >
               info@archtivy.com
             </a>
@@ -118,7 +123,7 @@ export default function PressPage() {
             </p>
             <a
               href="/press-kit"
-              className="mt-4 block text-sm font-medium text-archtivy-primary hover:underline dark:text-[#4d6fff]"
+              className="mt-4 block text-sm font-medium text-archtivy-primary hover:underline"
             >
               Download press kit →
             </a>
@@ -134,7 +139,7 @@ export default function PressPage() {
             </p>
             <a
               href="mailto:info@archtivy.com"
-              className="mt-4 block text-sm font-medium text-archtivy-primary hover:underline dark:text-[#4d6fff]"
+              className="mt-4 block text-sm font-medium text-archtivy-primary hover:underline"
             >
               info@archtivy.com
             </a>
@@ -153,7 +158,7 @@ export default function PressPage() {
 
       <MarketingCTA
         heading="Explore the platform."
-        body="See the structured record of architectural projects, products, and professionals in its current state."
+        body="See how projects, studios, products and brands connect on the platform today."
         primaryLabel="Explore Projects"
         primaryHref="/explore/projects"
         secondaryLabel="Explore Products"
