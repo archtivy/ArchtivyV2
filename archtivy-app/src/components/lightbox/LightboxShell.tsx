@@ -322,12 +322,39 @@ export function LightboxShell({
     else void el.requestFullscreen?.();
   };
 
-  /** Close, then let the browser take the anchor on the page underneath. */
-  const closeThenNavigate = () => requestClose();
+  /**
+   * Dismiss the viewer because the reader is LEAVING for another page.
+   *
+   * ── WHY THIS IS NOT requestClose ───────────────────────────────────────
+   * It used to be, and that silently broke every link in the sidebar.
+   * requestClose rewinds the history entry the viewer pushed on open, and
+   * `history.back()` is asynchronous: the click handler ran, the router
+   * pushed the product URL, and then the queued back() popped it again. The
+   * reader clicked a product and stayed exactly where they were. Measured on
+   * Istanbul House Design — the card's href was already the correct canonical
+   * URL, /products/lighting/ceiling/pendant/aeris-104-led-glass-pendant-lamp,
+   * and the address bar never changed.
+   *
+   * The tell was that the credit links over the photograph always worked:
+   * they call the plain onClose and never touch history.
+   *
+   * So this only clears state. The pushed entry is left alone — it holds the
+   * same URL as the page being left, so Back from the product lands on the
+   * project either way, and rewinding it is precisely what cancels the
+   * navigation. Closing by Escape, the ×, or Back is unaffected and still
+   * goes through requestClose.
+   */
+  const closeThenNavigate = () => {
+    pushedHistory.current = false;
+    onClose();
+  };
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-[#0b0b0c] p-0 sm:p-4 lg:p-6"
+      /* Edge to edge. This carried `p-0 sm:p-4 lg:p-6`, which framed the
+         viewer as a floating card on a backdrop — the photograph is the
+         subject and it should reach the screen's edges. */
+      className="fixed inset-0 z-[100] bg-[#0b0b0c]"
       role="dialog"
       aria-modal="true"
       aria-label={`${title} — gallery`}
@@ -335,7 +362,10 @@ export function LightboxShell({
       <div
         ref={shellRef}
         tabIndex={-1}
-        className="relative flex h-full w-full flex-col overflow-hidden bg-[#121213] outline-none sm:rounded-2xl sm:border sm:border-white/[0.07]"
+        /* No rounded corners and no hairline border: with the padding gone
+           there is nothing for them to sit against, and both were what made
+           this read as a modal rather than a viewer. */
+        className="relative flex h-full w-full flex-col overflow-hidden bg-[#121213] outline-none"
       >
         {/* ── Top bar ─────────────────────────────────────────────────── */}
         <div className="flex h-14 shrink-0 items-center gap-3 px-4 sm:h-16 sm:px-6">
@@ -423,13 +453,19 @@ export function LightboxShell({
                   }}
                 >
                   {/*
-                    ── CLICKABLE OBJECTS ──────────────────────────────────
-                    Invisible until pointed at. The spec asks for a photograph
-                    a reader can click into, with none of the machinery on
-                    show — no markers, no labels, no scores — so these boxes
-                    paint nothing at rest and only outline themselves under
-                    the cursor, which is enough to teach the affordance
-                    without decorating the picture.
+                    ── RECOGNISED OBJECTS ─────────────────────────────────
+                    Nothing is drawn at rest. The photograph is the subject,
+                    and a grid of permanent rectangles over a building is the
+                    opposite of what this feature is for.
+
+                    On approach each object gets a light treatment rather than
+                    an outline: a soft interior lift, a luminous edge with no
+                    hard 1px line, and one slow sweep down the region — the
+                    visual grammar of something being read. Selected, it holds
+                    a steadier edge and a single breathing point at its centre.
+                    All white at low alpha, all fading, none of it coloured:
+                    a tinted or neon edge would sit ON the photograph as a UI
+                    object instead of looking like the image catching light.
 
                     Below the pins in z-order (10 against 30/35) so a
                     confirmed product's marker always wins a click that lands
@@ -440,6 +476,9 @@ export function LightboxShell({
                     bounds of the table it sits on has to be selectable, and
                     the smaller of two overlapping boxes is always the more
                     specific answer to "what did they click".
+
+                    Geometry, hit-testing and the click contract are exactly
+                    as before — only the paint changed.
                   */}
                   {regions && regions.length > 0 && onRegionSelect && (
                     <div className="absolute inset-0 z-10">
@@ -454,20 +493,87 @@ export function LightboxShell({
                               aria-label="Find products like this object"
                               aria-pressed={selected}
                               onClick={() => onRegionSelect(selected ? null : r.id)}
-                              className={[
-                                "pointer-events-auto absolute rounded-md transition-colors duration-150 motion-reduce:transition-none",
-                                "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80",
-                                selected
-                                  ? "border-2 border-white/80 bg-white/[0.06]"
-                                  : "border-2 border-transparent hover:border-white/45 hover:bg-white/[0.04]",
-                              ].join(" ")}
+                              className="group/ai pointer-events-auto absolute cursor-pointer overflow-hidden rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                               style={{
                                 left: `${Math.max(0, r.x - r.width / 2)}%`,
                                 top: `${Math.max(0, r.y - r.height / 2)}%`,
                                 width: `${r.width}%`,
                                 height: `${r.height}%`,
                               }}
-                            />
+                            >
+                              {/*
+                                Interior lift.
+                                
+                                The object BRIGHTENS rather than being painted
+                                over: backdrop-brightness lifts whatever is
+                                actually behind it, so this reads on a white
+                                studio wall and on a dark interior alike. An
+                                earlier version was a white wash at low alpha
+                                and was invisible on Istanbul House Design,
+                                which is a pale, sunlit room — white light on
+                                a white photograph says nothing.
+                              */}
+                              <span
+                                aria-hidden
+                                className={[
+                                  "absolute inset-0 rounded-xl transition-opacity duration-300 ease-out motion-reduce:transition-none",
+                                  selected
+                                    ? "opacity-100 backdrop-brightness-[1.13] backdrop-saturate-[1.10]"
+                                    : "opacity-0 backdrop-brightness-[1.10] backdrop-saturate-[1.06] group-hover/ai:opacity-100",
+                                ].join(" ")}
+                                style={{
+                                  background:
+                                    "radial-gradient(ellipse at center, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 45%, rgba(255,255,255,0) 75%)",
+                                }}
+                              />
+
+                              {/* Luminous edge. An inset shadow rather than a
+                                  border, so it reads as light gathering along
+                                  the object instead of a drawn rectangle. */}
+                              <span
+                                aria-hidden
+                                className={[
+                                  "absolute inset-0 rounded-xl transition-opacity duration-300 ease-out motion-reduce:transition-none",
+                                  selected ? "opacity-100" : "opacity-0 group-hover/ai:opacity-100",
+                                ].join(" ")}
+                                style={{
+                                  /* Two-tone, for the same reason as the lift:
+                                     the light hairline carries the edge on a
+                                     dark photograph, the dark one carries it
+                                     on a bright photograph, and the outer
+                                     bloom softens both so neither reads as a
+                                     drawn rectangle. */
+                                  boxShadow: selected
+                                    ? "inset 0 0 0 1px rgba(255,255,255,0.60), inset 0 0 0 2px rgba(0,0,0,0.16), inset 0 0 26px rgba(255,255,255,0.14), 0 0 30px rgba(0,0,0,0.22)"
+                                    : "inset 0 0 0 1px rgba(255,255,255,0.42), inset 0 0 0 2px rgba(0,0,0,0.12), inset 0 0 20px rgba(255,255,255,0.10), 0 0 24px rgba(0,0,0,0.18)",
+                                }}
+                              />
+
+                              {/* One sweep on approach. Re-applied on every
+                                  hover because the class is removed when the
+                                  pointer leaves, so it replays rather than
+                                  looping — a loop would be decoration. */}
+                              {!selected && (
+                                <span
+                                  aria-hidden
+                                  className="absolute inset-x-0 -inset-y-1/2 opacity-0 group-hover/ai:animate-[aiScan_1100ms_cubic-bezier(0.4,0,0.2,1)_forwards] motion-reduce:animate-none"
+                                  style={{
+                                    background:
+                                      "linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.42) 50%, rgba(255,255,255,0) 100%)",
+                                    mixBlendMode: "overlay",
+                                  }}
+                                />
+                              )}
+
+                              {/* The focus point. Present only while selected,
+                                  so at most one exists at a time. */}
+                              {selected && (
+                                <span
+                                  aria-hidden
+                                  className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_10px_2px_rgba(255,255,255,0.7),0_0_0_1px_rgba(0,0,0,0.25)] animate-[aiBreath_2200ms_ease-in-out_infinite] motion-reduce:animate-none"
+                                />
+                              )}
+                            </button>
                           );
                         })}
                     </div>
