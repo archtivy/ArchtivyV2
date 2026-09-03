@@ -311,6 +311,98 @@ async function enrichListings(ids: string[]) {
 }
 
 /**
+ * ── THE CACHE STORES JSON, AND A Set IS NOT JSON ────────────────────────────
+ * InterestProfile is built out of four Sets and six Maps because that is what
+ * the scorer wants to read. unstable_cache SERIALISES whatever it is given, and
+ * `JSON.stringify(new Set(["a"]))` is `{}` — so a cached profile came back with
+ * every Set and Map replaced by an empty object, and the first `.has()` against
+ * one threw.
+ *
+ * The shape of the failure is what made it survive review: the cache MISS path
+ * returns the live object and works perfectly, so the first request after a
+ * deploy — and every request in local testing, where unstable_cache refuses to
+ * run at all outside a request context — behaved. Only the second request
+ * inside the five-minute window failed. In production:
+ *
+ *   TypeError: e.followedProfileIds.has is not a function   /api/home/for-you
+ *   TypeError: e.savedListingIds.has is not a function      /api/notifications
+ *
+ * So the cache boundary now carries a deliberately flat shape and the live
+ * structures are rebuilt on the near side of it. The scorer's contract is
+ * unchanged — it still receives real Sets and Maps — and nothing about the
+ * profile's content, weights or caching policy moves.
+ */
+interface CacheableProfile {
+  profileId: string;
+  clerkUserId: string;
+  followedProfileIds: string[];
+  followedTaxonomyIds: string[];
+  savedListingIds: string[];
+  taxonomyAffinity: [string, number][];
+  materialAffinity: [string, number][];
+  ownerAffinity: [string, number][];
+  boards: {
+    id: string;
+    name: string;
+    itemCount: number;
+    taxonomyPaths: [string, number][];
+    materialIds: [string, number][];
+    cities: [string, number][];
+  }[];
+  location: InterestProfile["location"];
+  viewedListingIds: [string, number][];
+  strength: SignalStrength;
+}
+
+function toCacheable(p: InterestProfile): CacheableProfile {
+  return {
+    profileId: p.profileId,
+    clerkUserId: p.clerkUserId,
+    followedProfileIds: [...p.followedProfileIds],
+    followedTaxonomyIds: [...p.followedTaxonomyIds],
+    savedListingIds: [...p.savedListingIds],
+    taxonomyAffinity: [...p.taxonomyAffinity],
+    materialAffinity: [...p.materialAffinity],
+    ownerAffinity: [...p.ownerAffinity],
+    boards: p.boards.map((b) => ({
+      id: b.id,
+      name: b.name,
+      itemCount: b.itemCount,
+      taxonomyPaths: [...b.taxonomyPaths],
+      materialIds: [...b.materialIds],
+      cities: [...b.cities],
+    })),
+    location: p.location,
+    viewedListingIds: [...p.viewedListingIds],
+    strength: p.strength,
+  };
+}
+
+function fromCacheable(c: CacheableProfile): InterestProfile {
+  return {
+    profileId: c.profileId,
+    clerkUserId: c.clerkUserId,
+    followedProfileIds: new Set(c.followedProfileIds),
+    followedTaxonomyIds: new Set(c.followedTaxonomyIds),
+    savedListingIds: new Set(c.savedListingIds),
+    taxonomyAffinity: new Map(c.taxonomyAffinity),
+    materialAffinity: new Map(c.materialAffinity),
+    ownerAffinity: new Map(c.ownerAffinity),
+    boards: c.boards.map((b) => ({
+      id: b.id,
+      name: b.name,
+      itemCount: b.itemCount,
+      taxonomyPaths: new Map(b.taxonomyPaths),
+      materialIds: new Map(b.materialIds),
+      cities: new Map(b.cities),
+    })),
+    location: c.location,
+    viewedListingIds: new Map(c.viewedListingIds),
+    strength: c.strength,
+  };
+}
+
+/**
  * The cached entry point.
  *
  * ── WHY CACHED, AND WHY ONLY BRIEFLY ────────────────────────────────────────
@@ -322,13 +414,14 @@ async function enrichListings(ids: string[]) {
  *
  * Keyed by profile id, so one viewer's profile can never be served to another.
  */
-export function getInterestProfile(
+export async function getInterestProfile(
   profileId: string,
   clerkUserId: string
 ): Promise<InterestProfile> {
-  return unstable_cache(
-    () => buildInterestProfile(profileId, clerkUserId),
+  const cached = await unstable_cache(
+    async () => toCacheable(await buildInterestProfile(profileId, clerkUserId)),
     ["interest-profile", profileId],
     { revalidate: CACHE_TTL_SECONDS, tags: [`interest-profile:${profileId}`] }
   )();
+  return fromCacheable(cached);
 }
