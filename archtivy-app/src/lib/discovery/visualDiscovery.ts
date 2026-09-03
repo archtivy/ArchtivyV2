@@ -10,15 +10,24 @@
  * near-duplicate-path failure is the single most repeated bug in this
  * repository. So nothing here writes a new store:
  *
- *   whole-room feed   computed live from the HNSW index, ~1ms, no AI call
- *   object feed       read from image_regions.match_candidates, precomputed
+ *   whole-room feed   live HNSW query from the image's stored vector
+ *   object feed       live HNSW query from the OBJECT's stored vector
+ *   product feed      live HNSW query from the product image's stored vector
  *   exact products    read from product_tags / project_product_links, untouched
  *
- * "Precomputed" in the cost constraint means no MODEL is invoked when someone
- * opens a lightbox. An indexed vector lookup is a database query, and keeping
- * the room feed live means a newly published product appears in it without a
- * rebuild. Regions are precomputed because a click must feel instant and
- * because a region's vector is not stored anywhere to query with.
+ * ── EVERY FEED IS LIVE, AND THAT IS THE POINT ───────────────────────────────
+ * The cost rule is that no MODEL is invoked when someone opens a lightbox. An
+ * indexed vector lookup is a database query — sub-millisecond over 1830 rows —
+ * so it costs nothing to run it fresh, and running it fresh is what keeps
+ * recommendations from ageing.
+ *
+ * The object feed used to read image_regions.match_candidates: the products
+ * nearest that object on the day the photograph was analysed. That answer is
+ * frozen. A product published a week later could never appear in it, and the
+ * only way to refresh it was to send an unchanged photograph back through a
+ * vision model. Now the OBJECT'S VECTOR is what was stored, and the products
+ * are found at click time, so a new product becomes eligible for every old
+ * project the moment its own embedding exists.
  *
  * ── EXACT AND SIMILAR NEVER MIX ─────────────────────────────────────────────
  * Everything this module returns is split into `exact` and `similar`, and the
@@ -431,7 +440,7 @@ export async function getImageDiscovery(imageId: string): Promise<ImageDiscovery
     listingType === "project"
       ? sup
           .from("image_regions")
-          .select("id, x, y, width, height, object_type, match_candidates, confidence")
+          .select("id, x, y, width, height, object_type, embedding, match_candidates, confidence")
           .eq("listing_image_id", imageId)
           .order("region_index", { ascending: true })
       : Promise.resolve({ data: [] as unknown[] }),
@@ -476,6 +485,7 @@ export async function getImageDiscovery(imageId: string): Promise<ImageDiscovery
     width: number | null;
     height: number | null;
     object_type: string;
+    embedding: unknown;
     match_candidates: MatchCandidate[] | null;
     confidence: number;
   }[];
@@ -524,10 +534,31 @@ export async function getImageDiscovery(imageId: string): Promise<ImageDiscovery
     const exact = pinnedIds.length > 0 ? await hydrateProducts([...new Set(pinnedIds)]) : [];
     const exactIds = new Set(exact.map((p) => p.id));
 
-    const similar = ((r.match_candidates ?? []) as MatchCandidate[])
-      .map(candidateToFeed)
-      .filter((p): p is FeedProduct => p !== null && !exactIds.has(p.id))
-      .slice(0, REGION_LIMIT);
+    /*
+     * ── THE OBJECT'S PRODUCTS ARE FOUND NOW, NOT REMEMBERED ────────────────
+     * The stored vector is re-run against the catalogue as it stands at this
+     * moment, so a product published after this photograph was analysed is a
+     * candidate immediately and the photograph is never re-analysed for it.
+     *
+     * The match_candidates fallback below is for rows written before the
+     * region vector existed. It is frozen, it is not refreshed, and it goes
+     * away as those rows are reprocessed — it is here only so that historical
+     * regions keep working rather than going blank.
+     */
+    const regionVector = parseVector(r.embedding);
+    const similar = regionVector
+      ? (
+          await findSimilarProducts(regionVector, {
+            limit: REGION_LIMIT,
+            excludeListingId: listing.id,
+            objectType: r.object_type,
+            excludeProductIds: [...exactIds],
+          })
+        ).slice(0, REGION_LIMIT)
+      : ((r.match_candidates ?? []) as MatchCandidate[])
+          .map(candidateToFeed)
+          .filter((p): p is FeedProduct => p !== null && !exactIds.has(p.id))
+          .slice(0, REGION_LIMIT);
 
     regions.push({
       id: r.id,

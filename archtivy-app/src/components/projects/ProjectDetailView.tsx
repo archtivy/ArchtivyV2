@@ -289,12 +289,9 @@ export async function ProjectDetailView({
                 title={detail.title}
                 listingId={detail.id}
                 shareUrl={canonicalUrl}
-                productsHref="#products-used-heading"
-                connectionsHref={connectionsHref}
                 locationLabel={locationLabel}
                 year={detail.year}
                 credits={lightboxCredits}
-                connectionCount={connectionCount}
               />
             </div>
 

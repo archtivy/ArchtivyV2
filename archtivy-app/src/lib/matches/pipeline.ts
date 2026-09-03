@@ -18,13 +18,28 @@
  *
  * The embedding is of a VISUAL SIGNATURE, not of the alt sentence and not of a
  * hash of the URL. See the notes in ai/visualSignature.ts and ai/embedding.ts.
+ *
+ * ── WHAT IS STORED, AND WHY IT IS A VECTOR AND NOT AN ANSWER ────────────────
+ * For every image: one signature vector on image_ai, plus the source_url and
+ * pipeline version that say what was analysed and by which pipeline.
+ * For a project photograph, additionally: one row per detected object, each
+ * carrying its own bounding box and its own signature vector.
+ *
+ * The object row stores a VECTOR, not a product list. An earlier version
+ * stored the list — the products nearest that object on the day it was
+ * analysed — and that list can only ever get more wrong: a product published
+ * next week cannot appear in it, and refreshing it would mean paying a vision
+ * model again to re-read a photograph that has not changed. Storing the query
+ * instead of the answer means a click runs against the catalogue as it stands
+ * at that moment. New products become discoverable in old projects the instant
+ * their own embedding lands, and no old image is ever re-analysed for it.
  */
 
 import { describeImageVisually } from "@/lib/ai/visualSignature";
 import { getSignatureEmbedding } from "@/lib/ai/embedding";
-import { upsertImageAi } from "@/lib/db/imageAi";
+import { upsertImageAi, toVectorLiteral } from "@/lib/db/imageAi";
 import { deleteRegionsForImage, insertRegions } from "@/lib/db/imageRegions";
-import { findSimilarProducts } from "@/lib/discovery/visualDiscovery";
+import { PIPELINE_VERSION } from "@/lib/discovery/lifecycle";
 import type { ImageSource } from "@/lib/matches/types";
 
 export interface ProcessImageInput {
@@ -45,9 +60,6 @@ export interface ProcessImageResult {
   /** False when the model produced no usable signature, so nothing was indexed. */
   embedded?: boolean;
 }
-
-/** How many suggestions to precompute per detected object. */
-const CANDIDATES_PER_REGION = 12;
 
 export async function processImage(input: ProcessImageInput): Promise<ProcessImageResult> {
   const { source, listing_id, listing_type, imageUrl } = input;
@@ -70,6 +82,15 @@ export async function processImage(input: ProcessImageInput): Promise<ProcessIma
     const described = await describeImageVisually(imageUrl, kind);
 
     if (described.error && !described.signature) {
+      /*
+       * Record the failure rather than leaving no trace.
+       *
+       * Without this row the image looks "never processed" forever, so every
+       * run picks it up again and every run pays for the same unreadable file.
+       * With it, the attempt is counted and abandoned after MAX_ATTEMPTS —
+       * and a later fix can clear the status to try again.
+       */
+      await recordFailure(input, `vision: ${described.error}`);
       return { ok: false, error: `vision: ${described.error}` };
     }
 
@@ -106,6 +127,14 @@ export async function processImage(input: ProcessImageInput): Promise<ProcessIma
       embedding: embedResult.embedding,
       attrs: described.attrs,
       confidence: described.confidence,
+      /* What was analysed and by which pipeline. Together these are the whole
+         basis for never paying twice for the same photograph — see
+         lib/discovery/lifecycle.ts. */
+      source_url: imageUrl,
+      pipeline_version: PIPELINE_VERSION,
+      status: embedResult.embedding ? "ok" : "failed",
+      error: embedResult.embedding ? null : embedResult.error ?? "no embedding",
+      attempts: 0,
     });
     if (upsertError) return { ok: false, error: upsertError };
 
@@ -125,19 +154,18 @@ export async function processImage(input: ProcessImageInput): Promise<ProcessIma
     for (let i = 0; i < described.objects.length; i++) {
       const obj = described.objects[i];
 
-      /* The object's own vector is used and thrown away. Storing it would mean
-         a `vector(1536)` column on image_regions and a third HNSW index; the
-         candidates it produces are what the reader actually needs, and they
-         fit the match_candidates column that already exists for them. */
-      const objEmbed = obj.signature ? await getSignatureEmbedding(obj.signature) : { embedding: null };
-
-      const candidates = objEmbed.embedding
-        ? await findSimilarProducts(objEmbed.embedding, {
-            limit: CANDIDATES_PER_REGION,
-            excludeListingId: listing_id,
-            objectType: obj.object_type,
-          })
-        : [];
+      /*
+       * The object's own vector is STORED, not spent.
+       *
+       * This is the difference between discovery that ages and discovery that
+       * does not. Keeping the vector means a click can search the catalogue as
+       * it stands at that moment; keeping a product list instead would freeze
+       * the answer at analysis time and leave every later product invisible to
+       * every earlier project.
+       */
+      const objEmbed = obj.signature
+        ? await getSignatureEmbedding(obj.signature)
+        : { embedding: null as number[] | null };
 
       rows.push({
         listing_image_id: input.imageId,
@@ -161,18 +189,11 @@ export async function processImage(input: ProcessImageInput): Promise<ProcessIma
          */
         matched_listing_id: null,
         match_score: null,
-        match_candidates: candidates.map((c) => ({
-          listing_id: c.id,
-          score: 0,
-          title: c.title,
-          // href is rebuilt from these two on read, so a taxonomy change is
-          // picked up without a rebuild.
-          slug: c.href.split("/").pop() ?? null,
-          cover: c.cover,
-          brand: c.brandName,
-          taxonomy_slug_path: taxonomyPathFromHref(c.href),
-        })),
-        selected_mode: candidates.length > 0 ? ("similar" as const) : ("none" as const),
+        /* Superseded by `embedding`, and written empty so no stale list can be
+           mistaken for a current one. See the migration's column comment. */
+        match_candidates: [],
+        embedding: objEmbed.embedding ? toVectorLiteral(objEmbed.embedding) : null,
+        selected_mode: "none" as const,
         scene_summary: i === 0 ? described.scene_summary || null : null,
       });
     }
@@ -185,15 +206,59 @@ export async function processImage(input: ProcessImageInput): Promise<ProcessIma
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e);
     console.error("[processImage] failed for image_id", input.imageId, errMsg);
+    await recordFailure(input, errMsg);
     return { ok: false, error: errMsg };
   }
 }
 
-/** "/products/furniture/seating/lounge-chair/eames-lounge" -> "furniture/seating/lounge-chair" */
-function taxonomyPathFromHref(href: string): string | null {
-  const parts = href.split("/").filter(Boolean); // ["products", ...path, slug]
-  if (parts.length <= 2) return null;
-  return parts.slice(1, -1).join("/") || null;
+/**
+ * Mark an attempt as failed and count it.
+ *
+ * Deliberately does NOT clear an embedding that is already there: a run that
+ * fails on an image with a good vector should leave discovery working, not
+ * blank it out because today's attempt went wrong.
+ */
+async function recordFailure(input: ProcessImageInput, message: string): Promise<void> {
+  try {
+    const { getSupabaseServiceClient } = await import("@/lib/supabaseServer");
+    const sup = getSupabaseServiceClient();
+    const { data: existing } = await sup
+      .from("image_ai")
+      .select("attempts")
+      .eq("image_id", input.imageId)
+      .eq("source", input.source)
+      .maybeSingle();
+
+    const attempts = Number((existing as { attempts?: number } | null)?.attempts ?? 0) + 1;
+
+    if (existing) {
+      await sup
+        .from("image_ai")
+        .update({ status: "failed", error: message.slice(0, 500), attempts })
+        .eq("image_id", input.imageId)
+        .eq("source", input.source);
+      return;
+    }
+
+    await sup.from("image_ai").insert({
+      image_id: input.imageId,
+      source: input.source,
+      listing_id: input.listing_id,
+      listing_type: input.listing_type,
+      embedding: null,
+      attrs: {},
+      confidence: 0,
+      source_url: input.imageUrl,
+      pipeline_version: PIPELINE_VERSION,
+      status: "failed",
+      error: message.slice(0, 500),
+      attempts,
+      updated_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    // Recording a failure must never become a second failure.
+    console.error("[processImage] could not record failure:", e);
+  }
 }
 
 /** Process every image of a listing. Errors on one image never stop the rest. */

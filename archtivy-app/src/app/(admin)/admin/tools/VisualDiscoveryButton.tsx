@@ -13,10 +13,11 @@ import { useState } from "react";
  * that is, and it processes a bounded batch rather than the whole catalogue,
  * so the cost of one press is always knowable in advance.
  *
- * "Missing" covers images with no vector at all — new uploads land here, since
- * nothing recomputes them automatically today. "Everything" re-runs images
- * that already have a vector, which is what replaces the synthetic ones the
- * old embedding fallback wrote.
+ * "Recent uploads" is what the hourly schedule already does on its own, and is
+ * here only so it can be forced. "Backlog" is the one that matters: it reaches
+ * the images the schedule deliberately will not touch — the ones uploaded
+ * before automatic processing existed, including every row still holding a
+ * version-0 synthetic vector.
  */
 
 interface RunResult {
@@ -41,7 +42,7 @@ interface RunResult {
 const BATCH = 20;
 
 export function VisualDiscoveryButton() {
-  const [mode, setMode] = useState<"missing" | "all">("missing");
+  const [mode, setMode] = useState<"new" | "backlog">("backlog");
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<number | null>(null);
   const [message, setMessage] = useState("");
@@ -103,7 +104,7 @@ export function VisualDiscoveryButton() {
         <select
           value={mode}
           onChange={(e) => {
-            setMode(e.target.value as "missing" | "all");
+            setMode(e.target.value as "new" | "backlog");
             setPending(null);
             setMessage("");
           }}
@@ -111,8 +112,8 @@ export function VisualDiscoveryButton() {
           className="rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900"
           aria-label="Which images to process"
         >
-          <option value="missing">Images with no vector yet</option>
-          <option value="all">Everything (replaces existing vectors)</option>
+          <option value="backlog">Backlog — everything not yet current</option>
+          <option value="new">Recent uploads only (what the schedule runs)</option>
         </select>
 
         <button

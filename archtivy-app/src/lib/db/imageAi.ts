@@ -78,6 +78,12 @@ export interface ImageAiInsert {
   embedding: number[] | null;
   attrs: Record<string, unknown>;
   confidence: number;
+  /** The image_url actually analysed, so a swapped photograph is detectable. */
+  source_url?: string | null;
+  pipeline_version?: number;
+  status?: "ok" | "failed";
+  error?: string | null;
+  attempts?: number;
 }
 
 export async function upsertImageAi(row: ImageAiInsert): Promise<{ error: string | null }> {
@@ -99,6 +105,11 @@ export async function upsertImageAi(row: ImageAiInsert): Promise<{ error: string
   };
   if (row.listing_id !== undefined) payload.listing_id = row.listing_id;
   if (row.listing_type !== undefined) payload.listing_type = row.listing_type;
+  if (row.source_url !== undefined) payload.source_url = row.source_url;
+  if (row.pipeline_version !== undefined) payload.pipeline_version = row.pipeline_version;
+  if (row.status !== undefined) payload.status = row.status;
+  if (row.error !== undefined) payload.error = row.error;
+  if (row.attempts !== undefined) payload.attempts = row.attempts;
   const { error } = await sup.from(TABLE).upsert(payload, { onConflict: "image_id,source" });
   return { error: error?.message ?? null };
 }

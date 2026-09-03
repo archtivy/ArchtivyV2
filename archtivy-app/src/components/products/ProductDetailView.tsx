@@ -250,41 +250,12 @@ export async function ProductDetailView({
               shareUrl={canonicalUrl}
               brandName={detail.brand?.name ?? null}
               brandHref={brandHref}
-              brandAvatarUrl={detail.brand?.avatarUrl ?? null}
               brandLocation={detail.brand?.location ?? null}
               year={detail.year}
-              categoryLabel={detail.categoryLabel}
-              categoryHref={
-                detail.categoryLabel && detail.categoryRoot
-                  ? `/products/${detail.categoryRoot}`
-                  : null
-              }
-              designers={detail.designers.map((d) => ({
-                name: d.name,
-                // 37 of 38 credited profiles are unclaimed stubs with no /u/
-                // route, so the row links only where one actually resolves.
-                href: d.username ? `/u/${encodeURIComponent(d.username)}` : null,
-              }))}
-              materials={detail.materials}
-              dimensions={detail.dimensions}
-              colors={detail.colorOptions}
-              projectCount={detail.projects.length}
-              projects={detail.projects.map((pr) => ({
-                id: pr.id,
-                title: pr.title,
-                href: pr.href,
-                cover: pr.cover,
-              }))}
-              projectsHref={detail.projects.length > 0 ? "#seen-in-projects" : null}
-              brandProducts={(detail.brand?.otherProducts ?? []).map((pr) => ({
-                id: pr.id,
-                title: pr.title,
-                href: pr.href,
-                cover: pr.cover,
-              }))}
-              brandProductsHref={
-                (detail.brand?.otherProducts?.length ?? 0) > 0 ? "#more-from-brand" : null
-              }
+              /* Resolved once, above, and shared with the page's own button so
+                 the two can never point at different destinations. */
+              websiteHref={externalSite?.href ?? null}
+              websiteLabel={externalSite?.label ?? null}
             />
           </div>
 

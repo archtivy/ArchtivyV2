@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getProfileByClerkIdForAdmin } from "@/lib/db/profiles";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { processImage } from "@/lib/matches/pipeline";
+import { selectPending, type PendingImage } from "@/lib/discovery/lifecycle";
 
 /**
  * Visual-discovery precompute — the batch that makes the lightbox feeds work.
@@ -18,10 +19,11 @@ import { processImage } from "@/lib/matches/pipeline";
  * endpoint that spends money cannot become unauthenticated by omission.
  *
  * ── IT WILL NOT RUN AWAY WITH THE BUDGET ────────────────────────────────────
- * `limit` is capped hard, and the default mode only touches images that have
- * no usable vector yet. A full re-run of an already-processed catalogue takes
- * an explicit ?mode=all, so the expensive thing is never the thing that
- * happens by accident.
+ * `limit` is capped hard, and the scheduled mode only sees images uploaded
+ * after AUTO_PROCESS_SINCE that have never produced a vector. The historical
+ * backlog — 224 never-analysed images and ~794 holding version-0 synthetic
+ * vectors — is reachable only through ?mode=backlog, which nothing schedules.
+ * The expensive thing is never the thing that happens by accident.
  */
 
 export const dynamic = "force-dynamic";
@@ -30,7 +32,7 @@ export const maxDuration = 300;
 
 /** Hard ceiling per invocation, whatever the caller asks for. */
 const MAX_LIMIT = 250;
-const DEFAULT_LIMIT = 40;
+const DEFAULT_LIMIT = 20;
 
 async function authorize(request: NextRequest): Promise<NextResponse | null> {
   const secret = process.env.CRON_SECRET;
@@ -48,80 +50,6 @@ async function authorize(request: NextRequest): Promise<NextResponse | null> {
   return null;
 }
 
-interface Candidate {
-  id: string;
-  image_url: string;
-  listing_id: string;
-  listing_type: "project" | "product";
-}
-
-/**
- * Which images still need work.
- *
- * "missing" — the default — is every approved project/product image with no
- * image_ai row carrying a vector. Note that a row can EXIST and still be
- * unusable: 845 of the 1000 sampled hold the synthetic URL-hash vector the old
- * embedding fallback wrote. Those are indistinguishable from real ones in SQL,
- * which is why replacing them needs mode=all rather than a cleverer query.
- */
-async function selectImages(mode: "missing" | "all", limit: number): Promise<Candidate[]> {
-  const sup = getSupabaseServiceClient();
-
-  const { data: listings } = await sup
-    .from("listings")
-    .select("id, type")
-    .in("type", ["project", "product"])
-    .eq("status", "APPROVED")
-    .is("deleted_at", null);
-
-  const typeById = new Map<string, "project" | "product">();
-  for (const l of (listings ?? []) as { id: string; type: string }[]) {
-    if (l.type === "project" || l.type === "product") typeById.set(l.id, l.type);
-  }
-  if (typeById.size === 0) return [];
-
-  /*
-   * ── PAGED, BECAUSE POSTGREST STOPS AT 1000 ─────────────────────────────────
-   * The default response cap is 1000 rows and listing_images already holds
-   * 1197. An unpaged select here would silently drop every image past the
-   * first thousand and the job would report itself finished with a couple of
-   * hundred photographs never processed — the same truncation that cut 28
-   * categories out of the sitemap. Both reads below page explicitly.
-   */
-  const images = await selectAll<{ id: string; image_url: string; listing_id: string }>(
-    () => sup.from("listing_images").select("id, image_url, listing_id").order("id", { ascending: true })
-  );
-
-  let rows = images
-    .filter((r) => r.image_url && typeById.has(r.listing_id))
-    .map((r) => ({ ...r, listing_type: typeById.get(r.listing_id)! }));
-
-  if (mode === "missing") {
-    const existing = await selectAll<{ image_id: string }>(
-      () => sup.from("image_ai").select("image_id").not("embedding", "is", null).order("image_id", { ascending: true })
-    );
-    const done = new Set(existing.map((r) => r.image_id));
-    rows = rows.filter((r) => !done.has(r.id));
-  }
-
-  return rows.slice(0, limit);
-}
-
-const PAGE = 1000;
-
-/** Read every row of a query, a page at a time. */
-async function selectAll<T>(build: () => { range: (a: number, b: number) => PromiseLike<{ data: unknown; error: unknown }> }): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await build().range(from, from + PAGE - 1);
-    if (error) break;
-    const page = (data ?? []) as T[];
-    out.push(...page);
-    if (page.length < PAGE) break;
-  }
-  return out;
-}
-
 async function run(request: NextRequest) {
   const denied = await authorize(request);
   if (denied) return denied;
@@ -131,16 +59,38 @@ async function run(request: NextRequest) {
   }
 
   const params = request.nextUrl.searchParams;
-  const mode = params.get("mode") === "all" ? "all" : "missing";
+
+  /*
+   * ── TWO MODES, AND THE DIFFERENCE IS WHO PAYS ─────────────────────────────
+   * "new"     — images uploaded since AUTO_PROCESS_SINCE that have never been
+   *             analysed, or whose file was replaced, or whose last attempt
+   *             failed and is still worth retrying. This is what the schedule
+   *             runs, and on a quiet day it processes nothing at all.
+   * "backlog" — everything not current, cutoff ignored, including the
+   *             version-0 rows holding the old synthetic vectors. This is a
+   *             deliberate, costed backfill and is never scheduled.
+   *
+   * A `listingId` narrows either mode to one listing and always ignores the
+   * cutoff, because naming a listing is itself the decision.
+   */
+  const mode = params.get("mode") === "backlog" ? "backlog" : "new";
+  const listingId = params.get("listingId")?.trim() || null;
   const limit = Math.max(
     1,
     Math.min(MAX_LIMIT, parseInt(params.get("limit") ?? String(DEFAULT_LIMIT), 10) || DEFAULT_LIMIT)
   );
   /* A dry run reports exactly what a real run would touch and spends nothing.
-     Always the first thing to reach for before a catalogue-wide pass. */
+     Always the first thing to reach for before a large pass. */
   const dryRun = params.get("dryRun") === "1";
 
-  const images = await selectImages(mode, limit);
+  const select = {
+    scope: (mode === "backlog" ? "backlog" : "auto") as "auto" | "backlog",
+    includeOutdated: mode === "backlog" || listingId !== null,
+    limit,
+    listingIds: listingId ? [listingId] : undefined,
+  };
+
+  const images = await selectPending(select);
 
   if (dryRun) {
     return NextResponse.json({
@@ -148,8 +98,9 @@ async function run(request: NextRequest) {
       mode,
       limit,
       wouldProcess: images.length,
-      projects: images.filter((i) => i.listing_type === "project").length,
-      products: images.filter((i) => i.listing_type === "product").length,
+      projects: images.filter((i) => i.listingType === "project").length,
+      products: images.filter((i) => i.listingType === "product").length,
+      reasons: countReasons(images),
     });
   }
 
@@ -177,18 +128,18 @@ async function run(request: NextRequest) {
       break;
     }
     const result = await processImage({
-      imageId: img.id,
-      source: img.listing_type,
-      imageUrl: img.image_url,
-      listing_id: img.listing_id,
-      listing_type: img.listing_type,
+      imageId: img.imageId,
+      source: img.listingType,
+      imageUrl: img.imageUrl,
+      listing_id: img.listingId,
+      listing_type: img.listingType,
     });
     processed++;
     if (result.ok) {
       if (result.embedded) embedded++;
       regions += result.regions ?? 0;
     } else if (result.error && errors.length < 20) {
-      errors.push(`${img.id}: ${result.error}`);
+      errors.push(`${img.imageId}: ${result.error}`);
     }
   }
 
@@ -197,14 +148,21 @@ async function run(request: NextRequest) {
     processed,
     embedded,
     regions,
-    /* Only meaningful for "missing", where finished work leaves the queue. A
-       mode=all run never shrinks its own queue, so a number here would be the
-       same one every time and read as no progress. */
-    remaining: mode === "missing" ? (await selectImages("missing", MAX_LIMIT)).length : null,
+    /* Recounted after the run, so it reflects work that actually completed.
+       Successful images leave the queue; failures that exhausted their
+       attempts leave it too, which is what stops a bad file being retried
+       forever. */
+    remaining: (await selectPending({ ...select, limit: MAX_LIMIT })).length,
     stoppedEarly,
     seconds: Math.round((Date.now() - started) / 1000),
     errors,
   });
+}
+
+function countReasons(images: PendingImage[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const i of images) out[i.reason] = (out[i.reason] ?? 0) + 1;
+  return out;
 }
 
 export const GET = run;

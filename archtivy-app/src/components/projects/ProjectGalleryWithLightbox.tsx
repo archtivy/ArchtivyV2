@@ -23,23 +23,17 @@ export function ProjectGalleryWithLightbox({
   images,
   title,
   shareUrl,
-  productsHref,
-  connectionsHref,
   locationLabel,
   year,
   credits,
-  connectionCount,
   listingId,
 }: {
   images: GalleryImage[];
   title: string;
   shareUrl: string;
-  productsHref: string;
-  connectionsHref: string | null;
   locationLabel: string | null;
   year: number | null;
   credits: LightboxCredit[];
-  connectionCount: number;
   listingId: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -62,12 +56,9 @@ export function ProjectGalleryWithLightbox({
         images={images}
         title={title}
         shareUrl={shareUrl}
-        productsHref={productsHref}
-        connectionsHref={connectionsHref}
         locationLabel={locationLabel}
         year={year}
         credits={credits}
-        connectionCount={connectionCount}
         listingId={listingId}
       />
     </>

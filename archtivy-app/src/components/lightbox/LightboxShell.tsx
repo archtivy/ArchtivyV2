@@ -59,6 +59,16 @@ export interface LightboxShellProps {
   selectedRegionId?: string | null;
   onRegionSelect?: (regionId: string | null) => void;
   onActiveImageChange?: (image: GalleryImage, index: number) => void;
+
+  /**
+   * Whether the shell draws Save alongside Share and Fullscreen.
+   *
+   * The product panel puts Save in its own primary action row, where the
+   * design asks for it. Two Save controls over one mechanism would be a
+   * duplicate control, so that panel turns this off. Share and Fullscreen are
+   * unaffected either way.
+   */
+  showSave?: boolean;
 }
 
 /** Geometry only. No label, type or confidence ever reaches this component. */
@@ -89,6 +99,7 @@ export function LightboxShell({
   selectedRegionId = null,
   onRegionSelect,
   onActiveImageChange,
+  showSave = true,
 }: LightboxShellProps) {
   const [index, setIndex] = useState(startIndex);
   const [openHotspot, setOpenHotspot] = useState<string | null>(null);
@@ -543,6 +554,7 @@ export function LightboxShell({
               listingId={listingId}
               entityType={entityType}
               initialSaved={initialSaved}
+              showSave={showSave}
               shareState={shareState}
               onShare={doShare}
               onFullscreen={goFullscreen}
@@ -592,6 +604,7 @@ export function LightboxShell({
                 listingId={listingId}
                 entityType={entityType}
                 initialSaved={initialSaved}
+                showSave={showSave}
                 shareState={shareState}
                 onShare={doShare}
                 onFullscreen={goFullscreen}
@@ -620,6 +633,7 @@ function LightboxActions({
   listingId,
   entityType,
   initialSaved,
+  showSave,
   shareState,
   onShare,
   onFullscreen,
@@ -628,6 +642,7 @@ function LightboxActions({
   listingId: string;
   entityType: "project" | "product";
   initialSaved?: boolean;
+  showSave: boolean;
   shareState: "idle" | "copied";
   onShare: () => void;
   onFullscreen: () => void;
@@ -642,6 +657,7 @@ function LightboxActions({
        * five other surfaces render. The wrapper stays `relative` so the board
        * popover still anchors to it.
        */}
+      {showSave && (
       <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.10] bg-white/[0.035] text-white [&>span]:!static [&>span]:!inset-auto">
         <SaveToggle
           listingId={listingId}
@@ -654,6 +670,7 @@ function LightboxActions({
           tone="dark"
         />
       </span>
+      )}
       <button
         type="button"
         onClick={onShare}
