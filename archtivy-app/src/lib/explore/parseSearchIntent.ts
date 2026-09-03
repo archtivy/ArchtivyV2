@@ -30,6 +30,17 @@ export const ALL_ENTITIES: EntityScope = ["project", "designer", "brand", "produ
 export interface SearchIntent {
   /** Inferred entity types to show. Empty = show all. */
   types: EntityType[];
+  /**
+   * The subset of `types` the query said OUT LOUD — "brands", "studios",
+   * "projects" — as opposed to the ones inferred from a category.
+   *
+   * The difference is confidence, and confidence is what earns the right to
+   * reshape results. Inferring products from the word "chair" is a good guess
+   * and should only tilt the ranking; someone typing "brands" has told you
+   * what they want, and answering with a product is answering a different
+   * question. Only this field may drive that stronger behaviour.
+   */
+  explicitTypes: EntityType[];
   /** Location text extracted from the query (to geocode or match). */
   location: string | null;
   /** Matched category/discipline terms. */
@@ -156,7 +167,16 @@ export function parseSearchIntent(
 ): SearchIntent {
   const raw = query.trim();
   if (!raw) {
-    return { types: [], location: null, categories: [], materials: [], styles: [], freeText: "", label: "" };
+    return {
+      types: [],
+      explicitTypes: [],
+      location: null,
+      categories: [],
+      materials: [],
+      styles: [],
+      freeText: "",
+      label: "",
+    };
   }
 
   const lower = raw.toLowerCase();
@@ -194,9 +214,12 @@ export function parseSearchIntent(
   const tokens = descriptorPart.split(/\s+/).filter((t) => t.length > 0);
 
   const types: EntityType[] = [];
+  const explicitTypes: EntityType[] = [];
   /** Adds a type only if the caller can display it, and only once. */
-  const pushType = (t: EntityType) => {
-    if (entities.includes(t) && !types.includes(t)) types.push(t);
+  const pushType = (t: EntityType, explicit = false) => {
+    if (!entities.includes(t)) return;
+    if (!types.includes(t)) types.push(t);
+    if (explicit && !explicitTypes.includes(t)) explicitTypes.push(t);
   };
   const categories: string[] = [];
   const materials: string[] = [];
@@ -215,7 +238,9 @@ export function parseSearchIntent(
       const typeMatch = TYPE_MAP.get(phrase);
       if (typeMatch) {
         const alreadyMatched = types.includes(typeMatch);
-        pushType(typeMatch);
+        // The query used the word itself — the one case that counts as
+        // explicit.
+        pushType(typeMatch, true);
         // Consumed even when the type is out of the caller's scope:
         // "products" is an entity word, not a free-text term to go matching
         // against titles.
@@ -316,7 +341,7 @@ export function parseSearchIntent(
   if (freeText) labelParts.push(`"${freeText}"`);
   const label = labelParts.join(" · ") + (location ? ` · ${titleCase(location)}` : "");
 
-  return { types, location, categories, materials, styles, freeText, label };
+  return { types, explicitTypes, location, categories, materials, styles, freeText, label };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

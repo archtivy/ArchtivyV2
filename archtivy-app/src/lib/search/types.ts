@@ -49,6 +49,33 @@ export interface SearchHit {
   score: number;
   /** Why this hit matched, strongest first. Drives the "matched on" line. */
   matchedOn: MatchReason[];
+  /**
+   * Whether this hit satisfies the query's HIGH-CONFIDENCE intent — the
+   * entity type the query named out loud, and the place it named.
+   *
+   * Everything is direct when the query stated neither, which is the common
+   * case ("chair", "lighting") and the one where a plain ranked list is
+   * already the right answer. The distinction only appears when someone asked
+   * for something specific and part of it could not be met.
+   */
+  direct: boolean;
+}
+
+/**
+ * The high-confidence constraints read off a query, when there were any.
+ *
+ * Null for a broad query. Present only when the searcher named an entity type
+ * or a place, which are the two things it is rude to quietly ignore.
+ */
+export interface SearchConstraint {
+  /** Plural label of the entity the query named, e.g. "brands". Null if none. */
+  entityLabel: string | null;
+  /** The entity types named, for filtering. */
+  entities: SearchEntity[];
+  /** The place named, title-cased for display. Null if none. */
+  location: string | null;
+  /** Direct matches across ALL entity types, independent of the active tab. */
+  totalDirect: number;
 }
 
 export interface SearchCounts {
@@ -60,8 +87,13 @@ export interface SearchCounts {
 }
 
 export interface SearchResult {
-  /** The page of hits requested, already ranked. */
+  /** The page of hits requested, already ranked, direct matches first. */
   hits: SearchHit[];
+  /** High-confidence intent, when the query carried any. */
+  constraint: SearchConstraint | null;
+  /** Direct and related totals for the ACTIVE tab, across all its pages. */
+  directTotal: number;
+  relatedTotal: number;
   /** Totals for every tab, independent of the tab being shown. */
   counts: SearchCounts;
   /** Total matching the ACTIVE tab, which is what pagination walks. */

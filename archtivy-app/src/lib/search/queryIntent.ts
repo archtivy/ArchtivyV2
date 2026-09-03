@@ -66,6 +66,13 @@ export interface QueryIntent {
    * "los angeles", never the full sentence, which matches no title on earth.
    */
   probes: string[];
+  /**
+   * Entity types the query named OUT LOUD. Distinct from `preferredEntities`,
+   * which includes guesses: "chair" prefers products, but only "products"
+   * makes products explicit. Explicit intent is the only kind strong enough
+   * to separate direct matches from related ones.
+   */
+  explicitEntities: EntityType[];
   /** Place named by the query, if any. */
   location: string | null;
   /** Canonical material names the query named. */
@@ -207,6 +214,7 @@ export async function resolveQueryIntent(rawQuery: string): Promise<QueryIntent>
     parsed: parseSearchIntent("", { entities: ALL_ENTITIES }),
     taxonomy: [],
     preferredEntities: [],
+    explicitEntities: [],
     probes: [],
     location: null,
     materials: [],
@@ -334,13 +342,37 @@ export async function resolveQueryIntent(rawQuery: string): Promise<QueryIntent>
   }
   if (taxonomy.some((t) => t.domain === "organization_type")) prefer("brand");
 
+  /*
+   * ── NOT EVERYTHING AFTER "IN" IS A PLACE ─────────────────────────────────
+   * The parser reads the text following a preposition as a location, which is
+   * right for "studios in Tokyo" and wrong for "table in walnut" or "seating
+   * in oak". Left unchecked that would set a location constraint no row could
+   * satisfy, and every result would be filed as merely related — an apology
+   * for a search that worked.
+   *
+   * The test is the taxonomy, not a list of banned words: if the phrase
+   * resolves to a material, style or product node, it names a thing rather
+   * than a place. Place names are not in the taxonomy, so real locations pass
+   * through untouched.
+   */
+  const NON_PLACE_DOMAINS = new Set(["material", "style", "product", "mood", "sustainability"]);
+  const locationNorm = parsed.location ? normalize(parsed.location) : null;
+  const locationIsThing =
+    locationNorm != null &&
+    index.some(
+      (n) =>
+        NON_PLACE_DOMAINS.has(n.domain) &&
+        variants(locationNorm).some((v) => v === normalize(n.label) || v === normalize(n.slug))
+    );
+
   return {
     query,
     parsed,
     taxonomy,
     preferredEntities: preferred,
+    explicitEntities: parsed.explicitTypes,
     probes: [...probeSet],
-    location: parsed.location ? normalize(parsed.location) : null,
+    location: locationIsThing ? null : locationNorm,
     materials: parsed.materials,
     label: parsed.label,
   };

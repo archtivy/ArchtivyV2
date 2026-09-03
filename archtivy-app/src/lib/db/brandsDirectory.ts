@@ -43,6 +43,7 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getProductsDirectory } from "@/lib/db/productsDirectory";
 import type { FacetValue } from "@/components/directory/FilterPrimitives";
+import { renderableImageUrl } from "@/lib/images/remoteAllowed";
 
 export interface DirectoryBrand {
   id: string;
@@ -177,8 +178,10 @@ async function fetchBrandsDirectory(): Promise<BrandsDirectory> {
         country: b.location_country,
         locationText:
           [b.location_city, b.location_country].filter(Boolean).join(", ") || null,
-        logoUrl: b.avatar_url,
-        cover: withCover?.cover ?? null,
+        // Same guard as the designers directory: one bad host anywhere in
+        // the grid is a 500 for the whole page, not a missing logo.
+        logoUrl: renderableImageUrl(b.avatar_url),
+        cover: renderableImageUrl(withCover?.cover),
         categories,
         productCount: own.length,
         projectCount: projectsByBrand.get(b.id)?.size ?? 0,

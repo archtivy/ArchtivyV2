@@ -4,6 +4,7 @@ import { renderableImageUrl } from "@/lib/images/remoteAllowed";
 import { resolveQueryIntent, type QueryIntent } from "@/lib/search/queryIntent";
 import type {
   MatchReason,
+  SearchConstraint,
   SearchCounts,
   SearchEntity,
   SearchHit,
@@ -235,6 +236,21 @@ function scoreFields(
   }
 
   return { score, matchedOn };
+}
+
+/**
+ * Does this row sit in the place the query named?
+ *
+ * One function, used both by the ranker and by the direct/related split — if
+ * they each had their own test they would eventually disagree, and a result
+ * would be boosted for matching a city while being labelled as not matching it.
+ */
+function satisfiesLocation(intent: QueryIntent, locationHaystack: string | null): boolean {
+  if (!intent.location) return true;
+  const loc = norm(locationHaystack);
+  const wanted = norm(intent.location);
+  if (!loc || !wanted) return false;
+  return loc.includes(wanted) || wanted.includes(loc);
 }
 
 /** Preference multiplier for an entity type, by its rank in the intent. */
@@ -571,6 +587,9 @@ export async function searchAll(
   if (!intent.query) {
     return {
       hits: [],
+      constraint: null,
+      directTotal: 0,
+      relatedTotal: 0,
       counts: emptyCounts,
       total: 0,
       page: 1,
@@ -714,6 +733,7 @@ export async function searchAll(
       year: row.year,
       score,
       matchedOn,
+      direct: isDirect(intent, entityType, locationHaystack),
     });
   }
 
@@ -767,6 +787,7 @@ export async function searchAll(
       year: null,
       score,
       matchedOn: parts.matchedOn,
+      direct: isDirect(intent, entityType, locationHaystack),
     });
   }
 
@@ -776,8 +797,18 @@ export async function searchAll(
    * same page — a ranking that reshuffles between two identical searches is
    * indistinguishable from a broken one.
    */
+  /*
+   * Direct matches lead. This is the only place explicit intent is allowed to
+   * override score, and it is deliberate: a brand in Germany answers "surface
+   * brands in Germany", and a better-scoring product does not, however well it
+   * matched the word "surface". Below that first partition the existing
+   * ranking is untouched — and when the query named neither an entity nor a
+   * place, every hit is direct and this term is constant, so broad queries
+   * like "chair" sort exactly as they did before.
+   */
   hits.sort(
     (a, b) =>
+      Number(b.direct) - Number(a.direct) ||
       b.score - a.score ||
       a.entity.localeCompare(b.entity) ||
       a.title.localeCompare(b.title) ||
@@ -800,12 +831,69 @@ export async function searchAll(
 
   return {
     hits: scoped.slice(start, start + perPage),
+    constraint: buildConstraint(intent, hits),
+    directTotal: scoped.filter((h) => h.direct).length,
+    relatedTotal: scoped.filter((h) => !h.direct).length,
     counts,
     total,
     page: safePage,
     perPage,
     pageCount,
     intent,
+  };
+}
+
+/**
+ * Does this hit satisfy every high-confidence constraint the query carried?
+ *
+ * ── WHAT COUNTS AS HIGH CONFIDENCE ──────────────────────────────────────────
+ * Two things, and only two: an entity type the query named OUT LOUD, and a
+ * place it named. Both are statements rather than guesses, and both are
+ * checkable against the row.
+ *
+ * A category inferred from "chair" is neither, which is why it is absent here.
+ * Guessing that chairs are products is worth a nudge in the ranking and
+ * nothing more; if that guess were allowed to declare results "related", a
+ * search for "chair" would grow an apology above its own best answers.
+ *
+ * With no constraints at all — the common case — everything is direct and the
+ * grouping never appears.
+ */
+function isDirect(
+  intent: QueryIntent,
+  entity: SearchEntity,
+  locationHaystack: string | null
+): boolean {
+  if (intent.explicitEntities.length > 0 && !intent.explicitEntities.includes(entity)) {
+    return false;
+  }
+  return satisfiesLocation(intent, locationHaystack);
+}
+
+/** Plural labels, for saying "No brands matched" in the searcher's own words. */
+const ENTITY_PLURAL: Record<SearchEntity, string> = {
+  project: "projects",
+  product: "products",
+  designer: "designers",
+  brand: "brands",
+};
+
+/**
+ * The constraint summary the UI needs to explain itself, or null when the
+ * query stated nothing specific enough to be worth explaining.
+ */
+function buildConstraint(intent: QueryIntent, allHits: SearchHit[]): SearchConstraint | null {
+  const entities = intent.explicitEntities as SearchEntity[];
+  if (entities.length === 0 && !intent.location) return null;
+
+  return {
+    entityLabel:
+      entities.length > 0 ? entities.map((e) => ENTITY_PLURAL[e]).join(" or ") : null,
+    entities,
+    location: intent.location ? titleCase(intent.location) : null,
+    // Across every entity type, so a tab showing nothing can still say
+    // truthfully whether the query was answered elsewhere.
+    totalDirect: allHits.filter((h) => h.direct).length,
   };
 }
 
@@ -830,9 +918,7 @@ function applyIntentModifiers(
   if (intent.location) {
     // Every place string on the row, not the display label. The label is
     // often just the country.
-    const loc = norm(locationHaystack);
-    const wanted = norm(intent.location);
-    const matches = loc.length > 0 && (loc.includes(wanted) || wanted.includes(loc));
+    const matches = satisfiesLocation(intent, locationHaystack);
     if (matches) {
       score += LOCATION_MATCH_BONUS;
       if (!matchedOn.includes("location")) matchedOn.push("location");

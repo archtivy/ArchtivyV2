@@ -46,6 +46,7 @@ import { unstable_cache } from "next/cache";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { FacetValue } from "@/components/directory/FilterPrimitives";
+import { renderableImageUrl } from "@/lib/images/remoteAllowed";
 
 export interface DirectoryDesigner {
   id: string;
@@ -198,9 +199,18 @@ async function fetchDesignersDirectory(): Promise<DesignersDirectory> {
         city: p.location_city,
         country: p.location_country,
         locationText,
-        cover: withCover?.cover_image_url ?? null,
+        /*
+         * Guarded at the source. next/image does not degrade on a host that
+         * is missing from next.config's remotePatterns — it throws, and in a
+         * server component that throw takes the whole route down. Two
+         * designer avatars scraped from studio websites (images.squarespace-
+         * cdn.com and www.woodsdangaran.com) were doing exactly that, which
+         * is why this route returned 500 rather than a page with two blank
+         * avatars on it.
+         */
+        cover: renderableImageUrl(withCover?.cover_image_url),
         coverProject: withCover?.title ?? null,
-        avatarUrl: p.avatar_url,
+        avatarUrl: renderableImageUrl(p.avatar_url),
         projectCount: ids.length,
         createdAt: p.created_at,
       };

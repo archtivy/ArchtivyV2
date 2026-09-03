@@ -72,6 +72,23 @@ export function SearchResultsView({
    */
   const mixedPage = new Set(hits.map((h) => h.entity)).size > 1;
 
+  /*
+   * ── WHEN TO SPLIT THE LIST ────────────────────────────────────────────────
+   * Only when the query stated something specific AND part of it went unmet.
+   *
+   * "surface brands in Germany" names an entity and a place; there are no
+   * German brands, so presenting the best-scoring product as the answer would
+   * be answering a question nobody asked. It gets a heading saying so.
+   *
+   * "chair", "sofa", "lighting", "wood house" state neither an entity type nor
+   * a place. Every hit is direct, `grouped` is false, and they render as the
+   * single ranked list they should be — no headings, no apology, no change
+   * from before this pass.
+   */
+  const direct = hits.filter((h) => h.direct);
+  const related = hits.filter((h) => !h.direct);
+  const grouped = result.constraint !== null && result.relatedTotal > 0;
+
   return (
     <div className="pb-24">
       {/* ── Heading ─────────────────────────────────────────────────────── */}
@@ -129,22 +146,99 @@ export function SearchResultsView({
         <EmptyState query={query} counts={counts} tab={tab} />
       ) : (
         <>
-          <div className="mt-8 grid grid-cols-2 gap-x-5 gap-y-9 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {hits.map((hit, i) => (
-              <HitCard
-                key={`${hit.entity}-${hit.id}`}
-                hit={hit}
-                priority={i < 5}
-                showKind={mixedPage}
-              />
-            ))}
-          </div>
+          {grouped ? (
+            <>
+              {direct.length > 0 ? (
+                <>
+                  <GroupHeading>Direct matches</GroupHeading>
+                  <Grid hits={direct} mixed={mixedPage} priorityFrom={0} />
+                </>
+              ) : (
+                page === 1 && <NoDirectMatches constraint={result.constraint!} />
+              )}
+
+              {related.length > 0 && (
+                <>
+                  <GroupHeading
+                    note={
+                      direct.length > 0
+                        ? "Matching some of the search, but not all of it."
+                        : "Matching some of the search. None of these satisfy it fully."
+                    }
+                  >
+                    Related results
+                  </GroupHeading>
+                  <Grid hits={related} mixed={mixedPage} priorityFrom={direct.length} />
+                </>
+              )}
+            </>
+          ) : (
+            <Grid hits={hits} mixed={mixedPage} priorityFrom={0} />
+          )}
 
           {pageCount > 1 && (
             <Pager query={query} tab={tab} page={page} pageCount={pageCount} total={total} />
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function Grid({
+  hits,
+  mixed,
+  priorityFrom,
+}: {
+  hits: SearchHit[];
+  mixed: boolean;
+  /** Offset into the page, so only the genuinely-first cards get priority. */
+  priorityFrom: number;
+}) {
+  return (
+    <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-9 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      {hits.map((hit, i) => (
+        <HitCard
+          key={`${hit.entity}-${hit.id}`}
+          hit={hit}
+          priority={priorityFrom + i < 5}
+          showKind={mixed}
+        />
+      ))}
+    </div>
+  );
+}
+
+function GroupHeading({ children, note }: { children: React.ReactNode; note?: string }) {
+  return (
+    <div className="mt-10 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline pb-2">
+      <h2 className="font-body text-[12px] uppercase tracking-[0.14em] text-ink">{children}</h2>
+      {note && <span className="font-body text-[13px] text-muted">{note}</span>}
+    </div>
+  );
+}
+
+/**
+ * Said plainly, above the fallback rather than instead of it.
+ *
+ * The alternative — showing related results with no explanation — quietly
+ * asserts that the top card IS the answer. It is not; it is the closest thing
+ * available, and the difference matters when someone asked for brands in
+ * Germany and the first result is a worktop.
+ */
+function NoDirectMatches({ constraint }: { constraint: NonNullable<SearchResult["constraint"]> }) {
+  const { entityLabel, location } = constraint;
+  const what = entityLabel ?? "results";
+  const where = location ? ` in ${location}` : "";
+  return (
+    <div className="mt-8 border-l-2 border-ink/25 bg-stone/20 px-5 py-4">
+      <p className="font-body text-[15px] text-ink">
+        No {what}
+        {where} matched this search.
+      </p>
+      <p className="mt-1 font-body text-[13px] text-muted">
+        Everything below is a related result, not an answer to the full query.
+      </p>
     </div>
   );
 }
