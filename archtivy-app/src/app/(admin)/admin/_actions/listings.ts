@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { auth } from "@clerk/nextjs/server";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { kickVisualDiscovery } from "@/lib/discovery/lifecycle";
 import { getProfileByClerkIdForAdmin } from "@/lib/db/profiles";
 import { createAuditLog } from "@/lib/db/audit";
 import { uploadGalleryImagesServer } from "@/lib/storage/gallery";
@@ -296,6 +297,10 @@ export async function createAdminProjectFull(
       await supabase.from("listings").delete().eq("id", listingId);
       return { error: `Failed to save gallery: ${imagesInsertError.message}` };
     }
+    // These two admin paths write listing_images directly rather than through
+    // addImages, because they carry alt and caption. They still have to
+    // announce the new photographs.
+    kickVisualDiscovery(listingId);
     await supabase
       .from("listings")
       .update({ cover_image_url: galleryItems[0].url })
@@ -555,6 +560,10 @@ export async function createAdminProductFull(
       await supabase.from("listings").delete().eq("id", listingId);
       return { error: `Failed to save gallery: ${imagesInsertError.message}` };
     }
+    // These two admin paths write listing_images directly rather than through
+    // addImages, because they carry alt and caption. They still have to
+    // announce the new photographs.
+    kickVisualDiscovery(listingId);
     await supabase
       .from("listings")
       .update({ cover_image_url: imageRows[0].image_url })

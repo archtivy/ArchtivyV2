@@ -1,35 +1,66 @@
 /**
- * AI pipeline: generate alt, embedding (from alt text), attributes for an image and save to image_ai.
- * Trigger when a new listing_image (project) or product_image is created.
+ * The per-image precompute: one vision call, one embedding, and — for project
+ * photographs — the clickable object regions and their product candidates.
+ *
+ * ── EVERYTHING EXPENSIVE HAPPENS HERE, NOT WHEN SOMEONE OPENS A LIGHTBOX ────
+ * This is the only place in the visual-discovery feature that calls a model.
+ * The reader-facing path (lib/discovery/visualDiscovery.ts) does an indexed
+ * vector lookup and a few selects. That is the whole cost design: a lightbox
+ * open costs database time, and model time is paid once per image, offline,
+ * in a batch someone triggered.
+ *
+ * ── WHAT CHANGED ────────────────────────────────────────────────────────────
+ * This used to make three model calls per image — alt, embedding, attributes —
+ * and object detection was a fourth, in a different admin route, over the same
+ * photograph. It is now one vision call (visualSignature) plus one embedding
+ * per vector. Fewer calls, lower cost, and one consistent reading of the image
+ * instead of three that could disagree.
+ *
+ * The embedding is of a VISUAL SIGNATURE, not of the alt sentence and not of a
+ * hash of the URL. See the notes in ai/visualSignature.ts and ai/embedding.ts.
+ *
+ * ── WHAT IS STORED, AND WHY IT IS A VECTOR AND NOT AN ANSWER ────────────────
+ * For every image: one signature vector on image_ai, plus the source_url and
+ * pipeline version that say what was analysed and by which pipeline.
+ * For a project photograph, additionally: one row per detected object, each
+ * carrying its own bounding box and its own signature vector.
+ *
+ * The object row stores a VECTOR, not a product list. An earlier version
+ * stored the list — the products nearest that object on the day it was
+ * analysed — and that list can only ever get more wrong: a product published
+ * next week cannot appear in it, and refreshing it would mean paying a vision
+ * model again to re-read a photograph that has not changed. Storing the query
+ * instead of the answer means a click runs against the catalogue as it stands
+ * at that moment. New products become discoverable in old projects the instant
+ * their own embedding lands, and no old image is ever re-analysed for it.
  */
 
-import { getImageAltText } from "@/lib/ai/attributes";
-import { getImageAttributes } from "@/lib/ai/attributes";
-import { getImageEmbedding } from "@/lib/ai/embedding";
-import { upsertImageAi } from "@/lib/db/imageAi";
+import { describeImageVisually } from "@/lib/ai/visualSignature";
+import { getSignatureEmbedding } from "@/lib/ai/embedding";
+import { upsertImageAi, toVectorLiteral } from "@/lib/db/imageAi";
+import { deleteRegionsForImage, insertRegions } from "@/lib/db/imageRegions";
+import { PIPELINE_VERSION } from "@/lib/discovery/lifecycle";
 import type { ImageSource } from "@/lib/matches/types";
-import { EMBEDDING_DIM } from "@/lib/matches/types";
 
 export interface ProcessImageInput {
   imageId: string;
   source: ImageSource;
   imageUrl: string;
-  /** When set, stored in image_ai for project/product lookups. */
   listing_id?: string | null;
   listing_type?: "project" | "product" | null;
-  /** When set, called with generated alt so caller can update listing_images.alt (e.g. backfill). */
+  /** When set, the caller persists the alt text itself (the backfill counts them). */
   onAltGenerated?: (imageId: string, alt: string) => Promise<void>;
 }
 
 export interface ProcessImageResult {
   ok: boolean;
   error?: string;
+  /** Regions written. Always 0 for a product photograph. */
+  regions?: number;
+  /** False when the model produced no usable signature, so nothing was indexed. */
+  embedded?: boolean;
 }
 
-/**
- * Generate alt, persist to listing_images.alt, then embedding and attributes and upsert into image_ai.
- * Errors in one image do not throw; they return { ok: false, error } so batch runs can continue.
- */
 export async function processImage(input: ProcessImageInput): Promise<ProcessImageResult> {
   const { source, listing_id, listing_type, imageUrl } = input;
 
@@ -47,145 +78,229 @@ export async function processImage(input: ProcessImageInput): Promise<ProcessIma
   }
 
   try {
-    console.log("[processImage] alt+embed+attrs for image_id", input.imageId, "listing_id", listing_id);
+    const kind = listing_type === "product" ? ("product" as const) : ("project" as const);
+    const described = await describeImageVisually(imageUrl, kind);
 
-    const altResult = await getImageAltText(imageUrl);
-    const altForEmbed = (altResult.alt ?? "").trim() || undefined;
-    const altToStore = altForEmbed || "Architecture or product image.";
-
-    if (input.onAltGenerated) {
-      await input.onAltGenerated(input.imageId, altToStore);
+    if (described.error && !described.signature) {
+      /*
+       * Record the failure rather than leaving no trace.
+       *
+       * Without this row the image looks "never processed" forever, so every
+       * run picks it up again and every run pays for the same unreadable file.
+       * With it, the attempt is counted and abandoned after MAX_ATTEMPTS —
+       * and a later fix can clear the status to try again.
+       */
+      await recordFailure(input, `vision: ${described.error}`);
+      return { ok: false, error: `vision: ${described.error}` };
     }
-    if (!input.onAltGenerated) {
-      const { getSupabaseServiceClient } = await import("@/lib/supabaseServer");
-      const sup = getSupabaseServiceClient();
-      const { error: updateError } = await sup
-        .from("listing_images")
-        .update({ alt: altToStore })
-        .eq("id", input.imageId);
-      if (updateError) {
-        console.error("[processImage] listing_images.alt update failed:", updateError.message);
-        return { ok: false, error: `alt update: ${updateError.message}` };
+
+    // ── Alt text ───────────────────────────────────────────────────────────
+    // Only written when the model actually produced one. The old pipeline
+    // stored the placeholder "Architecture or product image." on failure,
+    // which is worse for a screen reader than an empty alt and permanently
+    // removed the row from the backfill's own "alt is null" queue.
+    const alt = described.alt.trim();
+    if (alt) {
+      if (input.onAltGenerated) {
+        await input.onAltGenerated(input.imageId, alt);
+      } else {
+        const { getSupabaseServiceClient } = await import("@/lib/supabaseServer");
+        await getSupabaseServiceClient()
+          .from("listing_images")
+          .update({ alt })
+          .eq("id", input.imageId);
       }
     }
 
-    const embedResult = await getImageEmbedding(imageUrl, altForEmbed);
-    const raw = embedResult.embedding;
-    const embedding: number[] =
-      Array.isArray(raw) && raw.length === EMBEDDING_DIM
-        ? raw
-        : Array.from({ length: EMBEDDING_DIM }, () => 0);
+    // ── Image-level vector ─────────────────────────────────────────────────
+    const embedResult = described.signature
+      ? await getSignatureEmbedding(described.signature)
+      : { embedding: null as number[] | null, error: "no signature" };
 
-    const attrResult = await getImageAttributes(imageUrl);
-    const attrs = attrResult.attrs ?? {};
-    const confidence = Math.min(100, Math.max(0, attrResult.confidence ?? altResult.confidence ?? 0));
-
-    const { error } = await upsertImageAi({
+    const { error: upsertError } = await upsertImageAi({
       image_id: input.imageId,
       source: input.source,
       listing_id: input.listing_id,
       listing_type: input.listing_type,
-      embedding,
-      attrs,
-      confidence,
+      // null, never a stand-in vector: an unusable row must be visibly
+      // unusable rather than quietly ranked against real ones.
+      embedding: embedResult.embedding,
+      attrs: described.attrs,
+      confidence: described.confidence,
+      /* What was analysed and by which pipeline. Together these are the whole
+         basis for never paying twice for the same photograph — see
+         lib/discovery/lifecycle.ts. */
+      source_url: imageUrl,
+      pipeline_version: PIPELINE_VERSION,
+      status: embedResult.embedding ? "ok" : "failed",
+      error: embedResult.embedding ? null : embedResult.error ?? "no embedding",
+      attempts: 0,
     });
+    if (upsertError) return { ok: false, error: upsertError };
 
-    if (error) {
-      console.error("[processImage] upsertImageAi failed:", error);
-      return { ok: false, error };
+    // ── Clickable objects (project photographs only) ───────────────────────
+    if (kind === "product" || described.objects.length === 0) {
+      // A re-run that now finds nothing must clear what a previous run left,
+      // or the photograph keeps click targets its own pixels no longer justify.
+      if (kind === "project") await deleteRegionsForImage(input.imageId);
+      return {
+        ok: true,
+        regions: 0,
+        embedded: embedResult.embedding !== null,
+      };
     }
-    console.log("[processImage] image_ai upserted for image_id", input.imageId);
-    return { ok: true };
+
+    const rows = [];
+    for (let i = 0; i < described.objects.length; i++) {
+      const obj = described.objects[i];
+
+      /*
+       * The object's own vector is STORED, not spent.
+       *
+       * This is the difference between discovery that ages and discovery that
+       * does not. Keeping the vector means a click can search the catalogue as
+       * it stands at that moment; keeping a product list instead would freeze
+       * the answer at analysis time and leave every later product invisible to
+       * every earlier project.
+       */
+      const objEmbed = obj.signature
+        ? await getSignatureEmbedding(obj.signature)
+        : { embedding: null as number[] | null };
+
+      rows.push({
+        listing_image_id: input.imageId,
+        region_index: i,
+        label: obj.label,
+        object_type: obj.object_type,
+        keywords: obj.keywords,
+        confidence: obj.confidence,
+        x: obj.x,
+        y: obj.y,
+        width: obj.width,
+        height: obj.height,
+        /*
+         * matched_listing_id and match_score stay NULL, always.
+         *
+         * They exist to record "the AI believes this object IS this product",
+         * and nothing in this feature is allowed to make that claim. Whether a
+         * confirmed product sits on an object is decided by whether an owner's
+         * product_tags pin falls inside this box — read at request time, from
+         * the human-entered table, never mirrored into an AI row.
+         */
+        matched_listing_id: null,
+        match_score: null,
+        /* Superseded by `embedding`, and written empty so no stale list can be
+           mistaken for a current one. See the migration's column comment. */
+        match_candidates: [],
+        embedding: objEmbed.embedding ? toVectorLiteral(objEmbed.embedding) : null,
+        selected_mode: "none" as const,
+        scene_summary: i === 0 ? described.scene_summary || null : null,
+      });
+    }
+
+    await deleteRegionsForImage(input.imageId);
+    const { count, error: insertError } = await insertRegions(rows);
+    if (insertError) return { ok: false, error: `regions: ${insertError}` };
+
+    return { ok: true, regions: count, embedded: embedResult.embedding !== null };
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e);
     console.error("[processImage] failed for image_id", input.imageId, errMsg);
+    await recordFailure(input, errMsg);
     return { ok: false, error: errMsg };
   }
 }
 
 /**
- * Process all images for a project (listing_id = project_id) and upsert image_ai.
- * Reads from listing_images. Use after project gallery is created or updated.
+ * Mark an attempt as failed and count it.
+ *
+ * Deliberately does NOT clear an embedding that is already there: a run that
+ * fails on an image with a good vector should leave discovery working, not
+ * blank it out because today's attempt went wrong.
  */
-export async function processProjectImages(projectId: string): Promise<{ processed: number; errors: string[] }> {
-  const { getSupabaseServiceClient } = await import("@/lib/supabaseServer");
-  const sup = getSupabaseServiceClient();
-  const { data: rows, error } = await sup
-    .from("listing_images")
-    .select("id, image_url")
-    .eq("listing_id", projectId)
-    .order("sort_order", { ascending: true });
-  if (error) {
-    console.error("[image_ai] processProjectImages listing_images fetch error:", error.message);
-    return { processed: 0, errors: [error.message] };
-  }
-  const list = (rows ?? []) as { id: string; image_url: string }[];
-  console.log("[image_ai] processProjectImages(projectId) found", list.length, "images in listing_images");
-  if (list.length === 0) return { processed: 0, errors: [] };
-  const errors: string[] = [];
-  let processed = 0;
-  for (const row of list) {
-    const result = await processImage({
-      imageId: row.id,
-      source: "project",
-      imageUrl: row.image_url,
-      listing_id: projectId,
-      listing_type: "project",
-    });
-    if (result.ok) processed++;
-    else if (result.error) {
-      errors.push(`${row.id}: ${result.error}`);
-      console.error("[image_ai] project image embedding/upsert error:", row.id, result.error);
+async function recordFailure(input: ProcessImageInput, message: string): Promise<void> {
+  try {
+    const { getSupabaseServiceClient } = await import("@/lib/supabaseServer");
+    const sup = getSupabaseServiceClient();
+    const { data: existing } = await sup
+      .from("image_ai")
+      .select("attempts")
+      .eq("image_id", input.imageId)
+      .eq("source", input.source)
+      .maybeSingle();
+
+    const attempts = Number((existing as { attempts?: number } | null)?.attempts ?? 0) + 1;
+
+    if (existing) {
+      await sup
+        .from("image_ai")
+        .update({ status: "failed", error: message.slice(0, 500), attempts })
+        .eq("image_id", input.imageId)
+        .eq("source", input.source);
+      return;
     }
+
+    await sup.from("image_ai").insert({
+      image_id: input.imageId,
+      source: input.source,
+      listing_id: input.listing_id,
+      listing_type: input.listing_type,
+      embedding: null,
+      attrs: {},
+      confidence: 0,
+      source_url: input.imageUrl,
+      pipeline_version: PIPELINE_VERSION,
+      status: "failed",
+      error: message.slice(0, 500),
+      attempts,
+      updated_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    // Recording a failure must never become a second failure.
+    console.error("[processImage] could not record failure:", e);
   }
-  console.log("[image_ai] processProjectImages(projectId) upserted", processed, "image_ai rows, errors:", errors.length);
-  return { processed, errors };
 }
 
-/**
- * Process all images for a product and upsert image_ai.
- * Reads from listing_images where listing_id = productId (same as projects).
- * Use after product gallery is created or updated.
- */
-export async function processProductImages(productId: string): Promise<{ processed: number; errors: string[] }> {
+/** Process every image of a listing. Errors on one image never stop the rest. */
+async function processListingImages(
+  listingId: string,
+  type: "project" | "product"
+): Promise<{ processed: number; regions: number; errors: string[] }> {
   const { getSupabaseServiceClient } = await import("@/lib/supabaseServer");
   const sup = getSupabaseServiceClient();
   const { data: rows, error } = await sup
     .from("listing_images")
     .select("id, image_url")
-    .eq("listing_id", productId)
+    .eq("listing_id", listingId)
     .order("sort_order", { ascending: true });
-  if (error) {
-    console.error("[processProductImages] listing_images fetch error:", error.message);
-    return { processed: 0, errors: [error.message] };
-  }
-  const images = (rows ?? []) as { id: string; image_url: string }[];
-  console.log("[processProductImages] productId=", productId, "imagesFound=", images.length);
 
-  if (images.length === 0) return { processed: 0, errors: [] };
+  if (error) return { processed: 0, regions: 0, errors: [error.message] };
 
   const errors: string[] = [];
   let processed = 0;
-  for (const image of images) {
-    console.log("[processProductImages] processing image", image.id, image.image_url);
-    try {
-      const result = await processImage({
-        imageId: image.id,
-        source: "product",
-        imageUrl: image.image_url,
-        listing_id: productId,
-        listing_type: "product",
-      });
-      console.log("[processProductImages] processImage result for", image.id, result);
-      if (result.ok) processed++;
-      else if (result.error) {
-        errors.push(`${image.id}: ${result.error}`);
-      }
-    } catch (err) {
-      console.error("[processProductImages] processImage FAILED for", image.id, err);
-      errors.push(`${image.id}: ${err instanceof Error ? err.message : String(err)}`);
+  let regions = 0;
+  for (const row of (rows ?? []) as { id: string; image_url: string }[]) {
+    const result = await processImage({
+      imageId: row.id,
+      source: type,
+      imageUrl: row.image_url,
+      listing_id: listingId,
+      listing_type: type,
+    });
+    if (result.ok) {
+      processed++;
+      regions += result.regions ?? 0;
+    } else if (result.error) {
+      errors.push(`${row.id}: ${result.error}`);
     }
   }
-  console.log("[processProductImages] done. upserted", processed, "image_ai rows, errors:", errors.length);
-  return { processed, errors };
+  return { processed, regions, errors };
+}
+
+export function processProjectImages(projectId: string) {
+  return processListingImages(projectId, "project");
+}
+
+export function processProductImages(productId: string) {
+  return processListingImages(productId, "product");
 }

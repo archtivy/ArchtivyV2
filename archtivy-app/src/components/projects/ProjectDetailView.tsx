@@ -208,13 +208,6 @@ export async function ProjectDetailView({
         ? "#products-used-heading"
         : null;
 
-  const lightboxProducts = productModels.slice(0, 4).map((m) => ({
-    id: m.id,
-    title: m.title,
-    href: m.href,
-    cover: m.imageUrl,
-  }));
-
   const locationLabel =
     [detail.locationCity, detail.locationCountry].filter(Boolean).join(", ") ||
     detail.location;
@@ -296,14 +289,9 @@ export async function ProjectDetailView({
                 title={detail.title}
                 listingId={detail.id}
                 shareUrl={canonicalUrl}
-                productsHref="#products-used-heading"
-                connectionsHref={connectionsHref}
                 locationLabel={locationLabel}
                 year={detail.year}
                 credits={lightboxCredits}
-                products={lightboxProducts}
-                productCount={productCount}
-                connectionCount={connectionCount}
               />
             </div>
 

@@ -1,4 +1,5 @@
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { kickVisualDiscovery } from "@/lib/discovery/lifecycle";
 
 // All callers are server-side (Server Components / Server Actions).
 // Use the service-role client so reads are never blocked by RLS on listing_images.
@@ -36,6 +37,11 @@ export interface ListingImage {
 /**
  * Add image records for a listing. Assigns sort_order 0, 1, 2, ...
  * alt is set to null; can be extended later for per-image alt text.
+ *
+ * Every user-facing creation path funnels through here, so this is where a new
+ * photograph is announced to Visual Discovery. The announcement is fire-and-
+ * forget and cannot fail the insert — see kickVisualDiscovery, and note that
+ * the scheduled drain finds the same work anyway from the derived queue.
  */
 export async function addImages(
   listingId: string,
@@ -58,6 +64,9 @@ export async function addImages(
   if (error) {
     return { data: null, error: error.message };
   }
+
+  kickVisualDiscovery(listingId);
+
   return { data: data?.length ?? 0, error: null };
 }
 

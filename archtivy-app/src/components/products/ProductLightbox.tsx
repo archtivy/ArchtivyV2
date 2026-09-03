@@ -1,53 +1,43 @@
 "use client";
 
-import Image from "next/image";
+import { useCallback, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Layers, Package, Ruler, Tag } from "lucide-react";
-import { LightboxShell, LightboxAvatar } from "@/components/lightbox/LightboxShell";
+import { ExternalLink, Send } from "lucide-react";
+import { LightboxShell } from "@/components/lightbox/LightboxShell";
+import { DiscoveryFeed } from "@/components/lightbox/DiscoveryFeed";
+import { useImageDiscovery } from "@/components/lightbox/useImageDiscovery";
+import { ContactLeadModal } from "@/components/listing/ContactLeadModal";
+import { SaveToggle } from "@/components/home/SaveToggle";
 import type { GalleryImage } from "@/components/entity/Gallery";
 
 /**
- * The Product Lightbox — the shared immersive shell, plus a product sidebar.
+ * The Product Lightbox — the shared immersive shell, plus a product panel.
  *
- * ── THE SIDEBAR IS BUILT FROM WHAT EXISTS, NOT FROM THE MOCKUP ──────────────
- * Coverage measured across all 80 live products before any of this was drawn:
+ * ── THE PANEL IS IDENTITY, THREE ACTIONS, THEN DISCOVERY ────────────────────
+ * The approved design gives the right-hand column to the product's name, its
+ * publisher, one row of actions, and then a continuous feed of visually
+ * similar products. That is all of it.
  *
- *   brand                      79/80   category        79/80
- *   subtitle                   80/80   designers       38/80
- *   materials                  22/80   year            27/80
- *   dimensions                 16/80   colours          2/80
- *   used in >=1 project        15/80
+ * What was here before — category, materials, dimensions, colours, designers,
+ * "Used in N projects", "More from <brand>" — has not been lost, only stopped
+ * being said twice: every one of those rows is on the product page directly
+ * underneath this overlay, in the specification block and the rails. A
+ * lightbox that reprinted the page it is covering was competing with the
+ * photograph for the column.
  *
- * Every row is self-omitting, so a product renders only the rows it has and
- * the card shortens rather than showing blanks. The reference's LIGHT SOURCE
- * row — "LED 4.6W | 2700K | 575 lm" — has NO column behind it anywhere in the
- * schema: no wattage, colour temperature or lumen field exists on listings or
- * the products sidecar. It is not approximated from the description or the
- * title; it is simply absent, and so is its icon.
+ * There is deliberately no price anywhere. No listing on Archtivy carries one,
+ * and a specification platform is not a shop.
  *
- * COLOURS is kept despite 2/80 coverage because it is real, it is exactly what
- * a furniture buyer looks for, and self-omission means the other 78 products
- * pay nothing for it. Coverage decides whether a row RENDERS, never whether it
- * is worth having.
+ * ── NO OBJECT CLICKING HERE ─────────────────────────────────────────────────
+ * A product photograph has one subject and the reader is already on its page,
+ * so no regions are requested and no boxes are drawn. The discovery model is
+ * simply: this product → products that currently look like it.
  *
- * ── ROW ORDER ───────────────────────────────────────────────────────────────
- * Identity first (brand, designer), then what the object IS (category), then
- * what it is made of and how big it is (materials, dimensions, colours) — the
- * order a specifier reads in. Year sits in the header beside the brand's
- * location, mirroring the project lightbox rather than competing with it.
+ * `exact` is always empty on this surface — "used in this project" is a claim
+ * only a project can make — so the feed renders suggestions alone. It is still
+ * the same component with the same separation, so the day a product photo
+ * carries a confirmed pin it is already handled.
  */
-
-export interface ProductLightboxDesigner {
-  name: string;
-  href: string | null;
-}
-
-export interface ProductLightboxRelated {
-  id: string;
-  title: string;
-  href: string;
-  cover: string | null;
-}
 
 export interface ProductLightboxProps {
   open: boolean;
@@ -59,27 +49,20 @@ export interface ProductLightboxProps {
   listingId: string;
   initialSaved?: boolean;
 
+  /** The publisher line under the title. */
   brandName: string | null;
   brandHref: string | null;
-  brandAvatarUrl: string | null;
   brandLocation: string | null;
   year: number | null;
 
-  categoryLabel: string | null;
-  categoryHref: string | null;
-  designers: ProductLightboxDesigner[];
-  materials: string[];
-  dimensions: string | null;
-  colors: string[];
-
-  /** Projects featuring THIS product — project_product_links. */
-  projectCount: number;
-  projects: ProductLightboxRelated[];
-  projectsHref: string | null;
-
-  /** Other products by the same brand. */
-  brandProducts: ProductLightboxRelated[];
-  brandProductsHref: string | null;
+  /**
+   * Where "Visit website" goes, already resolved and normalised by the page:
+   * the product's own URL when it has one, the brand's homepage otherwise,
+   * and null when neither is a usable absolute URL. Never re-derived here —
+   * two answers to "which website" is the bug this once had.
+   */
+  websiteHref: string | null;
+  websiteLabel: string | null;
 }
 
 export function ProductLightbox(props: ProductLightboxProps) {
@@ -96,269 +79,209 @@ export function ProductLightbox(props: ProductLightboxProps) {
     brandHref,
     brandLocation,
     year,
+    websiteHref,
+    websiteLabel,
   } = props;
 
   const subtitle =
-    [brandName, brandLocation, year != null ? String(year) : null]
-      .filter(Boolean)
-      .join(" · ") || null;
+    [brandName, brandLocation, year != null ? String(year) : null].filter(Boolean).join(" · ") ||
+    null;
 
-  /*
-   * ── NO OVERLAY LINE ON PRODUCTS ───────────────────────────────────────────
-   * The project lightbox prints location and credits over the bottom-left of
-   * the photograph, and carries a dark scrim so they stay legible on a bright
-   * building. A product shot is usually a white studio cut-out, and that scrim
-   * greyed the bottom third of it — darkening the product to make room for a
-   * brand name the sidebar already shows. The product mockup has no such line
-   * either. So overlayMeta is not passed, and the scrim goes with it.
-   */
-  return (
-    <LightboxShell
-      open={open}
-      onClose={onClose}
-      startIndex={startIndex}
-      images={images}
-      title={title}
-      shareUrl={shareUrl}
-      listingId={listingId}
-      entityType="product"
-      initialSaved={initialSaved}
-      subtitle={subtitle}
-      sidebar={({ close }) => <ProductSidebar {...props} onNavigate={close} />}
-    />
-  );
-}
+  /* One fetch per photograph, held here rather than in the panel, which the
+     shell renders twice — once as the xl column, once inside the sub-xl sheet. */
+  const [activeImageId, setActiveImageId] = useState<string | undefined>(undefined);
+  const { data, loading } = useImageDiscovery(activeImageId);
+  const onActiveImageChange = useCallback((image: GalleryImage) => {
+    setActiveImageId(image.id);
+  }, []);
 
-function ProductSidebar({
-  title,
-  brandName,
-  brandHref,
-  brandAvatarUrl,
-  brandLocation,
-  year,
-  categoryLabel,
-  categoryHref,
-  designers,
-  materials,
-  dimensions,
-  colors,
-  projectCount,
-  projects,
-  projectsHref,
-  brandProducts,
-  brandProductsHref,
-  onNavigate,
-}: ProductLightboxProps & { onNavigate: () => void }) {
+  const [contactOpen, setContactOpen] = useState(false);
+
   return (
     <>
-      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] p-6">
-        <p className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-white/40">
-          Product
-        </p>
-        <h2 className="mt-2 font-display text-[26px] leading-[32px] tracking-tight text-white">
-          {title}
-        </h2>
-        {brandLocation && (
-          <p className="mt-2 font-body text-[14px] text-white/55">{brandLocation}</p>
+      <LightboxShell
+        open={open}
+        onClose={onClose}
+        startIndex={startIndex}
+        images={images}
+        title={title}
+        shareUrl={shareUrl}
+        listingId={listingId}
+        entityType="product"
+        initialSaved={initialSaved}
+        subtitle={subtitle}
+        /* The panel owns Save now, so the shell must not draw a second one.
+           Share and Fullscreen are untouched. */
+        showSave={false}
+        onActiveImageChange={onActiveImageChange}
+        sidebar={({ close }) => (
+          <>
+            <ProductIdentity
+              title={title}
+              brandName={brandName}
+              brandHref={brandHref}
+              listingId={listingId}
+              initialSaved={initialSaved}
+              websiteHref={websiteHref}
+              websiteLabel={websiteLabel}
+              onMessage={() => setContactOpen(true)}
+              onNavigate={close}
+            />
+            <DiscoveryFeed
+              loading={loading}
+              exact={[]}
+              similar={data?.room.similar ?? []}
+              mode="room"
+              variant="detailed"
+              title="Similar products"
+              subtitle="Pieces that currently look closest to this one."
+              showSparkle={false}
+              moreLabel="Explore more similar products"
+              onNavigate={close}
+            />
+          </>
         )}
-        {year != null && <p className="font-body text-[14px] text-white/55">{year}</p>}
+      />
 
-        {brandName && (
-          <Row
-            label="Brand"
-            bare
-            icon={<LightboxAvatar name={brandName} url={brandAvatarUrl} />}
-          >
-            <RowValue href={brandHref} onNavigate={onNavigate}>
-              {brandName}
-            </RowValue>
-          </Row>
-        )}
-
-        {/* Names only, no role. listing_team_members.title holds the taxonomy
-            CATEGORY on product rows ("Furniture"), not a role — rendering it
-            would print "Vincent Van Duysen — Furniture" and restate Category. */}
-        {designers.length > 0 && (
-          <Row label={designers.length === 1 ? "Designer" : "Designers"}>
-            <span className="min-w-0 flex-1">
-              {designers.map((d, i) => (
-                <span key={`${d.name}-${i}`} className="block">
-                  <RowValue href={d.href} onNavigate={onNavigate}>
-                    {d.name}
-                  </RowValue>
-                </span>
-              ))}
-            </span>
-          </Row>
-        )}
-
-        {categoryLabel && (
-          <Row label="Category" icon={<Tag strokeWidth={1.5} className="h-4 w-4" />}>
-            <RowValue href={categoryHref} onNavigate={onNavigate}>
-              {categoryLabel}
-            </RowValue>
-          </Row>
-        )}
-
-        {materials.length > 0 && (
-          <Row label={materials.length === 1 ? "Material" : "Materials"}>
-            <span className="min-w-0 flex-1 font-body text-[14px] text-white/85">
-              {materials.join(", ")}
-            </span>
-          </Row>
-        )}
-
-        {dimensions && (
-          <Row label="Dimensions" icon={<Ruler strokeWidth={1.5} className="h-4 w-4" />}>
-            <span className="min-w-0 flex-1 font-body text-[14px] text-white/85">
-              {dimensions}
-            </span>
-          </Row>
-        )}
-
-        {colors.length > 0 && (
-          <Row label={colors.length === 1 ? "Colour" : "Colours"}>
-            <span className="min-w-0 flex-1 font-body text-[14px] text-white/85">
-              {colors.join(", ")}
-            </span>
-          </Row>
-        )}
-
-        {/* Projects featuring this product — the same project_product_links
-            the "Seen in Projects" section below the fold renders in full. */}
-        {projectCount > 0 && projectsHref && (
-          <Block
-            href={projectsHref}
-            onNavigate={onNavigate}
-            icon={<Layers strokeWidth={1.5} className="h-[18px] w-[18px]" />}
-            title={`Used in ${projectCount} project${projectCount === 1 ? "" : "s"}`}
-            subtitle="Explore projects using this product"
-            thumbs={projects}
-          />
-        )}
-
-        {brandProducts.length > 0 && brandName && brandProductsHref && (
-          <Block
-            href={brandProductsHref}
-            onNavigate={onNavigate}
-            icon={<Package strokeWidth={1.5} className="h-[18px] w-[18px]" />}
-            title={`More from ${brandName}`}
-            subtitle="View all products from this brand"
-            thumbs={brandProducts}
-          />
-        )}
-      </div>
+      {/*
+       * "Message" is the platform's existing enquiry pipeline — the same modal,
+       * the same POST /api/leads, the same /admin/leads moderation queue that
+       * the product page's own button uses. Nothing second was built for it.
+       *
+       * Rendered OUTSIDE LightboxShell so it is not inside the shell's focus
+       * trap, which would otherwise fight the dialog for focus.
+       */}
+      <ContactLeadModal
+        open={contactOpen}
+        onClose={() => setContactOpen(false)}
+        listingId={listingId}
+        listingType="product"
+        listingTitle={title}
+        kind="contact"
+      />
     </>
   );
 }
 
-/** A label/value row with a hairline above it. Never rendered empty. */
-function Row({
-  label,
-  icon,
-  bare = false,
-  children,
-}: {
-  label: string;
-  icon?: React.ReactNode;
-  /** True when the icon already provides its own container. */
-  bare?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mt-5 flex items-center gap-3 border-t border-white/[0.07] pt-5">
-      <div className="min-w-0 flex-1">
-        <p className="font-body text-[11px] font-medium uppercase tracking-[0.12em] text-white/35">
-          {label}
-        </p>
-        <div className="mt-1 font-body text-[14px] text-white/85">{children}</div>
-      </div>
-      {/* `bare` skips the ring for an icon that already draws its own circle,
-          e.g. the brand avatar. */}
-      {icon &&
-        (bare ? (
-          icon
-        ) : (
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 text-white/55">
-            {icon}
-          </span>
-        ))}
-    </div>
-  );
-}
-
-function RowValue({
-  href,
-  onNavigate,
-  children,
-}: {
-  href: string | null;
-  onNavigate: () => void;
-  children: React.ReactNode;
-}) {
-  if (!href) return <span className="truncate">{children}</span>;
-  return (
-    <Link
-      href={href}
-      onClick={onNavigate}
-      className="truncate underline-offset-4 transition-colors hover:text-white hover:underline"
-    >
-      {children}
-    </Link>
-  );
-}
-
-/** A relationship block: count, a way in, and up to four real thumbnails. */
-function Block({
-  href,
-  onNavigate,
-  icon,
+function ProductIdentity({
   title,
-  subtitle,
-  thumbs,
+  brandName,
+  brandHref,
+  listingId,
+  initialSaved,
+  websiteHref,
+  websiteLabel,
+  onMessage,
+  onNavigate,
 }: {
-  href: string;
-  onNavigate: () => void;
-  icon: React.ReactNode;
   title: string;
-  subtitle: string;
-  thumbs: ProductLightboxRelated[];
+  brandName: string | null;
+  brandHref: string | null;
+  listingId: string;
+  initialSaved?: boolean;
+  websiteHref: string | null;
+  websiteLabel: string | null;
+  onMessage: () => void;
+  onNavigate: () => void;
 }) {
   return (
-    <div className="mt-6 border-t border-white/[0.07] pt-5">
-      <Link href={href} onClick={onNavigate} className="group flex items-center gap-3">
-        <span className="shrink-0 text-white/60">{icon}</span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-body text-[14px] text-white/90">{title}</span>
-          <span className="block font-body text-[12px] text-white/45">{subtitle}</span>
-        </span>
-        <ArrowRight
-          strokeWidth={1.5}
-          className="h-4 w-4 shrink-0 text-white/40 transition-transform group-hover:translate-x-0.5"
-          aria-hidden
-        />
-      </Link>
-      {thumbs.length > 0 && (
-        <ul className="mt-4 flex gap-2">
-          {thumbs.slice(0, 4).map((t) => (
-            /* A quarter each, never flex-1: with one project a grow-to-fill
-               thumbnail became a full-width square that dwarfed the rows above
-               it. Four is the cap, so one, two or three simply leave space. */
-            <li key={t.id} className="min-w-0 shrink-0 basis-[calc(25%-6px)]">
-              <Link
-                href={t.href}
-                onClick={onNavigate}
-                title={t.title}
-                className="relative block aspect-square overflow-hidden rounded-lg border border-white/[0.07] bg-white/[0.06] transition-colors hover:border-white/25"
-              >
-                {t.cover && (
-                  <Image src={t.cover} alt={t.title} fill sizes="80px" className="object-cover" />
-                )}
-              </Link>
-            </li>
-          ))}
-        </ul>
+    <div className="mb-6">
+      <h2 className="font-display text-[26px] leading-[32px] tracking-tight text-white">{title}</h2>
+
+      {brandName && (
+        <p className="mt-1.5 font-body text-[14px] text-white/50">
+          by{" "}
+          {brandHref ? (
+            <Link
+              href={brandHref}
+              onClick={onNavigate}
+              className="underline-offset-4 transition-colors hover:text-white/85 hover:underline"
+            >
+              {brandName}
+            </Link>
+          ) : (
+            brandName
+          )}
+        </p>
       )}
+
+      <div className="mt-5 grid grid-cols-3 gap-2">
+        {/* The platform's one save mechanism, in its inline form because here
+            it is a primary action rather than an overlay on a photograph. */}
+        <span className="flex items-center justify-center rounded-xl border border-white/[0.09] bg-white/[0.035] px-2 py-2.5 text-white/85 transition-colors hover:bg-white/[0.07]">
+          <SaveToggle
+            listingId={listingId}
+            entityType="product"
+            entityTitle={title}
+            initialSaved={initialSaved}
+            variant="inline"
+            align="left"
+            tone="dark"
+            compact
+          />
+        </span>
+
+        <ActionButton onClick={onMessage} icon={<Send strokeWidth={1.5} className="h-4 w-4" />}>
+          Message
+        </ActionButton>
+
+        {/*
+         * Rendered only with a real destination. The page resolves it through
+         * normaliseExternalUrl, which returns null for anything it cannot make
+         * into a safe absolute URL — so a stored value like "archtivy.com"
+         * declines to render rather than resolving as a relative path and 404ing.
+         */}
+        {websiteHref ? (
+          <ActionButton
+            href={websiteHref}
+            icon={<ExternalLink strokeWidth={1.5} className="h-4 w-4" />}
+            ariaLabel={websiteLabel ?? "Visit website"}
+          >
+            Visit website
+          </ActionButton>
+        ) : (
+          <span aria-hidden />
+        )}
+      </div>
     </div>
+  );
+}
+
+function ActionButton({
+  children,
+  icon,
+  onClick,
+  href,
+  ariaLabel,
+}: {
+  children: React.ReactNode;
+  icon: React.ReactNode;
+  onClick?: () => void;
+  href?: string;
+  ariaLabel?: string;
+}) {
+  const className =
+    "flex items-center justify-center gap-1.5 rounded-xl border border-white/[0.09] bg-white/[0.035] px-2 py-2.5 font-body text-[12.5px] text-white/85 transition-colors hover:bg-white/[0.07]";
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        aria-label={ariaLabel}
+        className={className}
+      >
+        <span className="shrink-0 text-white/60">{icon}</span>
+        <span className="truncate">{children}</span>
+      </a>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onClick} aria-label={ariaLabel} className={className}>
+      <span className="shrink-0 text-white/60">{icon}</span>
+      <span className="truncate">{children}</span>
+    </button>
   );
 }

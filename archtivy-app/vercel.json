@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/collections-refresh",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/visual-discovery?mode=new&limit=20",
+      "schedule": "0 * * * *"
     }
   ]
 }

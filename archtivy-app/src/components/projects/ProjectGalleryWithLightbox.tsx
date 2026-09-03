@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import { Gallery, type GalleryImage } from "@/components/entity/Gallery";
-import {
-  ProjectLightbox,
-  type LightboxCredit,
-  type LightboxProduct,
-} from "@/components/projects/ProjectLightbox";
+import { ProjectLightbox, type LightboxCredit } from "@/components/projects/ProjectLightbox";
 
 /**
  * The project hero gallery, plus the lightbox it opens.
@@ -27,27 +23,17 @@ export function ProjectGalleryWithLightbox({
   images,
   title,
   shareUrl,
-  productsHref,
-  connectionsHref,
   locationLabel,
   year,
   credits,
-  products,
-  productCount,
-  connectionCount,
   listingId,
 }: {
   images: GalleryImage[];
   title: string;
   shareUrl: string;
-  productsHref: string;
-  connectionsHref: string | null;
   locationLabel: string | null;
   year: number | null;
   credits: LightboxCredit[];
-  products: LightboxProduct[];
-  productCount: number;
-  connectionCount: number;
   listingId: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -70,14 +56,9 @@ export function ProjectGalleryWithLightbox({
         images={images}
         title={title}
         shareUrl={shareUrl}
-        productsHref={productsHref}
-        connectionsHref={connectionsHref}
         locationLabel={locationLabel}
         year={year}
         credits={credits}
-        products={products}
-        productCount={productCount}
-        connectionCount={connectionCount}
         listingId={listingId}
       />
     </>

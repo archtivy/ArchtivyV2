@@ -1,6 +1,7 @@
 import { AdminPage } from "@/components/admin/AdminPage";
 import { ImageAiBackfillAndRebuildButton } from "./ImageAiBackfillAndRebuildButton";
 import { RebuildMatchesButton } from "./RebuildMatchesButton";
+import { VisualDiscoveryButton } from "./VisualDiscoveryButton";
 
 export default function AdminToolsPage() {
   return (
@@ -9,6 +10,7 @@ export default function AdminToolsPage() {
         Admin utilities: rebuild matches, bulk import, and more.
       </p>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <VisualDiscoveryButton />
         <ImageAiBackfillAndRebuildButton />
         <RebuildMatchesButton />
         <div className="rounded-xl border border-zinc-200 bg-white p-4">

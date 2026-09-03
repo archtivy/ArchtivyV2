@@ -56,7 +56,7 @@ export interface ProjectDetail {
   slug: string | null;
   title: string;
   description: string | null;
-  images: { url: string; alt: string | null; hotspots?: ImageHotspot[] }[];
+  images: { id?: string; url: string; alt: string | null; hotspots?: ImageHotspot[] }[];
   location: string | null;
   year: number | null;
   areaSqft: number | null;
@@ -174,6 +174,7 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   const images: ProjectDetail["images"] = ((imgRes.data ?? []) as { id: string; image_url: string; alt: string | null }[])
     .filter((i) => i.image_url)
     .map((i) => ({
+      id: i.id,
       url: i.image_url,
       alt: i.alt,
       hotspots: hotspotsByImage[i.id] ?? undefined,

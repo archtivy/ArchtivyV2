@@ -23,6 +23,15 @@ export interface ImageRegion {
   selected_mode: "matched" | "similar" | "none";
   scene_summary: string | null;
   created_at: string;
+  /**
+   * The object's visual signature vector, as a pgvector literal on write.
+   *
+   * This is the durable asset: it is re-run against the CURRENT product index
+   * every time someone clicks, so newly published products appear in old
+   * projects without the old photograph ever going back through a vision
+   * model. It replaces match_candidates, which froze the answer instead.
+   */
+  embedding: string | null;
 }
 
 export interface MatchCandidate {
@@ -108,6 +117,7 @@ export async function insertRegions(
       match_candidates: r.match_candidates,
       selected_mode: r.selected_mode,
       scene_summary: r.scene_summary,
+      embedding: r.embedding,
     })))
     .select("id");
 
