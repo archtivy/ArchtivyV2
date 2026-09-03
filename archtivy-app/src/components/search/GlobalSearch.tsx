@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { useAnimatedPlaceholder } from "@/lib/hooks/useAnimatedPlaceholder";
 
@@ -15,26 +15,22 @@ import { useAnimatedPlaceholder } from "@/lib/hooks/useAnimatedPlaceholder";
  * bar. There is no per-page search anywhere; changing behaviour here changes
  * it everywhere, which is the point.
  *
- * ── THE ROUTING CONTRACT IS UNCHANGED ───────────────────────────────────────
- * Submitting pushes `/explore/{projects|products}?q=…`, with the scope decided
- * by the same pathname rule the previous header used, and the query encoded
- * the same way. Nothing about where a search lands or how results resolve is
- * touched by this component — it is a different field in front of identical
- * behaviour.
+ * ── IT SEARCHES EVERYTHING, NOT THE PAGE YOU ARE ON ─────────────────────────
+ * This field used to infer an entity type from the current pathname and push
+ * to that directory: `/explore/products?q=…` on two paths, `/explore/projects`
+ * on every other. So a search for "chair" from the homepage, a magazine
+ * article or a studio profile landed in Projects — and designers and brands
+ * could not be reached by search at all, because no pathname mapped to them.
  *
- * (Those two paths 308 to /projects and /products via middleware, which also
- * translates the query. Routing straight to the destination would skip a hop,
- * but it would also skip that translation, so the contract is left exactly as
- * it was.)
+ * It now submits to `/search?q=…`, which queries projects, products, designers
+ * and brands together and ranks them against each other. Where you happened to
+ * be standing is no longer taken as a statement about what you were looking
+ * for.
+ *
+ * The directories keep their own in-page search — the field in
+ * DirectoryFilterBar on /projects and /products, which narrows the set already
+ * on screen. That is a different job and it is untouched.
  */
-
-/** Scope follows the section being read, as it did before. */
-function scopeFor(pathname: string): "projects" | "products" {
-  if (pathname.startsWith("/explore/products") || pathname.startsWith("/products")) {
-    return "products";
-  }
-  return "projects";
-}
 
 export interface GlobalSearchProps {
   /**
@@ -60,7 +56,6 @@ export function GlobalSearch({
   inert = false,
   className = "",
 }: GlobalSearchProps) {
-  const pathname = usePathname() ?? "/";
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -80,11 +75,17 @@ export function GlobalSearch({
     (e: React.FormEvent) => {
       e.preventDefault();
       const q = query.trim();
-      const base = `/explore/${scopeFor(pathname)}`;
-      router.push(q ? `${base}?q=${encodeURIComponent(q)}` : base);
+      // An empty submit is a no-op rather than a trip to an empty results
+      // page. Previously it navigated to the projects directory, which is a
+      // strange thing for pressing Enter in a blank field to do.
+      if (!q) {
+        inputRef.current?.focus();
+        return;
+      }
+      router.push(`/search?q=${encodeURIComponent(q)}`);
       inputRef.current?.blur();
     },
-    [query, pathname, router]
+    [query, router]
   );
 
   const inline = size === "inline";

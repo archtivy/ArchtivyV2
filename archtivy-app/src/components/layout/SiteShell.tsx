@@ -22,6 +22,9 @@ const TOOL_PATHS = ["/explore"];
  */
 const EDITORIAL_ROUTES = new Set([
   "/",
+  // Universal search renders DirectoryPageShell, which brings its own
+  // HomeNav and HomeFooter — the same arrangement as the directories below.
+  "/search",
   "/projects",
   "/products",
   "/designers",

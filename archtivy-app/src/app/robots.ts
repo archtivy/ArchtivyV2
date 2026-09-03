@@ -22,6 +22,11 @@ export default function robots(): MetadataRoute.Robots {
           "/sign-in",
           "/sign-up",
           "/api/",
+          // Universal search results. Every query is a distinct URL over
+          // content already indexed at its own canonical address, so crawling
+          // them spends budget to create duplicates. The page also sets
+          // robots: noindex itself; this stops the fetch as well as the index.
+          "/search",
           "/debug/",
           "/test/",
           // Claim flows are transient form pages; exclude from indexing

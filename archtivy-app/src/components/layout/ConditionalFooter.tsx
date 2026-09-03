@@ -12,6 +12,8 @@ import { isCorporateRoute } from "@/lib/layout/corporateRoutes";
  * Keep in sync with EDITORIAL_ROUTES in SiteShell.
  */
 const FOOTERLESS_ROUTES = new Set([
+  // /search renders DirectoryPageShell, which draws its own HomeFooter.
+  "/search",
   "/explore",
   "/",
   "/projects",

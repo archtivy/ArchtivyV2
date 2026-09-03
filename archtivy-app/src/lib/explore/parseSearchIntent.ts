@@ -12,7 +12,20 @@
    Types
    ═══════════════════════════════════════════════════════════════════════════ */
 
-export type EntityType = "project" | "designer" | "brand";
+export type EntityType = "project" | "designer" | "brand" | "product";
+
+/**
+ * Which entity types the caller can actually display.
+ *
+ * The Explore map draws project, designer and brand pins and has nowhere to
+ * put a product, so it takes the default. Universal search passes all four.
+ * Inference never proposes a type the caller did not ask for — that is the
+ * whole reason this option exists rather than a second parser.
+ */
+export type EntityScope = readonly EntityType[];
+
+export const MAP_ENTITIES: EntityScope = ["project", "designer", "brand"];
+export const ALL_ENTITIES: EntityScope = ["project", "designer", "brand", "product"];
 
 export interface SearchIntent {
   /** Inferred entity types to show. Empty = show all. */
@@ -45,6 +58,8 @@ const TYPE_SYNONYMS: [string[], EntityType][] = [
   [["designers", "designer", "studios", "studio", "firms", "firm", "practices", "practice", "professionals"], "designer"],
   // Project
   [["projects", "project", "buildings", "building", "works", "work"], "project"],
+  // Product entity words. Inert unless the caller has products in scope.
+  [["products", "product", "objects", "object", "items", "item", "furnishings"], "product"],
 ];
 
 /** Flattened synonym → EntityType lookup (built once). */
@@ -72,7 +87,19 @@ const CATEGORY_SYNONYMS = new Map<string, string>([
   ["mixed-use", "Mixed-Use"], ["mixed use", "Mixed-Use"],
   // Brand product types (from productTaxonomy root types)
   ["lighting", "Lighting"], ["lights", "Lighting"], ["lamp", "Lighting"], ["lamps", "Lighting"],
+  ["light", "Lighting"], ["pendant", "Lighting"], ["pendants", "Lighting"], ["luminaire", "Lighting"],
   ["furniture", "Furniture"], ["seating", "Furniture"], ["chairs", "Furniture"], ["tables", "Furniture"],
+  // Singulars for the same terms. Someone searching "chair" and someone
+  // searching "chairs" mean the same thing, and only one of them was
+  // understood before.
+  ["chair", "Furniture"], ["table", "Furniture"], ["sofa", "Furniture"], ["sofas", "Furniture"],
+  ["armchair", "Furniture"], ["armchairs", "Furniture"], ["stool", "Furniture"], ["stools", "Furniture"],
+  ["bench", "Furniture"], ["benches", "Furniture"], ["desk", "Furniture"], ["desks", "Furniture"],
+  ["bed", "Furniture"], ["beds", "Furniture"], ["shelf", "Furniture"], ["shelving", "Furniture"],
+  ["couch", "Furniture"], ["couches", "Furniture"],
+  ["surface", "Surfaces"], ["surfaces", "Surfaces"], ["countertop", "Surfaces"],
+  ["countertops", "Surfaces"], ["worktop", "Surfaces"], ["worktops", "Surfaces"],
+  ["cladding", "Surfaces"], ["panel", "Surfaces"], ["panels", "Surfaces"],
   ["bathroom", "Bathroom"], ["bath", "Bathroom"], ["sanitary", "Bathroom"],
   ["kitchen", "Kitchen"], ["kitchens", "Kitchen"],
   ["flooring", "Flooring"], ["floors", "Flooring"], ["floor", "Flooring"],
@@ -123,7 +150,10 @@ const STOP_WORDS = new Set(["the", "a", "an", "and", "or", "with", "for", "of", 
    Parser
    ═══════════════════════════════════════════════════════════════════════════ */
 
-export function parseSearchIntent(query: string): SearchIntent {
+export function parseSearchIntent(
+  query: string,
+  { entities = MAP_ENTITIES }: { entities?: EntityScope } = {}
+): SearchIntent {
   const raw = query.trim();
   if (!raw) {
     return { types: [], location: null, categories: [], materials: [], styles: [], freeText: "", label: "" };
@@ -164,6 +194,10 @@ export function parseSearchIntent(query: string): SearchIntent {
   const tokens = descriptorPart.split(/\s+/).filter((t) => t.length > 0);
 
   const types: EntityType[] = [];
+  /** Adds a type only if the caller can display it, and only once. */
+  const pushType = (t: EntityType) => {
+    if (entities.includes(t) && !types.includes(t)) types.push(t);
+  };
   const categories: string[] = [];
   const materials: string[] = [];
   const styles: string[] = [];
@@ -179,10 +213,16 @@ export function parseSearchIntent(query: string): SearchIntent {
 
       // Type match
       const typeMatch = TYPE_MAP.get(phrase);
-      if (typeMatch && !types.includes(typeMatch)) {
-        types.push(typeMatch);
-        for (let j = i; j < i + len; j++) consumed.add(j);
-        continue;
+      if (typeMatch) {
+        const alreadyMatched = types.includes(typeMatch);
+        pushType(typeMatch);
+        // Consumed even when the type is out of the caller's scope:
+        // "products" is an entity word, not a free-text term to go matching
+        // against titles.
+        if (!alreadyMatched) {
+          for (let j = i; j < i + len; j++) consumed.add(j);
+          continue;
+        }
       }
 
       // Category match
@@ -222,21 +262,33 @@ export function parseSearchIntent(query: string): SearchIntent {
   // If no explicit type was mentioned, infer from other signals
   if (types.length === 0) {
     // Category hints at brand type
-    const brandCategories = new Set(["Lighting", "Furniture", "Bathroom", "Kitchen", "Flooring", "Outdoor", "Textiles", "Acoustic", "Hardware", "Doors & Windows"]);
+    const brandCategories = new Set(["Lighting", "Furniture", "Bathroom", "Kitchen", "Flooring", "Outdoor", "Textiles", "Acoustic", "Hardware", "Doors & Windows", "Surfaces"]);
     const projectCategories = new Set(["Residential", "Commercial", "Hospitality", "Cultural", "Interior", "Institutional", "Mixed-Use"]);
 
     const hasBrandCat = categories.some((c) => brandCategories.has(c));
     const hasProjectCat = categories.some((c) => projectCategories.has(c));
 
     if (hasBrandCat && !hasProjectCat) {
-      types.push("brand");
+      /*
+       * A product category with no entity word — "lighting", "chair",
+       * "surface". On the map this could only ever have meant brands. With
+       * products in scope the thing itself is the better first answer, and
+       * the brands that make it are the second; both are pushed, in that
+       * order, and ordering here is what the ranker reads as preference.
+       *
+       * Note this proposes types, it does not restrict to them. A query that
+       * favours products still returns matching projects and brands when they
+       * genuinely match — the type is a weight, never a filter.
+       */
+      pushType("product");
+      pushType("brand");
     } else if (hasProjectCat && !hasBrandCat) {
-      types.push("project");
+      pushType("project");
     }
 
     // Material/style hints → likely project search
     if (types.length === 0 && (materials.length > 0 || styles.length > 0)) {
-      types.push("project");
+      pushType("project");
     }
   }
 
@@ -253,7 +305,12 @@ export function parseSearchIntent(query: string): SearchIntent {
   if (materials.length > 0) labelParts.push(materials.join(", "));
   if (styles.length > 0) labelParts.push(styles.join(", "));
   if (types.length > 0) {
-    const typeLabels: Record<EntityType, string> = { project: "Projects", designer: "Designers", brand: "Brands" };
+    const typeLabels: Record<EntityType, string> = {
+      project: "Projects",
+      designer: "Designers",
+      brand: "Brands",
+      product: "Products",
+    };
     labelParts.push(types.map((t) => typeLabels[t]).join(" & "));
   }
   if (freeText) labelParts.push(`"${freeText}"`);
