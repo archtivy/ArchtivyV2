@@ -8,6 +8,18 @@ export interface ProfileContactButtonProps {
   listingId: string;
   listingType: "project" | "product";
   listingTitle: string;
+  /**
+   * The profile being messaged, forwarded to the modal's header.
+   *
+   * Purely presentational: the lead is still recorded against `listingId`,
+   * because that is what the data model stores. This exists so the dialog can
+   * say who it is addressed to instead of naming one of their products.
+   */
+  recipient?: {
+    name: string;
+    avatarUrl?: string | null;
+    meta?: string | null;
+  } | null;
   className?: string;
 }
 
@@ -25,6 +37,7 @@ export function ProfileContactButton({
   listingId,
   listingType,
   listingTitle,
+  recipient = null,
   className = "",
 }: ProfileContactButtonProps) {
   const [open, setOpen] = useState(false);
@@ -45,6 +58,7 @@ export function ProfileContactButton({
         listingId={listingId}
         listingType={listingType}
         listingTitle={listingTitle}
+        recipient={recipient}
       />
     </>
   );

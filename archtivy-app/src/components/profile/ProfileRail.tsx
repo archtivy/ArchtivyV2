@@ -203,6 +203,13 @@ export function ProfileRail({
                 listingId={contactListing.id}
                 listingType={contactListing.type}
                 listingTitle={contactListing.title}
+                /* The same three values rendered a few pixels above this
+                   button. Nothing is fetched for the dialog. */
+                recipient={{
+                  name: displayName,
+                  avatarUrl: profile.avatar_url,
+                  meta: [roleLabel, location].filter(Boolean).join(" · ") || null,
+                }}
               />
             )}
           </div>
