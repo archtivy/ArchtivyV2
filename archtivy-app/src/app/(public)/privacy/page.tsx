@@ -152,7 +152,7 @@ export default function PrivacyPage() {
             To exercise any of these rights, contact{" "}
             <a
               href="mailto:info@archtivy.com"
-              className="text-archtivy-primary hover:underline dark:text-[#4d6fff]"
+              className="text-archtivy-primary hover:underline"
             >
               info@archtivy.com
             </a>

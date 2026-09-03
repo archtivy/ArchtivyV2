@@ -2,8 +2,10 @@
 
 import { usePathname } from "next/navigation";
 import { TopNav } from "@/components/layout/TopNav";
+import { HomeNav } from "@/components/home/HomeNav";
+import { HomeFooter } from "@/components/home/HomeFooter";
+import { isCorporateRoute } from "@/lib/layout/corporateRoutes";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { Footer } from "@/components/layout/Footer";
 import { ExploreToolHeader } from "@/components/explore/ExploreToolHeader";
 
 // Routes that should render "shellless" (no public TopNav/Footer/PageContainer).
@@ -72,38 +74,6 @@ const EDITORIAL_ROUTES = new Set([
 
 // Routes that show TopNav but skip PageContainer (full-width content).
 const FULL_WIDTH_PATHS: string[] = [];
-
-/**
- * Corporate / static pages, restyled onto the editorial tokens.
- *
- * These were built on the legacy zinc palette while the rest of the platform
- * moved to cream/ink/hairline, so they read as a different product. The ground
- * is set here rather than inside each page because a page rendered inside
- * PageContainer cannot paint full-bleed behind the container it sits in.
- */
-const STATIC_PAGE_ROUTES = new Set([
-  "/about",
-  "/vision",
-  "/how-it-works",
-  "/partners",
-  "/careers",
-  "/press",
-  "/press-kit",
-  "/contact",
-  "/faq",
-  "/guidelines",
-  "/privacy",
-  "/terms",
-  "/cookies",
-  "/data-processing",
-  "/api-docs",
-  "/data-intelligence",
-  "/brand-intelligence",
-]);
-
-function isStaticPageRoute(pathname: string | null): boolean {
-  return !!pathname && STATIC_PAGE_ROUTES.has(pathname);
-}
 
 function isAuthRoute(pathname: string | null): boolean {
   if (!pathname) return false;
@@ -205,14 +175,37 @@ export function SiteShell({ children }: SiteShellProps) {
     );
   }
 
-  if (isStaticPageRoute(pathname)) {
+  /*
+   * ── CORPORATE PAGES USE THE CURRENT HEADER AND FOOTER ─────────────────────
+   * These rendered TopNav — a white bar with a bright-blue pill and a
+   * dark-mode toggle — directly above a cream editorial page, and the legacy
+   * zinc Footer underneath it. The page in between had already been migrated,
+   * which made the seam at both ends the most visible thing on it.
+   *
+   * ── WHY THIS IS SAFE, AND WHY IT IS NOT A GLOBAL RESTYLE ──────────────────
+   * TopNav is still rendered by the default branch below and by
+   * /me/promote, /me/profile, MeWorkspaceShell, ProfilePageView,
+   * ProjectCategoryArchive and DirectoryPageShell. None of them reach this
+   * branch: the swap is keyed on CORPORATE_ROUTES, an exact-match set of
+   * corporate routes. Restyling TopNav itself would have changed the
+   * authenticated workspace, the archives and the listing flows — so it is
+   * left completely alone.
+   *
+   * No navigation logic is duplicated either: HomeNav and HomeFooter are the
+   * components the homepage, the directories and the profiles already use.
+   *
+   * pt-[72px] clears HomeNav, which is `fixed top-0`. Without it the first
+   * heading renders under the header.
+   */
+  if (isCorporateRoute(pathname)) {
     return (
-      <>
-        <TopNav />
-        <main className="min-h-screen bg-cream font-body text-ink">
+      <div className="min-h-screen bg-cream font-body text-ink">
+        <HomeNav variant="solid" />
+        <main className="pt-[72px]">
           <PageContainer>{children}</PageContainer>
         </main>
-      </>
+        <HomeFooter />
+      </div>
     );
   }
 

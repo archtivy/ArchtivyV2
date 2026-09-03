@@ -71,11 +71,11 @@ export function ContactForm() {
 
   if (status === "done") {
     return (
-      <div className="rounded-[4px] border border-zinc-200 bg-white px-8 py-10 dark:border-zinc-700 dark:bg-zinc-900">
-        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+      <div className="rounded-[4px] border border-hairline bg-white px-8 py-10">
+        <p className="text-sm font-medium text-ink">
           Message received.
         </p>
-        <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="mt-2 text-sm leading-relaxed text-muted">
           We review all inquiries and respond within two business days.
         </p>
       </div>
@@ -86,13 +86,13 @@ export function ContactForm() {
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="space-y-5 rounded-[4px] border border-zinc-200 bg-white px-8 py-10 dark:border-zinc-700 dark:bg-zinc-900"
+      className="space-y-5 rounded-[4px] border border-hairline bg-white px-8 py-10"
     >
       {/* Name */}
       <div className="space-y-1.5">
         <label
           htmlFor="cf-name"
-          className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
+          className="block text-xs font-medium text-ink"
         >
           Name
         </label>
@@ -103,7 +103,7 @@ export function ContactForm() {
           value={form.name}
           onChange={set("name")}
           disabled={status === "submitting"}
-          className="w-full rounded-[4px] border border-zinc-200 bg-transparent px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 transition focus:border-[#002abf] focus:outline-none focus:ring-1 focus:ring-[#002abf] disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
+          className="w-full rounded-[4px] border border-hairline bg-transparent px-4 py-2.5 text-sm text-ink placeholder:text-muted/70 transition focus:border-archtivy-primary focus:outline-none focus:ring-1 focus:ring-archtivy-primary disabled:opacity-60"
           placeholder="Your name"
         />
         {errors.name && (
@@ -115,7 +115,7 @@ export function ContactForm() {
       <div className="space-y-1.5">
         <label
           htmlFor="cf-email"
-          className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
+          className="block text-xs font-medium text-ink"
         >
           Email
         </label>
@@ -126,7 +126,7 @@ export function ContactForm() {
           value={form.email}
           onChange={set("email")}
           disabled={status === "submitting"}
-          className="w-full rounded-[4px] border border-zinc-200 bg-transparent px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 transition focus:border-[#002abf] focus:outline-none focus:ring-1 focus:ring-[#002abf] disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
+          className="w-full rounded-[4px] border border-hairline bg-transparent px-4 py-2.5 text-sm text-ink placeholder:text-muted/70 transition focus:border-archtivy-primary focus:outline-none focus:ring-1 focus:ring-archtivy-primary disabled:opacity-60"
           placeholder="your@email.com"
         />
         {errors.email && (
@@ -138,7 +138,7 @@ export function ContactForm() {
       <div className="space-y-1.5">
         <label
           htmlFor="cf-category"
-          className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
+          className="block text-xs font-medium text-ink"
         >
           Category
         </label>
@@ -147,7 +147,7 @@ export function ContactForm() {
           value={form.category}
           onChange={set("category")}
           disabled={status === "submitting"}
-          className="w-full rounded-[4px] border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 transition focus:border-[#002abf] focus:outline-none focus:ring-1 focus:ring-[#002abf] disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          className="w-full rounded-[4px] border border-hairline bg-white px-4 py-2.5 text-sm text-ink transition focus:border-archtivy-primary focus:outline-none focus:ring-1 focus:ring-archtivy-primary disabled:opacity-60"
         >
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>
@@ -161,7 +161,7 @@ export function ContactForm() {
       <div className="space-y-1.5">
         <label
           htmlFor="cf-message"
-          className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
+          className="block text-xs font-medium text-ink"
         >
           Message
         </label>
@@ -171,7 +171,7 @@ export function ContactForm() {
           value={form.message}
           onChange={set("message")}
           disabled={status === "submitting"}
-          className="w-full resize-none rounded-[4px] border border-zinc-200 bg-transparent px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 transition focus:border-[#002abf] focus:outline-none focus:ring-1 focus:ring-[#002abf] disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
+          className="w-full resize-none rounded-[4px] border border-hairline bg-transparent px-4 py-2.5 text-sm text-ink placeholder:text-muted/70 transition focus:border-archtivy-primary focus:outline-none focus:ring-1 focus:ring-archtivy-primary disabled:opacity-60"
           placeholder="Describe your inquiry"
         />
         {errors.message && (
@@ -182,7 +182,7 @@ export function ContactForm() {
       <button
         type="submit"
         disabled={status === "submitting"}
-        className="rounded-[4px] bg-[#002abf] px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 disabled:opacity-60"
+        className="rounded-full bg-ink px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-archtivy-primary focus:ring-offset-2 disabled:opacity-60"
       >
         {status === "submitting" ? "Sending…" : "Send Message"}
       </button>

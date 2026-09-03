@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { isCorporateRoute } from "@/lib/layout/corporateRoutes";
 
 /**
  * Exact routes where the global footer must not render.
@@ -32,6 +33,12 @@ const FOOTERLESS_ROUTES = new Set([
 export function ConditionalFooter({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   if (FOOTERLESS_ROUTES.has(pathname)) return null;
+  /*
+   * Corporate pages render HomeFooter from SiteShell, so the legacy global
+   * footer must not also appear beneath it. Read from the shared set rather
+   * than restated here — see lib/layout/corporateRoutes.
+   */
+  if (isCorporateRoute(pathname)) return null;
   // Mirrors the SiteShell rule: /projects/* and /products/* are shell-less by
   // default because only the server can tell a detail page from an archive.
   // The CategoryArchive components render the global Footer themselves.

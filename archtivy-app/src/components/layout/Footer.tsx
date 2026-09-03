@@ -8,8 +8,6 @@ const COMPANY_LINKS = [
   { label: "About", href: "/about" },
   { label: "Vision", href: "/vision" },
   { label: "How It Works", href: "/how-it-works" },
-  { label: "Press", href: "/press" },
-  { label: "Careers", href: "/careers" },
   { label: "Contact", href: "/contact" },
 ];
 
@@ -49,8 +47,6 @@ const PROFESSIONALS_LINKS = [
 ];
 
 const RESOURCES_LINKS = [
-  { label: "Press Kit", href: "/press-kit" },
-  { label: "API Documentation", href: "/api-docs" },
   { label: "Connections", href: "/data-intelligence" },
   { label: "For brands", href: "/brand-intelligence" },
   { label: "Partner Program", href: "/partners" },

@@ -24,7 +24,7 @@ export default function DataProcessingPage() {
             rights available to individuals. It should be read alongside our{" "}
             <Link
               href="/privacy"
-              className="text-archtivy-primary hover:underline dark:text-[#4d6fff]"
+              className="text-archtivy-primary hover:underline"
             >
               Privacy Policy
             </Link>
@@ -176,7 +176,7 @@ export default function DataProcessingPage() {
           To exercise any of these rights, contact{" "}
           <a
             href="mailto:info@archtivy.com"
-            className="text-archtivy-primary hover:underline dark:text-[#4d6fff]"
+            className="text-archtivy-primary hover:underline"
           >
             info@archtivy.com
           </a>
