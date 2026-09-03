@@ -1,4 +1,3 @@
-import { supabase } from "@/lib/supabaseClient";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 
 const TABLE = "notifications";
@@ -154,7 +153,23 @@ export async function getNotificationsForProfile(
  * Get unread notification count.
  */
 export async function getUnreadCount(profileId: string): Promise<number> {
-  const { count, error } = await supabase
+  /*
+   * ── SERVICE ROLE, LIKE EVERY OTHER FUNCTION HERE ──────────────────────────
+   * This used the ANON client. `notifications` has RLS enabled and ZERO
+   * policies, so anon can see no row at all — the count was therefore always
+   * 0 and the bell's unread badge could never appear, whatever the table
+   * contained. Live data at the time of the fix: 16 notifications, 16 unread,
+   * badge showing nothing.
+   *
+   * getNotificationsForProfile and createNotification in this same file
+   * already use the service role, which is why the dropdown could LIST
+   * notifications while the badge stayed empty — two clients, one table, and
+   * only one of them able to see it.
+   *
+   * Authorization is the profileId argument, which every caller resolves from
+   * the session before calling.
+   */
+  const { count, error } = await getSupabaseServiceClient()
     .from(TABLE)
     .select("id", { count: "exact", head: true })
     .eq("recipient_profile_id", profileId)
@@ -176,7 +191,10 @@ export async function markAsRead(
   notificationId: string,
   recipientProfileId: string
 ): Promise<DbResult<void>> {
-  const { error } = await supabase
+  /* Service role for the same reason as getUnreadCount: under RLS with no
+     policy the anon client matched no row, so this returned "ok" and changed
+     nothing. Ownership is enforced by the recipient filter below. */
+  const { error } = await getSupabaseServiceClient()
     .from(TABLE)
     .update({ is_read: true })
     .eq("id", notificationId)
@@ -189,7 +207,8 @@ export async function markAsRead(
  * Mark all notifications as read for a profile.
  */
 export async function markAllAsRead(profileId: string): Promise<DbResult<void>> {
-  const { error } = await supabase
+  /* Service role — see getUnreadCount. Scoped to the caller's profile below. */
+  const { error } = await getSupabaseServiceClient()
     .from(TABLE)
     .update({ is_read: true })
     .eq("recipient_profile_id", profileId)

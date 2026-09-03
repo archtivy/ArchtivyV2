@@ -1,0 +1,23 @@
+-- ============================================================================
+-- notifications: remove the trigger that made every UPDATE fail
+--
+-- trg_notifications_set_updated_at calls set_updated_at(), which assigns
+-- NEW.updated_at. public.notifications has no updated_at column, so the
+-- assignment raises 42703 and EVERY update on the table aborts.
+--
+-- The visible consequence: nothing could ever be marked read. markAsRead and
+-- markAllAsRead both issue `update notifications set is_read = true`, so the
+-- read endpoint has been returning 500 since the trigger was attached. Live
+-- data before this migration: 15 notifications, 15 unread, none ever read.
+--
+-- ── WHY DROP RATHER THAN ADD THE COLUMN ─────────────────────────────────────
+-- No code reads notifications.updated_at, and none can — the column has never
+-- existed, so nothing was ever written against it. Adding one would introduce
+-- a column that exists only to keep a trigger from erroring, and the trigger
+-- itself has no purpose here: `created_at` is immutable and the only mutable
+-- field is is_read, whose change is not something anything queries by time.
+--
+-- The set_updated_at() function is left alone. Other tables use it correctly.
+-- ============================================================================
+
+drop trigger if exists trg_notifications_set_updated_at on public.notifications;
