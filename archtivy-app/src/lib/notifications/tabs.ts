@@ -48,7 +48,18 @@ const MENTION_EVENTS: NotificationEventType[] = [
  * this tab shows admin messages in practice. Deliberately not given its own
  * tab: a tab that is always empty reads as a broken feature.
  */
-const SYSTEM_EVENTS: NotificationEventType[] = ["admin_update", "opportunity_nearby"];
+const SYSTEM_EVENTS: NotificationEventType[] = [
+  "admin_update",
+  "opportunity_nearby",
+  /*
+   * A product request is written by another person but DELIVERED by the
+   * platform, after moderation — it is not something a followed account did,
+   * so Updates would be wrong, and it is not a credit, so Mentions would be
+   * too. It would still reach the All tab without this line, since `all`
+   * applies no filter; this only makes it reachable from a second tab as well.
+   */
+  "product_request",
+];
 
 /**
  * Event types for a tab, or null for "all" (no filter).

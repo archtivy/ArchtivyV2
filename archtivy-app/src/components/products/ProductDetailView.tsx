@@ -11,7 +11,7 @@ import { SaveToggle } from "@/components/home/SaveToggle";
 import { normaliseExternalUrl } from "@/lib/url/externalUrl";
 import { ProductStageBadge, CollaborationBadge } from "@/components/listing/StatusBadge";
 import { ProductCollaborationSection } from "@/components/listing/CollaborationSection";
-import { RequestQuoteButton } from "@/components/products/RequestQuoteButton";
+import { RequestInformationButton } from "@/components/products/request/RequestInformationButton";
 import { ProductAbout } from "@/components/products/ProductAbout";
 import { ProductDownloads } from "@/components/products/ProductDownloads";
 import { SeenInProjects } from "@/components/products/SeenInProjects";
@@ -362,7 +362,18 @@ export async function ProductDetailView({
                   </a>
                 )}
 
-                <RequestQuoteButton listingId={detail.id} listingTitle={detail.title} />
+                {/* Was RequestQuoteButton -> ContactLeadModal: an anonymous
+                    form that asked a signed-in person for the name and email
+                    the session already had, and whose submission the server
+                    could not attribute to anyone. This one is authenticated
+                    end to end. */}
+                <RequestInformationButton
+                  listingId={detail.id}
+                  productTitle={detail.title}
+                  brandName={detail.brand?.name ?? null}
+                  coverUrl={detail.images[0]?.url ?? null}
+                  productPath={canonicalPath}
+                />
               </div>
 
               {/* Finish / Colour swatches are gone. products.color_options is

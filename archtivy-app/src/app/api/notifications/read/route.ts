@@ -23,7 +23,14 @@ export async function POST(req: Request) {
   }
 
   if (body.id && typeof body.id === "string") {
-    const { error } = await markAsRead(body.id);
+    /* The owner is resolved from the session, then required by the update —
+       so an id belonging to someone else matches no row and changes nothing. */
+    const profileResult = await getProfileByClerkId(userId);
+    const profile = profileResult.data;
+    if (!profile) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    }
+    const { error } = await markAsRead(body.id, profile.id);
     if (error) return NextResponse.json({ error }, { status: 500 });
     return NextResponse.json({ ok: true });
   }

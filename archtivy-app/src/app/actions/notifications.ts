@@ -10,7 +10,14 @@ export async function markNotificationRead(
   const { userId } = await auth();
   if (!userId) return { error: "Sign in required." };
 
-  const { error } = await markAsRead(notificationId);
+  /* Same gap as the API route had: authenticated, then no check that the
+     notification belongs to the caller. The owner is resolved here and
+     required by the update. */
+  const profileResult = await getProfileByClerkId(userId);
+  const profile = profileResult.data;
+  if (!profile) return { error: "Profile not found." };
+
+  const { error } = await markAsRead(notificationId, profile.id);
   if (error) return { error };
   return {};
 }

@@ -18,7 +18,14 @@ export type NotificationEventType =
   | "followed_category_new_listing"
   | "followed_material_new_listing"
   | "admin_update"
-  | "opportunity_nearby";
+  | "opportunity_nearby"
+  /*
+   * A moderated product enquiry that has been delivered into the recipient's
+   * inbox. The DB column is free-form text with no CHECK — this union is the
+   * only gate, so adding the member here is the whole of "extending the
+   * vocabulary". No migration, and no second notification system.
+   */
+  | "product_request";
 
 export type NotificationPriority = "low" | "normal" | "high";
 
@@ -158,13 +165,22 @@ export async function getUnreadCount(profileId: string): Promise<number> {
 }
 
 /**
- * Mark a single notification as read.
+ * Mark a single notification as read, for its OWNER.
+ *
+ * The recipient is now required and filtered on. Before, the only argument was
+ * the notification id, so any signed-in caller who learned or guessed an id
+ * could mark somebody else's notification read — the route authenticated the
+ * caller and then never checked that the row belonged to them.
  */
-export async function markAsRead(notificationId: string): Promise<DbResult<void>> {
+export async function markAsRead(
+  notificationId: string,
+  recipientProfileId: string
+): Promise<DbResult<void>> {
   const { error } = await supabase
     .from(TABLE)
     .update({ is_read: true })
-    .eq("id", notificationId);
+    .eq("id", notificationId)
+    .eq("recipient_profile_id", recipientProfileId);
   if (error) return { data: null, error: error.message };
   return { data: undefined, error: null };
 }

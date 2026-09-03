@@ -162,6 +162,18 @@ export function SiteShell({ children }: SiteShellProps) {
     return <>{children}</>;
   }
 
+  /*
+   * A message THREAD is the same workspace destination one level down, and
+   * MeWorkspaceShell mounts for it. Without this it would take the default
+   * branch below — TopNav plus PageContainer's 1040px cap — under the
+   * workspace's own header, which is exactly what /me/saved and /me/settings
+   * each suffered before they were added to the set above. Kept as a narrow
+   * prefix rather than widening /me/*.
+   */
+  if (pathname?.startsWith("/me/messages/")) {
+    return <>{children}</>;
+  }
+
   // Everything under /projects/* and /products/* renders bare, because this client component
   // cannot tell a project DETAIL page from a CATEGORY ARCHIVE — both are served
   // by the same [...segments] catch-all, and only the server knows

@@ -46,12 +46,31 @@ export const ME_NAV: MeNavItem[] = [
  */
 const SHELL_ROUTES = new Set<string>(ME_NAV.map((i) => i.href));
 
+/**
+ * Workspace children that keep the shell.
+ *
+ * The exact-match rule above is right for /me/listings, whose children are the
+ * publish wizard. It is wrong for a message thread: /me/messages/[id] is the
+ * same destination one level down, and without this it would fall through to
+ * SiteShell's default and render inside PageContainer's 1040px cap under a
+ * second header — the pair of symptoms /me/saved and /me/settings both had.
+ *
+ * Listed as an explicit prefix rather than a general startsWith, so adding a
+ * route under /me/listings cannot pull the wizard in by accident.
+ */
+const SHELL_CHILD_PREFIXES = ["/me/messages/"];
+
 export function isWorkspaceRoute(pathname: string | null | undefined): boolean {
-  return Boolean(pathname && SHELL_ROUTES.has(pathname));
+  if (!pathname) return false;
+  if (SHELL_ROUTES.has(pathname)) return true;
+  return SHELL_CHILD_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
 /** The nav item a pathname activates, or null outside the workspace. */
 export function activeNavHref(pathname: string | null | undefined): string | null {
   if (!pathname) return null;
-  return ME_NAV.find((i) => i.href === pathname)?.href ?? null;
+  const exact = ME_NAV.find((i) => i.href === pathname)?.href;
+  if (exact) return exact;
+  // A thread keeps Messages lit in the sidebar.
+  return ME_NAV.find((i) => pathname.startsWith(`${i.href}/`))?.href ?? null;
 }
