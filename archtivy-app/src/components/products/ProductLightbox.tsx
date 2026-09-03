@@ -135,6 +135,7 @@ export function ProductLightbox(props: ProductLightboxProps) {
               variant="detailed"
               title="Similar products"
               subtitle="Pieces that currently look closest to this one."
+              showSparkle={false}
               moreLabel="Explore more similar products"
               onNavigate={close}
             />
@@ -207,7 +208,7 @@ function ProductIdentity({
       <div className="mt-5 grid grid-cols-3 gap-2">
         {/* The platform's one save mechanism, in its inline form because here
             it is a primary action rather than an overlay on a photograph. */}
-        <span className="flex items-center justify-center rounded-xl border border-white/[0.09] bg-white/[0.035] px-2 py-2.5 transition-colors hover:bg-white/[0.07] [&_button]:!text-white/85">
+        <span className="flex items-center justify-center rounded-xl border border-white/[0.09] bg-white/[0.035] px-2 py-2.5 text-white/85 transition-colors hover:bg-white/[0.07]">
           <SaveToggle
             listingId={listingId}
             entityType="product"
@@ -216,6 +217,7 @@ function ProductIdentity({
             variant="inline"
             align="left"
             tone="dark"
+            compact
           />
         </span>
 

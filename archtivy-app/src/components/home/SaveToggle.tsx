@@ -37,6 +37,7 @@ export function SaveToggle({
   align = "right",
   alwaysVisible = false,
   tone = "light",
+  compact = false,
 }: {
   listingId: string;
   /** Drives the label and what folder_items records. No default, deliberately. */
@@ -72,6 +73,17 @@ export function SaveToggle({
    * photograph and is what the card mockup shows.
    */
   tone?: "light" | "dark";
+  /**
+   * Inline variant only. Drops the noun and the pill's own colours so the
+   * control can sit inside a caller's button chrome.
+   *
+   * The product lightbox draws Save, Message and Visit website as three equal
+   * cells on a dark panel. "Save Product" wrapped onto two lines and made its
+   * cell taller than the other two, and the pill's cream-on-ink colouring
+   * fought the panel. The accessible name is unchanged either way — it comes
+   * from aria-label, not from this text.
+   */
+  compact?: boolean;
 }) {
   const [saved, setSaved] = useState(initialSaved);
   const [open, setOpen] = useState(false);
@@ -120,10 +132,12 @@ export function SaveToggle({
         aria-label={saved ? `Edit boards for this ${noun.toLowerCase()}` : `Save ${noun.toLowerCase()}`}
         className={
           variant === "inline"
-            ? [
-                "inline-flex h-9 items-center gap-2 rounded-full px-4 font-body text-[13px] transition-opacity",
-                "bg-ink text-cream hover:opacity-90",
-              ].join(" ")
+            ? compact
+              ? "inline-flex items-center gap-1.5 font-body text-[12.5px] text-inherit"
+              : [
+                  "inline-flex h-9 items-center gap-2 rounded-full px-4 font-body text-[13px] transition-opacity",
+                  "bg-ink text-cream hover:opacity-90",
+                ].join(" ")
             : [
                 // No positioning classes: the wrapper owns placement now.
                 "flex h-8 w-8 items-center justify-center rounded-full",
@@ -144,7 +158,9 @@ export function SaveToggle({
           className="h-4 w-4"
           fill={saved ? "currentColor" : "none"}
         />
-        {variant === "inline" && <span>{saved ? "Saved" : `Save ${noun}`}</span>}
+        {variant === "inline" && (
+          <span>{saved ? "Saved" : compact ? "Save" : `Save ${noun}`}</span>
+        )}
       </button>
 
       <SaveToBoardPopover

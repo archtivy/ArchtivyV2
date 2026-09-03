@@ -59,6 +59,12 @@ export interface DiscoveryFeedProps {
   onNavigate?: () => void;
   /** Label under the feed when there is more to reveal. */
   moreLabel?: string;
+  /**
+   * The sparkle marks "Explore this look" as the discovery surface on a
+   * project, where the whole column is a suggestion. A product's "Similar
+   * products" is a plain relationship and the design draws it plain.
+   */
+  showSparkle?: boolean;
 }
 
 /** Shown before "Explore more" appears. Enough to fill the panel twice over. */
@@ -75,6 +81,7 @@ export function DiscoveryFeed({
   onClearSelection,
   onNavigate,
   moreLabel = "Explore more",
+  showSparkle = true,
 }: DiscoveryFeedProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -96,7 +103,9 @@ export function DiscoveryFeed({
     <section className="pb-2" aria-label="Product discovery">
       <header className="mb-4">
         <div className="flex items-center gap-2">
-          <Sparkles strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0 text-white/85" aria-hidden />
+          {showSparkle && (
+            <Sparkles strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0 text-white/85" aria-hidden />
+          )}
           <h2 className="font-display text-[20px] leading-[26px] tracking-tight text-white">
             {title}
           </h2>
