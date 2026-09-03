@@ -1,9 +1,12 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Layers, Package, Ruler, Tag } from "lucide-react";
 import { LightboxShell, LightboxAvatar } from "@/components/lightbox/LightboxShell";
+import { DiscoveryFeed } from "@/components/lightbox/DiscoveryFeed";
+import { useImageDiscovery, type FeedProduct } from "@/components/lightbox/useImageDiscovery";
 import type { GalleryImage } from "@/components/entity/Gallery";
 
 /**
@@ -103,6 +106,14 @@ export function ProductLightbox(props: ProductLightboxProps) {
       .filter(Boolean)
       .join(" · ") || null;
 
+  /* One fetch per photograph, held here rather than in the sidebar, which the
+     shell renders twice. See the same note in ProjectLightbox. */
+  const [activeImageId, setActiveImageId] = useState<string | undefined>(undefined);
+  const { data, loading } = useImageDiscovery(activeImageId);
+  const onActiveImageChange = useCallback((image: GalleryImage) => {
+    setActiveImageId(image.id);
+  }, []);
+
   /*
    * ── NO OVERLAY LINE ON PRODUCTS ───────────────────────────────────────────
    * The project lightbox prints location and credits over the bottom-left of
@@ -124,7 +135,15 @@ export function ProductLightbox(props: ProductLightboxProps) {
       entityType="product"
       initialSaved={initialSaved}
       subtitle={subtitle}
-      sidebar={({ close }) => <ProductSidebar {...props} onNavigate={close} />}
+      onActiveImageChange={onActiveImageChange}
+      sidebar={({ close }) => (
+        <ProductSidebar
+          {...props}
+          onNavigate={close}
+          feedLoading={loading}
+          feedSimilar={data?.room.similar ?? []}
+        />
+      )}
     />
   );
 }
@@ -148,7 +167,13 @@ function ProductSidebar({
   brandProducts,
   brandProductsHref,
   onNavigate,
-}: ProductLightboxProps & { onNavigate: () => void }) {
+  feedLoading,
+  feedSimilar,
+}: ProductLightboxProps & {
+  onNavigate: () => void;
+  feedLoading: boolean;
+  feedSimilar: FeedProduct[];
+}) {
   return (
     <>
       <div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] p-6">
@@ -248,6 +273,17 @@ function ProductSidebar({
           />
         )}
       </div>
+
+      {/* The feed, below the spec card and scrolling with it. `exact` is
+          empty by construction — see the note at the top of this file. */}
+      <DiscoveryFeed
+        loading={feedLoading}
+        exact={[]}
+        similar={feedSimilar}
+        mode="room"
+        similarHeading="Visually similar"
+        onNavigate={onNavigate}
+      />
     </>
   );
 }

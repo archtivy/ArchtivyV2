@@ -46,6 +46,30 @@ export interface LightboxShellProps {
   subtitle?: string | null;
   /** The entity's sidebar. `close` dismisses the lightbox before navigating. */
   sidebar: (api: { close: () => void }) => React.ReactNode;
+
+  /*
+   * ── VISUAL DISCOVERY (all optional; the shell works exactly as before
+   *    when none of it is passed) ─────────────────────────────────────────
+   * Clickable object boxes for the CURRENT image, in the same 0–100
+   * percentage space as hotspots, resolved against the same painted
+   * rectangle. The shell owns the slide index, so it is the only thing that
+   * can say which image is on screen — hence onActiveImageChange.
+   */
+  regions?: StageRegion[];
+  selectedRegionId?: string | null;
+  onRegionSelect?: (regionId: string | null) => void;
+  onActiveImageChange?: (image: GalleryImage, index: number) => void;
+}
+
+/** Geometry only. No label, type or confidence ever reaches this component. */
+export interface StageRegion {
+  id: string;
+  /** Centre, 0–100 of the photograph. */
+  x: number;
+  y: number;
+  /** Box size, 0–100 of the photograph. */
+  width: number;
+  height: number;
 }
 
 export function LightboxShell({
@@ -61,6 +85,10 @@ export function LightboxShell({
   overlayMeta,
   subtitle,
   sidebar,
+  regions,
+  selectedRegionId = null,
+  onRegionSelect,
+  onActiveImageChange,
 }: LightboxShellProps) {
   const [index, setIndex] = useState(startIndex);
   const [openHotspot, setOpenHotspot] = useState<string | null>(null);
@@ -106,6 +134,21 @@ export function LightboxShell({
 
   // A pin card must never survive onto a different photograph.
   useEffect(() => setOpenHotspot(null), [index]);
+
+  /*
+   * Tell the caller which photograph is showing.
+   *
+   * Held in a ref so that a caller passing an inline arrow — which every
+   * caller does — cannot turn this into a render loop. The effect depends on
+   * the slide, not on the identity of the function.
+   */
+  const activeImageCbRef = useRef(onActiveImageChange);
+  activeImageCbRef.current = onActiveImageChange;
+  useEffect(() => {
+    if (!open) return;
+    const img = images[index];
+    if (img) activeImageCbRef.current?.(img, index);
+  }, [open, index, images]);
 
   /*
    * Back closes the overlay.
@@ -190,6 +233,12 @@ export function LightboxShell({
           setOpenHotspot(null);
           return;
         }
+        // A selected object is a layer too: Escape should return the reader to
+        // the whole-room feed before it starts closing anything.
+        if (selectedRegionId && onRegionSelect) {
+          onRegionSelect(null);
+          return;
+        }
         if (sheetOpen) {
           setSheetOpen(false);
           return;
@@ -205,7 +254,7 @@ export function LightboxShell({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, openHotspot, sheetOpen, go, requestClose]);
+  }, [open, openHotspot, sheetOpen, go, requestClose, selectedRegionId, onRegionSelect]);
 
   useEffect(() => {
     const el = stageRef.current;
@@ -362,6 +411,57 @@ export function LightboxShell({
                     height: photoRect.height,
                   }}
                 >
+                  {/*
+                    ── CLICKABLE OBJECTS ──────────────────────────────────
+                    Invisible until pointed at. The spec asks for a photograph
+                    a reader can click into, with none of the machinery on
+                    show — no markers, no labels, no scores — so these boxes
+                    paint nothing at rest and only outline themselves under
+                    the cursor, which is enough to teach the affordance
+                    without decorating the picture.
+
+                    Below the pins in z-order (10 against 30/35) so a
+                    confirmed product's marker always wins a click that lands
+                    on both: an owner's statement outranks a detection.
+
+                    Sorted LARGEST FIRST so the smallest box paints last and
+                    therefore receives the click. A lamp standing inside the
+                    bounds of the table it sits on has to be selectable, and
+                    the smaller of two overlapping boxes is always the more
+                    specific answer to "what did they click".
+                  */}
+                  {regions && regions.length > 0 && onRegionSelect && (
+                    <div className="absolute inset-0 z-10">
+                      {[...regions]
+                        .sort((a, b) => b.width * b.height - a.width * a.height)
+                        .map((r) => {
+                          const selected = r.id === selectedRegionId;
+                          return (
+                            <button
+                              key={r.id}
+                              type="button"
+                              aria-label="Find products like this object"
+                              aria-pressed={selected}
+                              onClick={() => onRegionSelect(selected ? null : r.id)}
+                              className={[
+                                "pointer-events-auto absolute rounded-md transition-colors duration-150 motion-reduce:transition-none",
+                                "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80",
+                                selected
+                                  ? "border-2 border-white/80 bg-white/[0.06]"
+                                  : "border-2 border-transparent hover:border-white/45 hover:bg-white/[0.04]",
+                              ].join(" ")}
+                              style={{
+                                left: `${Math.max(0, r.x - r.width / 2)}%`,
+                                top: `${Math.max(0, r.y - r.height / 2)}%`,
+                                width: `${r.width}%`,
+                                height: `${r.height}%`,
+                              }}
+                            />
+                          );
+                        })}
+                    </div>
+                  )}
+
                   {hotspots.map((h) => (
                     <LightboxHotspot
                       key={h.id}

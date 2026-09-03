@@ -38,6 +38,16 @@ export interface GalleryImage {
   alt?: string | null;
   /** Public product pins on this image. Optional: most galleries have none. */
   hotspots?: GalleryHotspot[];
+  /**
+   * The listing_images row id.
+   *
+   * Optional because one image in a gallery genuinely has none: a listing's
+   * cover_image_url is a bare URL with no row behind it, so it is prepended
+   * without an id (see projectDetail.ts). Everything keyed on this — pins,
+   * and now the visual-discovery feed — is absent for that one frame rather
+   * than guessed at.
+   */
+  id?: string;
 }
 
 export interface GalleryProps {

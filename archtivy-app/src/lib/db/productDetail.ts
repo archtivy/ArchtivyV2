@@ -107,7 +107,7 @@ export interface ProductDetail {
   title: string;
   subtitle: string | null;
   description: string | null;
-  images: { url: string; alt: string | null; hotspots?: ImageHotspot[] }[];
+  images: { id?: string; url: string; alt: string | null; hotspots?: ImageHotspot[] }[];
   categoryRoot: string | null;
   categoryLabel: string | null;
   typeLabel: string | null;
@@ -230,7 +230,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
     alt: string | null;
   }[])
     .filter((i) => i.image_url)
-    .map((i) => ({ url: i.image_url, alt: i.alt, hotspots: hotspotsByImage[i.id] ?? undefined }));
+    .map((i) => ({ id: i.id, url: i.image_url, alt: i.alt, hotspots: hotspotsByImage[i.id] ?? undefined }));
   const cover = (l.cover_image_url as string | null) ?? null;
   if (cover && !images.some((i) => i.url === cover)) images.unshift({ url: cover, alt: null });
 
