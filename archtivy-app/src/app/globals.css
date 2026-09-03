@@ -27,3 +27,24 @@
   from { opacity: 0; transform: translateX(-14px); }
   to   { opacity: 1; transform: translateX(0); }
 }
+
+/* ── Lightbox object recognition ──────────────────────────────────────────
+   The project lightbox marks objects the model found in a photograph. It must
+   read as "this is recognised and you can click it" WITHOUT covering an
+   architectural photograph in rectangles, so nothing is drawn at rest and the
+   treatment is light rather than outline: a single sweep on approach, and a
+   slow breath on the one that is selected.
+
+   Deliberately no colour. A tinted or neon edge would sit on top of the
+   photograph as a UI object; white at low alpha reads as the image itself
+   catching light. Both collapse under prefers-reduced-motion via
+   motion-reduce:animate-none on the element. */
+@keyframes aiScan {
+  from { transform: translateY(-100%); opacity: 0; }
+  35%  { opacity: 1; }
+  to   { transform: translateY(100%); opacity: 0; }
+}
+@keyframes aiBreath {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.35); }
+}
