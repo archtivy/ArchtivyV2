@@ -21,18 +21,33 @@ import { usePublisherRole } from "@/lib/hooks/usePublisherRole";
  * Link colour is the only thing that flips between states; nav items never
  * change hue on hover, only underline (Blueprint §16).
  *
- * ── SEARCH-FIRST ────────────────────────────────────────────────────────────
- * The five section links used to run across the middle of the bar. They now
- * live behind the menu button beside the wordmark, and the space they occupied
- * belongs to the global search field.
+ * ── SEARCH-FIRST, EXCEPT ON THE HOMEPAGE MASTHEAD ───────────────────────────
+ * This is a discovery platform: the five section links name the shelves, and
+ * search is how anyone actually finds a thing on them. Once a visitor is
+ * inside the site, giving the shelves the widest strip of every page turns the
+ * header into a table of contents for somewhere they already are — so on every
+ * internal page the links collapse behind the menu button and the centre of the
+ * bar belongs to search.
  *
- * The reasoning is that this is a discovery platform: the five links name the
- * shelves, and search is how anyone actually finds a thing on them. Giving the
- * shelves the widest real estate on every page made the header a table of
- * contents for a site the visitor is already inside.
+ * The top of the homepage is the one place that reasoning does not hold. It is
+ * the masthead: the first thing a stranger sees, and the only moment the header
+ * has to say what the site contains rather than help someone move around it.
+ * There it keeps its original form — the five links spelled out across the bar,
+ * no menu button, no search field, because the hero directly beneath already
+ * carries a large one of its own.
  *
- * Nothing is lost — the same five routes, in the same order, one click away —
- * and the account controls on the right are untouched.
+ * Hence exactly three states, all from `scrolled` on this one component:
+ *
+ *   1. homepage, at top  wordmark · horizontal links · controls
+ *   2. homepage, scrolled  wordmark · menu · search · controls
+ *   3. every other page  wordmark · menu · search · controls
+ *
+ * State 1 crosses into state 2 on the same scroll threshold that turns the bar
+ * solid, so the links fade out as the field fades in and the bar gains its
+ * background in a single movement rather than three staggered ones.
+ *
+ * Below `lg` the links have never fitted across the bar; the menu button is the
+ * navigation at those widths and therefore stays put in all three states.
  */
 
 const NAV_LINKS = [
@@ -111,6 +126,14 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
 
   const onDark = !scrolled;
 
+  /*
+   * The homepage masthead: state 1 above. `scrolled` is seeded to true whenever
+   * variant is "solid", so every internal page is false here from first paint
+   * and never re-evaluates — the correction is scoped to "/" by construction
+   * rather than by sniffing the pathname.
+   */
+  const masthead = variant === "overlay" && !scrolled;
+
   return (
     <header
       ref={headerRef}
@@ -145,6 +168,11 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
               onDark
                 ? "text-cream hover:bg-cream/10"
                 : "text-ink hover:bg-stone/50",
+              // Gone from the masthead, where the links are written out in
+              // full — but only at lg, the width they actually fit. Below
+              // that this button has always been the whole navigation, and
+              // hiding it would leave a homepage with no way through.
+              masthead ? "lg:hidden" : "",
             ].join(" ")}
           >
             {menuOpen ? (
@@ -156,30 +184,57 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
         </div>
 
         {/*
-          The centre of the bar. Wide on desktop, and still a real field on a
-          phone rather than an icon that hides one.
+          The centre of the bar holds the links and the field in the same slot,
+          one fading out as the other fades in. They are stacked rather than
+          swapped so neither the wordmark nor the account controls shift by a
+          pixel as the header changes state — the transition is a change of
+          contents, not of layout.
 
-          ── EXCEPT OVER THE HOMEPAGE HERO ───────────────────────────────────
-          The hero carries its own large search with the popular-search chips
-          beneath it, so showing this one at the same time puts two search
-          fields on screen 300px apart. The previous header avoided that by
-          hiding itself on "/" entirely; this keeps the field but defers it,
-          fading in on the same scroll threshold that turns the bar solid —
-          by which point the hero field has left the viewport. Search is never
-          more than a scroll away, and never doubled.
-
-          Every other surface passes variant="solid", so `scrolled` is true
-          from the first paint and the field is simply always there.
+          On the masthead the field is not merely hidden but inert: the hero a
+          few hundred pixels below carries its own large search with the
+          popular-search chips, and two search boxes that close together is one
+          too many. Tab order and the accessibility tree follow the visible
+          state, never the stack.
         */}
-        <div
-          className={[
-            "mx-4 min-w-0 flex-1 transition-opacity duration-300 md:mx-8 lg:mx-12",
-            scrolled ? "opacity-100" : "pointer-events-none opacity-0",
-          ].join(" ")}
-          aria-hidden={!scrolled}
-        >
-          <div className="mx-auto w-full max-w-[720px]">
-            <GlobalSearch onDark={onDark} />
+        <div className="relative mx-4 min-w-0 flex-1 md:mx-8 lg:mx-12">
+          {/* State 1. lg and up only — five links have never fitted a phone. */}
+          <nav
+            aria-label="Primary"
+            className={[
+              "absolute inset-0 hidden items-center justify-center transition-opacity duration-300 lg:flex",
+              masthead ? "opacity-100" : "pointer-events-none opacity-0",
+            ].join(" ")}
+            aria-hidden={!masthead}
+          >
+            <ul className="flex items-center gap-8">
+              {NAV_LINKS.map((l) => (
+                <li key={l.href}>
+                  <Link
+                    href={l.href}
+                    tabIndex={masthead ? undefined : -1}
+                    className={[
+                      "font-body text-[15px] underline-offset-[6px] transition-colors hover:underline",
+                      onDark ? "text-cream/90 hover:text-cream" : "text-ink/80 hover:text-ink",
+                    ].join(" ")}
+                  >
+                    {l.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {/* States 2 and 3. */}
+          <div
+            className={[
+              "flex h-full items-center transition-opacity duration-300",
+              masthead ? "pointer-events-none opacity-0" : "opacity-100",
+            ].join(" ")}
+            aria-hidden={masthead}
+          >
+            <div className="mx-auto w-full max-w-[720px]">
+              <GlobalSearch onDark={onDark} inert={masthead} />
+            </div>
           </div>
         </div>
 

@@ -44,10 +44,22 @@ export interface GlobalSearchProps {
   size?: "bar" | "inline";
   /** Cream-on-dark, for the transparent header over the homepage hero. */
   onDark?: boolean;
+  /**
+   * Rendered but not reachable. Set while the field is the faded-out half of
+   * the homepage masthead cross-fade: it stays in the DOM so the two states
+   * can transition, and must not be tabbable or animate a placeholder nobody
+   * can see while it is there.
+   */
+  inert?: boolean;
   className?: string;
 }
 
-export function GlobalSearch({ size = "bar", onDark = false, className = "" }: GlobalSearchProps) {
+export function GlobalSearch({
+  size = "bar",
+  onDark = false,
+  inert = false,
+  className = "",
+}: GlobalSearchProps) {
   const pathname = usePathname() ?? "/";
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -60,7 +72,9 @@ export function GlobalSearch({ size = "bar", onDark = false, className = "" }: G
    * empty. Focusing stops it on the same tick, and blurring an empty field
    * lets it resume.
    */
-  const placeholder = useAnimatedPlaceholder({ active: !focused && query.length === 0 });
+  const placeholder = useAnimatedPlaceholder({
+    active: !inert && !focused && query.length === 0,
+  });
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -122,6 +136,7 @@ export function GlobalSearch({ size = "bar", onDark = false, className = "" }: G
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
           autoComplete="off"
+          tabIndex={inert ? -1 : undefined}
           aria-label="Search Archtivy"
           className={[
             "min-w-0 flex-1 bg-transparent font-body outline-none",
@@ -147,7 +162,7 @@ export function GlobalSearch({ size = "bar", onDark = false, className = "" }: G
           complete affordance; it also gives keyboard and screen-reader users
           a real, labelled control to reach.
         */}
-        <button type="submit" className="sr-only">
+        <button type="submit" tabIndex={inert ? -1 : undefined} className="sr-only">
           Search
         </button>
       </div>
