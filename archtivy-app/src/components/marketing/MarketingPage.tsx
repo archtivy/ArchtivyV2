@@ -16,18 +16,20 @@ export function MarketingPage({
   children,
 }: MarketingPageProps) {
   return (
-    <article className="space-y-16 sm:space-y-20">
-      <header className="space-y-5 pt-4 sm:pt-8">
+    <article className="space-y-20 pb-24 sm:space-y-24">
+      <header className="space-y-6 pt-10 sm:pt-16">
         {label && (
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400 dark:text-zinc-500">
+          <p className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
             {label}
           </p>
         )}
-        <h1 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-zinc-900 sm:text-4xl dark:text-zinc-50">
+        {/* Serif display at editorial scale. The headline is the page — it gets
+            room, a measure that keeps lines readable, and no competition. */}
+        <h1 className="max-w-[20ch] font-display text-[34px] leading-[1.08] tracking-tight text-ink sm:text-[44px] lg:text-[52px]">
           {headline}
         </h1>
         {subheadline && (
-          <p className="max-w-2xl text-base leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <p className="max-w-[58ch] font-body text-[17px] leading-[27px] text-muted">
             {subheadline}
           </p>
         )}
@@ -52,10 +54,10 @@ export function MarketingSection({
 }: MarketingSectionProps) {
   return (
     <section
-      className={`border-t border-zinc-200 pt-12 dark:border-zinc-800 sm:pt-16 ${className}`.trim()}
+      className={`border-t border-hairline pt-12 sm:pt-16 ${className}`.trim()}
     >
       {heading && (
-        <h2 className="mb-8 text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+        <h2 className="mb-8 max-w-[34ch] font-display text-[26px] leading-[1.15] tracking-tight text-ink sm:text-[30px]">
           {heading}
         </h2>
       )}
@@ -76,36 +78,43 @@ interface MarketingCTAProps {
 }
 
 export function MarketingCTA({
-  heading = "The record is growing.",
-  body = "Submit your work to be part of the permanent record of global architecture.",
-  primaryLabel = "Submit Your Work",
-  primaryHref = "/add/project",
-  secondaryLabel = "Explore Projects",
-  secondaryHref = "/explore/projects",
+  /* Defaults carry the current positioning, because most pages take them as
+     given. "The record is growing / permanent record of global architecture"
+     was the old one, and it shipped on every page that did not override it. */
+  heading = "Start anywhere.",
+  body = "Every project leads to the people who made it, the products inside it, and the brands behind those. Follow it as far as you like.",
+  primaryLabel = "Explore projects",
+  primaryHref = "/projects",
+  secondaryLabel = "Browse products",
+  secondaryHref = "/products",
 }: MarketingCTAProps) {
   return (
-    <section className="border-t border-zinc-200 pt-12 dark:border-zinc-800 sm:pt-16">
+    <section className="border-t border-hairline pt-12 sm:pt-16">
       <div className="space-y-5">
         {heading && (
-          <h2 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h2 className="max-w-[26ch] font-display text-[28px] leading-[1.12] tracking-tight text-ink sm:text-[34px]">
             {heading}
           </h2>
         )}
         {body && (
-          <p className="max-w-xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+          <p className="max-w-[56ch] font-body text-[16px] leading-[26px] text-muted">
             {body}
           </p>
         )}
         <div className="flex flex-wrap gap-3 pt-1">
           <Link
             href={primaryHref}
-            className="inline-flex items-center justify-center rounded-[4px] bg-[#002abf] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2"
+            /* Ink, not the legacy #002abf. That hex is not the Archtivy blue —
+               the accent is #173DED (archtivy-primary) — and on the cream
+               editorial ground the primary action everywhere else in the
+               product is an ink pill. */
+            className="inline-flex items-center justify-center rounded-full bg-ink px-6 py-3 font-body text-[14px] text-cream transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-archtivy-primary focus-visible:ring-offset-2"
           >
             {primaryLabel}
           </Link>
           <Link
             href={secondaryHref}
-            className="inline-flex items-center justify-center rounded-[4px] border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition hover:border-zinc-400 hover:text-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#002abf] focus:ring-offset-2 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-300 dark:hover:border-zinc-500"
+            className="inline-flex items-center justify-center rounded-full border border-ink/25 px-6 py-3 font-body text-[14px] text-ink transition-colors hover:bg-stone/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-archtivy-primary focus-visible:ring-offset-2"
           >
             {secondaryLabel}
           </Link>

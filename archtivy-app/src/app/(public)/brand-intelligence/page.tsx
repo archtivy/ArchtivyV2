@@ -5,164 +5,174 @@ import {
 } from "@/components/marketing/MarketingPage";
 
 export const metadata = {
-  title: "Brand Intelligence | Archtivy",
+  title: "For Design Brands — Show Where Your Products Live | Archtivy",
   description:
-    "Specification analytics and product intelligence for architecture product brands on Archtivy.",
+    "A catalogue shows a product against a white background. Archtivy shows furniture, lighting and building products inside the architecture projects they were specified into, alongside the studios that chose them.",
 };
 
-export default function BrandIntelligencePage() {
+/**
+ * For design brands.
+ *
+ * ── WHAT THIS REPLACES ──────────────────────────────────────────────────────
+ * A specification-analytics pitch: "Know where your products are specified.
+ * Understand why", promising to reveal "which architecture firms specify your
+ * products most consistently", "geographic distribution of your specification
+ * footprint", "project typologies where your products perform best" and
+ * "emerging specifiers before they become large clients", under the heading
+ * "Brand intelligence dashboard".
+ *
+ * None of that exists. There is no analytics dashboard, no specification
+ * footprint report and no firm-level breakdown, and with the current density
+ * of the graph there could not honestly be one. The page was selling a market
+ * intelligence product to procurement.
+ *
+ * What Archtivy actually offers a brand is context: a product shown inside the
+ * spaces it was specified into, reachable from the studios that chose it. That
+ * is worth stating plainly and is true today. The page now says that.
+ *
+ * ── ON THE URL ──────────────────────────────────────────────────────────────
+ * The route stays /brand-intelligence. Renaming it would mean adding a page
+ * and a redirect, and the brief is explicit about not creating pages that do
+ * not already exist. The footer label now reads "For brands", which is what a
+ * reader is choosing.
+ */
+export default function ForBrandsPage() {
   return (
     <MarketingPage
-      label="Brand Intelligence"
-      headline="Know where your products are specified. Understand why."
-      subheadline="Architecture product brands invest significantly in specification. The return on that investment has historically been opaque. Archtivy creates the first structured record of architectural specification — and makes it queryable."
+      label="For brands"
+      headline="Show where your products live."
+      subheadline="A product photographed against a white wall tells a specifier almost nothing. The same product in a room — at that scale, beside those materials, chosen by a studio whose judgement they trust — tells them everything."
     >
-      {/* The opportunity */}
-      <MarketingSection heading="The specification gap">
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-muted">
+      <MarketingSection heading="The catalogue problem">
+        <div className="grid gap-12 lg:grid-cols-[1fr_0.9fr] lg:items-start">
+          <div className="max-w-[58ch] space-y-6 font-body text-[16px] leading-[27px] text-muted">
             <p>
-              Every year, architecture product brands invest in specification
-              support — technical documentation, CPD presentations, showrooms,
-              and relationships with designers built over years. The return on
-              that investment has historically been difficult to measure and
-              nearly impossible to optimise.
+              Product catalogues are organised the way products are
+              manufactured: by family, by finish, by dimension. Specifiers do
+              not think that way. They are looking at a room and asking what
+              would work in it.
             </p>
             <p>
-              Which markets are driving your specification volume? Which
-              typologies favour your products? Which firms are specifying your
-              direct competitors? These questions have always been answerable in
-              theory. Archtivy makes them answerable in practice.
+              So the most persuasive evidence a brand has — the projects its
+              work is already in — is the evidence hardest to find. It sits in
+              a case-study PDF, or in an architecture feature that credits the
+              photographer and not the furniture.
             </p>
           </div>
-          <div className="space-y-3">
+          <ul className="divide-y divide-hairline border-y border-hairline">
             {[
-              "Which architecture firms specify your products most consistently",
-              "Geographic distribution of your specification footprint",
-              "Project typologies where your products perform best",
-              "Emerging specifiers before they become large clients",
-              "Competitive specification patterns within your category",
-            ].map((item) => (
-              <div
-                key={item}
-                className="flex items-start gap-4 rounded-2xl border border-hairline bg-white px-5 py-3.5"
-              >
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-archtivy-primary" />
-                <span className="text-sm text-muted">
-                  {item}
-                </span>
-              </div>
+              "A product page shows the object, never the space.",
+              "The projects it appears in live on other sites, uncredited.",
+              "A specifier searching by room type finds nothing.",
+              "The studios who already chose it are invisible to the next one.",
+            ].map((t) => (
+              <li key={t} className="py-5 font-body text-[15px] leading-[24px] text-muted">
+                {t}
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       </MarketingSection>
 
-      {/* Product traceability */}
-      <MarketingSection heading="Product-to-project traceability">
-        <div className="grid gap-8 sm:grid-cols-3">
+      <MarketingSection heading="Products in context">
+        <div className="max-w-[62ch] space-y-6 font-body text-[16px] leading-[27px] text-muted">
+          <p>
+            On Archtivy a product is connected to the projects it has been
+            specified into, where a studio has credited it. Each of those leads
+            back to the space, the practice and the rest of their work.
+          </p>
+          <p>
+            It runs the other way too. Someone reading a project can reach your
+            product from the room it is in, and your brand from the product.
+            That is a route into your catalogue that does not begin with your
+            name.
+          </p>
+        </div>
+
+        <ul className="mt-10 divide-y divide-hairline border-y border-hairline">
           {[
-            {
-              step: "01",
-              title: "Tag at submission",
-              body: "When a designer submits a project to Archtivy, they tag the products used. Each tag is a verifiable data point connecting your product to a real architectural context.",
-            },
-            {
-              step: "02",
-              title: "Build a specification record",
-              body: "Over time, your product accumulates a traceable record: which firms, which countries, which typologies, which years. The record grows with every new project that references your product.",
-            },
-            {
-              step: "03",
-              title: "Query the intelligence",
-              body: "The brand intelligence dashboard surfaces the patterns within that record — making visible what was previously scattered across sales systems and anecdotal reports.",
-            },
-          ].map(({ step, title, body }) => (
-            <div key={step} className="space-y-3">
-              <span className="font-mono text-xs text-muted/70">
-                {step}
-              </span>
-              <h3 className="text-sm font-semibold text-ink">
-                {title}
-              </h3>
-              <p className="text-sm leading-relaxed text-muted">
+            [
+              "A brand profile",
+              "Your products, your location, and the projects your work appears in — reachable from every product you publish.",
+            ],
+            [
+              "Products inside spaces",
+              "Where a studio has credited a product, the project appears with it. The credit comes from the people who did the work, not from us.",
+            ],
+            [
+              "Discovery by what a specifier is thinking",
+              "Category, sub-type, material and the kind of space — not only product names.",
+            ],
+            [
+              "Visual discovery",
+              "In a project photograph, readers can explore pieces that suit the space. This is similarity, not identification: it surfaces your work to someone looking for that direction.",
+            ],
+            [
+              "Enquiries",
+              "A reader who wants to specify something can request information about it, and it reaches you.",
+            ],
+          ].map(([title, body]) => (
+            <li key={title} className="grid gap-2 py-6 sm:grid-cols-[14rem_1fr] sm:gap-8">
+              <h3 className="font-body text-[15px] text-ink">{title}</h3>
+              <p className="max-w-[58ch] font-body text-[15px] leading-[25px] text-muted">
                 {body}
               </p>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </MarketingSection>
 
-      {/* Why not advertising */}
-      <MarketingSection heading="Why this is not advertising">
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-5 text-sm leading-relaxed text-muted">
+      <MarketingSection heading="What this is not">
+        <div className="grid gap-12 lg:grid-cols-2 lg:items-start">
+          <div className="max-w-[54ch] space-y-6 font-body text-[16px] leading-[27px] text-muted">
             <p>
-              Advertising decays when spend stops. Brand intelligence on
-              Archtivy compounds with every new project that references your
-              products. The platform is designed to reward genuine architectural
-              relevance — a product with 300 specifications is more
-              discoverable than one with 30, not because it paid more, but
-              because it earned more placements.
+              It is not advertising. Placement is not bought, and a product
+              does not appear in a project because a brand paid for it to.
+              Products appear where studios have credited them.
             </p>
             <p>
-              When a designer or researcher explores a project on Archtivy,
-              your product appears in its real architectural context — not as
-              a promoted placement, but as a credited specification. This is
-              the most credible form of brand exposure available to an
-              architecture product company.
+              It is not a specification analytics service. There is no
+              dashboard reporting which practices favour your work or where
+              your footprint is growing. We would rather not offer that than
+              offer a version built on too little data.
             </p>
           </div>
-          <div className="divide-y divide-hairline rounded-2xl border border-hairline bg-white">
-            {[
-              ["Advertising", "Paid placement, decays on budget pause"],
-              ["Directory listing", "Static presence, no specification context"],
-              ["Trade fair", "Expensive, time-limited, reach is local"],
-              [
-                "Archtivy",
-                "Permanent record, specification context, compounds with scale",
-              ],
-            ].map(([type, desc]) => (
-              <div key={type} className="flex gap-6 px-5 py-4">
-                <span className="w-28 shrink-0 text-xs font-medium text-ink/80">
-                  {type}
-                </span>
-                <span className="text-xs leading-relaxed text-muted">
-                  {desc}
-                </span>
-              </div>
-            ))}
+          <div className="max-w-[54ch] space-y-6 font-body text-[16px] leading-[27px] text-muted">
+            <p>
+              It is not a marketplace. Nothing is sold here and no transaction
+              passes through us. A specifier who finds your product is sent to
+              you.
+            </p>
+            <p>
+              What it is: the place your products are found in the context that
+              makes them make sense.
+            </p>
           </div>
         </div>
       </MarketingSection>
 
-      {/* Coming soon */}
-      <MarketingSection heading="Brand intelligence dashboard">
-        <div className="rounded-2xl border border-hairline bg-stone/25 px-6 py-5">
-          <p className="text-sm font-medium text-ink">
-            The brand intelligence dashboard is in development.
+      <MarketingSection heading="Getting started">
+        <div className="max-w-[62ch] space-y-6 font-body text-[16px] leading-[27px] text-muted">
+          <p>
+            Publish your products with their category, materials and
+            dimensions, and add the documentation a specifier needs. As studios
+            credit them in their projects, each product accumulates the spaces
+            it appears in.
           </p>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-            The specification data is being collected now. The dashboard —
-            providing queryable access to your brand&apos;s specification footprint
-            — is planned for release to brand partners. Contact us to be
-            considered for early access.
+          <p>
+            If your brand already appears on Archtivy because a studio credited
+            your work, you can claim the profile and take it from there.
           </p>
-          <a
-            href="mailto:info@archtivy.com"
-            className="mt-4 inline-block text-sm font-medium text-archtivy-primary hover:underline dark:text-[#4d6fff]"
-          >
-            info@archtivy.com
-          </a>
         </div>
       </MarketingSection>
 
       <MarketingCTA
-        heading="Start building your specification record."
-        body="Claim your brand profile and ensure your products are correctly attributed in architectural projects."
-        primaryLabel="Claim Your Brand"
-        primaryHref="/claim"
-        secondaryLabel="Explore Products"
-        secondaryHref="/explore/products"
+        heading="Show where your products live."
+        body="Publish your products, or see how they are already appearing inside projects."
+        primaryLabel="Add a product"
+        primaryHref="/add/product"
+        secondaryLabel="Browse products"
+        secondaryHref="/products"
       />
     </MarketingPage>
   );

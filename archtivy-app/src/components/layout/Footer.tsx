@@ -8,18 +8,29 @@ const COMPANY_LINKS = [
   { label: "About", href: "/about" },
   { label: "Vision", href: "/vision" },
   { label: "How It Works", href: "/how-it-works" },
-  { label: "Press", href: "/press" },
-  { label: "Careers", href: "/careers" },
   { label: "Contact", href: "/contact" },
 ];
 
+/*
+ * ── THREE OF THESE WERE 404s ────────────────────────────────────────────────
+ * This footer renders on every corporate and legal page, and it linked
+ * /explore/professionals, /explore/locations and /explore/categories — none of
+ * which exist. Verified against a running server: 404, 404, 404. Two more,
+ * /explore/projects and /explore/products, resolve only via a 308 in
+ * middleware, so every click paid a redirect to reach the directory that has
+ * served them since the explore surfaces were replaced.
+ *
+ * Professionals is now /designers, which is exactly that directory. Locations
+ * and Categories are removed rather than repointed: there is no page that
+ * lists locations or categories on their own, and both are filters ON the
+ * directories already linked above — a link named "Categories" that lands on
+ * /projects would be a worse answer than no link.
+ */
 const PLATFORM_LINKS = [
-  { label: "Projects", href: "/explore/projects" },
-  { label: "Products", href: "/explore/products" },
-  { label: "Professionals", href: "/explore/professionals" },
+  { label: "Projects", href: "/projects" },
+  { label: "Products", href: "/products" },
+  { label: "Designers", href: "/designers" },
   { label: "Brands", href: "/brands" },
-  { label: "Locations", href: "/explore/locations" },
-  { label: "Categories", href: "/explore/categories" },
   // Magazine belongs in the footer now that it is out of the primary nav.
   // HomeFooter already carried it; this footer did not, so the two agreed on
   // nothing here until now.
@@ -36,10 +47,8 @@ const PROFESSIONALS_LINKS = [
 ];
 
 const RESOURCES_LINKS = [
-  { label: "Press Kit", href: "/press-kit" },
-  { label: "API Documentation", href: "/api-docs" },
-  { label: "Data & Intelligence", href: "/data-intelligence" },
-  { label: "Brand Intelligence", href: "/brand-intelligence" },
+  { label: "Connections", href: "/data-intelligence" },
+  { label: "For brands", href: "/brand-intelligence" },
   { label: "Partner Program", href: "/partners" },
   { label: "Status", href: "/status" },
 ];

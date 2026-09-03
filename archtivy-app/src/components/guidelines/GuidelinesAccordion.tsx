@@ -26,11 +26,11 @@ export function GuidelinesAccordion({ items }: { items: GuidelinesItem[] }) {
               className="flex w-full items-center justify-between px-4 py-4 text-left sm:px-6 sm:py-5"
               aria-expanded={isOpen}
             >
-              <span className="font-serif text-base font-medium text-zinc-900 sm:text-lg dark:text-zinc-100">
+              <span className="font-serif text-base font-medium text-ink sm:text-lg">
                 {item.title}
               </span>
               <span
-                className="ml-2 shrink-0 text-zinc-400 transition-transform"
+                className="ml-2 shrink-0 text-muted/70 transition-transform"
                 style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
                 aria-hidden
               >
@@ -44,7 +44,7 @@ export function GuidelinesAccordion({ items }: { items: GuidelinesItem[] }) {
                 className="border-t px-4 pb-4 pt-0 sm:px-6 sm:pb-5"
                 style={{ borderColor: "#eeeeee" }}
               >
-                <p className="font-sans text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                <p className="font-sans text-sm leading-relaxed text-muted">
                   {item.content}
                 </p>
               </div>

@@ -42,6 +42,11 @@ const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] =
     links: [
       { label: "Why Archtivy", href: "/vision" },
       { label: "How it works", href: "/how-it-works" },
+      /* These two pages existed but were reachable only from the legacy
+         footer, which corporate pages no longer render — so on most of the
+         public site they had become unlinked. */
+      { label: "For brands", href: "/brand-intelligence" },
+      { label: "Connections", href: "/data-intelligence" },
       { label: "Partners", href: "/partners" },
       // "Opportunities" removed. The /opportunities route was confirmed unused
       // and has been deleted, so there is no page left to link to.
@@ -51,8 +56,6 @@ const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] =
     heading: "Company",
     links: [
       { label: "About Us", href: "/about" },
-      { label: "Careers", href: "/careers" },
-      { label: "Press", href: "/press" },
       { label: "Contact", href: "/contact" },
     ],
   },

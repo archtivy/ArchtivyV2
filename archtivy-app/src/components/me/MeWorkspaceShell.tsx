@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Crown, Menu, X } from "lucide-react";
-import { HeaderSearch } from "@/components/layout/HeaderSearch";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { HeaderNotificationBell } from "@/components/home/HeaderNotificationBell";
 import { HeaderProfileMenu } from "@/components/home/HeaderProfileMenu";
 import { ME_NAV, isWorkspaceRoute } from "@/components/me/MeWorkspaceNav";
@@ -76,8 +76,10 @@ export function MeWorkspaceShell({
       <div className="lg:pl-[256px]">
         {/* ── TOP BAR ──────────────────────────────────────────────────────
             Search, notifications and the account menu are the platform's own
-            components, not workspace copies of them. HeaderSearch is the same
-            global search the public header mounts. */}
+            components, not workspace copies of them. GlobalSearch is the same
+            field the public header mounts — the workspace previously used the
+            legacy zinc HeaderSearch, which was the last piece of the old
+            palette on this bar. */}
         <header className="sticky top-0 z-30 flex h-[72px] items-center gap-3 border-b border-hairline bg-cream px-4 sm:px-6">
           <button
             type="button"
@@ -89,8 +91,8 @@ export function MeWorkspaceShell({
           </button>
 
           <div className="hidden min-w-0 flex-1 justify-center md:flex">
-            <div className="flex w-full max-w-[520px] [&_form]:max-w-none">
-              <HeaderSearch forceInline />
+            <div className="flex w-full max-w-[520px]">
+              <GlobalSearch size="inline" />
             </div>
           </div>
           <div className="flex-1 md:hidden" />

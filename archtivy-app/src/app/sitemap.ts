@@ -52,12 +52,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/faq`,                lastModified: staticLastMod, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/contact`,            lastModified: staticLastMod, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/guidelines`,         lastModified: staticLastMod, changeFrequency: "monthly", priority: 0.5 },
-    { url: `${base}/press`,              lastModified: staticLastMod, changeFrequency: "monthly", priority: 0.5 },
-    { url: `${base}/press-kit`,          lastModified: staticLastMod, changeFrequency: "monthly", priority: 0.5 },
-    { url: `${base}/api-docs`,           lastModified: staticLastMod, changeFrequency: "monthly", priority: 0.5 },
 
     { url: `${base}/partners`,           lastModified: staticLastMod, changeFrequency: "monthly", priority: 0.4 },
-    { url: `${base}/careers`,            lastModified: staticLastMod, changeFrequency: "monthly", priority: 0.4 },
     { url: `${base}/status`,             lastModified: staticLastMod, changeFrequency: "daily",   priority: 0.3 },
 
     { url: `${base}/privacy`,            lastModified: staticLastMod, changeFrequency: "yearly",  priority: 0.3 },

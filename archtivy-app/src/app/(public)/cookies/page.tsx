@@ -136,7 +136,7 @@ export default function CookiesPage() {
           Questions about this policy can be sent to{" "}
           <a
             href="mailto:info@archtivy.com"
-            className="text-archtivy-primary hover:underline dark:text-[#4d6fff]"
+            className="text-archtivy-primary hover:underline"
           >
             info@archtivy.com
           </a>

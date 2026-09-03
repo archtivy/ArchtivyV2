@@ -168,7 +168,7 @@ export default async function FAQPage() {
               <li key={item.id}>
                 <a
                   href={`#${item.id}`}
-                  className="text-muted underline decoration-zinc-300 underline-offset-2 hover:text-archtivy-primary hover:decoration-archtivy-primary dark:decoration-zinc-600 dark:hover:text-archtivy-primary"
+                  className="text-muted underline decoration-hairline underline-offset-2 hover:text-archtivy-primary hover:decoration-archtivy-primary"
                 >
                   {item.label}
                 </a>
@@ -188,7 +188,7 @@ export default async function FAQPage() {
             <li key={item.id}>
               <a
                 href={`#${item.id}`}
-                className="text-sm text-muted underline decoration-zinc-300 underline-offset-2 hover:text-archtivy-primary hover:decoration-archtivy-primary dark:decoration-zinc-600 dark:hover:text-archtivy-primary"
+                className="text-sm text-muted underline decoration-hairline underline-offset-2 hover:text-archtivy-primary hover:decoration-archtivy-primary"
               >
                 {item.title}
               </a>
@@ -217,14 +217,14 @@ export default async function FAQPage() {
                 <h3 className="text-base font-semibold text-ink">
                   {item.q}
                 </h3>
-                <p className="mt-2 leading-relaxed text-muted">
+                <p className="mt-2 max-w-[68ch] font-body leading-relaxed text-muted">
                   {item.a}
                 </p>
               </li>
             ))}
           </ul>
           {section.sectionId === "section-trust-credibility" && (
-            <p className="mt-6 text-sm italic text-muted">
+            <p className="mt-6 max-w-[68ch] text-sm italic text-muted">
               {TRUST_DISCLAIMER}
             </p>
           )}
@@ -237,14 +237,14 @@ export default async function FAQPage() {
           <h2 className="mb-2 font-serif text-lg font-normal tracking-tight text-ink">
             Still need help?
           </h2>
-          <p className="text-sm leading-relaxed text-muted">
-            Use the <Link href="/contact" className="font-medium text-archtivy-primary underline underline-offset-2 hover:no-underline dark:text-archtivy-primary">Contact</Link> link in the footer. Include the page URL and what you were trying to do so we can respond quickly.
+          <p className="max-w-[68ch] text-sm leading-relaxed text-muted">
+            Use the <Link href="/contact" className="font-medium text-archtivy-primary underline underline-offset-2 hover:no-underline">Contact</Link> link in the footer. Include the page URL and what you were trying to do so we can respond quickly.
           </p>
         </div>
       </section>
 
       <section className="border-t border-hairline pt-16 text-center sm:pt-20">
-        <p className="mb-6 text-muted">
+        <p className="mb-6 max-w-[68ch] text-muted">
           Ready to share your work or explore projects?
         </p>
         <PageCTA userId={userId} role={role} />

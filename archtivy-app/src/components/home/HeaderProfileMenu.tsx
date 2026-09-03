@@ -7,7 +7,6 @@ import {
   ChevronDown,
   User,
   Pencil,
-  TrendingUp,
   Settings,
   LogOut,
   FolderDown,
@@ -18,16 +17,18 @@ import {
 /**
  * Profile dropdown for the editorial header.
  *
- * ── ON "PROMOTE" ────────────────────────────────────────────────────────────
- * Rendered as a DISABLED row with a "Coming soon" tag, not a link. The brief
- * said placeholder destination only, and the real flow is blocked on Stripe.
+ * ── THE "PROMOTE" ROW IS GONE ───────────────────────────────────────────────
+ * It sat here as a non-interactive row tagged "Coming soon" — an advertisement
+ * for a paid feature that could not be bought, inside the menu someone opens
+ * to reach their own account. An account menu should contain account actions
+ * and nothing else, so it is removed rather than relabelled or relocated.
  *
- * /me/promote does exist and would have been the obvious target — but
- * site_settings.feature_listing_enabled is currently `true`, so that route
- * renders its full PromoteDashboard rather than the "Coming Soon" state it
- * falls back to when the flag is off. Linking there would have pointed at
- * something that looks finished and cannot take payment. A non-interactive row
- * is the honest version, and it needs no new placeholder route to maintain.
+ * The `disabledNote` field and its rendering branch went with it: Promote was
+ * the only item that ever used them, and a mechanism kept for a row that no
+ * longer exists is how the row comes back.
+ *
+ * Nothing replaces it. /me/promote is untouched and still reachable directly;
+ * only this entry point is withdrawn.
  *
  * ── ON "EDIT PROFILE" ───────────────────────────────────────────────────────
  * Points at /me/profile, which follows the established /me/* convention for
@@ -41,10 +42,8 @@ import {
 
 interface MenuItem {
   label: string;
-  href?: string;
+  href: string;
   icon: LucideIcon;
-  /** Renders as a non-interactive row with a tag instead of a link. */
-  disabledNote?: string;
 }
 
 const ITEMS: MenuItem[] = [
@@ -57,7 +56,6 @@ const ITEMS: MenuItem[] = [
   { label: "View Profile", href: "/me", icon: User },
   { label: "Edit Profile", href: "/me/profile", icon: Pencil },
   { label: "Files", href: "/me/files", icon: FolderDown },
-  { label: "Promote", icon: TrendingUp, disabledNote: "Coming soon" },
   { label: "Account Settings", href: "/me/settings", icon: Settings },
 ];
 
@@ -153,26 +151,10 @@ export function HeaderProfileMenu({ onDark }: { onDark: boolean }) {
           <ul className="py-1.5">
             {ITEMS.map((item) => {
               const Icon = item.icon;
-              if (item.disabledNote) {
-                return (
-                  <li key={item.label}>
-                    <div
-                      className="flex items-center gap-2.5 px-4 py-2.5 font-body text-[14px] text-muted"
-                      aria-disabled="true"
-                    >
-                      <Icon strokeWidth={1.5} className="h-4 w-4 shrink-0" />
-                      <span>{item.label}</span>
-                      <span className="ml-auto rounded-full bg-stone/60 px-2 py-0.5 font-body text-[11px] text-muted">
-                        {item.disabledNote}
-                      </span>
-                    </div>
-                  </li>
-                );
-              }
               return (
                 <li key={item.label}>
                   <Link
-                    href={item.href!}
+                    href={item.href}
                     role="menuitem"
                     onClick={() => setOpen(false)}
                     className="flex items-center gap-2.5 px-4 py-2.5 font-body text-[14px] text-ink transition-colors hover:bg-stone/40"
