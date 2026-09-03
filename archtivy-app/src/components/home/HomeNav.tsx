@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bookmark, Menu, X } from "lucide-react";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { SignedIn, useAuth, useClerk } from "@clerk/nextjs";
 import { HeaderNotificationBell } from "@/components/home/HeaderNotificationBell";
 import { HeaderProfileMenu } from "@/components/home/HeaderProfileMenu";
@@ -19,6 +20,19 @@ import { usePublisherRole } from "@/lib/hooks/usePublisherRole";
  *
  * Link colour is the only thing that flips between states; nav items never
  * change hue on hover, only underline (Blueprint §16).
+ *
+ * ── SEARCH-FIRST ────────────────────────────────────────────────────────────
+ * The five section links used to run across the middle of the bar. They now
+ * live behind the menu button beside the wordmark, and the space they occupied
+ * belongs to the global search field.
+ *
+ * The reasoning is that this is a discovery platform: the five links name the
+ * shelves, and search is how anyone actually finds a thing on them. Giving the
+ * shelves the widest real estate on every page made the header a table of
+ * contents for a site the visitor is already inside.
+ *
+ * Nothing is lost — the same five routes, in the same order, one click away —
+ * and the account controls on the right are untouched.
  */
 
 const NAV_LINKS = [
@@ -60,6 +74,30 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
   const { canPublish } = usePublisherRole();
   const [scrolled, setScrolled] = useState(variant === "solid");
   const [menuOpen, setMenuOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+
+  /*
+   * Escape and outside-click dismissal, matching HeaderProfileMenu. The panel
+   * used to be a drawer that only its own trigger could close, which is
+   * tolerable for a full-width sheet and wrong for a popover.
+   */
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    const onClick = (e: MouseEvent) => {
+      if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onClick);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onClick);
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     if (variant === "solid") return;
@@ -75,41 +113,77 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
 
   return (
     <header
+      ref={headerRef}
       className={[
         "fixed inset-x-0 top-0 z-50 transition-colors duration-300",
         scrolled ? "border-b border-hairline bg-cream" : "bg-transparent",
       ].join(" ")}
     >
       <div className="mx-auto flex h-[72px] max-w-content items-center justify-between px-4 md:px-12 lg:px-24">
-        <Link
-          href="/"
+        <div className="flex shrink-0 items-center gap-3">
+          <Link
+            href="/"
+            className={[
+              "font-display text-[22px] font-medium tracking-tight transition-colors",
+              onDark ? "text-cream" : "text-ink",
+            ].join(" ")}
+          >
+            archtivy
+          </Link>
+
+          {/* One button at every width. Below lg it also carries the account
+              actions, which is why the panel below branches rather than the
+              trigger. */}
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            aria-haspopup="true"
+            className={[
+              "-ml-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+              onDark
+                ? "text-cream hover:bg-cream/10"
+                : "text-ink hover:bg-stone/50",
+            ].join(" ")}
+          >
+            {menuOpen ? (
+              <X strokeWidth={1.5} className="h-5 w-5" />
+            ) : (
+              <Menu strokeWidth={1.5} className="h-5 w-5" />
+            )}
+          </button>
+        </div>
+
+        {/*
+          The centre of the bar. Wide on desktop, and still a real field on a
+          phone rather than an icon that hides one.
+
+          ── EXCEPT OVER THE HOMEPAGE HERO ───────────────────────────────────
+          The hero carries its own large search with the popular-search chips
+          beneath it, so showing this one at the same time puts two search
+          fields on screen 300px apart. The previous header avoided that by
+          hiding itself on "/" entirely; this keeps the field but defers it,
+          fading in on the same scroll threshold that turns the bar solid —
+          by which point the hero field has left the viewport. Search is never
+          more than a scroll away, and never doubled.
+
+          Every other surface passes variant="solid", so `scrolled` is true
+          from the first paint and the field is simply always there.
+        */}
+        <div
           className={[
-            "font-display text-[22px] font-medium tracking-tight transition-colors",
-            onDark ? "text-cream" : "text-ink",
+            "mx-4 min-w-0 flex-1 transition-opacity duration-300 md:mx-8 lg:mx-12",
+            scrolled ? "opacity-100" : "pointer-events-none opacity-0",
           ].join(" ")}
+          aria-hidden={!scrolled}
         >
-          archtivy
-        </Link>
+          <div className="mx-auto w-full max-w-[720px]">
+            <GlobalSearch onDark={onDark} />
+          </div>
+        </div>
 
-        <nav aria-label="Primary" className="hidden lg:block">
-          <ul className="flex items-center gap-8">
-            {NAV_LINKS.map((l) => (
-              <li key={l.href}>
-                <Link
-                  href={l.href}
-                  className={[
-                    "font-body text-[15px] underline-offset-[6px] transition-colors hover:underline",
-                    onDark ? "text-cream/90 hover:text-cream" : "text-ink/80 hover:text-ink",
-                  ].join(" ")}
-                >
-                  {l.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           {/* Signed out: unchanged — the "For Professionals" CTA is the whole
               point of the logged-out header and stays exactly as it was. */}
           {showGuestCta && (
@@ -148,22 +222,37 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
           <SignedIn>
             <HeaderProfileMenu onDark={onDark} />
           </SignedIn>
-
-          <button
-            type="button"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-label={menuOpen ? "Close menu" : "Open menu"}
-            aria-expanded={menuOpen}
-            className={onDark ? "text-cream lg:hidden" : "text-ink lg:hidden"}
-          >
-            {menuOpen ? (
-              <X strokeWidth={1.5} className="h-5 w-5" />
-            ) : (
-              <Menu strokeWidth={1.5} className="h-5 w-5" />
-            )}
-          </button>
         </div>
       </div>
+
+      {/*
+        ── DESKTOP: A POPOVER, NOT A DRAWER ──────────────────────────────────
+        Anchored under the menu button and sized to its content, in the same
+        cream / hairline / soft-shadow language as the account menu it sits
+        beside. A full-width panel sliding down from the bar would read as a
+        mobile navigation drawer that had wandered onto a desktop.
+      */}
+      {menuOpen && (
+        <div className="hidden lg:block">
+          <div
+            className="absolute left-4 top-[64px] z-50 w-[248px] overflow-hidden rounded-2xl border border-hairline bg-cream py-1.5 shadow-[0_12px_40px_rgba(22,22,22,0.12)] md:left-12 lg:left-24"
+            role="menu"
+            aria-label="Sections"
+          >
+            {NAV_LINKS.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                role="menuitem"
+                onClick={() => setMenuOpen(false)}
+                className="block px-4 py-2.5 font-body text-[14px] text-ink transition-colors hover:bg-stone/40"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Mobile / tablet drawer. The primary links must stay reachable below
           lg — responsive adaptation never removes functionality (Blueprint §9). */}
