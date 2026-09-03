@@ -8,6 +8,7 @@ import { HeroBand } from "@/components/home/HeroBand";
 import { DiscoverSection } from "@/components/home/DiscoverSection";
 import { ConnectSection } from "@/components/home/ConnectSection";
 import { PopularProfilesSection } from "@/components/home/PopularProfilesSection";
+import { ForYouSections } from "@/components/home/ForYouSections";
 import { Showcase, type ShowcaseItem } from "@/components/home/Showcase";
 import { JoinArchtivy } from "@/components/home/JoinArchtivy";
 import { HomeFooter } from "@/components/home/HomeFooter";
@@ -232,6 +233,18 @@ export default async function Home() {
             hrefById={discoverHrefById}
           />
         </div>
+
+        {/*
+          Personalized sections, for signed-in viewers only.
+
+          Placed after Discover so the editorial opening of the page is
+          identical for everyone, and rendered by a client component so this
+          page keeps its `revalidate = 3600`. It returns null for anonymous
+          visitors and for anyone the personalization layer has nothing
+          confident to say about, so nothing here can produce an empty heading
+          or shift the layout of the page as it stands today.
+        */}
+        <ForYouSections />
 
         {/* 02 — Connect: one real chain, selected from the graph */}
         <ConnectSection chain={connectChain} />
