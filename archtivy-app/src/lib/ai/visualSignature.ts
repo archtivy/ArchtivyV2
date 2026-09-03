@@ -264,7 +264,20 @@ export async function describeImageVisually(
       continue;
     }
 
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    };
+
+    /* Batch runs spend real money, so each call says what it cost in tokens.
+       The job's own log is the only place that number is recoverable after
+       the fact, and a run that suddenly doubles should be visible there. */
+    if (data.usage) {
+      console.log(
+        `[visualSignature] ${MODEL_BY_KIND[kind].model} ${kind} in=${data.usage.prompt_tokens} out=${data.usage.completion_tokens}`
+      );
+    }
+
     const raw = (data.choices?.[0]?.message?.content ?? "").trim();
     let parsed: Record<string, unknown>;
     try {

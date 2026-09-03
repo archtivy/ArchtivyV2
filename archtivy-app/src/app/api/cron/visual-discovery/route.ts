@@ -80,26 +80,46 @@ async function selectImages(mode: "missing" | "all", limit: number): Promise<Can
   }
   if (typeById.size === 0) return [];
 
-  const { data: images } = await sup
-    .from("listing_images")
-    .select("id, image_url, listing_id")
-    .in("listing_id", [...typeById.keys()])
-    .order("created_at", { ascending: true });
+  /*
+   * ── PAGED, BECAUSE POSTGREST STOPS AT 1000 ─────────────────────────────────
+   * The default response cap is 1000 rows and listing_images already holds
+   * 1197. An unpaged select here would silently drop every image past the
+   * first thousand and the job would report itself finished with a couple of
+   * hundred photographs never processed — the same truncation that cut 28
+   * categories out of the sitemap. Both reads below page explicitly.
+   */
+  const images = await selectAll<{ id: string; image_url: string; listing_id: string }>(
+    () => sup.from("listing_images").select("id, image_url, listing_id").order("id", { ascending: true })
+  );
 
-  let rows = ((images ?? []) as { id: string; image_url: string; listing_id: string }[])
+  let rows = images
     .filter((r) => r.image_url && typeById.has(r.listing_id))
     .map((r) => ({ ...r, listing_type: typeById.get(r.listing_id)! }));
 
   if (mode === "missing") {
-    const { data: existing } = await sup
-      .from("image_ai")
-      .select("image_id")
-      .not("embedding", "is", null);
-    const done = new Set((existing ?? []).map((r: { image_id: string }) => r.image_id));
+    const existing = await selectAll<{ image_id: string }>(
+      () => sup.from("image_ai").select("image_id").not("embedding", "is", null).order("image_id", { ascending: true })
+    );
+    const done = new Set(existing.map((r) => r.image_id));
     rows = rows.filter((r) => !done.has(r.id));
   }
 
   return rows.slice(0, limit);
+}
+
+const PAGE = 1000;
+
+/** Read every row of a query, a page at a time. */
+async function selectAll<T>(build: () => { range: (a: number, b: number) => PromiseLike<{ data: unknown; error: unknown }> }): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await build().range(from, from + PAGE - 1);
+    if (error) break;
+    const page = (data ?? []) as T[];
+    out.push(...page);
+    if (page.length < PAGE) break;
+  }
+  return out;
 }
 
 async function run(request: NextRequest) {
@@ -139,7 +159,23 @@ async function run(request: NextRequest) {
   let embedded = 0;
   let regions = 0;
 
+  /*
+   * ── STOP BEFORE THE PLATFORM DOES ──────────────────────────────────────────
+   * maxDuration is 300s and a project photograph takes 6–9s end to end, so a
+   * batch of forty cannot finish inside one invocation. A killed invocation is
+   * the worst outcome available: the images already paid for are written, but
+   * the caller gets no response and no count, so nobody knows where the run
+   * stopped. Instead the loop stops itself with time to spare and reports what
+   * is left, which makes any `limit` safe to ask for.
+   */
+  const budgetMs = 240_000;
+  let stoppedEarly = false;
+
   for (const img of images) {
+    if (Date.now() - started > budgetMs) {
+      stoppedEarly = true;
+      break;
+    }
     const result = await processImage({
       imageId: img.id,
       source: img.listing_type,
@@ -161,7 +197,11 @@ async function run(request: NextRequest) {
     processed,
     embedded,
     regions,
-    remaining: Math.max(0, (await selectImages(mode, MAX_LIMIT)).length - (mode === "missing" ? 0 : processed)),
+    /* Only meaningful for "missing", where finished work leaves the queue. A
+       mode=all run never shrinks its own queue, so a number here would be the
+       same one every time and read as no progress. */
+    remaining: mode === "missing" ? (await selectImages("missing", MAX_LIMIT)).length : null,
+    stoppedEarly,
     seconds: Math.round((Date.now() - started) / 1000),
     errors,
   });

@@ -33,7 +33,12 @@ interface RunResult {
   error?: string;
 }
 
-const BATCH = 40;
+/*
+ * Twenty, not forty. A project photograph costs 6-9 seconds of model time and
+ * the route gives itself a 240s budget inside a 300s platform limit, so forty
+ * would routinely stop half-finished and report it. Twenty completes.
+ */
+const BATCH = 20;
 
 export function VisualDiscoveryButton() {
   const [mode, setMode] = useState<"missing" | "all">("missing");
