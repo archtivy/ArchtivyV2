@@ -8,7 +8,7 @@
     },
     {
       "path": "/api/cron/visual-discovery?mode=new&limit=20",
-      "schedule": "0 * * * *"
+      "schedule": "0 5 * * *"
     }
   ]
 }

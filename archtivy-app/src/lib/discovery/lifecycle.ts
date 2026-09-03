@@ -217,11 +217,17 @@ export async function selectPending(options: SelectOptions): Promise<PendingImag
  * serverless platform the request that called this may be frozen the instant
  * it responds, so this fetch can simply not happen — which is fine, because
  * the cron will find the same work from the derived queue. It exists so that a
- * newly published listing is usually discoverable in seconds instead of within
- * the hour, and for no other reason.
+ * newly published listing is usually discoverable in seconds instead of on the
+ * next daily sweep, and for no other reason.
  *
  * This is also why listing creation cannot be broken by Visual Discovery: the
  * only thing creation does is fail to notify something.
+ *
+ * The backstop runs ONCE A DAY (05:00 UTC), which is the most a Vercel Hobby
+ * project is allowed. That cadence is fine precisely because it is a backstop:
+ * the kick above is what makes a new listing discoverable in seconds, and the
+ * cron only exists to sweep up what the kick missed — a frozen request, a
+ * transient model failure, a creation path that never called it at all.
  */
 export function kickVisualDiscovery(listingId: string): void {
   /* getBaseUrl already knows the production alias, the preview host and the

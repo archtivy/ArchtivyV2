@@ -13,8 +13,8 @@ import { useState } from "react";
  * that is, and it processes a bounded batch rather than the whole catalogue,
  * so the cost of one press is always knowable in advance.
  *
- * "Recent uploads" is what the hourly schedule already does on its own, and is
- * here only so it can be forced. "Backlog" is the one that matters: it reaches
+ * "Recent uploads" is what the daily schedule already does on its own, and is
+ * here only so it can be forced without waiting for it. "Backlog" is the one that matters: it reaches
  * the images the schedule deliberately will not touch — the ones uploaded
  * before automatic processing existed, including every row still holding a
  * version-0 synthetic vector.
