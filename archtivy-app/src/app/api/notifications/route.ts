@@ -14,7 +14,10 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const { userId } = await auth();
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: { "Cache-Control": "private, no-store" } }
+    );
   }
 
   const profileResult = await getProfileByClerkId(userId);
@@ -63,10 +66,21 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: result.error }, { status: 500 });
   }
 
-  return NextResponse.json({
-    data: result.data!.items,
-    unread_count: unreadCount,
-    total: result.data!.total,
-    tab,
-  });
+  return NextResponse.json(
+    {
+      data: result.data!.items,
+      unread_count: unreadCount,
+      total: result.data!.total,
+      tab,
+    },
+    /*
+     * ── PER-VIEWER, SO NEVER STORED ──────────────────────────────────────────
+     * This body is one person's notifications and unread count. `dynamic =
+     * "force-dynamic"` stops Next and Vercel caching the route, but it emits no
+     * Cache-Control of its own — verified: the response carried none at all —
+     * which leaves the payload heuristically cacheable by a browser or any
+     * intermediary proxy. Stated explicitly rather than relied upon.
+     */
+    { headers: { "Cache-Control": "private, no-store" } }
+  );
 }

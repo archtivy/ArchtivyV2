@@ -47,6 +47,25 @@ const DIGEST_SCORE_THRESHOLD = 90;
 const MIN_DIGEST_ITEMS = 3;
 /** How long a given digest group stays satisfied. */
 const DIGEST_WINDOW_HOURS = 20;
+
+/**
+ * Group-key prefix for one-time relationship facts.
+ *
+ * ── WHY THESE DEDUPE FOREVER AND DIGESTS DO NOT ─────────────────────────────
+ * A digest is a recurring statement whose content changes — "3 new listings
+ * match your interests" is true today and differently true tomorrow — so it is
+ * suppressed for a window and then allowed to say something new.
+ *
+ * A connection notification is a statement about a FACT: this product was
+ * specified in that project. The fact does not become newsworthy again. Under
+ * a windowed check it was re-delivered every time the window lapsed while the
+ * project stayed inside the 14-day lookback — verified against production as
+ * suppressed at 20 hours and re-created at 21, which over the lookback is
+ * roughly sixteen copies of one event.
+ *
+ * So keys under this prefix are checked against ALL history, not a window.
+ */
+const ONE_TIME_PREFIX = "conn:";
 /** Only listings this new are considered. */
 const LOOKBACK_DAYS = 14;
 /** Never create more than this many notifications in one pass. */
@@ -68,14 +87,40 @@ interface Existing {
 async function alreadyDelivered(profileId: string, groupKeys: string[]): Promise<Set<string>> {
   const out = new Set<string>();
   if (groupKeys.length === 0) return out;
-  const since = new Date(Date.now() - DIGEST_WINDOW_HOURS * 3600_000).toISOString();
-  const { data } = await getSupabaseServiceClient()
-    .from("notifications")
-    .select("group_key")
-    .eq("recipient_profile_id", profileId)
-    .in("group_key", groupKeys)
-    .gte("created_at", since);
-  for (const r of (data ?? []) as Existing[]) if (r.group_key) out.add(r.group_key);
+
+  const sup = getSupabaseServiceClient();
+  const oneTime = groupKeys.filter((k) => k.startsWith(ONE_TIME_PREFIX));
+  const windowed = groupKeys.filter((k) => !k.startsWith(ONE_TIME_PREFIX));
+
+  const queries: PromiseLike<{ data: unknown }>[] = [];
+
+  // One-time facts: has this ever been sent, at any point?
+  if (oneTime.length > 0) {
+    queries.push(
+      sup
+        .from("notifications")
+        .select("group_key")
+        .eq("recipient_profile_id", profileId)
+        .in("group_key", oneTime)
+    );
+  }
+
+  // Digests: has this been sent recently?
+  if (windowed.length > 0) {
+    const since = new Date(Date.now() - DIGEST_WINDOW_HOURS * 3600_000).toISOString();
+    queries.push(
+      sup
+        .from("notifications")
+        .select("group_key")
+        .eq("recipient_profile_id", profileId)
+        .in("group_key", windowed)
+        .gte("created_at", since)
+    );
+  }
+
+  for (const res of await Promise.all(queries)) {
+    for (const r of ((res.data ?? []) as Existing[])) if (r.group_key) out.add(r.group_key);
+  }
   return out;
 }
 
