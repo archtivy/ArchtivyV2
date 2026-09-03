@@ -7,6 +7,7 @@ import {
   isNotificationTab,
   type NotificationTab,
 } from "@/lib/notifications/tabs";
+import { materialiseSmartNotifications } from "@/lib/personalization/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,20 @@ export async function GET(req: Request) {
   const tabParam = url.searchParams.get("tab");
   const tab: NotificationTab = isNotificationTab(tabParam) ? tabParam : "all";
   const eventTypes = eventTypesForTab(tab);
+
+  /*
+   * ── DIGESTS ARE BUILT WHEN SOMEONE LOOKS ─────────────────────────────────
+   * Awaited deliberately, so a digest earned before this request appears in
+   * the very response that triggered it rather than a page-load later. It is
+   * idempotent within its window, does nothing when there is nothing to say,
+   * and swallows its own failures — a personalization error must never stop
+   * someone reading their existing notifications.
+   *
+   * Only on the first page: paging through history should not re-run it.
+   */
+  if (offset === 0) {
+    await materialiseSmartNotifications(profile.id, userId);
+  }
 
   const [result, unreadCount] = await Promise.all([
     getNotificationsForProfile(profile.id, {

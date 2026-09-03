@@ -11,12 +11,13 @@ import type { NotificationEventType } from "@/lib/db/notifications";
  * drift: the tab a user clicks is the same list the query filters by.
  */
 
-export const NOTIFICATION_TABS = ["all", "updates", "mentions", "system"] as const;
+export const NOTIFICATION_TABS = ["all", "updates", "for_you", "mentions", "system"] as const;
 export type NotificationTab = (typeof NOTIFICATION_TABS)[number];
 
 export const NOTIFICATION_TAB_LABELS: Record<NotificationTab, string> = {
   all: "All",
   updates: "Updates",
+  for_you: "For you",
   mentions: "Mentions",
   system: "System",
 };
@@ -51,6 +52,26 @@ const MENTION_EVENTS: NotificationEventType[] = [
 const SYSTEM_EVENTS: NotificationEventType[] = ["admin_update", "opportunity_nearby"];
 
 /**
+ * For you — everything the personalization layer produced.
+ *
+ * A tab rather than a rename: Updates, Mentions and System keep their exact
+ * meanings, and the new events get somewhere of their own instead of being
+ * filed under a heading that does not describe them. A connection event ("a
+ * product you saved was specified here") is not an update from someone you
+ * follow, and a digest is not a system message.
+ *
+ * They also reach the All tab, which applies no filter — this only makes them
+ * reachable from a second, more specific place.
+ */
+const FOR_YOU_EVENTS: NotificationEventType[] = [
+  "saved_product_in_project",
+  "followed_brand_in_project",
+  "interest_digest",
+  "board_digest",
+  "local_digest",
+];
+
+/**
  * Event types for a tab, or null for "all" (no filter).
  *
  * Returning null rather than the full list matters: it keeps the "all" query
@@ -63,6 +84,8 @@ export function eventTypesForTab(tab: NotificationTab): NotificationEventType[] 
       return UPDATE_EVENTS;
     case "mentions":
       return MENTION_EVENTS;
+    case "for_you":
+      return FOR_YOU_EVENTS;
     case "system":
       return SYSTEM_EVENTS;
     case "all":

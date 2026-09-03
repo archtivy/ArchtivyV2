@@ -18,7 +18,28 @@ export type NotificationEventType =
   | "followed_category_new_listing"
   | "followed_material_new_listing"
   | "admin_update"
-  | "opportunity_nearby";
+  | "opportunity_nearby"
+  /*
+   * ── SMART NOTIFICATIONS ───────────────────────────────────────────────────
+   * Added for the personalization layer. `event_type` carries no CHECK
+   * constraint in the database — verified 2026-09-03, only `source` and
+   * `priority` are constrained — so extending this union needed no migration.
+   *
+   * The first two are CONNECTION events: something the viewer already has a
+   * relationship with turned up inside new work. They are the highest-value
+   * thing this platform can tell someone, because they are facts about the
+   * graph rather than guesses about taste.
+   *
+   * The last three are DIGESTS. They are deliberately plural — one
+   * notification standing for several listings — because the alternative is
+   * one notification per matching listing, which is how a useful feed becomes
+   * an unusable inbox.
+   */
+  | "saved_product_in_project"
+  | "followed_brand_in_project"
+  | "interest_digest"
+  | "board_digest"
+  | "local_digest";
 
 export type NotificationPriority = "low" | "normal" | "high";
 
