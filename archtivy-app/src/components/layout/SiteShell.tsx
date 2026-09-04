@@ -1,8 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { TopNav } from "@/components/layout/TopNav";
 import { HomeNav } from "@/components/home/HomeNav";
+import { HEADER_CLEARANCE_TIGHT } from "@/components/home/headerClearance";
 import { HomeFooter } from "@/components/home/HomeFooter";
 import { isCorporateRoute } from "@/lib/layout/corporateRoutes";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -75,9 +75,6 @@ const EDITORIAL_ROUTES = new Set([
   "/me/tools",
 ]);
 
-// Routes that show TopNav but skip PageContainer (full-width content).
-const FULL_WIDTH_PATHS: string[] = [];
-
 function isAuthRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return AUTH_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -105,11 +102,6 @@ function isToolRoute(pathname: string | null): boolean {
  */
 function isListingEditRoute(pathname: string | null): boolean {
   return Boolean(pathname && /^\/me\/listings\/[^/]+\/edit\/?$/.test(pathname));
-}
-
-function isFullWidthRoute(pathname: string | null): boolean {
-  if (!pathname) return false;
-  return FULL_WIDTH_PATHS.some((p) => pathname === p);
 }
 
 interface SiteShellProps {
@@ -188,15 +180,6 @@ export function SiteShell({ children }: SiteShellProps) {
     return <>{children}</>;
   }
 
-  if (isFullWidthRoute(pathname)) {
-    return (
-      <>
-        <TopNav />
-        <main>{children}</main>
-      </>
-    );
-  }
-
   /*
    * ── CORPORATE PAGES USE THE CURRENT HEADER AND FOOTER ─────────────────────
    * These rendered TopNav — a white bar with a bright-blue pill and a
@@ -216,14 +199,16 @@ export function SiteShell({ children }: SiteShellProps) {
    * No navigation logic is duplicated either: HomeNav and HomeFooter are the
    * components the homepage, the directories and the profiles already use.
    *
-   * pt-[72px] clears HomeNav, which is `fixed top-0`. Without it the first
-   * heading renders under the header.
+   * Clearance comes from headerClearance.ts rather than a literal, because
+   * the bar is not one height any more: on mobile it carries a second row for
+   * the search, and a hard-coded 72px left corporate pages with their first
+   * heading under the header on a phone.
    */
   if (isCorporateRoute(pathname)) {
     return (
       <div className="min-h-screen bg-cream font-body text-ink">
         <HomeNav variant="solid" />
-        <main className="pt-[72px]">
+        <main className={HEADER_CLEARANCE_TIGHT}>
           <PageContainer>{children}</PageContainer>
         </main>
         <HomeFooter />
@@ -231,10 +216,25 @@ export function SiteShell({ children }: SiteShellProps) {
     );
   }
 
+  /*
+   * ── EVERY REMAINING ROUTE, ON THE SAME HEADER ─────────────────────────────
+   * This branch rendered TopNav, which is why the site had two headers: the
+   * routes above got HomeNav and these got a different bar with a different
+   * search, a different menu and none of the mobile work. On a phone that
+   * meant /me/notifications and /claim behaved unlike /projects.
+   *
+   * The header is HomeNav now, exactly as the corporate branch above already
+   * used it, and with the same shared clearance. Nothing is duplicated and no
+   * markup is copied — this renders the same component every other surface
+   * does, so a fix to it reaches the whole site at once.
+   *
+   * The page's own background and content are untouched; only the bar above
+   * them changed.
+   */
   return (
     <>
-      <TopNav />
-      <main>
+      <HomeNav variant="solid" />
+      <main className={HEADER_CLEARANCE_TIGHT}>
         <PageContainer>{children}</PageContainer>
       </main>
     </>
