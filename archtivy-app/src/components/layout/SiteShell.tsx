@@ -88,6 +88,25 @@ function isToolRoute(pathname: string | null): boolean {
   return TOOL_PATHS.some((p) => pathname === p);
 }
 
+/**
+ * /me/listings/<id>/edit renders the SAME wizard as /add/project and
+ * /add/product, which supplies its own HomeNav and its own 1400px workspace.
+ *
+ * The create routes are exact entries in EDITORIAL_ROUTES and so take the bare
+ * branch. The edit route has a dynamic id, matched no branch at all, and fell
+ * through to the default — which wrapped it in TopNav plus PageContainer, i.e.
+ * a second header above the wizard's own and a 1040px cap around a workspace
+ * designed for 1400. That is the whole of why editing looked like a narrow
+ * panel while creating did not.
+ *
+ * A regex rather than a prefix: EDITORIAL_ROUTES is exact-match on purpose,
+ * and `startsWith("/me/listings")` would also swallow the listings directory
+ * and the pin-tagging page, which do want the default shell.
+ */
+function isListingEditRoute(pathname: string | null): boolean {
+  return Boolean(pathname && /^\/me\/listings\/[^/]+\/edit\/?$/.test(pathname));
+}
+
 function isFullWidthRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return FULL_WIDTH_PATHS.some((p) => pathname === p);
@@ -131,7 +150,7 @@ export function SiteShell({ children }: SiteShellProps) {
   // the taxonomy archive routes under /projects/[...segments] still use the
   // existing shell and palette. Widening this to a prefix would restyle every
   // archive page unintentionally.
-  if (EDITORIAL_ROUTES.has(pathname ?? "")) {
+  if (EDITORIAL_ROUTES.has(pathname ?? "") || isListingEditRoute(pathname)) {
     return <>{children}</>;
   }
 

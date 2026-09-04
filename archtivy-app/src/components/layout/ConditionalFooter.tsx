@@ -35,6 +35,9 @@ const FOOTERLESS_ROUTES = new Set([
 export function ConditionalFooter({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   if (FOOTERLESS_ROUTES.has(pathname)) return null;
+  // Kept in step with SiteShell: the listing edit route renders the publish
+  // wizard bare, exactly as /add/* does, so it carries no global footer either.
+  if (/^\/me\/listings\/[^/]+\/edit\/?$/.test(pathname ?? "")) return null;
   /*
    * Corporate pages render HomeFooter from SiteShell, so the legacy global
    * footer must not also appear beneath it. Read from the shared set rather
