@@ -1,3 +1,4 @@
+import { waitUntil } from "@vercel/functions";
 import { getBaseUrl } from "@/lib/canonical";
 
 /**
@@ -132,26 +133,46 @@ export async function prewarmHeroImage(imageUrl: string | null | undefined): Pro
 /**
  * Fire-and-forget wrapper for use inside a publish path.
  *
- * Publishing must not wait several seconds for image encoding, and must not
- * fail because an optimiser request did. This returns immediately; every
+ * Returns immediately — publishing never waits for image encoding — and every
  * failure inside is caught and logged rather than thrown, so no rejection can
  * escape to become an unhandled one.
  *
- * ── A LIMIT WORTH KNOWING ABOUT ─────────────────────────────────────────────
- * On Vercel this is BEST EFFORT, not a guarantee. A Node serverless function
- * may be frozen or torn down once its response has been sent, so work started
- * here and not awaited can be cut short. Next 14.2 has no `after()` and
- * `@vercel/functions` (which provides `waitUntil`) is not a dependency of this
- * project, so there is no supported way to hold the instance open without
- * adding one.
+ * ── WHY waitUntil ───────────────────────────────────────────────────────────
+ * Starting the work and not awaiting it is not enough on Vercel. A Node
+ * serverless function may be frozen or torn down the moment its response has
+ * been sent, so a promise left running can simply be cut off mid-request — the
+ * warming would appear to have been wired up and would silently never finish.
  *
- * The failure is benign in every direction: publishing is unaffected, and the
- * worst case is that the first reader pays the optimisation cost they would
- * have paid anyway. The warn above is what makes the difference between
- * "warming worked" and "warming never ran" visible in the logs.
+ * `waitUntil` is the platform's supported answer: it asks Vercel to keep the
+ * instance alive until the promise settles, WITHOUT holding the response open.
+ * The publish action still returns at exactly the same moment; only the
+ * teardown is deferred.
+ *
+ * Next 14.2 has no `after()` of its own — that arrived in 15 — so
+ * `@vercel/functions` is the smallest supported way to reach this. Only
+ * `waitUntil` is imported; the package's OIDC and CLI helpers are never
+ * referenced and do not enter the bundle.
+ *
+ * ── AND OFF VERCEL ──────────────────────────────────────────────────────────
+ * Outside a Vercel request context `waitUntil` returns without throwing, and
+ * the promise runs to completion anyway because nothing is tearing the process
+ * down — local development and the production build behave exactly as before.
+ * It is wrapped regardless, because a background helper that can throw inside
+ * a publish path would defeat the entire point of it being background.
  */
 export function prewarmHeroInBackground(imageUrl: string | null | undefined): void {
-  void prewarmHeroImage(imageUrl).catch((err) => {
+  // Already terminal: prewarmHeroImage never rejects, and this catch is the
+  // belt to that brace, so what `waitUntil` receives can only ever resolve.
+  const work = prewarmHeroImage(imageUrl).catch((err) => {
     console.warn("[prewarmHero] unexpected failure:", err);
   });
+
+  try {
+    waitUntil(work);
+  } catch (err) {
+    // No request context, or a platform that does not offer one. The work is
+    // already running; this only means nobody is holding the door open for it.
+    const reason = err instanceof Error ? err.message : String(err);
+    console.warn(`[prewarmHero] waitUntil unavailable, continuing best-effort: ${reason}`);
+  }
 }
