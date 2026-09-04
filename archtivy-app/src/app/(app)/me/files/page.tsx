@@ -11,6 +11,7 @@ import { FilesControls } from "@/components/files/FilesControls";
 import { FilesTable } from "@/components/files/FilesTable";
 import { parseFilesParams, filesHref, hasActiveFileFilters, WINDOW_DAYS } from "@/lib/files/params";
 import { BTN_PILL_SECONDARY } from "@/components/ui/publicButton";
+import { HEADER_CLEARANCE } from "@/components/home/headerClearance";
 
 export const metadata: Metadata = {
   title: "Your files | Archtivy",
@@ -133,7 +134,7 @@ export default async function MyFilesPage({
       {/* The canonical header, not the one drawn in the mockup. */}
       <HomeNav variant="solid" />
 
-      <div className="mx-auto flex w-full max-w-[1600px] gap-10 px-4 pb-24 pt-[92px] sm:px-6 lg:px-8">
+      <div className={`mx-auto flex w-full max-w-[1600px] gap-10 px-4 pb-24 ${HEADER_CLEARANCE} sm:px-6 lg:px-8`}>
         <aside className="hidden w-[264px] shrink-0 lg:block">
           <div className="sticky top-[92px] border-r border-hairline pr-6">
             <FilesSidebar {...sidebarProps} />

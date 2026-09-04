@@ -9,6 +9,7 @@ import { HomeFooter } from "@/components/home/HomeFooter";
 import { MagazineIndexView } from "@/components/magazine/MagazineIndexView";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildCollectionPageJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { HEADER_CLEARANCE } from "@/components/home/headerClearance";
 
 /**
  * /magazine — replaces the "coming soon" placeholder.
@@ -64,7 +65,7 @@ export default async function MagazineIndexPage() {
       <JsonLd schemas={[collectionJsonLd, breadcrumbJsonLd]} />
       <HomeNav variant="solid" />
 
-      <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
+      <div className={`mx-auto max-w-content px-4 ${HEADER_CLEARANCE} md:px-12 lg:px-24`}>
         <MagazineIndexView data={data} feature={feature} />
       </div>
 

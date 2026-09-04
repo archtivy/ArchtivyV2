@@ -5,6 +5,7 @@ import { HeroConnectionMetric } from "@/components/home/HeroConnectionMetric";
 import { getHeroFeature } from "@/lib/db/heroFeature";
 import { getConnectionsMapped } from "@/lib/db/connectionsMetric";
 import { getHomeCategories, toPopularSearches } from "@/lib/db/homeCategories";
+import { HEADER_CLEARANCE_HERO } from "@/components/home/headerClearance";
 
 /**
  * Hero band — dark, full-bleed, ~640px tall on desktop.
@@ -82,7 +83,7 @@ export async function HeroBand() {
         aria-hidden
       />
 
-      <div className="mx-auto flex min-h-[560px] max-w-content flex-col justify-center px-4 pb-24 pt-[112px] md:px-12 lg:min-h-[640px] lg:px-24 lg:pb-28">
+      <div className={`mx-auto flex min-h-[560px] max-w-content flex-col justify-center px-4 pb-24 ${HEADER_CLEARANCE_HERO} md:px-12 lg:min-h-[640px] lg:px-24 lg:pb-28`}>
         {/* Capped rather than full-bleed. Without a max width the search bar and
             pills would run the full 1440px into the right of the photograph —
             the part the scrim deliberately leaves light so the building still

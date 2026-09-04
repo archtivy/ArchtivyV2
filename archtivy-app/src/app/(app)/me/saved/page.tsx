@@ -20,6 +20,7 @@ import {
 } from "@/lib/saved/params";
 import { BoardShareButton } from "@/components/saved/BoardShareButton";
 import { BTN_PILL_SECONDARY } from "@/components/ui/publicButton";
+import { HEADER_CLEARANCE } from "@/components/home/headerClearance";
 
 export const metadata: Metadata = {
   title: "Saved | Archtivy",
@@ -161,7 +162,7 @@ export default async function SavedPage({
           renders — not the header drawn in the mockup. */}
       <HomeNav variant="solid" />
 
-      <div className="mx-auto flex w-full max-w-[1600px] gap-10 px-4 pb-24 pt-[92px] sm:px-6 lg:px-8">
+      <div className={`mx-auto flex w-full max-w-[1600px] gap-10 px-4 pb-24 ${HEADER_CLEARANCE} sm:px-6 lg:px-8`}>
         {/* ~280px, per the reference. The hairline is the divider between the
             two columns; the workspace is full-width, never a centred container. */}
         <aside className="hidden w-[280px] shrink-0 lg:block">

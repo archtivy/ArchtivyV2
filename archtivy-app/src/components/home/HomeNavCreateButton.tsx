@@ -110,7 +110,7 @@ export function HomeNavCreateButton({ onDark = false }: { onDark?: boolean }) {
           aria-label="Create"
           // Right-aligned to the button: it sits at the right end of the
           // header, where a left-aligned panel would run off the viewport.
-          className="absolute right-0 top-[calc(100%+8px)] z-50 w-[296px] overflow-hidden rounded-xl border border-hairline bg-cream shadow-lg"
+          className="absolute right-0 top-[calc(100%+8px)] z-50 w-[296px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-hairline bg-cream shadow-lg"
         >
           <p className="border-b border-hairline px-4 py-2.5 font-body text-[11px] uppercase tracking-[0.12em] text-muted">
             Create

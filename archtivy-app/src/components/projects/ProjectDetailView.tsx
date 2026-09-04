@@ -27,6 +27,7 @@ import { buildProjectJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
 import { getProductRailCards } from "@/lib/cards/productRailCards";
 import { getProjectRailCards } from "@/lib/cards/projectRailCards";
 import type { ProjectCanonical } from "@/lib/canonical-models";
+import { HEADER_CLEARANCE } from "@/components/home/headerClearance";
 
 /**
  * Project Detail.
@@ -234,7 +235,7 @@ export async function ProjectDetailView({
       <ListingViewTracker type="project" id={detail.id} />
       <HomeNav variant="solid" />
 
-      <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
+      <div className={`mx-auto max-w-content px-4 ${HEADER_CLEARANCE} md:px-12 lg:px-24`}>
         {/* Breadcrumb and actions share the top line. The actions used to sit
             under the title as three bordered buttons, where they outweighed
             the project name; up here they frame the header instead of

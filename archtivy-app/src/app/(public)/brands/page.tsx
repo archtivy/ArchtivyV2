@@ -11,6 +11,7 @@ import { BrandsDirectory } from "@/components/brands/BrandsDirectory";
 import { BrandsCtaBand } from "@/components/brands/BrandsCtaBand";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildCollectionPageJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { HEADER_CLEARANCE } from "@/components/home/headerClearance";
 
 /**
  * /brands — Directory/Search Layout archetype (Blueprint §8), fourth page on
@@ -63,7 +64,7 @@ export default async function BrandsIndexPage() {
       <JsonLd schemas={[collectionJsonLd, breadcrumbJsonLd]} />
       <HomeNav variant="solid" />
 
-      <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
+      <div className={`mx-auto max-w-content px-4 ${HEADER_CLEARANCE} md:px-12 lg:px-24`}>
         <BrandsDirectory
           brands={brands}
           facets={facets}

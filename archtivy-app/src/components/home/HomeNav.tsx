@@ -224,10 +224,18 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
             </ul>
           </nav>
 
-          {/* States 2 and 3. */}
+          {/*
+            States 2 and 3 — from `md` up only.
+
+            On a phone this slot is barely 180px wide once the wordmark, the
+            burger and three account controls have taken their share, which is
+            a search box too small to read what you typed into it. The field
+            moves to its own full-width row below instead; this one is hidden
+            rather than shrunk.
+          */}
           <div
             className={[
-              "flex h-full items-center transition-opacity duration-300",
+              "hidden h-full items-center transition-opacity duration-300 md:flex",
               masthead ? "pointer-events-none opacity-0" : "opacity-100",
             ].join(" ")}
             aria-hidden={masthead}
@@ -281,6 +289,31 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
       </div>
 
       {/*
+        ── ROW TWO: THE MOBILE SEARCH ──────────────────────────────────────
+        Full width, its own line, part of the header rather than floating
+        under it — same component, same routing, same placeholder animation as
+        the desktop field, just given room to be usable with a thumb.
+
+        Hidden on the homepage masthead, where the hero's own large search sits
+        a few hundred pixels below and two search boxes that close together is
+        one too many. That is also why the homepage reserves no header
+        clearance and cannot gain a gap from this row's absence.
+
+        Its height is the 56px that headerClearance.ts adds to every mobile
+        offset; the two numbers are the same fact and are commented as such.
+      */}
+      {!masthead && (
+        <div
+          className={[
+            "flex h-14 items-center border-t px-4 md:hidden",
+            scrolled ? "border-hairline bg-cream" : "border-transparent",
+          ].join(" ")}
+        >
+          <GlobalSearch onDark={onDark} size="inline" />
+        </div>
+      )}
+
+      {/*
         ── DESKTOP: A POPOVER, NOT A DRAWER ──────────────────────────────────
         Anchored under the menu button and sized to its content, in the same
         cream / hairline / soft-shadow language as the account menu it sits
@@ -309,8 +342,23 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
         </div>
       )}
 
-      {/* Mobile / tablet drawer. The primary links must stay reachable below
-          lg — responsive adaptation never removes functionality (Blueprint §9). */}
+      {/*
+        ── MOBILE DRAWER: PRIMARY NAVIGATION, AND NOTHING ELSE ─────────────
+        The five section links, in the same order the desktop bar uses. That
+        is the whole menu.
+
+        It used to also carry the guest CTA, Share a Project, Share a Product,
+        Dashboard, Notifications, View Profile, Edit Profile, Promote, Files,
+        Account Settings and Sign Out — a second, longer copy of controls that
+        are already in the header beside it. The bell, the Create button and
+        the avatar menu are all still there on mobile and all still work, so
+        every one of those destinations remained one tap away; the drawer was
+        duplicating them, and "Promote" was a dead entry that only ever
+        rendered the words "Coming soon".
+
+        Nothing is lost by removing them, and the burger now answers exactly
+        one question: where else can I go?
+      */}
       {menuOpen && (
         <div className="border-t border-hairline bg-cream lg:hidden">
           <ul className="mx-auto max-w-content px-4 py-4 md:px-12">
@@ -325,124 +373,6 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
                 </Link>
               </li>
             ))}
-            {showGuestCta && (
-              <li>
-                <Link
-                  href="/sign-up"
-                  onClick={() => setMenuOpen(false)}
-                  className="mt-2 inline-flex rounded-full border border-ink/25 px-4 py-2 font-body text-[13px] text-ink"
-                >
-                  For Professionals
-                </Link>
-              </li>
-            )}
-
-            {/* Below lg the account actions live in the drawer rather than the
-                bar, so nothing is lost on small screens. */}
-            <SignedIn>
-              {/* Two direct links rather than the chooser modal: opening a
-                  dialog on top of an open drawer stacks two overlays and traps
-                  focus in the wrong one. The destinations are identical.
-
-                  Gated on the same role check as the desktop button — the
-                  drawer was the second place a reader was offered the wizard. */}
-              {canPublish && (
-                <>
-                  <li className="mt-2 border-t border-hairline pt-2">
-                    <Link
-                      href="/add/project"
-                      onClick={() => setMenuOpen(false)}
-                      className="block py-3 font-body text-[16px] font-medium text-ink"
-                    >
-                      Share a Project
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/add/product"
-                      onClick={() => setMenuOpen(false)}
-                      className="block py-3 font-body text-[16px] font-medium text-ink"
-                    >
-                      Share a Product
-                    </Link>
-                  </li>
-                </>
-              )}
-              <li className="mt-2 border-t border-hairline pt-2">
-                <Link
-                  href="/me/dashboard"
-                  onClick={() => setMenuOpen(false)}
-                  className="block py-3 font-body text-[16px] font-medium text-ink"
-                >
-                  Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/me/notifications"
-                  onClick={() => setMenuOpen(false)}
-                  className="block py-3 font-body text-[16px] text-ink"
-                >
-                  Notifications
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/me"
-                  onClick={() => setMenuOpen(false)}
-                  className="block py-3 font-body text-[16px] text-ink"
-                >
-                  View Profile
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/me/profile"
-                  onClick={() => setMenuOpen(false)}
-                  className="block py-3 font-body text-[16px] text-ink"
-                >
-                  Edit Profile
-                </Link>
-              </li>
-              <li>
-                <span className="flex items-center gap-2 py-3 font-body text-[16px] text-muted">
-                  Promote
-                  <span className="rounded-full bg-stone/60 px-2 py-0.5 text-[11px]">
-                    Coming soon
-                  </span>
-                </span>
-              </li>
-              <li>
-                <Link
-                  href="/me/files"
-                  onClick={() => setMenuOpen(false)}
-                  className="block py-3 font-body text-[16px] text-ink"
-                >
-                  Files
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/me/settings"
-                  onClick={() => setMenuOpen(false)}
-                  className="block py-3 font-body text-[16px] text-ink"
-                >
-                  Account Settings
-                </Link>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    void signOut({ redirectUrl: "/" });
-                  }}
-                  className="block w-full py-3 text-left font-body text-[16px] text-ink"
-                >
-                  Sign Out
-                </button>
-              </li>
-            </SignedIn>
           </ul>
         </div>
       )}

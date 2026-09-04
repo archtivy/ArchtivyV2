@@ -1,5 +1,6 @@
 import { HomeNav } from "@/components/home/HomeNav";
 import { HomeFooter } from "@/components/home/HomeFooter";
+import { HEADER_CLEARANCE } from "@/components/home/headerClearance";
 
 /**
  * The chrome every public directory surface renders: the editorial HomeNav,
@@ -35,7 +36,7 @@ export function DirectoryPageShell({ children }: { children: React.ReactNode }) 
     <div className="min-h-screen bg-cream font-body text-ink">
       {/* solid: there is no dark hero behind the bar on any directory page. */}
       <HomeNav variant="solid" />
-      <main className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
+      <main className={`mx-auto max-w-content px-4 ${HEADER_CLEARANCE} md:px-12 lg:px-24`}>
         {children}
       </main>
       <HomeFooter />

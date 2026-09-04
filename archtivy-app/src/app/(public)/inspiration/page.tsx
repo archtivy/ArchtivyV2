@@ -13,6 +13,7 @@ import { InspirationControls } from "@/components/inspiration/InspirationControl
 import { InspirationFilters } from "@/components/inspiration/InspirationFilters";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildCollectionPageJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { HEADER_CLEARANCE } from "@/components/home/headerClearance";
 
 /**
  * /inspiration — the feed (spec §9.6 v1 scope).
@@ -123,7 +124,7 @@ export default async function InspirationPage({
       <JsonLd schemas={[jsonLd, breadcrumb]} />
       <HomeNav variant="solid" />
 
-      <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
+      <div className={`mx-auto max-w-content px-4 ${HEADER_CLEARANCE} md:px-12 lg:px-24`}>
         <header className="max-w-[46ch]">
           <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
             Visual discovery

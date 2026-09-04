@@ -23,6 +23,7 @@ import { ListingViewTracker } from "@/components/listing/ListingViewTracker";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildProductJsonLd, buildBreadcrumbJsonLd } from "@/lib/seo/jsonld";
 import type { ProductCanonical } from "@/lib/canonical-models";
+import { HEADER_CLEARANCE } from "@/components/home/headerClearance";
 
 /**
  * Product Detail — Entity Detail Layout archetype (Blueprint §8).
@@ -223,7 +224,7 @@ export async function ProductDetailView({
       <ListingViewTracker type="product" id={detail.id} />
       <HomeNav variant="solid" />
 
-      <div className="mx-auto max-w-content px-4 pt-[92px] md:px-12 lg:px-24">
+      <div className={`mx-auto max-w-content px-4 ${HEADER_CLEARANCE} md:px-12 lg:px-24`}>
         <nav aria-label="Breadcrumb" className="mb-6 font-body text-[12px] text-muted">
           <Link href="/" className="hover:text-ink">
             Home

@@ -25,6 +25,7 @@ import { EditableText } from "@/components/profile/edit/EditableText";
 import { ProfileIntro } from "@/components/profile/edit/ProfileIntro";
 import { ProfileCoverImage } from "@/components/profile/edit/ProfileCoverImage";
 import type { Profile } from "@/lib/types/profiles";
+import { HEADER_CLEARANCE } from "@/components/home/headerClearance";
 
 /**
  * The public profile page — ONE component, two content models.
@@ -340,7 +341,7 @@ export function ProfilePageView(props: ProfilePageViewProps) {
           21:79, which no clean grid fraction lands on, and a fixed rail also
           keeps the profile card a constant size as the window grows instead of
           stretching it. */}
-      <div className="mx-auto w-full max-w-[1600px] px-4 pb-24 pt-[92px] sm:px-6 lg:px-8">
+      <div className={`mx-auto w-full max-w-[1600px] px-4 pb-24 ${HEADER_CLEARANCE} sm:px-6 lg:px-8`}>
         <ProfileViewProvider views={views}>
           {/* Two columns, as in the reference: a persistent identity rail and
               the content beside it. Below `lg` the rail falls into document

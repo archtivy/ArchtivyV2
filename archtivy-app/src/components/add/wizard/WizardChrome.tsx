@@ -2,6 +2,7 @@
 
 import { Check } from "lucide-react";
 import { HomeNav } from "@/components/home/HomeNav";
+import { HEADER_CLEARANCE_WIZARD } from "@/components/home/headerClearance";
 
 /**
  * Wizard chrome — the frame, step rail, progress and autosave indicator.
@@ -42,7 +43,7 @@ export function WizardFrame({
    * The edit route needs a publish/draft control that belongs to the same
    * column as the wizard. Putting it above <WizardFrame> instead left it
    * outside this cream, header-offset container — sitting on the bare page
-   * background, which is white, and needing its own copy of the `pt-[104px]`
+   * background, which is white, and needing its own copy of the `${HEADER_CLEARANCE_WIZARD}`
    * header clearance plus a negative margin to cancel this one. That produced
    * the white band under the header. A slot inside the column removes the
    * cause rather than hiding it: one background, one header offset, one
@@ -63,7 +64,7 @@ export function WizardFrame({
   return (
     <div className="min-h-screen bg-cream font-body text-ink">
       <HomeNav variant="solid" />
-      <div className="mx-auto max-w-[1400px] px-5 pb-16 pt-[104px] md:px-10 lg:px-14">
+      <div className={`mx-auto max-w-[1400px] px-5 pb-16 ${HEADER_CLEARANCE_WIZARD} md:px-10 lg:px-14`}>
         {headerSlot}
         {children}
       </div>
