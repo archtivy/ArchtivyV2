@@ -10,7 +10,6 @@ import { getProfileByClerkId } from "@/lib/db/profiles";
 import { getOwnedListingsForClerkUser } from "@/lib/db/listings";
 import { getFirstImageUrlPerListingIds } from "@/lib/db/listingImages";
 import { getUserListingStats, getLiveSaveCountsByListingIds } from "@/lib/db/userStats";
-import { getListingUrl } from "@/lib/canonical";
 import { ListingActionsMenu } from "@/components/me/ListingActionsMenu";
 import { ListingsToolbar } from "./ListingsToolbar";
 import type { OwnedListingSummary } from "@/lib/db/listings";
@@ -232,11 +231,19 @@ function ListingRow({
 }) {
   const isDraft = listing.status === "DRAFT";
   const title = listing.title?.trim() || "Untitled";
+  const editHref = `/me/listings/${listing.id}/edit`;
 
   return (
     <li className="flex flex-col gap-4 rounded-xl border border-hairline bg-white p-3.5 transition-colors hover:border-ink/20 sm:flex-row sm:items-center">
+      {/*
+        Opening a listing from your own workspace means opening it to work on
+        it, so the image and the title both go to the edit page. That is what
+        the "Manage" button did; the button is gone and the card does its job.
+        The PUBLIC page has not become unreachable — it is "View" in the ••• menu,
+        which is also where it belongs, since a draft has no public page yet.
+      */}
       <Link
-        href={getListingUrl(listing)}
+        href={editHref}
         className="relative h-20 w-full shrink-0 overflow-hidden rounded-lg bg-stone/40 sm:h-16 sm:w-24"
       >
         {imageUrl ? (
@@ -250,7 +257,11 @@ function ListingRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="min-w-0 truncate font-body text-[14px] text-ink">{title}</h2>
+          <h2 className="min-w-0 truncate font-body text-[14px] text-ink">
+            <Link href={editHref} className="hover:underline">
+              {title}
+            </Link>
+          </h2>
           <span className="rounded border border-hairline px-1.5 py-0.5 font-body text-[10px] uppercase tracking-[0.08em] text-muted">
             {listing.type}
           </span>
@@ -279,12 +290,6 @@ function ListingRow({
           <Bookmark strokeWidth={1.5} className="h-3.5 w-3.5" aria-hidden />
           {saves.toLocaleString()}
         </span>
-        <Link
-          href={`/me/listings/${listing.id}`}
-          className="rounded-lg border border-ink/25 px-3 py-1.5 font-body text-[13px] text-ink transition-colors hover:bg-stone/40"
-        >
-          Manage
-        </Link>
         <ListingActionsMenu
           listingId={listing.id}
           listingType={listing.type}

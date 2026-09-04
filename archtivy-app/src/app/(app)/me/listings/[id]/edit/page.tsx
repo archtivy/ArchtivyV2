@@ -13,6 +13,7 @@ import {
 } from "@/lib/publish/wizardReferenceData";
 import { ProjectWizard } from "@/app/(app)/add/project/ProjectWizard";
 import { ProductWizard } from "@/app/(app)/add/product/ProductWizard";
+import { ListingStatusBar } from "@/components/me/ListingStatusBar";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -79,14 +80,24 @@ export default async function EditListingPage({
       getWizardFacets("product"),
     ]);
     return (
-      <ProductWizard
-        categories={categories}
-        materials={materials}
-        facets={facets}
-        brandName={profile.display_name?.trim() || profile.username || null}
-        initial={listing}
-        initialStep={initialStep}
-      />
+      <>
+        {/* The wizard is shared with /add/product, where there is no listing to
+            publish yet — so the status control belongs to this route, above it,
+            rather than inside it. */}
+        <ListingStatusBar
+          listingId={listing.id}
+          status={listing.status}
+          title={listing.title?.trim() || "this listing"}
+        />
+        <ProductWizard
+          categories={categories}
+          materials={materials}
+          facets={facets}
+          brandName={profile.display_name?.trim() || profile.username || null}
+          initial={listing}
+          initialStep={initialStep}
+        />
+      </>
     );
   }
 
@@ -98,14 +109,21 @@ export default async function EditListingPage({
     getWizardFacets("project"),
   ]);
   return (
-    <ProjectWizard
-      categories={categories}
-      materials={materials}
-      facets={facets}
-      products={products}
-      memberTitles={memberTitles}
-      initial={listing}
-      initialStep={initialStep}
-    />
+    <>
+      <ListingStatusBar
+        listingId={listing.id}
+        status={listing.status}
+        title={listing.title?.trim() || "this listing"}
+      />
+      <ProjectWizard
+        categories={categories}
+        materials={materials}
+        facets={facets}
+        products={products}
+        memberTitles={memberTitles}
+        initial={listing}
+        initialStep={initialStep}
+      />
+    </>
   );
 }

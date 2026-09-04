@@ -141,6 +141,21 @@ export function ListingActionsMenu({
               View
             </Link>
           )}
+          {/*
+            The pin-tagging page at /me/listings/[id] was reached only by the
+            "Manage" button on the listings row. That button is gone, so the
+            entry point moves here rather than disappearing — it is a shipped
+            feature, and losing the only way to find it is not a cleanup.
+          */}
+          <Link
+            href={`/me/listings/${listingId}`}
+            role="menuitem"
+            className={itemCls}
+            onClick={() => setOpen(false)}
+          >
+            Tag products
+          </Link>
+
           <Link
             href={`/me/listings/${listingId}/edit`}
             role="menuitem"
