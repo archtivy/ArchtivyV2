@@ -12,6 +12,7 @@ import {
   setListingTaxonomyNode,
   type TaxonomyNode,
 } from "./taxonomyDb";
+import { cache } from "react";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { fuzzyMatchProductNode, fuzzyMatchProjectNode, type TaxonomyNodeForMatch } from "./normalize";
 
@@ -284,8 +285,24 @@ async function resolveFromLegacyFields(listingId: string): Promise<TaxonomyNode 
  *
  * Use this for breadcrumbs, detail pages, canonical route generation,
  * archive page linking, and internal linking.
+ *
+ * ── DEDUPED PER REQUEST ─────────────────────────────────────────────────────
+ * Wrapped in React's `cache`, which memoises on the argument for the lifetime
+ * of one server render and nothing longer.
+ *
+ * A detail page asked for the same listing's path at least twice on every
+ * request — once in `generateMetadata` and again in the page body's canonical
+ * resolution — and each call cost two round trips (listing_taxonomy_node, then
+ * taxonomy_nodes). Nothing was caching it: unlike the listing fetchers this
+ * had no `unstable_cache` around it, so the second call really did go back to
+ * the database for an answer the first had already been given.
+ *
+ * `cache` rather than `unstable_cache` on purpose. This is deduplication, not
+ * caching: the memo dies with the request, so a taxonomy edit is visible on
+ * the very next page view exactly as it is today. Adding a cross-request cache
+ * here would be a behaviour change; removing a duplicate round trip is not.
  */
-export async function getListingTaxonomyPath(
+export const getListingTaxonomyPath = cache(async function getListingTaxonomyPath(
   listingId: string
 ): Promise<ListingTaxonomyPath> {
   // Layer 1+2: junction table + direct column fallback
@@ -304,7 +321,7 @@ export async function getListingTaxonomyPath(
   }
 
   return EMPTY_PATH;
-}
+});
 
 /**
  * Batch-resolve primary taxonomy slug_paths for an array of listing IDs.
