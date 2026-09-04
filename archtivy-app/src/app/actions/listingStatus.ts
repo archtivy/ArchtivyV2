@@ -1,8 +1,9 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 import { canManageListing } from "@/lib/auth/listingOwnership";
 import { prewarmHeroInBackground } from "@/lib/images/prewarmHero";
@@ -143,8 +144,24 @@ export async function setListingStatusAction(
  * Both directions need the same set: publishing has to make the row appear in
  * the directories and its detail page resolve, and un-publishing has to make
  * both stop.
+ *
+ * ── PATHS ARE NOT ENOUGH ────────────────────────────────────────────────────
+ * The detail routes read through `unstable_cache` with a 3600s life, tagged
+ * `listings`, `matches` and `project:{slug}` / `product:{slug}`.
+ * `revalidatePath` clears rendered output and the router cache; it does NOT
+ * clear that data cache. Without the tags below, a listing moved to draft kept
+ * serving its cached APPROVED row to anonymous visitors — measured, a 200
+ * where a 404 was required, for up to an hour. The route guard was correct all
+ * along; it was simply never asked again.
+ *
+ * cache-tags.ts states the rule this restores: call revalidateTag for every
+ * domain a mutation touches, AND revalidatePath for the affected routes.
  */
 function revalidateForListing(type: string | null, slug: string | null) {
+  revalidateTag(CACHE_TAGS.listings);
+  revalidateTag(CACHE_TAGS.explore);
+  if (slug) revalidateTag(type === "product" ? `product:${slug}` : `project:${slug}`);
+
   revalidatePath("/me/listings");
   revalidatePath("/me/dashboard");
   revalidatePath("/admin/projects");
