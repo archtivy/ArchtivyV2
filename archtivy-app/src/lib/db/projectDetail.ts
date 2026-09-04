@@ -139,7 +139,7 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   if (!row) return null;
   const l = row as Record<string, unknown>;
 
-  const [imgRes, teamRes, prodLinkRes, docRes, taxRes, matLinkRes] = await Promise.all([
+  const [imgRes, teamRes, prodLinkRes, docRes, taxRes, matLinkRes, hotspotsRes] = await Promise.all([
     sup
       .from("listing_images")
       .select("id, image_url, alt, sort_order")
@@ -163,13 +163,143 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
     // Explicit two-step: project_material_links has no FK, so PostgREST cannot
     // embed materials across it (see projectsDirectory.ts).
     sup.from("project_material_links").select("material_id").eq("project_id", listingId),
+    // Public product pins, keyed by listing_image_id. Filtered to
+    // verified/official inside getHotspotsForListing — see the note there on
+    // why the service-role client makes that filter load-bearing rather than
+    // redundant with RLS.
+    //
+    // In this batch rather than after it: it needs nothing but listingId, so
+    // waiting for the batch to finish before asking was a round trip spent on
+    // nothing.
+    getHotspotsForListing(listingId),
   ]);
 
-  // Public product pins, keyed by listing_image_id. Filtered to
-  // verified/official inside getHotspotsForListing — see the note there on why
-  // the service-role client makes that filter load-bearing rather than
-  // redundant with RLS.
-  const hotspotsByImage = await getHotspotsForListing(listingId);
+  const hotspotsByImage = hotspotsRes;
+
+  /*
+   * ── EVERY INDEPENDENT BRANCH STARTS HERE, TOGETHER ────────────────────────
+   * What follows this batch used to be six branches — team profiles, products,
+   * materials, related, same-studio, nearby — each awaiting the one before it
+   * even though none reads another's result. They all depend only on the rows
+   * the batch above just returned, so the page waited for the SUM of six
+   * round-trip chains where it only ever needed the LONGEST.
+   *
+   * The queries are fired here and awaited further down at exactly the point
+   * each result was already being used. Nothing else moved: every piece of
+   * processing stays where it was, in the same order, so the returned shape is
+   * unchanged and the diff stays readable. The small id lists are recomputed
+   * here rather than hoisting their consumers — a couple of array maps over a
+   * handful of rows, against six serialised network waits.
+   *
+   * Each promise is an async IIFE because a PostgREST builder is lazy: it does
+   * not issue anything until awaited, so merely constructing it here would
+   * have changed the ordering not at all.
+   */
+  const _teamRows = (teamRes.data ?? []) as { profile_id: string | null }[];
+  const _profileIds = Array.from(
+    new Set(
+      [..._teamRows.map((t) => t.profile_id), l.owner_profile_id as string | null].filter(
+        Boolean
+      ) as string[]
+    )
+  );
+  const _productIds = ((prodLinkRes.data ?? []) as { product_id: string }[]).map(
+    (r) => r.product_id
+  );
+  const _materialIds = ((matLinkRes.data ?? []) as { material_id: string }[]).map(
+    (r) => r.material_id
+  );
+  const _pickOne = <T,>(v: T | T[] | null | undefined): T | null =>
+    Array.isArray(v) ? v[0] ?? null : v ?? null;
+  let _buildingTypeRoot: string | null = null;
+  for (const r of (taxRes.data ?? []) as unknown as {
+    is_primary: boolean;
+    taxonomy_nodes: { domain: string; slug_path: string } | { domain: string; slug_path: string }[] | null;
+  }[]) {
+    const n = _pickOne(r.taxonomy_nodes);
+    if (n && n.domain === "project" && (r.is_primary || !_buildingTypeRoot)) {
+      _buildingTypeRoot = n.slug_path.split("/")[0];
+    }
+  }
+  const _ownerProfileId = (l.owner_profile_id as string | null) ?? null;
+  const _city = ((l.location_city as string | null) ?? "").trim() || null;
+  const _country = ((l.location_country as string | null) ?? "").trim() || null;
+
+  const pProfiles =
+    _profileIds.length > 0
+      ? (async () =>
+          sup
+            .from("profiles")
+            .select("id, display_name, username, avatar_url, claim_status")
+            .in("id", _profileIds))()
+      : null;
+
+  const pProducts =
+    _productIds.length > 0
+      ? (async () =>
+          Promise.all([
+            sup
+              .from("listings")
+              .select("id, slug, title, cover_image_url, category")
+              .in("id", _productIds)
+              .eq("status", "APPROVED")
+              .is("deleted_at", null),
+            sup.from("products").select("id, brand_profile_id").in("id", _productIds),
+          ]))()
+      : null;
+
+  const pMaterials =
+    _materialIds.length > 0
+      ? (async () => sup.from("materials").select("name, slug").in("id", _materialIds))()
+      : null;
+
+  const pSameType = _buildingTypeRoot
+    ? (async () =>
+        sup
+          .from("listing_taxonomy_node")
+          .select("listing_id, taxonomy_nodes:taxonomy_node_id(domain, slug_path)")
+          .neq("listing_id", listingId)
+          .limit(400))()
+    : null;
+
+  const pStudio = _ownerProfileId
+    ? (async () =>
+        sup
+          .from("listings")
+          .select("id")
+          .eq("type", "project")
+          .eq("status", "APPROVED")
+          .is("deleted_at", null)
+          .eq("owner_profile_id", _ownerProfileId)
+          .neq("id", listingId)
+          .limit(8))()
+    : null;
+
+  const pNearbyCity = _city
+    ? (async () =>
+        sup
+          .from("listings")
+          .select("id")
+          .eq("type", "project")
+          .eq("status", "APPROVED")
+          .is("deleted_at", null)
+          .eq("location_city", _city)
+          .neq("id", listingId)
+          .limit(8))()
+    : null;
+
+  const pNearbyCountry = _country
+    ? (async () =>
+        sup
+          .from("listings")
+          .select("id")
+          .eq("type", "project")
+          .eq("status", "APPROVED")
+          .is("deleted_at", null)
+          .eq("location_country", _country)
+          .neq("id", listingId)
+          .limit(8))()
+    : null;
 
   const images: ProjectDetail["images"] = ((imgRes.data ?? []) as { id: string; image_url: string; alt: string | null }[])
     .filter((i) => i.image_url)
@@ -212,10 +342,7 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
     }
   >();
   if (profileIds.length > 0) {
-    const { data: profs } = await sup
-      .from("profiles")
-      .select("id, display_name, username, avatar_url, claim_status")
-      .in("id", profileIds);
+    const { data: profs } = (await pProfiles) ?? { data: null };
     for (const p of (profs ?? []) as {
       id: string;
       display_name: string | null;
@@ -273,22 +400,15 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
     // which silently emptied this panel until it was caught by diffing the
     // rendered page against the measured data. Brand is read from the sidecar
     // below instead.
-    const { data: prods, error: prodErr } = await sup
-      .from("listings")
-      .select("id, slug, title, cover_image_url, category")
-      .in("id", productIds)
-      .eq("status", "APPROVED")
-      .is("deleted_at", null);
+    const [prodsRes, sidecarsRes] = (await pProducts) ?? [{ data: null, error: null }, { data: null }];
+    const { data: prods, error: prodErr } = prodsRes;
 
     if (prodErr) {
       console.warn("[projectDetail] product lookup failed:", prodErr.message);
     }
 
     const brandIds = new Map<string, string | null>();
-    const { data: sidecars } = await sup
-      .from("products")
-      .select("id, brand_profile_id")
-      .in("id", productIds);
+    const { data: sidecars } = sidecarsRes;
     const brandProfileIds = Array.from(
       new Set(
         ((sidecars ?? []) as { id: string; brand_profile_id: string | null }[])
@@ -357,7 +477,7 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   );
   let materials: { name: string; slug: string | null }[] = [];
   if (materialIds.length > 0) {
-    const { data: mats } = await sup.from("materials").select("name, slug").in("id", materialIds);
+    const { data: mats } = (await pMaterials) ?? { data: null };
     materials = ((mats ?? []) as { name: string; slug: string | null }[])
       .filter((m) => m.name)
       .map((m) => ({ name: m.name, slug: m.slug ?? null }));
@@ -414,11 +534,7 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   }
 
   if (buildingTypeRoot) {
-    const { data: sameType } = await sup
-      .from("listing_taxonomy_node")
-      .select("listing_id, taxonomy_nodes:taxonomy_node_id(domain, slug_path)")
-      .neq("listing_id", listingId)
-      .limit(400);
+    const { data: sameType } = (await pSameType) ?? { data: null };
     const ids = ((sameType ?? []) as unknown as {
       listing_id: string;
       taxonomy_nodes: { domain: string; slug_path: string } | { domain: string; slug_path: string }[] | null;
@@ -447,15 +563,7 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   // ── More from this studio ────────────────────────────────────────────────
   let studioProjectIds: string[] = [];
   if (l.owner_profile_id) {
-    const { data: sameStudio } = await sup
-      .from("listings")
-      .select("id")
-      .eq("type", "project")
-      .eq("status", "APPROVED")
-      .is("deleted_at", null)
-      .eq("owner_profile_id", l.owner_profile_id as string)
-      .neq("id", listingId)
-      .limit(8);
+    const { data: sameStudio } = (await pStudio) ?? { data: null };
     studioProjectIds = ((sameStudio ?? []) as { id: string }[]).map((r) => r.id);
   }
 
@@ -467,17 +575,16 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   const country = ((l.location_country as string | null) ?? "").trim() || null;
   const NEARBY_MIN = 3;
 
-  async function projectsIn(column: "location_city" | "location_country", value: string) {
-    const { data } = await sup
-      .from("listings")
-      .select("id")
-      .eq("type", "project")
-      .eq("status", "APPROVED")
-      .is("deleted_at", null)
-      .eq(column, value)
-      .neq("id", listingId)
-      .limit(8);
-    return ((data ?? []) as { id: string }[]).map((r) => r.id);
+  /*
+   * Both nearby queries are already in flight (see the batch above). The city
+   * result is preferred and the country one is simply discarded when the city
+   * has enough projects — one speculative query against a serial fallback that
+   * would otherwise add a whole round trip to every project outside a
+   * well-populated city.
+   */
+  async function projectsIn(column: "location_city" | "location_country", _value: string) {
+    const res = await (column === "location_city" ? pNearbyCity : pNearbyCountry);
+    return (((res?.data ?? []) as { id: string }[])).map((r) => r.id);
   }
 
   let nearby: ProjectDetail["nearby"] = null;

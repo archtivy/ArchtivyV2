@@ -190,7 +190,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   const one = <T,>(v: T | T[] | null | undefined): T | null =>
     Array.isArray(v) ? v[0] ?? null : v ?? null;
 
-  const [imgRes, docRes, taxRes, matLinkRes, projLinkRes, sidecarRes, creditRes] = await Promise.all([
+  const [imgRes, docRes, taxRes, matLinkRes, projLinkRes, sidecarRes, creditRes, hotspotsRes] = await Promise.all([
     sup
       .from("listing_images")
       .select("id, image_url, alt, sort_order")
@@ -217,12 +217,55 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
       .select("display_name, profile_id, sort_order")
       .eq("listing_id", listingId)
       .order("sort_order", { ascending: true }),
+    // Needs nothing but listingId, so it belongs in this batch rather than
+    // a round trip after it.
+    getHotspotsForListing(listingId),
   ]);
 
   // Symmetric with Project Detail. No product currently carries a pin — all 7
   // migrated pins are on projects — but a product photo can be tagged, and
   // wiring only one side would guarantee the other is forgotten.
-  const hotspotsByImage = await getHotspotsForListing(listingId);
+  const hotspotsByImage = hotspotsRes;
+
+  /*
+   * ── INDEPENDENT BRANCHES, STARTED TOGETHER ────────────────────────────────
+   * Same change as projectDetail.ts, same reason: materials, design credits
+   * and the projects featuring this product each depend only on rows the batch
+   * above already returned, and none reads another's result — yet each waited
+   * for the previous one's round trip. Fired here, awaited unchanged below.
+   */
+  const _materialIds = ((matLinkRes.data ?? []) as { material_id: string }[]).map(
+    (r) => r.material_id
+  );
+  const _creditProfileIds = Array.from(
+    new Set(
+      ((creditRes.data ?? []) as { profile_id: string | null }[])
+        .map((r) => r.profile_id)
+        .filter(Boolean) as string[]
+    )
+  );
+  const _projectIds = ((projLinkRes.data ?? []) as { project_id: string }[]).map(
+    (r) => r.project_id
+  );
+
+  const pMaterials =
+    _materialIds.length > 0
+      ? (async () => sup.from("materials").select("name").in("id", _materialIds))()
+      : null;
+  const pCreditProfiles =
+    _creditProfileIds.length > 0
+      ? (async () => sup.from("profiles").select("id, username").in("id", _creditProfileIds))()
+      : null;
+  const pProjectRows =
+    _projectIds.length > 0
+      ? (async () =>
+          sup
+            .from("listings")
+            .select("id, slug, title, cover_image_url, owner_profile_id")
+            .in("id", _projectIds)
+            .eq("status", "APPROVED")
+            .is("deleted_at", null))()
+      : null;
 
   const images: ProductDetail["images"] = ((imgRes.data ?? []) as {
     id: string;
@@ -321,7 +364,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   );
   let materials: string[] = [];
   if (materialIds.length > 0) {
-    const { data: mats } = await sup.from("materials").select("name").in("id", materialIds);
+    const { data: mats } = (await pMaterials) ?? { data: null };
     materials = ((mats ?? []) as { name: string }[]).map((m) => m.name).filter(Boolean);
   }
 
@@ -342,10 +385,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
     );
     const usernames = new Map<string, string | null>();
     if (creditProfileIds.length > 0) {
-      const { data: cps } = await sup
-        .from("profiles")
-        .select("id, username")
-        .in("id", creditProfileIds);
+      const { data: cps } = (await pCreditProfiles) ?? { data: null };
       for (const cp of (cps ?? []) as { id: string; username: string | null }[]) {
         usernames.set(cp.id, cp.username);
       }
@@ -381,12 +421,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   );
   let projects: ProductDetailProject[] = [];
   if (projectIds.length > 0) {
-    const { data: projRows } = await sup
-      .from("listings")
-      .select("id, slug, title, cover_image_url, owner_profile_id")
-      .in("id", projectIds)
-      .eq("status", "APPROVED")
-      .is("deleted_at", null);
+    const { data: projRows } = (await pProjectRows) ?? { data: null };
     const ownerIds = Array.from(
       new Set(
         ((projRows ?? []) as Record<string, unknown>[])
