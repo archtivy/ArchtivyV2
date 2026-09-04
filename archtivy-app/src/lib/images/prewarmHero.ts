@@ -106,9 +106,20 @@ export async function prewarmHeroImage(imageUrl: string | null | undefined): Pro
           // A failed warm must not poison the memo — the next publish, or the
           // first reader, should be free to try again.
           warmed.delete(target);
+          console.warn(`[prewarmHero] ${res.status} for w=${w} at ${base}`);
         }
-      } catch {
+      } catch (err) {
         warmed.delete(target);
+        /*
+         * Logged, not swallowed. This is best-effort work whose only failure
+         * mode is that a reader pays a cost they would have paid anyway — but
+         * a warm that silently never runs is indistinguishable from one that
+         * never helped, and on a platform that may suspend background work
+         * after a response (see the note on the export below) that is exactly
+         * the thing worth being able to see in the logs.
+         */
+        const reason = err instanceof Error ? err.name : String(err);
+        console.warn(`[prewarmHero] failed for w=${w} at ${base}: ${reason}`);
       } finally {
         clearTimeout(timer);
       }
@@ -122,10 +133,25 @@ export async function prewarmHeroImage(imageUrl: string | null | undefined): Pro
  * Fire-and-forget wrapper for use inside a publish path.
  *
  * Publishing must not wait several seconds for image encoding, and must not
- * fail because an optimiser request did. This returns immediately and swallows
- * everything; the worst outcome of a failure is that the first reader pays the
- * cost they would have paid anyway.
+ * fail because an optimiser request did. This returns immediately; every
+ * failure inside is caught and logged rather than thrown, so no rejection can
+ * escape to become an unhandled one.
+ *
+ * ── A LIMIT WORTH KNOWING ABOUT ─────────────────────────────────────────────
+ * On Vercel this is BEST EFFORT, not a guarantee. A Node serverless function
+ * may be frozen or torn down once its response has been sent, so work started
+ * here and not awaited can be cut short. Next 14.2 has no `after()` and
+ * `@vercel/functions` (which provides `waitUntil`) is not a dependency of this
+ * project, so there is no supported way to hold the instance open without
+ * adding one.
+ *
+ * The failure is benign in every direction: publishing is unaffected, and the
+ * worst case is that the first reader pays the optimisation cost they would
+ * have paid anyway. The warn above is what makes the difference between
+ * "warming worked" and "warming never ran" visible in the logs.
  */
 export function prewarmHeroInBackground(imageUrl: string | null | undefined): void {
-  void prewarmHeroImage(imageUrl).catch(() => undefined);
+  void prewarmHeroImage(imageUrl).catch((err) => {
+    console.warn("[prewarmHero] unexpected failure:", err);
+  });
 }
