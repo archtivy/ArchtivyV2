@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { MoreHorizontal } from "lucide-react";
 import { deleteListing } from "@/app/actions/listings";
+import { setListingStatusAction } from "@/app/actions/listingStatus";
 import { getListingUrl } from "@/lib/canonical";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 
@@ -12,11 +13,17 @@ import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
  * The ••• overflow menu on a workspace listing card or row.
  *
  * ── ONLY ACTIONS THAT EXIST ─────────────────────────────────────────────────
- * View · Edit · Promote · Delete. The reference also offers "Unpublish", which
- * this deliberately omits: `listings.status` holds exactly two values platform-
- * wide, APPROVED and DRAFT, and no code path moves a row back from one to the
- * other. Shipping the item would mean either inventing a state transition or
- * drawing a button that does nothing.
+ * View · Publish / Move to draft · Edit · Promote · Delete.
+ *
+ * The status item used to be absent, and the reason was recorded here: no code
+ * path moved a row back from APPROVED to DRAFT, so the item would have been a
+ * button that did nothing. `setListingStatusAction` is that path, so the item
+ * is real now. It writes the SAME `listings.status` column every public read
+ * already filters on — there is no second status field, and DRAFT/APPROVED are
+ * still the only two values in play.
+ *
+ * "Published" is the word in the menu; APPROVED is the value in the column.
+ * The internal name is a moderation term and stays internal.
  *
  * Promote is shown only for APPROVED listings — a draft has no public page to
  * send traffic to — and links into the REAL promotion flow at /me/tools with
@@ -41,6 +48,7 @@ export function ListingActionsMenu({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -68,6 +76,29 @@ export function ListingActionsMenu({
     type: listingType,
     slug: listingSlug ?? undefined,
   });
+
+  /*
+   * Publishing is immediate; un-publishing asks first.
+   *
+   * The asymmetry is deliberate. Making something live is additive and
+   * trivially reversible by the item directly above it, while taking a live
+   * listing off the site removes a public page other people may already be
+   * linking to — the one direction worth a moment's pause.
+   */
+  const handleSetStatus = (next: "DRAFT" | "APPROVED") => {
+    setError(null);
+    startTransition(async () => {
+      const res = await setListingStatusAction(listingId, next);
+      if (!res.ok) {
+        setError(res.error);
+        setDraftConfirmOpen(false);
+        return;
+      }
+      setDraftConfirmOpen(false);
+      setOpen(false);
+      router.refresh();
+    });
+  };
 
   const handleDelete = () => {
     setError(null);
@@ -148,6 +179,17 @@ export function ListingActionsMenu({
           {error}
         </p>
       )}
+
+      <ConfirmDialog
+        open={draftConfirmOpen}
+        title={`Move “${listingTitle}” to draft?`}
+        body="It comes off the public site — its page, the directories and search. Nothing is deleted: images, links and the same web address all come back when you publish it again."
+        confirmLabel={isPending ? "Moving…" : "Move to draft"}
+        cancelLabel="Keep it published"
+        pending={isPending}
+        onConfirm={() => handleSetStatus("DRAFT")}
+        onCancel={() => setDraftConfirmOpen(false)}
+      />
 
       <ConfirmDialog
         open={confirmOpen}

@@ -95,6 +95,61 @@ export function Gallery({
   const [stageBox, setStageBox] = useState({ width: 0, height: 0 });
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
 
+  /*
+   * ── THE STAGE TAKES THE PHOTOGRAPH'S SHAPE ────────────────────────────────
+   * This box used to be a fixed aspect-[16/10] with object-cover, so every
+   * image was cropped to a letterbox the photographer did not choose — a
+   * portrait interior lost its top and bottom, and two images of different
+   * shapes were shown as though they were the same shape.
+   *
+   * The ratio now comes from the file. Recorded for EVERY image rather than
+   * only the visible one, because all of them are mounted and loading anyway
+   * (they cross-fade in place), and remembering each means moving between two
+   * differently shaped photographs resizes the stage once, on arrival, instead
+   * of collapsing to a default and snapping back on every navigation.
+   *
+   * `object-cover` stays on the image itself and is now a no-op: when the box
+   * and the file share a ratio there is nothing to crop. It is left in place so
+   * the brief moment before a first measurement fills the frame rather than
+   * letterboxing it.
+   */
+  const [ratios, setRatios] = useState<Record<string, number>>({});
+
+  /*
+   * `onLoadingComplete` is not enough on its own. An image already in the
+   * browser cache can finish loading before React attaches the handler, and the
+   * callback then never fires — the stage keeps the 16/10 placeholder and the
+   * photograph is cropped after all. Observed at 390px against a warm cache.
+   *
+   * So the DOM is read directly after paint as well: any <img> reporting
+   * `complete` with real dimensions has its ratio recorded here instead.
+   * Measuring twice is harmless — the setter below is a no-op when nothing has
+   * changed — and it is the difference between this working only on a cold load
+   * and working every time.
+   */
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const measure = () => {
+      const found: Record<string, number> = {};
+      el.querySelectorAll("img").forEach((node) => {
+        const im = node as HTMLImageElement;
+        const key = im.dataset.galleryKey;
+        if (!key || !im.complete || !im.naturalWidth || !im.naturalHeight) return;
+        found[key] = im.naturalWidth / im.naturalHeight;
+      });
+      if (Object.keys(found).length === 0) return;
+      setRatios((prev) => {
+        const changed = Object.entries(found).some(([k, v]) => prev[k] !== v);
+        return changed ? { ...prev, ...found } : prev;
+      });
+    };
+    measure();
+    // One more pass on the next frame, for images that decode a tick later.
+    const raf = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(raf);
+  }, [images, index]);
+
   /**
    * Which hotspot's card is open. One at a time, and OPEN-ON-INTENT rather than
    * open-on-hover: a hover-only card is unreachable by keyboard and impossible
@@ -268,7 +323,14 @@ export function Gallery({
         onKeyDown={onKeyDown}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
-        className="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-stone focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+        className="relative w-full overflow-hidden rounded-xl bg-stone focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+        /*
+         * Width stays 100% of the content column; height follows the file.
+         * 16/10 is only the placeholder used until the first measurement
+         * arrives, which keeps the reserved space — and therefore the layout
+         * shift — the same as it was before this change.
+         */
+        style={{ aspectRatio: String(ratios[images[index]?.url ?? ""] ?? 16 / 10) }}
       >
         {images.map((img, i) => (
           <Image
@@ -279,9 +341,16 @@ export function Gallery({
             sizes="(max-width: 1024px) 100vw, 66vw"
             priority={priority && i === 0}
             aria-hidden={i !== index}
+            data-gallery-key={img.url}
             onLoadingComplete={(el) => {
               if (i === index)
                 setNaturalSize({ width: el.naturalWidth, height: el.naturalHeight });
+              if (el.naturalWidth > 0 && el.naturalHeight > 0) {
+                const r = el.naturalWidth / el.naturalHeight;
+                setRatios((prev) =>
+                  prev[img.url] === r ? prev : { ...prev, [img.url]: r }
+                );
+              }
             }}
             className={[
               "object-cover transition-opacity duration-300 ease-out",

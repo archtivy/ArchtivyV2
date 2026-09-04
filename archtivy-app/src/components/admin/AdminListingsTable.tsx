@@ -9,6 +9,7 @@ import {
   bulkDeleteListings,
 } from "@/app/(admin)/admin/_actions/listings";
 import { getListingUrl } from "@/lib/canonical";
+import { setListingStatusAction } from "@/app/actions/listingStatus";
 import { ListingStatusPill } from "@/components/admin/ui/StatusPill";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import {
@@ -70,6 +71,27 @@ export function AdminListingsTable({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  /*
+   * The row whose un-publish is awaiting confirmation. Publishing is applied
+   * straight away; taking a live listing off the site asks first, because that
+   * removes a public page other people may be linking to.
+   */
+  const [draftTarget, setDraftTarget] = useState<{ id: string; title: string } | null>(null);
+
+  const applyStatus = (id: string, next: "DRAFT" | "APPROVED") =>
+    startTransition(async () => {
+      const res = await setListingStatusAction(id, next);
+      if (!res.ok) {
+        setBanner({ type: "error", message: res.error });
+        return;
+      }
+      setDraftTarget(null);
+      setBanner({
+        type: "success",
+        message: next === "APPROVED" ? "Listing published." : "Listing moved to draft.",
+      });
+      router.refresh();
+    });
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [bulkYear, setBulkYear] = useState("");
   const [bulkLocation, setBulkLocation] = useState("");
@@ -292,6 +314,27 @@ export function AdminListingsTable({
                     >
                       Preview
                     </Link>
+                    {r.status === "DRAFT" ? (
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => applyStatus(r.id, "APPROVED")}
+                        className={BTN_ROW}
+                      >
+                        {isPending ? "Working…" : "Publish"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() =>
+                          setDraftTarget({ id: r.id, title: toText(r.title) || "this listing" })
+                        }
+                        className={BTN_ROW}
+                      >
+                        Move to draft
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={isPending}
@@ -333,6 +376,17 @@ export function AdminListingsTable({
           </TBody>
         </Table>
       </TableShell>
+
+      <ConfirmDialog
+        open={!!draftTarget}
+        title={`Move “${draftTarget?.title ?? ""}” to draft?`}
+        body="It comes off the public site — its page, the directories and search. Nothing is deleted: images, links and the same web address all return when it is published again."
+        confirmLabel={isPending ? "Moving…" : "Move to draft"}
+        cancelLabel="Keep it published"
+        pending={isPending}
+        onConfirm={() => draftTarget && applyStatus(draftTarget.id, "DRAFT")}
+        onCancel={() => setDraftTarget(null)}
+      />
 
       <ConfirmDialog
         open={!!deleteTarget}

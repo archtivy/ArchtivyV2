@@ -9,12 +9,7 @@ import {
   updateAdminProductFromWizard,
 } from "../../_actions/listings";
 import { getListingForEdit } from "@/lib/db/listingEdit";
-import { getProductMaterialOptions } from "@/lib/db/materials";
-import { getListingImagesWithIds, sanitizeListingImageUrl } from "@/lib/db/listingImages";
-import { getProductTagsByImageIds } from "@/lib/db/productTags";
 import { ProductWizard } from "@/app/(app)/add/product/ProductWizard";
-import { EditorialImageManager } from "@/components/listing/EditorialImageManager";
-import type { ImageTaggingItem } from "@/components/listing/EditorialImageManager";
 import { getWizardOwnerOptions } from "@/lib/admin/wizardOwnerOptions";
 import {
   getWizardTaxonomyNodes,
@@ -52,51 +47,15 @@ export default async function AdminProductEditPage({
     categories,
     materials,
     memberTitles,
-    imagesWithIdsResult,
-    productMaterialOptions,
     facets,
   ] = await Promise.all([
     getWizardOwnerOptions("product"),
     getWizardTaxonomyNodes("product"),
     getWizardMaterials(),
     getWizardMemberTitles(),
-    getListingImagesWithIds(id),
-    getProductMaterialOptions(),
     getWizardFacets("product"),
   ]);
 
-  const imagesWithIds = imagesWithIdsResult.data ?? [];
-  let imageTaggingData: ImageTaggingItem[] = [];
-  if (imagesWithIds.length > 0) {
-    // product_tags, not the retired photo_product_tags sidecar. Same pins —
-    // every legacy row was already mirrored here — but this is the table with
-    // the verification workflow, and the one the public page reads.
-    const tags = await getProductTagsByImageIds(imagesWithIds.map((i) => i.id));
-    const tagsByImageId: Record<string, typeof tags> = {};
-    for (const tag of tags) {
-      (tagsByImageId[tag.listing_image_id] ??= []).push(tag);
-    }
-    imageTaggingData = imagesWithIds.map((img) => ({
-      listingImageId: img.id,
-      imageUrl: sanitizeListingImageUrl(img.image_url) ?? "",
-      imageAlt: img.alt ?? "Image",
-      imageTitle: img.title ?? "",
-      imageCaption: img.caption ?? "",
-      existingTags: (tagsByImageId[img.id] ?? []).map((t) => ({
-        id: t.id,
-        listing_image_id: t.listing_image_id,
-        product_id: t.product_id,
-        // Already percentages. The legacy table stored 0–1 and this mapping
-        // passed it straight through, so nothing here may rescale.
-        x: t.x_percent,
-        y: t.y_percent,
-        product_title: t.product_title ?? undefined,
-        product_slug: t.product_slug ?? undefined,
-        verification_status: t.verification_status,
-        tag_source: t.tag_source,
-      })),
-    }));
-  }
 
   const errorMsg = toText(searchParams.error);
   const showError = Boolean(errorMsg);
@@ -163,24 +122,6 @@ export default async function AdminProductEditPage({
         }}
       />
 
-      <div className="mt-12 border-t border-zinc-200 pt-8">
-        <EditorialImageManager
-          listingId={id}
-          images={imageTaggingData.map((img, i) => ({
-            listingImageId: img.listingImageId,
-            imageUrl: img.imageUrl,
-            imageAlt: img.imageAlt,
-            imageTitle: img.imageTitle,
-            imageCaption: img.imageCaption,
-            sortOrder: i,
-            existingTags: img.existingTags.map((t) => ({
-              ...t,
-              product_id: t.product_id?.trim() || null,
-            })),
-          }))}
-          materialOptions={productMaterialOptions ?? []}
-        />
-      </div>
     </AdminPage>
   );
 }
