@@ -6,6 +6,13 @@
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { projectListingSelect, productListingSelect } from "@/lib/db/selects";
 import { getImagesByListingIds, type ListingImageRow } from "@/lib/db/listingImages";
+import {
+  getCoreListingImages,
+  getCoreProductMaterials,
+  getCoreProjectMaterials,
+  getCoreTaxonomyRootLabels,
+  getCoreTaxonomyRows,
+} from "@/lib/db/listingCore";
 import type { ProductImageRow } from "@/lib/db/gallery";
 import { getProfilesByClerkIds, getProfilesByIds } from "@/lib/db/profiles";
 import { getCardBadgeCounts, getCreditCounts } from "@/lib/db/cardBadgeCounts";
@@ -62,6 +69,31 @@ export interface PrimaryTaxonomy {
  * Two queries for any number of listings, added to a fan-out that already runs
  * in parallel. No per-card work.
  */
+/**
+ * The single-listing form of getPrimaryTaxonomy, built on the request-scoped
+ * core rows so a detail page reads a listing's taxonomy once rather than
+ * three times. The batch version below is unchanged and still serves every
+ * caller that has many ids.
+ */
+async function getPrimaryTaxonomyOne(listingId: string): Promise<PrimaryTaxonomy | undefined> {
+  const rows = await getCoreTaxonomyRows(listingId);
+  const primaryRow = rows.find((r) => r.is_primary && r.node?.slug_path);
+  const node = primaryRow?.node;
+  if (!node?.slug_path) return undefined;
+
+  const rootPath = node.slug_path.split("/")[0];
+  const rootLabels = await getCoreTaxonomyRootLabels(rootPath);
+  const rootLabel = rootLabels.get(rootPath) ?? null;
+  return {
+    slugPath: node.slug_path,
+    rootLabel,
+    // Character-for-character the batch version's rule below: compare the
+    // node's LABEL against the ROOT's label, not their paths, so the line is
+    // never "Furniture · Furniture".
+    typeLabel: node.label && node.label !== rootLabel ? node.label : null,
+  };
+}
+
 async function getPrimaryTaxonomy(
   listingIds: string[]
 ): Promise<Map<string, PrimaryTaxonomy>> {
@@ -1422,21 +1454,31 @@ export async function getProjectCanonicalBySlugOrId(
   const row = await getProjectListingBySlugOrId(slugOrId);
   if (!row || !isProjectListing(row)) return null;
   const id = String(row.id);
-  const [imageResult, profilesResult, materialsMap] = await Promise.all([
-    getImagesByListingIds([id]),
+  /*
+   * Images, materials and taxonomy come from the request-scoped core helpers
+   * (see listingCore.ts). The detail loader asks for the same four things a
+   * moment later on the same render, and this is what stops it paying for
+   * them twice. The batch variants are still used everywhere that genuinely
+   * has many listing ids.
+   */
+  const [coreImages, profilesResult, coreMaterials] = await Promise.all([
+    getCoreListingImages(id),
     (row.owner_clerk_user_id as string)
       ? getProfilesByClerkIds([row.owner_clerk_user_id as string])
       : Promise.resolve({ data: [], error: null }),
-    getMaterialsByProjectIds([id]),
+    getCoreProjectMaterials(id),
   ]);
-  const { data: imageRows } = imageResult;
-  const listingImages = (imageRows ?? []).map((img) => ({
+  const listingImages = coreImages.map((img) => ({
     listing_id: img.listing_id,
     image_url: img.image_url,
     alt: img.alt,
     sort_order: img.sort_order,
   }));
-  const projectMaterials = materialsMap[id] ?? [];
+  const projectMaterials = coreMaterials.map((m) => ({
+    id: m.id,
+    display_name: m.display_name,
+    slug: m.slug,
+  }));
   const project = normalizeProject(row, listingImages, projectMaterials);
   // Carried through from the raw row: normalizeProject does not map it, and the
   // draft-preview guard on the detail route needs it to recognise owners whose
@@ -1458,8 +1500,10 @@ export async function getProjectCanonicalBySlugOrId(
     project.owner = null;
   }
 
-  // Hydrate taxonomy_slug_path for canonical URL generation
-  const tax = (await getPrimaryTaxonomy([id])).get(id);
+  // Hydrate taxonomy_slug_path for canonical URL generation.
+  // Via the shared core, so the detail loader's own taxonomy read on the same
+  // render is a memo hit rather than a second round trip.
+  const tax = await getPrimaryTaxonomyOne(id);
   project.taxonomy_slug_path = tax?.slugPath ?? null;
   project.taxonomy_label = tax?.rootLabel ?? null;
   project.taxonomy_type_label = tax?.typeLabel ?? null;
@@ -1491,24 +1535,35 @@ export async function getProductCanonicalBySlug(
   const row = await getProductListingBySlugOrId(slug);
   if (!row) return null;
   const id = String(row.id);
-  const [imageResult, usedCounts, materialMap, productRow] = await Promise.all([
-    getImagesByListingIds([id]),
+  // Images and materials via the request-scoped core, shared with the detail
+  // loader that runs a moment later on the same render.
+  const [coreImages, usedCounts, coreMaterials, productRow] = await Promise.all([
+    getCoreListingImages(id),
     getUsedInProjectsCountByProductIds([id]),
-    getMaterialsByProductIds([id]),
+    getCoreProductMaterials(id),
     supabase().from("products").select("documents").eq("id", id).maybeSingle(),
   ]);
   if (productRow?.data && "documents" in productRow.data) {
     (row as Record<string, unknown>).documents = productRow.data.documents;
   }
-  const imageRows = imageResult.data ?? [];
+  const imageRows = coreImages.map((img) => ({
+    listing_id: img.listing_id,
+    image_url: img.image_url,
+    alt: img.alt,
+    sort_order: img.sort_order,
+  }));
   const productImages = listingImagesToProductImageRows(id, imageRows);
-  const product = normalizeProduct(row, productImages, materialMap[id] ?? []);
+  const product = normalizeProduct(
+    row,
+    productImages,
+    coreMaterials.map((m) => ({ id: m.id, display_name: m.display_name, slug: m.slug }))
+  );
   const usedCount = usedCounts[id] ?? 0;
   product.usedInProjectsCount = usedCount;
   product.connectionCount += usedCount;
 
-  // Hydrate taxonomy_slug_path for canonical URL generation
-  const tax = (await getPrimaryTaxonomy([id])).get(id);
+  // Hydrate taxonomy_slug_path for canonical URL generation, via the core.
+  const tax = await getPrimaryTaxonomyOne(id);
   product.taxonomy_slug_path = tax?.slugPath ?? null;
   product.taxonomy_label = tax?.rootLabel ?? null;
   product.taxonomy_type_label = tax?.typeLabel ?? null;

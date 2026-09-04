@@ -27,6 +27,7 @@ import { setProjectProductsManualAction } from "@/app/actions/projectBrandsProdu
 import { notifySearchEngines } from "@/lib/seo/indexnow";
 import { normaliseInstagramHandle } from "@/lib/publish/instagram";
 import { replaceGallery } from "@/lib/db/listingGallery";
+import { prewarmHeroInBackground } from "@/lib/images/prewarmHero";
 
 const MIN_GALLERY_IMAGES = 3;
 
@@ -305,6 +306,9 @@ export async function createAdminProjectFull(
       .from("listings")
       .update({ cover_image_url: galleryItems[0].url })
       .eq("id", listingId);
+    // Only once the cover exists AND this is a real publish. A draft is not
+    // public, so warming it would encode an image nobody can request.
+    if (!isDraft) prewarmHeroInBackground(galleryItems[0].url);
   }
 
   // Match computation runs in background; cache invalidation happens after completion
@@ -568,6 +572,7 @@ export async function createAdminProductFull(
       .from("listings")
       .update({ cover_image_url: imageRows[0].image_url })
       .eq("id", listingId);
+    if (!isDraft) prewarmHeroInBackground(imageRows[0].image_url);
   }
 
   // Publish-flow columns. create_product_with_sidecar has no parameters for
@@ -1319,12 +1324,16 @@ export async function approveListingAction(listingId: string) {
   // and saves a second round trip.
   const { data: target, error: targetError } = await supabase
     .from("listings")
-    .select("slug, type")
+    .select("slug, type, cover_image_url")
     .eq("id", listingId)
     .maybeSingle();
   if (targetError) return { ok: false as const, error: targetError.message };
   if (!target) return { ok: false as const, error: "Listing not found" };
-  const approved = target as { slug: string | null; type: string | null };
+  const approved = target as {
+    slug: string | null;
+    type: string | null;
+    cover_image_url: string | null;
+  };
 
   if (approved.type === "product") {
     const { error: sidecarError } = await supabase
@@ -1342,6 +1351,15 @@ export async function approveListingAction(listingId: string) {
 
   const { error } = await supabase.from("listings").update({ status: "APPROVED" }).eq("id", listingId);
   if (error) return { ok: false as const, error: error.message };
+
+  /*
+   * Now that the row is genuinely public, ask our own optimiser for the hero
+   * variants a reader will request. Deliberately after the status write and
+   * deliberately not awaited: approving must not wait on image encoding, and
+   * must not fail if it fails. A draft that never reaches this line is never
+   * warmed, which is the intent — see prewarmHero.ts.
+   */
+  prewarmHeroInBackground(approved.cover_image_url);
   await createAuditLog({
     adminUserId: admin.adminUserId,
     action: "listing.approve",

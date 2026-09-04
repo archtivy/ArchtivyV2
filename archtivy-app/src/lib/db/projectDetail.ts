@@ -17,6 +17,11 @@ import { unstable_cache } from "next/cache";
 import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getHotspotsForListing, type ImageHotspot } from "@/lib/db/imageHotspots";
+import {
+  getCoreListingImages,
+  getCoreProjectMaterials,
+  getCoreTaxonomyRows,
+} from "@/lib/db/listingCore";
 
 export interface DetailTeamMember {
   id: string;
@@ -139,12 +144,9 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   if (!row) return null;
   const l = row as Record<string, unknown>;
 
-  const [imgRes, teamRes, prodLinkRes, docRes, taxRes, matLinkRes, hotspotsRes] = await Promise.all([
-    sup
-      .from("listing_images")
-      .select("id, image_url, alt, sort_order")
-      .eq("listing_id", listingId)
-      .order("sort_order", { ascending: true }),
+  const [coreImages, teamRes, prodLinkRes, docRes, coreTaxRows, coreMaterials, hotspotsRes] = await Promise.all([
+    // Shared with the canonical lookup on this same render — see listingCore.
+    getCoreListingImages(listingId),
     sup
       .from("listing_team_members")
       .select("id, display_name, title, profile_id, sort_order")
@@ -156,13 +158,11 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
       .select("id, file_name, file_url, sort_order")
       .eq("listing_id", listingId)
       .order("sort_order", { ascending: true }),
-    sup
-      .from("listing_taxonomy_node")
-      .select("is_primary, taxonomy_nodes:taxonomy_node_id(domain, slug_path, label)")
-      .eq("listing_id", listingId),
-    // Explicit two-step: project_material_links has no FK, so PostgREST cannot
-    // embed materials across it (see projectsDirectory.ts).
-    sup.from("project_material_links").select("material_id").eq("project_id", listingId),
+    getCoreTaxonomyRows(listingId),
+    // Explicit two-step inside the core helper: project_material_links has no
+    // FK, so PostgREST cannot embed materials across it (see
+    // projectsDirectory.ts). Shared with the canonical lookup.
+    getCoreProjectMaterials(listingId),
     // Public product pins, keyed by listing_image_id. Filtered to
     // verified/official inside getHotspotsForListing — see the note there on
     // why the service-role client makes that filter load-bearing rather than
@@ -206,17 +206,12 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   const _productIds = ((prodLinkRes.data ?? []) as { product_id: string }[]).map(
     (r) => r.product_id
   );
-  const _materialIds = ((matLinkRes.data ?? []) as { material_id: string }[]).map(
-    (r) => r.material_id
-  );
+  // Already resolved by the core helper; nothing further to fetch.
   const _pickOne = <T,>(v: T | T[] | null | undefined): T | null =>
     Array.isArray(v) ? v[0] ?? null : v ?? null;
   let _buildingTypeRoot: string | null = null;
-  for (const r of (taxRes.data ?? []) as unknown as {
-    is_primary: boolean;
-    taxonomy_nodes: { domain: string; slug_path: string } | { domain: string; slug_path: string }[] | null;
-  }[]) {
-    const n = _pickOne(r.taxonomy_nodes);
+  for (const r of coreTaxRows) {
+    const n = r.node;
     if (n && n.domain === "project" && (r.is_primary || !_buildingTypeRoot)) {
       _buildingTypeRoot = n.slug_path.split("/")[0];
     }
@@ -248,10 +243,6 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
           ]))()
       : null;
 
-  const pMaterials =
-    _materialIds.length > 0
-      ? (async () => sup.from("materials").select("name, slug").in("id", _materialIds))()
-      : null;
 
   const pSameType = _buildingTypeRoot
     ? (async () =>
@@ -301,7 +292,7 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
           .limit(8))()
     : null;
 
-  const images: ProjectDetail["images"] = ((imgRes.data ?? []) as { id: string; image_url: string; alt: string | null }[])
+  const images: ProjectDetail["images"] = coreImages
     .filter((i) => i.image_url)
     .map((i) => ({
       id: i.id,
@@ -456,11 +447,8 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   let buildingTypeSlugPath: string | null = null;
   let buildingTypeLabel: string | null = null;
   let styleLabel: string | null = null;
-  for (const r of (taxRes.data ?? []) as unknown as {
-    is_primary: boolean;
-    taxonomy_nodes: TaxNode | TaxNode[] | null;
-  }[]) {
-    const n = one(r.taxonomy_nodes);
+  for (const r of coreTaxRows) {
+    const n = r.node;
     if (!n) continue;
     if (n.domain === "project" && (r.is_primary || !buildingTypeRoot)) {
       buildingTypeRoot = n.slug_path.split("/")[0];
@@ -472,16 +460,10 @@ async function fetchProjectDetail(listingId: string): Promise<ProjectDetail | nu
   }
 
   // ── Materials ─────────────────────────────────────────────────────────────
-  const materialIds = ((matLinkRes.data ?? []) as { material_id: string }[]).map(
-    (r) => r.material_id
-  );
-  let materials: { name: string; slug: string | null }[] = [];
-  if (materialIds.length > 0) {
-    const { data: mats } = (await pMaterials) ?? { data: null };
-    materials = ((mats ?? []) as { name: string; slug: string | null }[])
-      .filter((m) => m.name)
-      .map((m) => ({ name: m.name, slug: m.slug ?? null }));
-  }
+  const materials: { name: string; slug: string | null }[] = coreMaterials.map((m) => ({
+    name: m.name,
+    slug: m.slug || null,
+  }));
 
   const ownerProf = l.owner_profile_id
     ? profiles.get(String(l.owner_profile_id))

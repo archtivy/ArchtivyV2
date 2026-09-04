@@ -46,6 +46,11 @@ import { getSupabaseServiceClient } from "@/lib/supabaseServer";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getHotspotsForListing, type ImageHotspot } from "@/lib/db/imageHotspots";
 import { documentFormat } from "@/lib/documents/format";
+import {
+  getCoreListingImages,
+  getCoreProductMaterials,
+  getCoreTaxonomyRows,
+} from "@/lib/db/listingCore";
 
 export interface ProductDetailDocument {
   id: string;
@@ -190,22 +195,16 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   const one = <T,>(v: T | T[] | null | undefined): T | null =>
     Array.isArray(v) ? v[0] ?? null : v ?? null;
 
-  const [imgRes, docRes, taxRes, matLinkRes, projLinkRes, sidecarRes, creditRes, hotspotsRes] = await Promise.all([
-    sup
-      .from("listing_images")
-      .select("id, image_url, alt, sort_order")
-      .eq("listing_id", listingId)
-      .order("sort_order", { ascending: true }),
+  const [coreImages, docRes, coreTaxRows, coreMaterials, projLinkRes, sidecarRes, creditRes, hotspotsRes] = await Promise.all([
+    // Shared with the canonical lookup on this same render — see listingCore.
+    getCoreListingImages(listingId),
     sup
       .from("listing_documents")
       .select("id, file_name, file_url, file_type, sort_order")
       .eq("listing_id", listingId)
       .order("sort_order", { ascending: true }),
-    sup
-      .from("listing_taxonomy_node")
-      .select("is_primary, taxonomy_nodes:taxonomy_node_id(id, domain, slug_path, label)")
-      .eq("listing_id", listingId),
-    sup.from("product_material_links").select("material_id").eq("product_id", listingId),
+    getCoreTaxonomyRows(listingId),
+    getCoreProductMaterials(listingId),
     sup.from("project_product_links").select("project_id").eq("product_id", listingId),
     // color_options lives on the products sidecar, NOT on listings — selecting
     // it off listings would 42703 and null the whole row.
@@ -234,9 +233,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
    * above already returned, and none reads another's result — yet each waited
    * for the previous one's round trip. Fired here, awaited unchanged below.
    */
-  const _materialIds = ((matLinkRes.data ?? []) as { material_id: string }[]).map(
-    (r) => r.material_id
-  );
+  // Materials are already resolved by the core helper — nothing to fire here.
   const _creditProfileIds = Array.from(
     new Set(
       ((creditRes.data ?? []) as { profile_id: string | null }[])
@@ -248,10 +245,6 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
     (r) => r.project_id
   );
 
-  const pMaterials =
-    _materialIds.length > 0
-      ? (async () => sup.from("materials").select("name").in("id", _materialIds))()
-      : null;
   const pCreditProfiles =
     _creditProfileIds.length > 0
       ? (async () => sup.from("profiles").select("id, username").in("id", _creditProfileIds))()
@@ -267,11 +260,7 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
             .is("deleted_at", null))()
       : null;
 
-  const images: ProductDetail["images"] = ((imgRes.data ?? []) as {
-    id: string;
-    image_url: string;
-    alt: string | null;
-  }[])
+  const images: ProductDetail["images"] = coreImages
     .filter((i) => i.image_url)
     .map((i) => ({ id: i.id, url: i.image_url, alt: i.alt, hotspots: hotspotsByImage[i.id] ?? undefined }));
   const cover = (l.cover_image_url as string | null) ?? null;
@@ -300,11 +289,8 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   let styleLabel: string | null = null;
   let primaryNodeId: string | null = null;
 
-  for (const r of (taxRes.data ?? []) as unknown as {
-    is_primary: boolean;
-    taxonomy_nodes: TaxNode | TaxNode[] | null;
-  }[]) {
-    const n = one(r.taxonomy_nodes);
+  for (const r of coreTaxRows) {
+    const n = r.node;
     if (!n) continue;
     if (n.domain === "product" && (r.is_primary || !categoryRoot)) {
       categoryRoot = n.slug_path.split("/")[0];
@@ -358,15 +344,8 @@ async function fetchProductDetail(listingId: string): Promise<ProductDetail | nu
   );
   if (typeDuplicatesCategory) typeLabel = null;
 
-  // Materials: explicit two-step, product_material_links has no FK.
-  const materialIds = ((matLinkRes.data ?? []) as { material_id: string }[]).map(
-    (r) => r.material_id
-  );
-  let materials: string[] = [];
-  if (materialIds.length > 0) {
-    const { data: mats } = (await pMaterials) ?? { data: null };
-    materials = ((mats ?? []) as { name: string }[]).map((m) => m.name).filter(Boolean);
-  }
+  // Materials: resolved by the core helper, shared with the canonical lookup.
+  const materials: string[] = coreMaterials.map((m) => m.name).filter(Boolean);
 
   // ── Design credits ───────────────────────────────────────────────────────
   // Two steps rather than a PostgREST embed: the credit rows are the source of
