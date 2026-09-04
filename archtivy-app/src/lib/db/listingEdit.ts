@@ -13,6 +13,7 @@ import {
 } from "@/lib/listings/mentionedProducts";
 import type { UploadedGalleryItem } from "@/lib/storage/types";
 import type { TeamMember } from "@/lib/types/listings";
+import { getDocumentsByListingId } from "@/lib/db/listingDocuments";
 
 /**
  * Loads a listing back into the shape the publish wizards accept, so editing
@@ -60,6 +61,17 @@ export interface ListingEditCommon {
   instagram: string;
   videoUrl: string;
   images: UploadedGalleryItem[];
+  /**
+   * Files already attached to this listing, so the edit form can SHOW them.
+   *
+   * The uploader only ever held newly-picked Files, so an author editing a
+   * listing with three documents already on it saw an empty box and no way to
+   * tell. Nothing was lost — both update paths append rather than replace —
+   * but the form implied otherwise, which is how a duplicate gets uploaded.
+   * Read-only here: removing a document is the Files surface's job, not the
+   * publish wizard's.
+   */
+  existingDocuments: { id: string; name: string; url: string }[];
   /** Primary taxonomy node id, or "" when unclassified. */
   taxonomyNodeId: string;
   /** Material taxonomy node ids (domain = "material"). */
@@ -137,12 +149,18 @@ export async function getListingForEdit(listingId: string): Promise<ListingEditD
   const listing = row as Record<string, unknown>;
   const type = str(listing.type) === "product" ? "product" : "project";
 
-  const [imagesRes, materialNodesRes, facetsRes, taxonomyRes] = await Promise.all([
+  const [imagesRes, materialNodesRes, facetsRes, taxonomyRes, documentsRes] = await Promise.all([
     getListingImagesWithIds(listingId),
     getListingMaterialNodeIds(listingId),
     getListingFacetValueIds(listingId),
     getListingTaxonomyNodes(listingId),
+    // Joins the existing fan-out rather than adding a round trip.
+    getDocumentsByListingId(listingId),
   ]);
+
+  const existingDocuments = (documentsRes.data ?? [])
+    .filter((d) => d.file_url)
+    .map((d) => ({ id: d.id, name: d.file_name ?? "Document", url: d.file_url as string }));
 
   const images: UploadedGalleryItem[] = (imagesRes.data ?? []).map((img) => ({
     path: storagePathFromUrl(img.image_url),
@@ -162,6 +180,7 @@ export async function getListingForEdit(listingId: string): Promise<ListingEditD
 
   const common: ListingEditCommon = {
     id: listingId,
+    existingDocuments,
     slug: str(listing.slug),
     status: str(listing.status) || "APPROVED",
     title: str(listing.title),

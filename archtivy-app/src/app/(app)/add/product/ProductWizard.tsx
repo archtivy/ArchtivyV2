@@ -104,6 +104,7 @@ export function ProductWizard({
   initial,
   initialStep,
   admin,
+  headerSlot,
 }: {
   categories: ProductTaxonomyOption[];
   materials: ProductMaterialOption[];
@@ -127,6 +128,8 @@ export function ProductWizard({
    * for it would undercut the point of naming the field.
    */
   initialStep?: number;
+  /** Rendered inside the workspace column, above the step header. */
+  headerSlot?: React.ReactNode;
   /**
    * Present only in /admin. Same convention as `initial` — the wizard is in
    * admin context because it was handed what only an admin has, so a mode flag
@@ -322,7 +325,6 @@ export function ProductWizard({
             }))
         )
       );
-      for (const f of documents) fd.append("documents", f);
     }
 
     // Author-facing now, so always submitted.
@@ -332,6 +334,18 @@ export function ProductWizard({
       "product_looking_for",
       JSON.stringify(collabStatus && collabStatus !== "not_open_for_collaboration" ? lookingFor : [])
     );
+    /*
+     * Documents post for EVERY author, not just admins.
+     *
+     * This append used to sit inside the `if (admin)` block above, alongside
+     * the uploader that was also admin-gated — so an owner could not attach a
+     * file, and the server was ready for one the whole time:
+     * createProject/createProduct and both update paths already read
+     * formData.getAll("documents") and call uploadListingDocumentsServer.
+     * Raw Files, unlike the gallery, which is uploaded client-side and posted
+     * as JSON.
+     */
+    for (const f of documents) fd.append("documents", f);
     return fd;
   }
 
@@ -401,7 +415,7 @@ export function ProductWizard({
     !taxonomyIncomplete;
 
   return (
-    <WizardFrame bare={Boolean(admin)}>
+    <WizardFrame bare={Boolean(admin)} headerSlot={headerSlot}>
       <header className="mb-10 flex flex-wrap items-end justify-between gap-4">
         {/* Suppressed in admin: AdminPage supplies the title and actions bar. */}
         {admin ? (
@@ -464,10 +478,45 @@ export function ProductWizard({
               {step === 0 && (
                 <div className="space-y-8">
                   <ImageDropzone items={images} onChange={setImages} />
-                  {admin && (
+                  {admin ? (
                     <AdminOnly label="Documents">
                       <DocumentsUploadCard files={documents} onChange={setDocuments} />
                     </AdminOnly>
+                  ) : (
+                    <section className="border-t border-hairline pt-8">
+                      <h3 className="font-body text-[14px] text-ink">Files and documents</h3>
+                      <p className="mt-1 max-w-[60ch] font-body text-[13px] text-muted">
+                        Optional. A spec sheet, drawing set, brochure or presentation — anything
+                        that is not a photograph. These appear as downloads, never in the gallery.
+                      </p>
+{/* Already attached. Read-only: removing one belongs to the Files
+                          surface, not to the publish wizard. */}
+                      {(initial?.existingDocuments?.length ?? 0) > 0 && (
+                        <ul className="mt-4 space-y-2">
+                          {initial!.existingDocuments.map((d) => (
+                            <li
+                              key={d.id}
+                              className="flex items-center justify-between gap-3 rounded-xl border border-hairline bg-cream px-4 py-2.5"
+                            >
+                              <span className="min-w-0 truncate font-body text-[13px] text-ink">
+                                {d.name}
+                              </span>
+                              <a
+                                href={d.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="shrink-0 font-body text-[12.5px] text-muted underline-offset-4 hover:text-ink hover:underline"
+                              >
+                                View
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <div className="mt-4">
+                        <DocumentsUploadCard files={documents} onChange={setDocuments} />
+                      </div>
+                    </section>
                   )}
                 </div>
               )}

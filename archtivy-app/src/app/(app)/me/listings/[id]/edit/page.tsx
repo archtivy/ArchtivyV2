@@ -81,25 +81,24 @@ export default async function EditListingPage({
       getWizardMemberTitles(),
     ]);
     return (
-      <>
-        {/* The wizard is shared with /add/product, where there is no listing to
-            publish yet — so the status control belongs to this route, above it,
-            rather than inside it. */}
-        <ListingStatusBar
-          listingId={listing.id}
-          status={listing.status}
-          title={listing.title?.trim() || "this listing"}
-        />
-        <ProductWizard
-          categories={categories}
-          materials={materials}
-          facets={facets}
-          memberTitles={productMemberTitles}
-          brandName={profile.display_name?.trim() || profile.username || null}
-          initial={listing}
-          initialStep={initialStep}
-        />
-      </>
+      <ProductWizard
+        /* Into the wizard's own workspace column via headerSlot — the create
+           routes pass nothing, so they are unchanged. */
+        headerSlot={
+          <ListingStatusBar
+            listingId={listing.id}
+            status={listing.status}
+            title={listing.title?.trim() || "this listing"}
+          />
+        }
+        categories={categories}
+        materials={materials}
+        facets={facets}
+        memberTitles={productMemberTitles}
+        brandName={profile.display_name?.trim() || profile.username || null}
+        initial={listing}
+        initialStep={initialStep}
+      />
     );
   }
 
@@ -111,21 +110,21 @@ export default async function EditListingPage({
     getWizardFacets("project"),
   ]);
   return (
-    <>
-      <ListingStatusBar
-        listingId={listing.id}
-        status={listing.status}
-        title={listing.title?.trim() || "this listing"}
-      />
-      <ProjectWizard
-        categories={categories}
-        materials={materials}
-        facets={facets}
-        products={products}
-        memberTitles={memberTitles}
-        initial={listing}
-        initialStep={initialStep}
-      />
-    </>
+    <ProjectWizard
+      headerSlot={
+        <ListingStatusBar
+          listingId={listing.id}
+          status={listing.status}
+          title={listing.title?.trim() || "this listing"}
+        />
+      }
+      categories={categories}
+      materials={materials}
+      facets={facets}
+      products={products}
+      memberTitles={memberTitles}
+      initial={listing}
+      initialStep={initialStep}
+    />
   );
 }

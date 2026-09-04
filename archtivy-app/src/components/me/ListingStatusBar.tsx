@@ -65,21 +65,16 @@ export function ListingStatusBar({
 
   return (
     /*
-     * ── THE WIZARD'S OWN COLUMN, NOT A NARROWER ONE ─────────────────────────
-     * Width, horizontal padding and top offset are copied from WizardFrame
-     * (add/wizard/WizardChrome.tsx) so this bar sits in exactly the workspace
-     * the wizard below occupies, at every breakpoint. Using max-w-content here
-     * would reintroduce, one element higher, the narrow column this change
-     * exists to remove.
+     * No width, no padding, no header offset of its own.
      *
-     * `pt-[104px]` clears the fixed HomeNav the wizard itself renders. The
-     * matching negative bottom margin cancels the wizard's own `pt-[104px]`,
-     * which would otherwise reappear as ~100px of dead space between this bar
-     * and the first step — the wizard is not modified, so its padding is
-     * absorbed here instead. `pb-6` then sets the real gap. Both numbers are
-     * tied to WizardFrame and are commented there and here for that reason.
+     * This used to carry the wizard's column classes plus `pt-[104px]` and a
+     * matching negative bottom margin, because it rendered ABOVE the wizard
+     * and therefore outside its cream, header-offset container — which put a
+     * white band under the global header and made the bar responsible for
+     * cancelling padding it did not own. It is passed to the wizard's
+     * `headerSlot` now, so it sits inside that column and simply inherits it.
      */
-    <div className="mx-auto w-full max-w-[1400px] px-5 pt-[104px] pb-6 -mb-[104px] md:px-10 lg:px-14">
+    <div className="mb-8">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-hairline bg-white px-4 py-3">
         <div className="flex items-center gap-2.5">
           <span

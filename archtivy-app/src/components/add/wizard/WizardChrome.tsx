@@ -31,18 +31,40 @@ import { HomeNav } from "@/components/home/HomeNav";
  */
 export function WizardFrame({
   bare = false,
+  headerSlot,
   children,
 }: {
   /** True inside AdminShell, which supplies its own chrome. */
   bare?: boolean;
+  /**
+   * Rendered at the top of the workspace column, above the step header.
+   *
+   * The edit route needs a publish/draft control that belongs to the same
+   * column as the wizard. Putting it above <WizardFrame> instead left it
+   * outside this cream, header-offset container — sitting on the bare page
+   * background, which is white, and needing its own copy of the `pt-[104px]`
+   * header clearance plus a negative margin to cancel this one. That produced
+   * the white band under the header. A slot inside the column removes the
+   * cause rather than hiding it: one background, one header offset, one
+   * measurement of the workspace.
+   */
+  headerSlot?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  if (bare) return <div className="font-body text-ink">{children}</div>;
+  if (bare) {
+    return (
+      <div className="font-body text-ink">
+        {headerSlot}
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-cream font-body text-ink">
       <HomeNav variant="solid" />
       <div className="mx-auto max-w-[1400px] px-5 pb-16 pt-[104px] md:px-10 lg:px-14">
+        {headerSlot}
         {children}
       </div>
     </div>
