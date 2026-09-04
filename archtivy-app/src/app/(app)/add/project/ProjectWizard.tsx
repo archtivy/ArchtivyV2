@@ -218,6 +218,13 @@ export function ProjectWizard({
   const [instagram, setInstagram] = useState(initial?.instagram ?? "");
   const [videoUrl, setVideoUrl] = useState(initial?.videoUrl ?? "");
   const [metaDescription, setMetaDescription] = useState(initial?.metaDescription ?? "");
+
+  /*
+   * Distinct products pinned to this listing's photos, reported by
+   * ProductsStep. Held here only so the step rail can tick — see the
+   * completion array below.
+   */
+  const [taggedCount, setTaggedCount] = useState(0);
   const [slug, setSlug] = useState(initial?.slug ?? "");
   // An existing listing's slug is fixed, so it counts as "touched" from the
   // start — otherwise the title-sync effect below would rewrite the live URL
@@ -277,7 +284,20 @@ export function ProjectWizard({
       images.length > 0,
       title.trim().length > 0 && description.trim().length > 0,
       team.length > 0,
-      productIds.length > 0,
+      /*
+       * Tagged photos, not the removed picker.
+       *
+       * This read `productIds.length > 0`, which was correct while "Used in
+       * this project" existed and wrong the moment it did not: an author could
+       * pin every product in every photo and the step stayed grey, because
+       * nothing filled the array any more. It counts pins now — the same
+       * publicly-visible ones the step itself lists — so the tick follows what
+       * the author actually did.
+       *
+       * Still optional. Nothing here blocks navigation or publishing; zero
+       * tags simply leaves the step unticked.
+       */
+      taggedCount > 0,
       materialIds.length > 0,
       location?.location_lat != null && location?.location_lng != null,
       Boolean(website || instagram || videoUrl),
@@ -611,6 +631,7 @@ export function ProjectWizard({
                   onChange={setProductIds}
                   listingId={initial?.id ?? draftId}
                   gallery={images}
+                  onTaggedCountChange={setTaggedCount}
                 />
               )}
 

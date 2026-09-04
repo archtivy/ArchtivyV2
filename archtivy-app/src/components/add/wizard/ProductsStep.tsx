@@ -45,6 +45,7 @@ export function ProductsStep({
   onChange,
   listingId,
   gallery,
+  onTaggedCountChange,
 }: {
   products: ProductsStepProduct[];
   /** Products marked "used in this project" — the manual links. */
@@ -54,6 +55,17 @@ export function ProductsStep({
   listingId: string | null;
   /** What the Images step currently holds, so a draft's rows can catch up. */
   gallery: { url: string; alt?: string }[];
+  /**
+   * How many distinct products are pinned to this listing's photos, reported
+   * upward whenever it changes.
+   *
+   * The wizard cannot compute this: pins live in product_tags and are loaded
+   * here, not in the parent. Rather than have the parent run its own query for
+   * a number this component already holds, the number is handed up — one
+   * value, derived from the same `taggedIds` the summary below renders, so
+   * there is no second source of truth about what is tagged.
+   */
+  onTaggedCountChange?: (count: number) => void;
 }) {
   const [images, setImages] = useState<ManagedImage[] | null>(null);
   const [taggable, setTaggable] = useState<TaggableProduct[]>([]);
@@ -98,6 +110,16 @@ export function ProductsStep({
     }
     return set;
   }, [images]);
+
+  /*
+   * Reported after every load, which is what makes the step's tick live: the
+   * pin editor calls `onChanged` after any successful mutation, `load` re-runs,
+   * `taggedIds` recomputes, and this fires — so placing the first pin ticks the
+   * step and removing the last one un-ticks it, with no page reload.
+   */
+  useEffect(() => {
+    onTaggedCountChange?.(taggedIds.size);
+  }, [taggedIds, onTaggedCountChange]);
 
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
