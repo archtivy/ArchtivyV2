@@ -136,7 +136,18 @@ export async function createProject(
   if (!description?.trim()) return { error: "Project description is required." };
   if (!location?.trim()) return { error: "Project location is required." };
   if (!taxonomyNodeId && !category?.trim()) return { error: "Project category is required." };
-  if (!year?.trim()) return { error: "Year is required." };
+  /*
+   * Year is OPTIONAL, and so is floor area.
+   *
+   * The wizard never marked either field required — no asterisk, and neither
+   * appears in the Information step's completion rule — but this line rejected
+   * the submission anyway, so a project without a year could be filled in
+   * completely and then refused at the last step with an error the form gave
+   * no warning about. A real project may genuinely not have one: unbuilt work,
+   * a competition entry, an ongoing build.
+   *
+   * The column is nullable and stays; nothing is removed from the form.
+   */
 
   // Derive legacy category from taxonomy node when taxonomy is primary but category is empty
   let resolvedCategory: string | null = category;

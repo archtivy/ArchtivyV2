@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Plus, Trash2, Check, X } from "lucide-react";
@@ -48,9 +48,17 @@ export function ProductPinEditor({
   products,
   tagsTableReady,
   onChanged,
+  initialImageId,
   emptyHint = "This listing has no images yet. Pins are placed on photos, so add images first.",
 }: {
   images: ManagedImage[];
+  /**
+   * Which photo to open on. Set by the tagging grid, which is a view onto the
+   * SAME editor rather than a second one: the caller says "start on this
+   * image" and everything below — placing, searching, existing pins, the
+   * image strip that moves between photos — is unchanged.
+   */
+  initialImageId?: string | null;
   products: TaggableProduct[];
   tagsTableReady: boolean;
   /** Called after any successful mutation so the host can reload its own data. */
@@ -58,7 +66,13 @@ export function ProductPinEditor({
   emptyHint?: string;
 }) {
   const [pending, startTransition] = useTransition();
-  const [activeId, setActiveId] = useState(images[0]?.id ?? null);
+  const [activeId, setActiveId] = useState(initialImageId ?? images[0]?.id ?? null);
+
+  // Follow the caller when it names a different photo — reopening the grid on
+  // a new image must move the canvas, not just remount around a stale id.
+  useEffect(() => {
+    if (initialImageId) setActiveId(initialImageId);
+  }, [initialImageId]);
   const [placing, setPlacing] = useState<{ x: number; y: number } | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);

@@ -74,10 +74,11 @@ export default async function EditListingPage({
   if (!owns) notFound();
 
   if (listing.type === "product") {
-    const [categories, materials, facets] = await Promise.all([
+    const [categories, materials, facets, productMemberTitles] = await Promise.all([
       getWizardTaxonomyNodes("product"),
       getWizardMaterials(),
       getWizardFacets("product"),
+      getWizardMemberTitles(),
     ]);
     return (
       <>
@@ -93,6 +94,7 @@ export default async function EditListingPage({
           categories={categories}
           materials={materials}
           facets={facets}
+          memberTitles={productMemberTitles}
           brandName={profile.display_name?.trim() || profile.username || null}
           initial={listing}
           initialStep={initialStep}

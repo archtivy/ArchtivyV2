@@ -24,7 +24,6 @@ import {
   OwnerField,
   AdminOnly,
   PickerStep,
-  SeoStep,
   PublishStep,
   type TeamMemberDraft,
   type MemberTitleOption,
@@ -94,7 +93,6 @@ const STEP_LABELS = [
   "Materials",
   "Location",
   "Links",
-  "SEO & Settings",
   "Preview & Publish",
 ] as const;
 
@@ -283,7 +281,6 @@ export function ProjectWizard({
       materialIds.length > 0,
       location?.location_lat != null && location?.location_lng != null,
       Boolean(website || instagram || videoUrl),
-      seo.checks.find((c) => c.id === "meta")?.passed ?? false,
       false,
     ][i],
   }));
@@ -679,25 +676,8 @@ export function ProjectWizard({
                 </Card>
               )}
 
-              {step === 7 && (
-                <SeoStep
-                  slug={slug}
-                  onSlug={(v) => { setSlugTouched(true); setSlug(slugify(v)); }}
-                  metaDescription={metaDescription}
-                  onMeta={setMetaDescription}
-                  seo={seo}
-                  /* Locked when editing: the slug is the live URL and
-                     updateProjectCanonical never changes it. */
-                  slugReadOnly={isEdit}
-                  note={
-                    isEdit
-                      ? "The URL is fixed once a project exists — changing it would break every link already pointing here."
-                      : undefined
-                  }
-                />
-              )}
 
-              {step === 7 && (
+              {step === 1 && (
                 <div className="mt-8 space-y-5 rounded-2xl border border-hairline bg-cream p-6 sm:p-8">
                   <div>
                     <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
@@ -772,7 +752,7 @@ export function ProjectWizard({
                 </div>
               )}
 
-              {step === 8 && (
+              {step === 7 && (
                 <PublishStep
                   seo={seo}
                   canPublish={canPublish}

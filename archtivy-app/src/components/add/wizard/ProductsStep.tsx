@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { PickerStep } from "@/components/add/wizard/WizardPrimitives";
-import { ProductPinEditor } from "@/components/listing/ProductPinEditor";
+import { PhotoTaggingGrid } from "@/components/add/wizard/PhotoTaggingGrid";
 import { getListingTaggingData } from "@/app/actions/productTags";
 import { syncDraftGallery } from "@/app/actions/listingDrafts";
 import { PUBLIC_STATUSES, type ManagedImage, type TaggableProduct } from "@/lib/db/productTags";
@@ -120,28 +119,20 @@ export function ProductsStep({
 
   return (
     <div className="space-y-10">
-      <section>
-        <h3 className="font-body text-[14px] text-ink">Used in this project</h3>
-        <p className="mt-1 max-w-[60ch] font-body text-[13px] text-muted">
-          Everything specified for the build. A product belongs here whether or not it is
-          visible in a photo.
-        </p>
-        <div className="mt-4">
-          <PickerStep
-            kind="product"
-            options={products.map((p) => ({
-              id: p.id,
-              label: p.title,
-              sub: p.brand,
-              cover: p.cover,
-            }))}
-            selected={selectedIds}
-            onChange={onChange}
-            placeholder="Search products by name or brand…"
-            emptyHint="No products added yet."
-          />
-        </div>
-      </section>
+      {/*
+        ── ONE WAY TO ASSOCIATE A PRODUCT, NOT TWO ──────────────────────────
+        A separate "Used in this project" picker used to sit here, listing
+        products whether or not they appeared in a photo. It asked the author
+        to say the same thing twice: pin the sofa to the photograph, then find
+        it again in a search box. Pinning already records the association, and
+        it records WHERE, so the picker was the weaker half of a duplicate.
+
+        Nothing is deleted. `selectedIds` still arrives from the listing and is
+        still submitted unchanged, so links created before this — and any an
+        admin adds — survive an owner's edit and keep rendering on the public
+        page exactly as they did. This removes a way to ENTER the data, not the
+        data or the column behind it.
+      */}
 
       <section>
         <h3 className="font-body text-[14px] text-ink">Tagged in your photos</h3>
@@ -165,12 +156,11 @@ export function ProductsStep({
               Loading your photos…
             </p>
           ) : (
-            <ProductPinEditor
+            <PhotoTaggingGrid
               images={images}
               products={taggable}
               tagsTableReady={tagsTableReady}
               onChanged={load}
-              emptyHint="Your photos are still saving. Give it a moment, then reload this step."
             />
           )}
         </div>

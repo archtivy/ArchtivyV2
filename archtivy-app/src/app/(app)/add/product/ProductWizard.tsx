@@ -20,8 +20,8 @@ import {
   OwnerField,
   AdminOnly,
   TeamStep,
+  type MemberTitleOption,
   PickerStep,
-  SeoStep,
   PublishStep,
   type TeamMemberDraft,
 } from "@/components/add/wizard/WizardPrimitives";
@@ -83,7 +83,6 @@ const STEP_LABELS = [
   "Details",
   "Materials",
   "Links",
-  "SEO & Settings",
   "Preview & Publish",
 ] as const;
 
@@ -101,6 +100,7 @@ export function ProductWizard({
   materials,
   facets,
   brandName,
+  memberTitles = [],
   initial,
   initialStep,
   admin,
@@ -110,6 +110,12 @@ export function ProductWizard({
   /** Every facet the product domain declares — see FacetPicker. */
   facets: FacetForPicker[];
   brandName: string | null;
+  /**
+   * Role suggestions for the Credits step. Optional and empty by default so
+   * every existing call site keeps working — free-text names have always been
+   * accepted, and the list only offers suggestions.
+   */
+  memberTitles?: MemberTitleOption[];
   /**
    * Present only when editing. Its absence is what makes this a create form —
    * there is no separate `mode` prop to keep in sync with it.
@@ -239,7 +245,6 @@ export function ProductWizard({
       Boolean(taxonomyNodeId) || facetValueIds.length > 0,
       materialIds.length > 0,
       Boolean(website || instagram || videoUrl),
-      seo.checks.find((c) => c.id === "meta")?.passed ?? false,
       false,
     ][i],
   }));
@@ -550,15 +555,36 @@ export function ProductWizard({
                 </Card>
               )}
 
-              {step === 2 && admin && (
+              {/*
+                Credits, for everybody — not just admins.
+
+                The step, the draft shape and the write path were already here
+                and already used by the admin form; `listing_team_members`
+                carries 52 rows against product listings today, so this is the
+                existing relationship model being exposed rather than a new
+                one. Admins keep the AdminOnly framing they had; an owner sees
+                the same control without it.
+              */}
+              {step === 2 && (
                 <div className="mt-8">
-                  <AdminOnly label="Credits">
-                    <TeamStep
-                      team={team}
-                      setTeam={setTeam}
-                      titles={admin.memberTitles ?? []}
-                    />
-                  </AdminOnly>
+                  {admin ? (
+                    <AdminOnly label="Credits">
+                      <TeamStep team={team} setTeam={setTeam} titles={memberTitles} />
+                    </AdminOnly>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
+                          Credits
+                        </p>
+                        <p className="mt-1.5 max-w-[52ch] font-body text-[13px] leading-[19px] text-muted">
+                          Optional. Credit the designer, studio or maker behind this product.
+                          Typing a name that is already on Archtivy links their profile.
+                        </p>
+                      </div>
+                      <TeamStep team={team} setTeam={setTeam} titles={memberTitles} />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -615,31 +641,8 @@ export function ProductWizard({
                 </Card>
               )}
 
-              {step === 5 && (
-                <SeoStep
-                  slug={slug}
-                  onSlug={(v) => {
-                    setSlugTouched(true);
-                    setSlug(slugify(v));
-                  }}
-                  metaDescription={metaDescription}
-                  onMeta={setMetaDescription}
-                  seo={seo}
-                  slugPrefix="/products/"
-                  /* The slug is shown but not editable when editing: it is
-                     the live URL, and updateProductCanonical deliberately
-                     never changes it. An editable field that silently
-                     discards its own input is worse than a locked one. */
-                  slugReadOnly={isEdit}
-                  note={
-                    isEdit
-                      ? "The URL is fixed once a product exists — changing it would break every link already pointing here."
-                      : "Products have no location of their own, so that check stays unticked — it doesn’t stop you publishing."
-                  }
-                />
-              )}
 
-              {step === 5 && (
+              {step === 1 && (
                 <div className="mt-8 space-y-5 rounded-2xl border border-hairline bg-cream p-6 sm:p-8">
                   <div>
                     <p className="font-body text-[12px] uppercase tracking-[0.14em] text-muted">
@@ -713,7 +716,7 @@ export function ProductWizard({
                 </div>
               )}
 
-              {step === 6 && (
+              {step === 5 && (
                 <PublishStep
                   seo={seo}
                   canPublish={canPublish}

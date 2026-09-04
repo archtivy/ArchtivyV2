@@ -3,8 +3,12 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getProfileByClerkId } from "@/lib/db/profiles";
 // Shared with the edit route — see lib/publish/wizardReferenceData.
-import { getWizardTaxonomyNodes,
-  getWizardFacets, getWizardMaterials } from "@/lib/publish/wizardReferenceData";
+import {
+  getWizardTaxonomyNodes,
+  getWizardFacets,
+  getWizardMaterials,
+  getWizardMemberTitles,
+} from "@/lib/publish/wizardReferenceData";
 import { ProductWizard } from "./ProductWizard";
 
 export const dynamic = "force-dynamic";
@@ -37,11 +41,10 @@ export default async function AddProductPage() {
   // wizard directly and publish a live product.
   if (profile.role === "reader") redirect("/me/settings");
 
-  const [categories, materials,
-    facets,
-  ] = await Promise.all([
+  const [categories, materials, memberTitles, facets] = await Promise.all([
     getWizardTaxonomyNodes("product"),
     getWizardMaterials(),
+    getWizardMemberTitles(),
     getWizardFacets("product"),
   ]);
 
@@ -52,6 +55,7 @@ export default async function AddProductPage() {
       materials={materials}
       // The brand is the submitting profile — there is nothing to choose, so it
       // is shown as confirmed context rather than asked for.
+      memberTitles={memberTitles}
       brandName={profile.display_name?.trim() || profile.username || null}
     />
   );
