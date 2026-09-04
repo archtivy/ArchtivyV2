@@ -110,12 +110,28 @@ export async function ProductDetailView({
   product: ProductCanonical;
   canonicalPath: string;
 }) {
-  const detail = await getProductDetail(product.id);
+  /*
+   * ── TWO INDEPENDENT FETCHES, RUN TOGETHER ─────────────────────────────────
+   * Both take nothing but `product.id`, and neither reads the other's result,
+   * yet they used to run one after the other: `getOftenSpecifiedWith` waited
+   * for the whole of `getProductDetail` before issuing its first query.
+   * Measured on /products/.../otoo-chair against a production build, cold:
+   * getProductDetail 937ms / 19 queries, then getOftenSpecifiedWith 433ms /
+   * 6 queries. The second was pure added latency on the critical path.
+   *
+   * The queries themselves are not slow — every one of them executes in under
+   * a millisecond in Postgres. What costs is the round trip, so the fix is to
+   * overlap them rather than to touch any query.
+   *
+   * `oftenSpecifiedWith` is now computed even on the 404 path where `detail`
+   * is null. That is a few wasted queries on a page nobody sees, which is a
+   * better trade than half a second on every page somebody does.
+   */
+  const [detail, oftenSpecifiedWith] = await Promise.all([
+    getProductDetail(product.id),
+    getOftenSpecifiedWith(product.id),
+  ]);
   if (!detail) return null;
-
-  // Fetched here rather than passed in: this component already owns its own
-  // data fetching, and the module is self-suppressing when it finds nothing.
-  const oftenSpecifiedWith = await getOftenSpecifiedWith(product.id);
 
   /*
    * The related rail is deduplicated against the two rows above it before the
