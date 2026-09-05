@@ -50,7 +50,10 @@ export function ProjectHeaderActions({
   }
 
   return (
-  <div className="flex shrink-0 items-center gap-2">
+  /* flex-wrap so a narrow phone drops More onto a second line rather than
+     pushing the row past the viewport; nothing wraps at the widths where the
+     row shares a line with the breadcrumb. */
+  <div className="flex shrink-0 flex-wrap items-center gap-2">
     <button
       type="button"
       onClick={share}

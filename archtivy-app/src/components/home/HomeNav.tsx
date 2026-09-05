@@ -196,7 +196,10 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
           too many. Tab order and the accessibility tree follow the visible
           state, never the stack.
         */}
-        <div className="relative mx-4 min-w-0 flex-1 md:mx-8 lg:mx-12">
+        {/* Below md this holds nothing — the search field is in row two — so its
+            side margins are 32px of dead width on the row that can least afford
+            it. They start at md, where the field is actually here. */}
+        <div className="relative min-w-0 flex-1 md:mx-8 lg:mx-12">
           {/* State 1. lg and up only — five links have never fitted a phone. */}
           <nav
             aria-label="Primary"
@@ -246,7 +249,7 @@ export function HomeNav({ variant = "overlay" }: { variant?: "overlay" | "solid"
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 md:gap-3">
           {/* Signed out: unchanged — the "For Professionals" CTA is the whole
               point of the logged-out header and stays exactly as it was. */}
           {showGuestCta && (

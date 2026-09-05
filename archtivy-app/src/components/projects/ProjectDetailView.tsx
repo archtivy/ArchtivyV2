@@ -236,11 +236,19 @@ export async function ProjectDetailView({
       <HomeNav variant="solid" />
 
       <div className={`mx-auto max-w-content px-4 ${HEADER_CLEARANCE} md:px-12 lg:px-24`}>
-        {/* Breadcrumb and actions share the top line. The actions used to sit
-            under the title as three bordered buttons, where they outweighed
-            the project name; up here they frame the header instead of
-            competing with it. */}
-        <div className="mb-6 flex items-start justify-between gap-4">
+        {/* Breadcrumb and actions share the top line — from md up.
+            The actions used to sit under the title as three bordered buttons,
+            where they outweighed the project name; up here they frame the
+            header instead of competing with it.
+
+            ── BUT NOT ON A PHONE ──────────────────────────────────────────
+            On one line at 390px the breadcrumb wrapped to two lines and ran
+            straight into Share / Save / More, which are `shrink-0` and so gave
+            up no width — the trail read "Residential / House" underneath the
+            buttons that were sitting on top of it. Below md they are two rows
+            instead: the breadcrumb gets the full width and may wrap as far as
+            it likes, and the actions sit beneath it on their own line. */}
+        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <nav aria-label="Breadcrumb" className="min-w-0 font-body text-[12px] text-muted">
           <Link href="/" className="hover:text-ink">
             Home

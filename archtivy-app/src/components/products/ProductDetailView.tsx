@@ -225,26 +225,6 @@ export async function ProductDetailView({
       <HomeNav variant="solid" />
 
       <div className={`mx-auto max-w-content px-4 ${HEADER_CLEARANCE} md:px-12 lg:px-24`}>
-        <nav aria-label="Breadcrumb" className="mb-6 font-body text-[12px] text-muted">
-          <Link href="/" className="hover:text-ink">
-            Home
-          </Link>
-          <span className="px-2">/</span>
-          <Link href="/products" className="hover:text-ink">
-            Products
-          </Link>
-          {detail.categoryLabel && detail.categoryRoot && (
-            <>
-              <span className="px-2">/</span>
-              <Link href={`/products/${detail.categoryRoot}`} className="hover:text-ink">
-                {detail.categoryLabel}
-              </Link>
-            </>
-          )}
-          <span className="px-2">/</span>
-          <span className="text-ink">{detail.title}</span>
-        </nav>
-
         {/* Two items per row on desktop, both rows sharing one 12-column grid:
             gallery + product information, then tabs + brand card. Keeping them
             in a single grid rather than two stacked flex rows means the tabs
@@ -253,7 +233,7 @@ export async function ProductDetailView({
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-start lg:gap-8">
           {/* ── Gallery ─────────────────────────────────────────────────
               Column 1, row 1. */}
-          <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:col-span-7">
+          <div className="min-w-0 lg:col-start-1 lg:row-start-2 lg:col-span-7">
             {/* ── The gallery, and the lightbox it opens ────────────────
                 Every value is already resolved for this page; the lightbox
                 adds no query. Each sidebar row is self-omitting, so a product
@@ -276,6 +256,42 @@ export async function ProductDetailView({
             />
           </div>
 
+          {/* ── Breadcrumb ───────────────────────────────────────────────
+              Row 1 across all twelve columns on desktop, which is exactly
+              where it has always sat — above the gallery, full width.
+
+              It is a GRID CHILD rather than a block above the grid so that a
+              phone can put it somewhere else without a second copy of it. The
+              mobile grid is one column, so DOM order is the rendered order:
+              the gallery and its thumbnail rail come first, then this, then
+              the brand, title and actions. Above the hero it was the first
+              thing on the page, four links of 12px type between the header
+              and the product — clutter ahead of the photograph the visitor
+              came for. There is one nav element either way, so screen readers
+              and the breadcrumb JSON-LD see no duplicate. */}
+          <nav
+            aria-label="Breadcrumb"
+            className="font-body text-[12px] text-muted max-lg:-my-3 lg:col-start-1 lg:col-span-12 lg:row-start-1 lg:-mb-2"
+          >
+            <Link href="/" className="hover:text-ink">
+              Home
+            </Link>
+            <span className="px-2">/</span>
+            <Link href="/products" className="hover:text-ink">
+              Products
+            </Link>
+            {detail.categoryLabel && detail.categoryRoot && (
+              <>
+                <span className="px-2">/</span>
+                <Link href={`/products/${detail.categoryRoot}`} className="hover:text-ink">
+                  {detail.categoryLabel}
+                </Link>
+              </>
+            )}
+            <span className="px-2">/</span>
+            <span className="text-ink">{detail.title}</span>
+          </nav>
+
           {/* ── Right column: one sticky unit ─────────────────────────────
               Title, actions, specification and the brand card are a single
               sticky block, so the information you decide on stays in view
@@ -296,7 +312,7 @@ export async function ProductDetailView({
               permanently below the fold with no way to reach them; capping it
               to the remaining viewport height lets it scroll internally in
               that case, and does nothing at all when it fits. */}
-          <div className="min-w-0 lg:sticky lg:top-[88px] lg:col-start-8 lg:row-start-1 lg:col-span-5 lg:row-span-2 lg:max-h-[calc(100vh-104px)] lg:overflow-y-auto">
+          <div className="min-w-0 lg:sticky lg:top-[88px] lg:col-start-8 lg:row-start-2 lg:col-span-5 lg:row-span-2 lg:max-h-[calc(100vh-104px)] lg:overflow-y-auto">
             <div>
               {/* Brand line. No verification checkmark: no verification flag
                   exists on any table, and brand claim_status is 'unclaimed'
@@ -493,7 +509,7 @@ export async function ProductDetailView({
               content. A seven-column track keeps the About panel's 68ch
               measure filling its column instead of reading as a narrow island
               in a full-width field. */}
-          <div className="min-w-0 lg:col-start-1 lg:row-start-2 lg:col-span-7">
+          <div className="min-w-0 lg:col-start-1 lg:row-start-3 lg:col-span-7">
             <ProductAbout product={detail} />
             <ProductCollaborationSection
               product_collaboration_status={detail.collaborationStatus}

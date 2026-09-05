@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useMobilePanelPosition } from "@/lib/hooks/useMobilePanelPosition";
 import Link from "next/link";
 import { useUser, useClerk } from "@clerk/nextjs";
 import {
@@ -72,6 +73,9 @@ export function HeaderProfileMenu({ onDark }: { onDark: boolean }) {
   const { signOut } = useClerk();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  /* Same viewport-anchored treatment as the Create menu and the notification
+     panel — one hook, not a third copy. See useMobilePanelPosition. */
+  const mobilePos = useMobilePanelPosition(ref, open);
 
   useEffect(() => {
     if (!open) return;
@@ -139,7 +143,13 @@ export function HeaderProfileMenu({ onDark }: { onDark: boolean }) {
         <div
           role="menu"
           aria-label="Account"
-          className="absolute right-0 top-full z-[100] mt-2 w-[248px] overflow-hidden rounded-2xl border border-hairline bg-cream shadow-[0_12px_40px_rgba(22,22,22,0.12)]"
+          /*
+            Phones: fixed between two 16px gutters, so the account panel cannot
+            overhang either edge even when its trigger is the last control in a
+            crowded bar. md and up: the original anchored 248px dropdown.
+          */
+          className="fixed left-4 right-4 z-[100] overflow-y-auto overscroll-contain rounded-2xl border border-hairline bg-cream shadow-[0_12px_40px_rgba(22,22,22,0.12)] md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:w-[248px] md:overflow-hidden"
+          style={mobilePos ? { top: mobilePos.top, maxHeight: mobilePos.maxHeight } : undefined}
         >
           <div className="border-b border-hairline px-4 py-3">
             <p className="truncate font-body text-[14px] font-medium text-ink">
