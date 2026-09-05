@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useMobilePanelPosition } from "@/lib/hooks/useMobilePanelPosition";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
@@ -38,6 +39,11 @@ export function HomeNavCreateButton({ onDark = false }: { onDark?: boolean }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+
+  /* Phones position this against the viewport instead of the trigger — see
+     useMobilePanelPosition. Undefined at md and up, where the `md:` classes
+     below keep the anchored dropdown exactly as it was. */
+  const mobilePos = useMobilePanelPosition(triggerRef, open);
 
   const close = useCallback(
     (returnFocus = false) => {
@@ -108,9 +114,14 @@ export function HomeNavCreateButton({ onDark = false }: { onDark?: boolean }) {
         <div
           role="menu"
           aria-label="Create"
-          // Right-aligned to the button: it sits at the right end of the
-          // header, where a left-aligned panel would run off the viewport.
-          className="absolute right-0 top-[calc(100%+8px)] z-50 w-[296px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-hairline bg-cream shadow-lg"
+          /*
+            Phones: fixed between two 16px gutters, so the width is whatever
+            the viewport allows and neither edge can overhang. `top` comes from
+            the trigger's measured bottom. md and up: the original anchored
+            dropdown, right-aligned to the button at its fixed 296px.
+          */
+          className="fixed left-4 right-4 z-50 overflow-y-auto overscroll-contain rounded-xl border border-hairline bg-cream shadow-lg md:absolute md:left-auto md:right-0 md:top-[calc(100%+8px)] md:w-[296px] md:overflow-hidden"
+          style={mobilePos ? { top: mobilePos.top, maxHeight: mobilePos.maxHeight } : undefined}
         >
           <p className="border-b border-hairline px-4 py-2.5 font-body text-[11px] uppercase tracking-[0.12em] text-muted">
             Create

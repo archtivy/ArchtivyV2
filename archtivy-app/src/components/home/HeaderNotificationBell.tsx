@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useMobilePanelPosition } from "@/lib/hooks/useMobilePanelPosition";
 import Link from "next/link";
 import { Bell, Settings, ArrowRight, ChevronRight } from "lucide-react";
 import type { NotificationWithActor } from "@/lib/db/notifications";
@@ -97,6 +98,10 @@ export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  /* Phones position this against the viewport instead of the bell — see
+     useMobilePanelPosition. `ref` wraps the button and the panel, but the panel
+     is out of flow when fixed, so its bottom is still the button's bottom. */
+  const mobilePos = useMobilePanelPosition(ref, open);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,10 +204,18 @@ export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-full z-[100] mt-3 w-[min(440px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-[0_16px_48px_rgba(0,0,0,0.14)]"
+          /*
+            Phones: fixed between two 16px gutters — width follows the viewport
+            and neither edge can overhang. `top` and `maxHeight` are measured
+            from the bell and the viewport, so a long list scrolls inside the
+            panel rather than running off the bottom of a short screen. md and
+            up: the original anchored 440px dropdown, unchanged.
+          */
+          className="fixed left-4 right-4 z-[100] flex flex-col overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-[0_16px_48px_rgba(0,0,0,0.14)] md:absolute md:left-auto md:right-0 md:top-full md:mt-3 md:w-[440px]"
+          style={mobilePos ? { top: mobilePos.top, maxHeight: mobilePos.maxHeight } : undefined}
         >
           {/* Header */}
-          <div className="flex items-center justify-between gap-3 px-5 pb-3 pt-4">
+          <div className="flex shrink-0 items-center justify-between gap-3 px-5 pb-3 pt-4">
             <h2 className="font-body text-[17px] font-semibold tracking-[-0.01em] text-ink">
               Notifications
             </h2>
@@ -227,7 +240,7 @@ export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
 
           {/* Underline tabs */}
           <div
-            className="flex items-center gap-6 border-b border-black/[0.07] px-5"
+            className="flex shrink-0 items-center gap-6 border-b border-black/[0.07] px-5"
             role="tablist"
             aria-label="Notification categories"
           >
@@ -258,7 +271,7 @@ export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
           </div>
 
           {/* List */}
-          <div className="max-h-[420px] overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain md:max-h-[420px] md:flex-none">
             {loading ? (
               <div className="space-y-4 p-5">
                 {[0, 1, 2].map((i) => (
@@ -354,7 +367,7 @@ export function HeaderNotificationBell({ onDark }: { onDark: boolean }) {
           </div>
 
           {/* Footer button */}
-          <div className="p-3">
+          <div className="shrink-0 p-3">
             <Link
               href="/me/notifications"
               onClick={() => setOpen(false)}

@@ -7,6 +7,8 @@ import { Crown, Menu, X } from "lucide-react";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { HeaderNotificationBell } from "@/components/home/HeaderNotificationBell";
 import { HeaderProfileMenu } from "@/components/home/HeaderProfileMenu";
+import { HomeNavCreateButton } from "@/components/home/HomeNavCreateButton";
+import { usePublisherRole } from "@/lib/hooks/usePublisherRole";
 import { ME_NAV, isWorkspaceRoute } from "@/components/me/MeWorkspaceNav";
 
 /**
@@ -44,6 +46,11 @@ export function MeWorkspaceShell({
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  /* Same gate the public header uses: the create affordance appears for
+     publisher roles only, because a reader who clicks it reaches a wizard that
+     refuses the submission. Before the early return — it is a hook. */
+  const { canPublish } = usePublisherRole();
+
   if (!isWorkspaceRoute(pathname)) return <>{children}</>;
 
   return (
@@ -75,34 +82,86 @@ export function MeWorkspaceShell({
 
       <div className="lg:pl-[256px]">
         {/* ── TOP BAR ──────────────────────────────────────────────────────
-            Search, notifications and the account menu are the platform's own
-            components, not workspace copies of them. GlobalSearch is the same
-            field the public header mounts — the workspace previously used the
-            legacy zinc HeaderSearch, which was the last piece of the old
-            palette on this bar. */}
-        <header className="sticky top-0 z-30 flex h-[72px] items-center gap-3 border-b border-hairline bg-cream px-4 sm:px-6">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            aria-label="Open navigation"
-            className="-ml-1 rounded p-2 text-muted transition-colors hover:text-ink lg:hidden"
-          >
-            <Menu strokeWidth={1.5} className="h-5 w-5" />
-          </button>
+            Search, notifications, create and the account menu are the
+            platform's own components, not workspace copies of them.
+            GlobalSearch is the same field the public header mounts — the
+            workspace previously used the legacy zinc HeaderSearch, which was
+            the last piece of the old palette on this bar.
 
-          <div className="hidden min-w-0 flex-1 justify-center md:flex">
-            <div className="flex w-full max-w-[520px]">
-              <GlobalSearch size="inline" />
+            ── TWO ROWS BELOW md, ONE ABOVE ────────────────────────────────
+            This bar is the mobile header on five signed-in routes, and it did
+            not look like the one every other page shows: no wordmark, no
+            create button, and — because the search was `hidden md:flex` with a
+            spacer standing in for it — no search at all on a phone. It is the
+            same two-row shape as HomeNav now: the bar, then a full-width
+            search row that disappears at md, where the search returns to the
+            centre of row one exactly as before.
+
+            The wordmark and the burger are the chrome that stands in for the
+            hidden sidebar, so both are `lg:hidden` and both leave at the width
+            where the rail returns and supplies its own wordmark. Desktop is
+            untouched: at lg this is the identical single 72px row it was. */}
+        <header className="sticky top-0 z-30 border-b border-hairline bg-cream">
+          <div className="flex h-[72px] items-center gap-3 px-4 sm:px-6">
+            <Link
+              href="/"
+              className="shrink-0 font-display text-[22px] font-medium leading-none tracking-tight text-ink lg:hidden"
+            >
+              archtivy
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open navigation"
+              className="rounded p-2 text-muted transition-colors hover:text-ink lg:hidden"
+            >
+              <Menu strokeWidth={1.5} className="h-5 w-5" />
+            </button>
+
+            <div className="hidden min-w-0 flex-1 justify-center md:flex">
+              <div className="flex w-full max-w-[520px]">
+                <GlobalSearch size="inline" />
+              </div>
+            </div>
+            <div className="flex-1 md:hidden" />
+
+            {/* Create sits before the bell and the account menu, which is
+                where HomeNav puts it — same order, same spacing, same distance
+                from the right edge, so this bar and the public one behave
+                identically rather than diverging.
+
+                KNOWN, MEASURED: below ~420px that shared panel is right-
+                anchored to a trigger which is not the rightmost control, so it
+                runs off the LEFT edge (28px clipped at 390, 41px at 375). The
+                notification panel has the same defect at every phone width
+                (50px), and that one predates this file — it measures identical
+                before and after this change. Both live in the shared
+                components, and fixing them alters the public header too. */}
+            <div className="flex shrink-0 items-center gap-1">
+              {canPublish && (
+                <div className="lg:hidden">
+                  <HomeNavCreateButton onDark={false} />
+                </div>
+              )}
+              <HeaderNotificationBell onDark={false} />
+              <HeaderProfileMenu onDark={false} />
             </div>
           </div>
-          <div className="flex-1 md:hidden" />
 
-          <div className="flex shrink-0 items-center gap-1">
-            <HeaderNotificationBell onDark={false} />
-            <HeaderProfileMenu onDark={false} />
+          {/* Row two: the same GlobalSearch, full width, phones only. */}
+          <div className="flex h-14 items-center border-t border-hairline px-4 sm:px-6 md:hidden">
+            <GlobalSearch size="inline" />
           </div>
         </header>
 
+        {/* No HEADER_CLEARANCE here, deliberately. Those constants exist for
+            the fixed HomeNav, which is out of flow and so has to have its
+            height reserved by every page under it. This bar is `sticky`: it
+            occupies its own space, and growing it by a row pushes the content
+            down on its own. `pt-6` is the content's top margin, not clearance
+            for a header — importing a clearance token would double the gap on
+            mobile by exactly the height of the new search row. */}
         <main className="px-4 pb-16 pt-6 sm:px-6 lg:px-8">{children}</main>
       </div>
     </div>
